@@ -36,28 +36,8 @@ BewlyBewly 是一个用于 BiliBili 的浏览器扩展，旨在通过重新设�
 
 ## ⬇️ 安装
 
-### 在线安装
-
-> [!TIP]
-> 即使在 Edge 浏览器中，我们也强烈建议您使用 Chrome 应用商店进行安装。在审核速度上，Chrome > 应用商店的审核速度比 Edge 应用商店快得多。
->
-> 此外，BewlyBewly 的 Chrome Web Store 版本将更快地解决和修复关键性错误。
-
-> [!IMPORTANT]
-> 如果你的电脑无法访问 Chrome Web Store，你可以尝试去 crx 搜搜下载：<https://www.crxsoso.com/webstore/detail/bbbiejemhfihiooipfcjmjmbfdmobobp>
->
-> 但与此项目在 Chrome Web Store 是否一致且未经修改不太能保证，但是经过测试是正常的，使用时请慎重，出现任何后果本项目概不负责
-
-- Chrome: <https://chromewebstore.google.com/detail/bewlybewly/bbbiejemhfihiooipfcjmjmbfdmobobp>
-- Edge: <https://chromewebstore.google.com/detail/bewlybewly/bbbiejemhfihiooipfcjmjmbfdmobobp>
-- Firefox: <https://addons.mozilla.org/zh-CN/firefox/addon/bewlybewly/>
-
-#### 对于 Firefox 用户
-
-> [!WARNING]
-> 使用 Firefox 浏览器时，请记得启用下面图片中显示的所有权限，以正常使用 BewlyBewly
-
-<br/> <img width="655" alt="enable all bewlybewly permissions on firefox" src="https://github.com/hakadao/BewlyBewly/assets/33394391/9566aed8-040a-4435-a2ec-c61117f8e429">
+> [!NOTE]
+> 本项目不再通过浏览器扩展商店分发，请从 [Releases](https://github.com/Dynesshely/BewlyBewly/releases) 下载 `extension.zip` 或自行本地构建。
 
 ### 本地安装
 

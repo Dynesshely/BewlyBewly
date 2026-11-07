@@ -19,7 +19,9 @@ async function stubIndexHtml() {
     await fs.ensureDir(r(
       isFirefox
         ? `extension-firefox/dist/${view}`
-        : isSafari ? `extension-safari/dist/${view}` : `extension/dist/${view}`,
+        : isSafari
+          ? `extension-safari/dist/${view}`
+          : `extension/dist/${view}`,
     ))
     let data = await fs.readFile(r(`src/${view}/index.html`), 'utf-8')
     data = data
@@ -28,7 +30,9 @@ async function stubIndexHtml() {
     await fs.writeFile(r(
       isFirefox
         ? `extension-firefox/dist/${view}/index.html`
-        : isSafari ? `extension-safari/dist/${view}/index.html` : `extension/dist/${view}/index.html`,
+        : isSafari
+          ? `extension-safari/dist/${view}/index.html`
+          : `extension/dist/${view}/index.html`,
     ), data, 'utf-8')
     log('PRE', `stub ${view}`)
   }
@@ -38,8 +42,12 @@ function writeManifest() {
   execSync('npx esno ./scripts/manifest.ts', { stdio: 'inherit' })
 }
 
-fs.ensureDirSync(r(isFirefox ? 'extension-firefox' : isSafari ? 'extension-safari' : 'extension'))
-fs.copySync(r('assets'), r(isFirefox ? 'extension-firefox/assets' : isSafari ? 'extension-safari/assets' : 'extension/assets'))
+fs.ensureDirSync(r(isFirefox
+  ? 'extension-firefox'
+  : isSafari ? 'extension-safari' : 'extension'))
+fs.copySync(r('assets'), r(isFirefox
+  ? 'extension-firefox/assets'
+  : isSafari ? 'extension-safari/assets' : 'extension/assets'))
 writeManifest()
 
 if (isDev) {
@@ -48,7 +56,10 @@ if (isDev) {
     .on('change', () => {
       stubIndexHtml()
     })
-  chokidar.watch([r('src/manifest.ts'), r('package.json')])
+  chokidar.watch([
+    r('src/manifest.ts'),
+    r('package.json'),
+  ])
     .on('change', () => {
       writeManifest()
     })

@@ -1,0 +1,33 @@
+name: Bilibili DOM Probe
+
+# 每天定时探测 B 站线上 DOM 结构，尽早发现上游改版导致的选择器失效。
+on:
+  schedule:
+    # 每天 UTC 01:00（北京时间 09:00）
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: |
+            - args: [--frozen-lockfile]
+
+      - name: Install Edge for Playwright
+        run: pnpm exec playwright install --with-deps msedge
+
+      - name: Run online DOM probe
+        run: pnpm run test:e2e:online

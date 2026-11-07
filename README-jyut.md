@@ -36,23 +36,8 @@ BewlyBewly 係一個用於 BiliBili 嘅瀏覽器延伸功能，目的係透過�
 
 ## ⬇️ 單撈
 
-### 線上單嘢
-
-> [!TIP]
-> 即使你用嘅係 Edge browser，我哋都係建議你喺返 Chrome 線上應用程式商店單撈。事關喺審核速度上，Chrome 線上應用程式商店照計係快過 Edge 的附加元件好鬼死多。~~Edge Add-ons 收皮啦屌~~
->
-> 仲有，BewlyBewly 喺 Chrome 線上應用程式商店嘅版本執啲嚴重性嘅 bug 速度係會快趣過 Edge 附加元件好多嘅 ~~Edge Add-ons 你幾時死~~
-
-- Chrome: <https://chromewebstore.google.com/detail/bewlybewly/bbbiejemhfihiooipfcjmjmbfdmobobp>
-- Edge: <https://chromewebstore.google.com/detail/bewlybewly/bbbiejemhfihiooipfcjmjmbfdmobobp>
-- Firefox: <https://addons.mozilla.org/zh-TW/firefox/addon/bewlybewly/>
-
-#### Firefox 用家留意吓
-
-> [!WARNING]
-> 用 Firefox 瀏覽器嗰陣，爲咗你正常使用 BewlyBewly，記得開晒下邊圖片展示嘅權限
-
-<br/> <img width="655" alt="enable all bewlybewly permissions on firefox" src="https://github.com/hakadao/BewlyBewly/assets/33394391/9566aed8-040a-4435-a2ec-c61117f8e429">
+> [!NOTE]
+> 呢個 project 唔再經瀏覽器擴充商店發佈，請去 [Releases](https://github.com/Dynesshely/BewlyBewly/releases) 下載 `extension.zip` 或者自己本地 build。
 
 ### 離線單嘢
 

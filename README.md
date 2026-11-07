@@ -39,24 +39,8 @@ Without this template, it may not be possible to develop this project.
 
 ## ⬇️ Installation
 
-### Online Installation
-
-> [!TIP]
-> Even in the Edge browser, we strongly recommend you install it in the Chrome web store.
-> In terms of review speed, the Chrome web store is faster than Edge Add-ons.
->
-> Additionally, the Chrome Web Store version of BewlyBewly will address and fix critical bugs more quickly.
-
-- Chrome: <https://chromewebstore.google.com/detail/bewlybewly/bbbiejemhfihiooipfcjmjmbfdmobobp>
-- Edge: <https://chromewebstore.google.com/detail/bewlybewly/bbbiejemhfihiooipfcjmjmbfdmobobp>
-- Firefox: <https://addons.mozilla.org/en-US/firefox/addon/bewlybewly/>
-
-#### To Firefox users
-
-> [!WARNING]
-> When using the Firefox browser, remember to enable all permissions shown in the picture below for normal use of BewlyBewly
-
-<br/> <img width="655" alt="enable all bewlybewly permissions on firefox" src="https://github.com/hakadao/BewlyBewly/assets/33394391/9566aed8-040a-4435-a2ec-c61117f8e429">
+> [!NOTE]
+> This project is no longer distributed through browser extension stores. Please download `extension.zip` from [Releases](https://github.com/Dynesshely/BewlyBewly/releases) or build it locally.
 
 ### Local Installation
 

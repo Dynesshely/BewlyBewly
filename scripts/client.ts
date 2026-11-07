@@ -8,7 +8,9 @@ import type { ViteHotContext } from 'vite/types/hot'
 console.debug('[vite] connecting...')
 
 // use server configuration, then fallback to inference
-const socketProtocol = location.protocol === 'https:' ? 'wss' : 'ws'
+const socketProtocol = location.protocol === 'https:'
+  ? 'wss'
+  : 'ws'
 const socketHost = 'localhost:3303'
 const base = '/'
 const messageBuffer: string[] = []
@@ -101,7 +103,9 @@ async function handleMessage(payload: HMRPayload) {
             cleanUrl(e.href).includes(searchUrl),
           )
           if (el) {
-            const newPath = `${base}${searchUrl.slice(1)}${searchUrl.includes('?') ? '&' : '?'}t=${timestamp}`
+            const newPath = `${base}${searchUrl.slice(1)}${searchUrl.includes('?')
+              ? '&'
+              : '?'}t=${timestamp}`
             el.href = new URL(newPath, el.href).href
           }
           console.log(`[vite] css hot updated: ${searchUrl}`)
@@ -210,7 +214,7 @@ async function waitForSuccessfulPing(ms = 1000) {
       await fetch(`${location.protocol}//${socketHost}`)
       break
     }
-    catch (e) {
+    catch {
       // wait ms before attempting to ping again
       await new Promise(resolve => setTimeout(resolve, ms))
     }
@@ -224,7 +228,7 @@ const supportsConstructedSheet = (() => {
   // try {
   //   new CSSStyleSheet()
   //   return true
-  // } catch (e) {}
+  // } catch {}
   return false
 })()
 
@@ -328,7 +332,9 @@ async function fetchUpdate({ path, acceptedPath, timestamp }: Update) {
       try {
         const newMod = await import(
           /* @vite-ignore */
-          normalizeScriptUrl(`${base + path.slice(1)}.js${query ? `_${query}` : ''}`, timestamp)
+          normalizeScriptUrl(`${base + path.slice(1)}.js${query
+            ? `_${query}`
+            : ''}`, timestamp),
         )
         moduleMap.set(dep, newMod)
       }
@@ -341,7 +347,9 @@ async function fetchUpdate({ path, acceptedPath, timestamp }: Update) {
   return () => {
     for (const { deps, fn } of qualifiedCallbacks) fn(deps.map(dep => moduleMap.get(dep)))
 
-    const loggedPath = isSelfUpdate ? path : `${acceptedPath} via ${path}`
+    const loggedPath = isSelfUpdate
+      ? path
+      : `${acceptedPath} via ${path}`
     console.log(`[vite] hot updated: ${loggedPath}`)
   }
 }
@@ -481,5 +489,7 @@ export function injectQuery(url: string, queryToInject: string): string {
   const pathname = url.replace(/#.*$/, '').replace(/\?.*$/, '')
   const { search, hash } = new URL(url, 'http://vitejs.dev')
 
-  return `${pathname}?${queryToInject}${search ? `&${search.slice(1)}` : ''}${hash || ''}`
+  return `${pathname}?${queryToInject}${search
+    ? `&${search.slice(1)}`
+    : ''}${hash || ''}`
 }

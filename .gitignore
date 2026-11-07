@@ -16,3 +16,5 @@ extension-safari/
 node_modules
 web-ext-profile
 extension-safari-macos/
+test-results/
+playwright-report/

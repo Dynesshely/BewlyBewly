@@ -3,6 +3,8 @@ import { settings } from '~/logic'
 import emitter from '~/utils/mitt'
 
 const CARD_SELECTOR = '[data-video-card]'
+// B 站原生页面（搜索页、原生首页模式）的卡片选择器
+const NATIVE_CARD_SELECTOR = '.bili-video-card'
 const ACTIVE_ATTR = 'data-keyboard-active'
 const WHEEL_THRESHOLD = 55
 const NAV_STATE_KEY = 'bewly-keyboard-nav-state'
@@ -31,7 +33,11 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
   let shadowRootEl: ShadowRoot | null = null
 
   function getCards(): HTMLElement[] {
-    return Array.from(shadowRootEl?.querySelectorAll<HTMLElement>(CARD_SELECTOR) ?? [])
+    const bewlyCards = Array.from(shadowRootEl?.querySelectorAll<HTMLElement>(CARD_SELECTOR) ?? [])
+    if (bewlyCards.length)
+      return bewlyCards
+    // 搜索页等原生页面：回退到 B 站原生卡片
+    return Array.from(document.querySelectorAll<HTMLElement>(NATIVE_CARD_SELECTOR))
   }
 
   function findActiveIndex(cards: HTMLElement[]): number {
@@ -201,9 +207,23 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
       ? current
       : activeIndex
     const url = cards[index]?.dataset.videoUrl
+      || cards[index]?.querySelector<HTMLAnchorElement>('a[href*="/video/"]')?.href
     if (!url)
       return
     window.open(url, target)
+  }
+
+  /** 打开当前卡片右键菜单（原生卡片 / Bewly 卡片均尽力触发） */
+  function openContextMenu(card: HTMLElement | undefined) {
+    if (!card)
+      return
+    const rect = card.getBoundingClientRect()
+    card.dispatchEvent(new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + 20,
+      clientY: rect.top + 20,
+    }))
   }
 
   function handleKeydown(event: KeyboardEvent) {
@@ -272,6 +292,10 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
       case '/':
         event.preventDefault()
         focusSearchBar()
+        break
+      case 'd':
+        event.preventDefault()
+        openContextMenu(cards[base])
         break
       case '?':
         event.preventDefault()

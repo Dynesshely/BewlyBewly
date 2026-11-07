@@ -90,6 +90,12 @@ function handleRemoveCustomWallpaper() {
 
 <template>
   <SettingsItemGroup :title="$t('settings.group_wallpaper')">
+    <SettingsItem v-if="isGlobal" :title="$t('settings.wallpaper_auto_switch')">
+      <template #desc>
+        <span>{{ $t('settings.wallpaper_auto_switch_desc') }}</span>
+      </template>
+      <Radio v-model="settings.wallpaperAutoSwitch" />
+    </SettingsItem>
     <SettingsItem v-if="!isGlobal" :title="$t('settings.individually_set_search_page_wallpaper')">
       <template #desc>
         <span color="$bew-warning-color">{{ $t('common.performance_impact_warn') }}</span>

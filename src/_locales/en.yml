@@ -90,6 +90,8 @@ settings:
   group_sidebar_desc: Located on the right or left side of pages other than the homepage, typically includes a light/dark mode toggle button and settings button.
   group_color: Color
   group_wallpaper: Wallpaper
+  wallpaper_auto_switch: Auto-rotate built-in wallpapers
+  wallpaper_auto_switch_desc: Change to a different built-in wallpaper every day
   group_logo: LOGO
   group_search_bar: Search Bar
   group_recommendation_mode: |-

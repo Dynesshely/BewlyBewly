@@ -6,6 +6,8 @@ export interface Video {
   durationStr?: string
   title: string
   desc?: string
+  /** 推荐原因（B 站推荐接口返回的 rcmd_reason.content） */
+  reason?: string
   cover: string
 
   /** `author` for individual submissions by UP; `authorList` for collaborative submissions by UP */

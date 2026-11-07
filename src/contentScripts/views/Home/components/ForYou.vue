@@ -424,6 +424,7 @@ defineExpose({ initData })
             duration: video.item.duration,
             title: video.item.title,
             cover: video.item.pic,
+            reason: video.item.rcmd_reason?.content,
             author: {
               name: video.item.owner.name,
               authorFace: video.item.owner.face,

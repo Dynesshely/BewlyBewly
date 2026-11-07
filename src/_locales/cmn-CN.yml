@@ -90,6 +90,8 @@ settings:
   group_sidebar_desc: 位于主页以外的页面右侧或左侧，通常有亮/暗模式切换按钮和设置按钮。
   group_color: 颜色
   group_wallpaper: 背景图片
+  wallpaper_auto_switch: 自动轮换内置壁纸
+  wallpaper_auto_switch_desc: 每天自动切换一张内置壁纸
   group_logo: LOGO
   group_search_bar: 搜索栏
   group_recommendation_mode: “个性推荐” 推荐模式

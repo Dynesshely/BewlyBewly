@@ -90,6 +90,8 @@ settings:
   group_sidebar_desc: 喺主頁以外嘅頁面嘅右邊或左邊，通常有淺/深色模式切換掣同設定掣。
   group_color: 顏色
   group_wallpaper: 背景圖片
+  wallpaper_auto_switch: 自動輪換內置背景
+  wallpaper_auto_switch_desc: 每日自動切換一張內置背景
   group_logo: LOGO
   group_search_bar: 搜尋欄
   group_recommendation_mode: 「估你心水」推介模式

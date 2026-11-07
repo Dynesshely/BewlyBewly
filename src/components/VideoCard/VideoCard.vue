@@ -443,6 +443,9 @@ provide('getVideoType', () => props.type!)
                     {{ video.title }}
                   </a>
                 </h3>
+                <div v-if="video.reason" class="video-reason" text="$bew-text-3 xs" mt-1 line-clamp-1>
+                  {{ video.reason }}
+                </div>
 
                 <div
                   v-if="moreBtn"

@@ -2,6 +2,7 @@
 import { useDebounceFn } from '@vueuse/core'
 
 import { useDark } from '~/composables/useDark'
+import { WALLPAPERS } from '~/constants/imgs'
 import { AppPage } from '~/enums/appEnums'
 import { settings } from '~/logic'
 import { useMainStore } from '~/stores/mainStore'
@@ -11,6 +12,15 @@ const props = defineProps<{ activatedPage: AppPage }>()
 
 const { isDark } = useDark()
 const { getActivatedCover } = useMainStore()
+
+/** 自动轮换时按天从内置壁纸中挑选，否则使用用户设置的壁纸 */
+const resolvedWallpaper = computed((): string => {
+  if (settings.value.wallpaperAutoSwitch && settings.value.wallpaperMode === 'buildIn' && WALLPAPERS.length) {
+    const dayIndex = Math.floor(Date.now() / 86_400_000)
+    return WALLPAPERS[dayIndex % WALLPAPERS.length].url
+  }
+  return settings.value.wallpaper
+})
 
 const currentActivatedCover = ref<string>('')
 const isBlurredCoverLoaded = ref<boolean>(false)
@@ -122,7 +132,7 @@ function setAppWallpaperMaskingOpacity() {
       <div v-else>
         <!-- background -->
         <div
-          :style="{ backgroundImage: `url('${settings.wallpaper}')` }"
+          :style="{ backgroundImage: `url('${resolvedWallpaper}')` }"
           pos="absolute top-0 left-0" w-full h-full duration-300 bg="cover center $bew-homepage-bg"
           z--1 transform-gpu
         />

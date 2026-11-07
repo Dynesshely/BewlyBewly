@@ -63,6 +63,8 @@ export interface Settings {
   useLinearGradientThemeColorBackground: boolean
   wallpaperMode: 'buildIn' | 'byUrl'
   wallpaper: string
+  /** 自动轮换内置壁纸（每天一张） */
+  wallpaperAutoSwitch: boolean
   enableWallpaperMasking: boolean
   wallpaperMaskOpacity: number
   wallpaperBlurIntensity: number
@@ -169,6 +171,7 @@ export const originalSettings: Settings = {
   useLinearGradientThemeColorBackground: false,
   wallpaperMode: 'buildIn',
   wallpaper: '',
+  wallpaperAutoSwitch: false,
   enableWallpaperMasking: false,
   wallpaperMaskOpacity: 80,
   wallpaperBlurIntensity: 0,
@@ -223,11 +226,15 @@ export const settings = useStorageLocal<Settings>('settings', ref<Settings>(orig
 export type GridLayoutType = 'adaptive' | 'twoColumns' | 'oneColumn'
 
 export interface GridLayout {
+  /** 全局默认布局（旧字段，作为未单独设置 Tab 的兜底） */
   home: GridLayoutType
+  /** 各首页 Tab 单独记忆的布局 */
+  byTab?: Record<string, GridLayoutType>
 }
 
 export const gridLayout = useStorageLocal<GridLayout>('gridLayout', ref<GridLayout>({
   home: 'adaptive',
+  byTab: {},
 }), { mergeDefaults: true })
 
 export const sidePanel = useStorageLocal<{

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { GridLayoutIcon } from './types'
 
+import type { GridLayoutType } from '~/logic'
 import type { HomeTab } from '~/stores/mainStore'
 import { useThrottleFn } from '@vueuse/core'
 import { useBewlyApp } from '~/composables/useAppProvider'
@@ -30,6 +31,16 @@ const tabContentLoading = ref<boolean>(false)
 const currentTabs = ref<HomeTab[]>([])
 const tabPageRef = ref()
 const topBarVisibility = ref<boolean>(false)
+/** 当前 Tab 的布局（未单独设置时回退到全局默认） */
+const currentLayout = computed((): GridLayoutType => gridLayout.value.byTab?.[activatedPage.value] ?? gridLayout.value.home)
+
+function setCurrentLayout(value: GridLayoutType) {
+  gridLayout.value.byTab = {
+    ...(gridLayout.value.byTab ?? {}),
+    [activatedPage.value]: value,
+  }
+}
+
 const gridLayoutIcons = computed((): GridLayoutIcon[] => {
   return [
     { icon: 'i-mingcute:table-3-line', iconActivated: 'i-mingcute:table-3-fill', value: 'adaptive' },
@@ -254,14 +265,14 @@ function toggleTabContentLoading(loading: boolean) {
         >
           <div
             v-for="icon in gridLayoutIcons" :key="icon.value"
-            :class="{ 'grid-layout-item-activated': gridLayout.home === icon.value }"
+            :class="{ 'grid-layout-item-activated': currentLayout === icon.value }"
             flex="~ justify-center items-center"
             h-full aspect-square text="$bew-text-2 hover:$bew-text-1"
             rounded-full bg="hover:$bew-fill-2" duration-300
             cursor-pointer
-            @click="gridLayout.home = icon.value"
+            @click="setCurrentLayout(icon.value)"
           >
-            <div :class="gridLayout.home === icon.value ? icon.iconActivated : icon.icon" text-base />
+            <div :class="currentLayout === icon.value ? icon.iconActivated : icon.icon" text-base />
           </div>
         </div>
       </header>
@@ -271,7 +282,7 @@ function toggleTabContentLoading(loading: boolean) {
           <Component
             :is="pages[activatedPage]" :key="activatedPage"
             ref="tabPageRef"
-            :grid-layout="gridLayout.home"
+            :grid-layout="currentLayout"
             :top-bar-visibility="topBarVisibility"
             @before-loading="toggleTabContentLoading(true)"
             @after-loading="toggleTabContentLoading(false)"

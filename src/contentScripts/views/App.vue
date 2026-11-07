@@ -177,13 +177,12 @@ onMounted(() => {
   }
   // document.documentElement.style.setProperty('font-size', '14px')
 
-  document.addEventListener('scroll', () => {
-    if (window.scrollY > 0)
-      reachTop.value = false
-    else
-      reachTop.value = true
-  })
+  document.addEventListener('scroll', handleWindowScroll)
 })
+
+function handleWindowScroll() {
+  reachTop.value = window.scrollY <= 0
+}
 
 function handleDockItemClick(dockItem: DockItem) {
   // Opening in a new tab while still on the current tab doesn't require changing the `activatedPage`
@@ -350,6 +349,11 @@ provide<BewlyAppProvider>('BEWLY_APP', {
   handleReachBottom,
   openIframeDrawer,
   haveScrollbar,
+})
+onUnmounted(() => {
+  document.removeEventListener('scroll', handleWindowScroll)
+  reachBottomObserver?.disconnect()
+  reachBottomObserver = null
 })
 </script>
 

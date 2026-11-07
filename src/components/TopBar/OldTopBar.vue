@@ -299,16 +299,24 @@ onMounted(() => {
   })
 })
 
+let unreadPollTimer: ReturnType<typeof setInterval> | null = null
+
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
   emitter.off(OVERLAY_SCROLL_BAR_SCROLL)
+  if (unreadPollTimer) {
+    clearInterval(unreadPollTimer)
+    unreadPollTimer = null
+  }
 })
 
 async function initData() {
   await getUserInfo()
 
+  if (unreadPollTimer)
+    clearInterval(unreadPollTimer)
   // automatically update notifications and moments count
-  setInterval(() => {
+  unreadPollTimer = setInterval(() => {
     getUnreadMessageCount()
     getTopBarNewMomentsCount()
   }, updateInterval)

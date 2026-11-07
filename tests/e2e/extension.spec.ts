@@ -13,7 +13,7 @@ test.describe('扩展挂载冒烟测试', () => {
 
   test('在 B 站首页 fixture 上挂载 #bewly', async () => {
     const context = await chromium.launchPersistentContext('', {
-      channel: 'msedge',
+      channel: 'chromium',
       headless: true,
       args: [
         `--disable-extensions-except=${EXTENSION_DIR}`,

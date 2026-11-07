@@ -1,5 +1,13 @@
 import type { API_COLLECTION } from '~/background/messageListeners/api'
 
+/** B 站接口通用响应结构；具体 data 类型由各调用处按接口断言 */
+export interface APIResult<T = any> {
+  code: number
+  message: string
+  data?: T
+  [key: string]: any
+}
+
 type CamelCase<S extends string> = S extends `${infer P1}_${infer P2}${infer P3}`
   ? `${Lowercase<P1>}${Uppercase<P2>}${CamelCase<P3>}`
   : Lowercase<S>

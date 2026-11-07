@@ -55,7 +55,7 @@ async function getAllWatchLaterList() {
   isLoading.value = true
   currentWatchLaterList.value.length = 0
   try {
-    const res: WatchLaterResult = await api.watchlater.getAllWatchLaterList()
+    const res = await api.watchlater.getAllWatchLaterList() as WatchLaterResult
     if (res.code === 0) {
       allWatchLaterList.value = res.data.list
       watchLaterCount.value = allWatchLaterList.value.length

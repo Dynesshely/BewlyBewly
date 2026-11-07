@@ -1,8 +1,10 @@
 import { onMounted, onUnmounted } from 'vue'
+import { settings } from '~/logic'
 
 const CARD_SELECTOR = '[data-video-card]'
 const ACTIVE_ATTR = 'data-keyboard-active'
 const WHEEL_THRESHOLD = 55
+const NAV_STATE_KEY = 'bewly-keyboard-nav-state'
 
 /**
  * 首页视频卡片的键盘 / 滚轮导航。
@@ -73,10 +75,14 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
 
   function applyActive(cards: HTMLElement[], index: number) {
     cards.forEach((card, i) => {
-      if (i === index)
+      if (i === index) {
         card.setAttribute(ACTIVE_ATTR, '')
-      else
+        card.setAttribute('aria-current', 'true')
+      }
+      else {
         card.removeAttribute(ACTIVE_ATTR)
+        card.removeAttribute('aria-current')
+      }
     })
   }
 
@@ -249,7 +255,37 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
     return event.deltaY
   }
 
+  /** 页面正常滚动时，让高亮跟随视口内第一张卡片（不触发滚动跟随） */
+  function followActiveToViewport() {
+    const instance = getInstance()
+    const cards = getCards()
+    if (!instance || !cards.length)
+      return
+    try {
+      const vpRect = instance.elements().viewport.getBoundingClientRect()
+      const visible = cards.find((card) => {
+        const rect = card.getBoundingClientRect()
+        return rect.bottom > vpRect.top + 96 && rect.top < vpRect.bottom - 32
+      })
+      if (!visible)
+        return
+      const index = cards.indexOf(visible)
+      if (index >= 0 && index !== findActiveIndex(cards)) {
+        activeIndex = index
+        applyActive(cards, index)
+      }
+    }
+    catch {
+      // ignore
+    }
+  }
+
   function handleWheel(event: WheelEvent) {
+    // 模式二：不接管滚轮，页面正常滚动，高亮跟随视口内卡片
+    if (!settings.value.keyboardNavLockScroll) {
+      requestAnimationFrame(followActiveToViewport)
+      return
+    }
     if (hasOpenModal() || isEditableTarget(event.target))
       return
 
@@ -278,11 +314,60 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
     setActive(base + direction)
   }
 
+  function saveNavigationState() {
+    try {
+      const cards = getCards()
+      const instance = getInstance()
+      const active = cards.findIndex(card => card.hasAttribute(ACTIVE_ATTR))
+      const url = active >= 0
+        ? cards[active].getAttribute('data-video-url')
+        : null
+      sessionStorage.setItem(NAV_STATE_KEY, JSON.stringify({
+        scrollTop: instance?.elements().viewport.scrollTop ?? 0,
+        url,
+      }))
+    }
+    catch {
+      // ignore
+    }
+  }
+
+  function restoreNavigationState() {
+    try {
+      const raw = sessionStorage.getItem(NAV_STATE_KEY)
+      if (!raw)
+        return
+      const state = JSON.parse(raw) as { scrollTop?: number, url?: string | null }
+      const cards = getCards()
+      if (!cards.length)
+        return
+      const index = state.url
+        ? cards.findIndex(card => card.getAttribute('data-video-url') === state.url)
+        : -1
+      if (index >= 0) {
+        activeIndex = index
+        applyActive(cards, index)
+        scrollCardIntoView(cards[index])
+        return
+      }
+      const instance = getInstance()
+      if (instance && state.scrollTop)
+        instance.elements().viewport.scrollTop = state.scrollTop
+    }
+    catch {
+      // ignore
+    }
+  }
+
   onMounted(() => {
     shadowRootEl = document.querySelector('#bewly')?.shadowRoot ?? null
     window.addEventListener('keydown', handleKeydown)
+    window.addEventListener('pagehide', saveNavigationState)
     // capture 阶段接管，先于 OverlayScrollbars 内部的 wheel 处理
     document.addEventListener('wheel', handleWheel, { capture: true, passive: false })
+    // 从播放页返回后恢复滚动位置与高亮卡片
+    setTimeout(restoreNavigationState, 600)
+    setTimeout(restoreNavigationState, 1500)
 
     if (shadowRootEl) {
       observer = new MutationObserver(() => ensureActive())
@@ -293,6 +378,7 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
 
   onUnmounted(() => {
     window.removeEventListener('keydown', handleKeydown)
+    window.removeEventListener('pagehide', saveNavigationState)
     document.removeEventListener('wheel', handleWheel, { capture: true })
     observer?.disconnect()
     shadowRootEl?.querySelectorAll(ACTIVE_ATTR).forEach(el => el.removeAttribute(ACTIVE_ATTR))

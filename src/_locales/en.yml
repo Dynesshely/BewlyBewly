@@ -270,6 +270,8 @@ settings:
   home_tabs_adjustment: Tabs adjustment
   home_tabs_adjustment_desc: The first activated tab is the default page.
   always_show_tabs_on_home_page: Always show tabs on the home page
+  keyboard_nav_lock_scroll: 'Keyboard navigation: lock page scroll'
+  keyboard_nav_lock_scroll_desc: 'When enabled, the wheel switches cards and the page stays still; when disabled, the wheel scrolls the page and the highlight follows the viewport'
 
   # Compatibility
   # Common

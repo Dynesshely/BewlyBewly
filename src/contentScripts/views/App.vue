@@ -163,9 +163,12 @@ useKeyboardCardNavigation(() => scrollbarRef.value
   : null)
 
 // Setup necessary settings watchers
+watch(() => showBewlyPage.value, () => nextTick(setupReachBottomObserver))
+
 setupNecessarySettingsWatchers()
 
 onMounted(() => {
+  nextTick(setupReachBottomObserver)
   window.dispatchEvent(new CustomEvent(BEWLY_MOUNTED))
 
   if (isHomePage()) {
@@ -235,6 +238,23 @@ function handleBackToTop(targetScrollTop = 0 as number) {
   iframePageRef.value?.handleBackToTop()
 }
 
+const reachBottomSentinel = ref<HTMLElement | null>(null)
+let reachBottomObserver: IntersectionObserver | null = null
+
+function setupReachBottomObserver() {
+  reachBottomObserver?.disconnect()
+  reachBottomObserver = null
+  const root = scrollbarRef.value as HTMLElement | undefined
+  const sentinel = reachBottomSentinel.value
+  if (!root || !sentinel)
+    return
+  reachBottomObserver = new IntersectionObserver((entries) => {
+    if (entries.some(entry => entry.isIntersecting))
+      handleThrottledReachBottom()
+  }, { root, rootMargin: '0px 0px 300px 0px', threshold: 0 })
+  reachBottomObserver.observe(sentinel)
+}
+
 let osScrollRaf = 0
 function handleOsScroll() {
   if (osScrollRaf)
@@ -247,12 +267,9 @@ function handleOsScroll() {
     const el = scrollbarRef.value
     if (!el)
       return
-    const { scrollTop, scrollHeight, clientHeight } = el // get scroll offset
+    const { scrollTop } = el // get scroll offset
 
     reachTop.value = scrollTop === 0
-
-    if (clientHeight + scrollTop >= scrollHeight - 300)
-      handleThrottledReachBottom()
 
     if (isHomePage())
       topBarRef.value?.handleScroll()
@@ -413,6 +430,7 @@ provide<BewlyAppProvider>('BEWLY_APP', {
                 </Transition>
               </div>
             </main>
+            <div ref="reachBottomSentinel" aria-hidden="true" style="height: 1px" />
           </div>
         </template>
       </Transition>

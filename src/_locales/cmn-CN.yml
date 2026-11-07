@@ -265,6 +265,8 @@ settings:
   home_tabs_adjustment: 标签栏调整
   home_tabs_adjustment_desc: 第一个激活的标签项是默认界面
   always_show_tabs_on_home_page: 总是显示首页标签栏
+  keyboard_nav_lock_scroll: 键盘导航：锁定页面滚动
+  keyboard_nav_lock_scroll_desc: 开启后滚轮逐张切换卡片且页面不滚动；关闭后滚轮正常滚动页面，高亮跟随视口内卡片
 
   # Compatibility
   # Common

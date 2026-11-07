@@ -266,6 +266,8 @@ settings:
   home_tabs_adjustment: 標籤欄調整
   home_tabs_adjustment_desc: 第一個啓用的標籤項目調整頁面將是起始頁面。
   always_show_tabs_on_home_page: 總是顯示首頁標籤欄
+  keyboard_nav_lock_scroll: 鍵盤導航：鎖定頁面滾動
+  keyboard_nav_lock_scroll_desc: 開啟後滾輪逐張切換卡片且頁面不滾動；關閉後滾輪正常滾動頁面，高亮跟隨視口內卡片
 
   # Compatibility
   # Common

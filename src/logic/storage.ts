@@ -85,6 +85,8 @@ export interface Settings {
   searchPageWallpaperBlurIntensity: number
 
   recommendationMode: 'web' | 'app'
+  /** 滚轮锁定页面并逐张切换卡片；关闭后滚轮正常滚动页面、高亮跟随视口 */
+  keyboardNavLockScroll: boolean
 
   // filter setting
   disableFilterForFollowedUser: boolean
@@ -189,6 +191,7 @@ export const originalSettings: Settings = {
   searchPageWallpaperBlurIntensity: 0,
 
   recommendationMode: 'web',
+  keyboardNavLockScroll: true,
 
   // filter setting
   disableFilterForFollowedUser: false,

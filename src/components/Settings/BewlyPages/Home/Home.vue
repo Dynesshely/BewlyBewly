@@ -417,6 +417,12 @@ function handleToggleHomeTab(tab: any) {
       <SettingsItem :title="$t('settings.always_show_tabs_on_home_page')">
         <Radio v-model="settings.alwaysShowTabsOnHomePage" />
       </SettingsItem>
+      <SettingsItem :title="$t('settings.keyboard_nav_lock_scroll')">
+        <template #desc>
+          <span>{{ $t('settings.keyboard_nav_lock_scroll_desc') }}</span>
+        </template>
+        <Radio v-model="settings.keyboardNavLockScroll" />
+      </SettingsItem>
     </SettingsItemGroup>
 
     <SettingsItemGroup :title="$t('settings.group_search_page_mode')">

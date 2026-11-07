@@ -24,6 +24,27 @@ const Settings = defineAsyncComponent(() => import('~/components/Settings/Settin
 const { isDark } = useDark()
 const [showSettings, toggleSettings] = useToggle(false)
 
+// 键盘快捷键帮助 / 当前卡片信息条 / 接口失败提示
+const showKeyboardHelp = ref(false)
+const activeCardInfo = ref<{ title: string, meta: string, url: string } | null>(null)
+const apiErrorVisible = ref(false)
+let apiErrorTimer: ReturnType<typeof setTimeout> | null = null
+
+emitter.on('toggle-keyboard-help', () => {
+  showKeyboardHelp.value = !showKeyboardHelp.value
+})
+emitter.on('keyboard-active-card', (info: { title: string, meta: string, url: string }) => {
+  activeCardInfo.value = info
+})
+emitter.on('api-error', () => {
+  apiErrorVisible.value = true
+  if (apiErrorTimer)
+    clearTimeout(apiErrorTimer)
+  apiErrorTimer = setTimeout(() => {
+    apiErrorVisible.value = false
+  }, 3000)
+})
+
 // Get the 'page' query parameter from the URL
 function getPageParam(): AppPage | null {
   const urlParams = new URLSearchParams(window.location.search)
@@ -357,6 +378,11 @@ onUnmounted(() => {
   document.removeEventListener('scroll', handleWindowScroll)
   reachBottomObserver?.disconnect()
   reachBottomObserver = null
+  emitter.off('toggle-keyboard-help')
+  emitter.off('keyboard-active-card')
+  emitter.off('api-error')
+  if (apiErrorTimer)
+    clearTimeout(apiErrorTimer)
 })
 </script>
 
@@ -452,6 +478,17 @@ onUnmounted(() => {
       :url="iframeDrawerURL"
       @close="showIframeDrawer = false"
     />
+
+    <KeyboardShortcutHelp v-if="showKeyboardHelp" @close="showKeyboardHelp = false" />
+
+    <div v-if="activeCardInfo" class="bewly-active-info">
+      <span class="bewly-active-info-title">{{ activeCardInfo.title }}</span>
+      <span v-if="activeCardInfo.meta" class="bewly-active-info-meta">{{ activeCardInfo.meta }}</span>
+    </div>
+
+    <div v-if="apiErrorVisible" class="bewly-api-error">
+      {{ $t('common.request_failed') }}
+    </div>
   </div>
 </template>
 
@@ -470,5 +507,53 @@ onUnmounted(() => {
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
+}
+
+.bewly-active-info {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  z-index: 10005;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  max-width: min(680px, 80vw);
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--bew-elevated);
+  border: 1px solid var(--bew-border-color);
+  box-shadow: var(--bew-shadow-1);
+  transform: translateX(-50%);
+  pointer-events: none;
+  font-size: 13px;
+  color: var(--bew-text-1);
+}
+
+.bewly-active-info-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.bewly-active-info-meta {
+  flex-shrink: 0;
+  color: var(--bew-text-3);
+  font-size: 12px;
+}
+
+.bewly-api-error {
+  position: fixed;
+  left: 50%;
+  top: 70px;
+  z-index: 10005;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: var(--bew-danger-color, #f53f3f);
+  color: #fff;
+  font-size: 13px;
+  transform: translateX(-50%);
+  box-shadow: var(--bew-shadow-1);
+  pointer-events: none;
 }
 </style>

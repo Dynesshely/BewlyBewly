@@ -1,5 +1,6 @@
 import { onMounted, onUnmounted } from 'vue'
 import { settings } from '~/logic'
+import emitter from '~/utils/mitt'
 
 const CARD_SELECTOR = '[data-video-card]'
 const ACTIVE_ATTR = 'data-keyboard-active'
@@ -140,6 +141,22 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
     })
   }
 
+  function extractCardInfo(card: HTMLElement) {
+    const title = card.querySelector('h3, [class*="title"]')?.textContent?.trim() ?? ''
+    const meta = card.textContent?.replace(/\s+/g, ' ').trim().slice(0, 160) ?? ''
+    return {
+      title: title || meta.slice(0, 60),
+      meta,
+      url: card.getAttribute('data-video-url') || '',
+    }
+  }
+
+  function focusSearchBar() {
+    const root = document.querySelector('#bewly')?.shadowRoot
+    const input = root?.querySelector<HTMLInputElement>('#search-wrap input, .search-bar input, input[type="text"]')
+    input?.focus()
+  }
+
   function setActive(index: number) {
     const cards = getCards()
     if (!cards.length)
@@ -149,6 +166,7 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
     activeIndex = next
     applyActive(cards, next)
     scrollCardIntoView(cards[next])
+    emitter.emit('keyboard-active-card', extractCardInfo(cards[next]))
   }
 
   /** 卡片列表变化（无限加载、组件重建）后补回高亮 */
@@ -241,6 +259,23 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
       case ' ':
         event.preventDefault()
         openActive('_self')
+        break
+      case '1':
+      case '2':
+      case '3':
+      case '4':
+      case '5':
+      case '6':
+        event.preventDefault()
+        emitter.emit('switch-home-tab', Number(event.key) - 1)
+        break
+      case '/':
+        event.preventDefault()
+        focusSearchBar()
+        break
+      case '?':
+        event.preventDefault()
+        emitter.emit('toggle-keyboard-help')
         break
       default:
         break

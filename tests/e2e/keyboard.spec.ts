@@ -90,4 +90,44 @@ test.describe('键盘卡片导航', () => {
       await context.close()
     }
   })
+
+  test('? 打开/关闭快捷键帮助面板', async () => {
+    const context = await chromium.launchPersistentContext('', {
+      channel: 'chromium',
+      headless: true,
+      args: [
+        `--disable-extensions-except=${EXTENSION_DIR}`,
+        `--load-extension=${EXTENSION_DIR}`,
+      ],
+      viewport: { width: 1440, height: 900 },
+    })
+
+    try {
+      const page = await context.newPage()
+      await context.route('https://www.bilibili.com/**', (route) => {
+        route.fulfill({
+          status: 200,
+          contentType: 'text/html; charset=utf-8',
+          body: readFileSync(HOME_FIXTURE, 'utf-8'),
+        })
+      })
+      await page.goto('https://www.bilibili.com/', { waitUntil: 'domcontentloaded' })
+      await expect(page.locator('#bewly')).toHaveCount(1, { timeout: 30_000 })
+      await page.waitForFunction(
+        () => (document.querySelector('#bewly')?.shadowRoot?.querySelectorAll('[data-video-card]').length ?? 0) > 0,
+        undefined,
+        { timeout: 30_000 },
+      )
+
+      const helpVisible = () => page.evaluate(() => !!document.querySelector('#bewly')?.shadowRoot?.querySelector('.keyboard-help-panel'))
+
+      await page.keyboard.press('?')
+      await expect.poll(helpVisible, { timeout: 5_000 }).toBe(true)
+      await page.keyboard.press('?')
+      await expect.poll(helpVisible, { timeout: 5_000 }).toBe(false)
+    }
+    finally {
+      await context.close()
+    }
+  })
 })

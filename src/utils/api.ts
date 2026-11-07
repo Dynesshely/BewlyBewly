@@ -1,4 +1,5 @@
 import type { API_COLLECTION } from '~/background/messageListeners/api'
+import emitter from '~/utils/mitt'
 
 /** B 站接口通用响应结构；具体 data 类型由各调用处按接口断言 */
 export interface APIResult<T = any> {
@@ -54,6 +55,9 @@ export class APIClient {
                 }
                 catch (e) {
                   console.warn(`[BewlyBewly] API request failed: ${String(p)}`, e)
+                  emitter.emit('api-error', {
+                    query: String(p),
+                  })
                   return undefined
                 }
               }

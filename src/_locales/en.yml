@@ -1,3 +1,14 @@
+keyboard_help:
+  title: Keyboard shortcuts
+  hint: Press ? again or click outside to close
+  move: Move between video cards
+  jump: Jump to first / last card
+  open_new: Open the video in a new tab
+  open_current: Open the video in the current tab
+  tabs: Switch home tabs
+  search: Focus the search bar
+  help: Show / hide this help
+
 common:
   view_all: View ALL
   play_all: Play ALL
@@ -21,6 +32,7 @@ common:
   added: Added
   performance_impact_warn: This feature may cause performance *DECREASE*!
   no_more_content: No more content now, owari da
+  request_failed: Request failed, please check your network
 
   operation:
     add: Add

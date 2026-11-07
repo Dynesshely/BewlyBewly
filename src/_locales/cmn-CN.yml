@@ -1,3 +1,14 @@
+keyboard_help:
+  title: 键盘快捷键
+  hint: 再次按 ? 或点击空白处关闭
+  move: 在视频卡片间移动
+  jump: 跳到第一张 / 最后一张
+  open_new: 在新标签页打开当前视频
+  open_current: 在当前标签页打开当前视频
+  tabs: 切换首页标签页
+  search: 聚焦搜索框
+  help: 显示 / 隐藏本帮助
+
 common:
   view_all: 查看更多
   play_all: 播放全部
@@ -21,6 +32,7 @@ common:
   added: 已添加
   performance_impact_warn: 这个功能可能会影响性能！
   no_more_content: 没有更多内容了
+  request_failed: 请求失败，请检查网络连接
 
   operation:
     add: 新增

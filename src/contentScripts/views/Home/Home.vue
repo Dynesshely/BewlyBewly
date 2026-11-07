@@ -94,10 +94,17 @@ onMounted(() => {
 
   currentTabs.value = computeTabs()
   activatedPage.value = currentTabs.value[0].page
+
+  emitter.on('switch-home-tab', (index: number) => {
+    const tab = currentTabs.value[index]
+    if (tab)
+      handleChangeTab(tab)
+  })
 })
 
 onUnmounted(() => {
   emitter.off(TOP_BAR_VISIBILITY_CHANGE)
+  emitter.off('switch-home-tab')
 })
 
 function handleChangeTab(tab: HomeTab) {

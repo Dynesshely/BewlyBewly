@@ -42,12 +42,30 @@ function writeManifest() {
   execSync('npx esno ./scripts/manifest.ts', { stdio: 'inherit' })
 }
 
+function writeContentLoader() {
+  const dir = r(isFirefox
+    ? 'extension-firefox/dist/contentScripts'
+    : isSafari ? 'extension-safari/dist/contentScripts' : 'extension/dist/contentScripts')
+  fs.ensureDirSync(dir)
+  // 主 content script 只做一件事：运行时加载 ESM bundle（冷路径按需拆成 chunk）
+  const loader = `(() => {
+  const entry = chrome.runtime.getURL('dist/contentScripts/esm/index.js')
+  import(entry).catch((err) => {
+    console.error('[BewlyBewly] failed to load content script', err)
+  })
+})()
+`
+  fs.writeFileSync(`${dir}/loader.js`, loader, 'utf-8')
+  log('PRE', 'content loader')
+}
+
 fs.ensureDirSync(r(isFirefox
   ? 'extension-firefox'
   : isSafari ? 'extension-safari' : 'extension'))
 fs.copySync(r('assets'), r(isFirefox
   ? 'extension-firefox/assets'
   : isSafari ? 'extension-safari/assets' : 'extension/assets'))
+writeContentLoader()
 writeManifest()
 
 if (isDev) {

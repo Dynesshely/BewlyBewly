@@ -18,6 +18,9 @@ import { setupNecessarySettingsWatchers } from './necessarySettingsWatchers'
 
 const mainStore = useMainStore()
 const settingsStore = useSettingsStore()
+
+// 设置面板按需加载（冷路径，单独 chunk）
+const Settings = defineAsyncComponent(() => import('~/components/Settings/Settings.vue'))
 const { isDark } = useDark()
 const [showSettings, toggleSettings] = useToggle(false)
 

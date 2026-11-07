@@ -44,25 +44,35 @@ content script 调用 `api.*` → `browser.runtime.sendMessage({ contentScriptQu
 - content script 侧在 `src/utils/api.ts` 有 3 秒超时与一次重试，失败会
   `console.warn`，便于发现类似"接口静默失败"的问题。
 
-## content script 拆分评估（P2-2）
+## content script 拆分（已实现）
 
-当前构建为 Vite lib 模式 + IIFE 单入口，**动态 import 会被内联进单文件**
-（产物中无 `import(`），因此无法产出按需 chunk。继续拆分需要：
+### 结构
 
-1. 用 tsup/esbuild 多入口生成独立 chunk，并让 content script 通过
-   `chrome.runtime.getURL` 动态加载（需同步调整 manifest web_accessible_resources）；或
-2. 将冷路径（设置面板、搜索页）改为独立 content script，按页面匹配注入。
+- `dist/contentScripts/loader.js`：主 content script（极简 IIFE），运行时
+  `import(chrome.runtime.getURL('dist/contentScripts/esm/index.js'))` 加载 ESM bundle。
+- `dist/contentScripts/esm/index.js`：ESM 主 bundle（约 804 KB，原 IIFE 约 1.03 MB）。
+- `dist/contentScripts/esm/chunks/*.js`：冷路径与第三方依赖的按需 chunk
+  （如 `Settings-*.js`、`Home-*.js`、`vue.runtime-*.js`、`vuedraggable-*.js`）。
+- `dist/contentScripts/esm/style.css`：基础样式（manifest 注入）。
 
-两条路径都会改变扩展加载与打包方式，风险较高，**暂缓**；当前单文件 1.03 MB、
-gzip 后约 300 KB，首屏影响可接受。
+### 构建
 
-## API 类型化计划（P2-1）
+- `vite.config.content-esm.ts` 负责 ESM 分包构建（`chunkFileNames: 'chunks/[name]-[hash].js'`）。
+- `package.json` 的 `build:js` 指向该配置；`scripts/prepare.ts` 生成 `loader.js`。
+- `src/manifest.ts` 的 `content_scripts` 指向 loader，`web_accessible_resources` 暴露
+  `dist/contentScripts/esm/*`（chunk 需要被运行时 import 加载）。
 
-`src/utils/api.ts` 已提供 `APIResult<T>` 类型定义。现状是接口返回仍为 `any`
-（大量调用处使用具体 `XxxResult` 类型标注，直接换成 `APIResult` 会因 `ttl` 等
-必填字段冲突）。迁移计划：
+### 冷路径拆分原则
 
-1. 逐接口把 `XxxResult` 改为 `APIResult<XxxData>`（`data` 泛型化），从高频接口
-   （`video.getRecommendVideos`、`ranking.getRanking`）开始；
-2. 每次迁移单个接口并更新调用处，避免一次性大改；
-3. 最终移除返回类型中的 `any`。
+- 全局组件注册（`src/components/index.ts`）用 `import.meta.glob` 的负模式
+  `!./Settings/**` 排除设置面板；
+- 设置面板由 `App.vue` 通过 `defineAsyncComponent(() => import('~/components/Settings/Settings.vue'))`
+  按需加载，因此其子组件自动进入独立 chunk。
+- 后续可继续把其他低频面板（关于页、更改壁纸等）纳入同样的异步加载策略。
+
+### 注意
+
+- ESM bundle 中的 `import()` 以 entry URL 为基准解析 chunk，因此
+  `web_accessible_resources` 必须覆盖 `dist/contentScripts/esm/*`。
+- 新增冷路径时保持「动态导入 + 不在全局 glob 中 eager 注册」即可自动分包。
+

@@ -1,4 +1,4 @@
-# BewlyBewly
+# BewlyBewly (Dynesshely Fork)
 
 English | [官话 - 简体中文](README-cmn_CN.md) | [官話 - 繁體中文](README-cmn_TW.md) | [廣東話](README-jyut.md)
 
@@ -8,86 +8,81 @@ English | [官话 - 简体中文](README-cmn_CN.md) | [官話 - 繁體中文](RE
 
 <p align="center">Just make a few small changes to your Bilibili homepage.</p>
 
-<!-- ![min1](https://github.com/hakadao/BewlyBewly/assets/33394391/951f9e2a-d0e1-452c-83a9-dc6d85c4d441)
-![min2](https://github.com/hakadao/BewlyBewly/assets/33394391/3e75dd20-f60b-4645-b434-23a24c72959c) -->
-
-## 👋 Introduction
-
 > [!IMPORTANT]
-> BewlyBewly mainly focuses on page adjustments and optimization rather than improving functionally and efficiency.
+> This is a community fork of the archived upstream project
+> [BewlyBewly](https://github.com/BewlyBewly/BewlyBewly). Upstream stopped maintenance at `v0.41.1`
+> (2025-02-26); this fork continues maintenance with new features, performance work and stability fixes.
 >
-> The dark mode will only be adapted to commonly used pages due to its efficiency and maintenance difficulty, while less
-> frequently used pages will not to be adapted.
+> The upstream project focuses on page adjustments; this fork additionally adds keyboard-driven
+> navigation and hardens the extension against Bilibili API/DOM changes.
 
-> [!CAUTION]
-> [BLBewly](https://apps.apple.com/us/app/blbewly/id6742200021) is a free BewlyBewly extension on Safari. We thank [𝗦𝘁𝗲𝘃𝗲 𝕏](https://x.com/st7evechou) for their help with the free publication of the app to Safari.
-> However, issues encountered with the Safari version are outside of our maintenance scope,
-> and we are not considering Safari maintenance.
+## ✨ Fork highlights
 
-> [!CAUTION]
-> If you are installing this extension, your browser will probably say that it can read your browser history.
->
-> This is because BewlyBewly uses the ["tabs" permission](https://developer.chrome.com/docs/extensions/reference/api/tabs), which can also be used to read each tab, allowing it to know the browsing history, but it is not utilized here.
->
-> **Some browsers will mention the worst-case scenario and the highest risks, ensuring your safety after installation.**
-> Additionally, this project is open source, so you can see what exactly what it does.
-
-BewlyBewly is a browser extension for BiliBili that aims to enhance the user experience by redesigning the BiliBili UI.
-The design is inspired by YouTube, Vision OS, and iOS, resulting in a more visually appealing and user-friendly interface.
-This project uses the [vitesse-webext](https://github.com/antfu/vitesse-webext) template for development.
-Without this template, it may not be possible to develop this project.
+- **Keyboard-first card navigation**
+  - Wheel switches cards one by one (page scroll locked by default), arrow keys / Home / End move the highlight
+  - `Enter` opens the highlighted video in a new tab, `Space` opens it in the current tab
+  - `1`–`6` switch home tabs, `/` focuses the search bar, `?` shows a shortcut help panel, `d` opens the card context menu
+  - The page follows the highlighted card; scroll position and highlighted card are restored after returning from a video page
+- **Configurable wheel mode** — lock page scroll and switch cards, or scroll the page normally and let the highlight follow the viewport
+- **Native page support** — keyboard navigation also works on Bilibili's native cards (e.g. search results)
+- **Content features** — recommend reason display, per-tab grid layout memory, daily built-in wallpaper rotation
+- **Performance** — page-scoped style injection, font subsetting, ESM code-splitting content script with a lightweight loader
+- **Stability** — fixed background message registration, ForYou infinite reload, native scroll container, timer/listener cleanup
 
 ## ⬇️ Installation
 
 > [!NOTE]
-> This project is no longer distributed through browser extension stores. Please download `extension.zip` from [Releases](https://github.com/Dynesshely/BewlyBewly/releases) or build it locally.
+> This fork is **not** distributed through browser extension stores. Build it locally or download
+> `extension.zip` from [Releases](https://github.com/Dynesshely/BewlyBewly/releases).
 
-### Local Installation
+### Build from source
 
-[CI](https://github.com/hakadao/BewlyBewly/actions): Automatically build with the latest code
+```bash
+# Node.js ^22.12 or >=24, pnpm 9
+pnpm install
+pnpm build
+pnpm run pack:zip   # produces extension.zip
+```
 
-[Releases](https://github.com/hakadao/BewlyBewly/releases): Stable version
+### Load unpacked (Edge / Chrome)
 
-#### Edge & Chrome (RECOMMENDED)
+> If the store version of BewlyBewly is already installed, disable or remove it first to avoid duplicate injection.
 
-> Ensure you installed [extension.zip](https://github.com/hakadao/BewlyBewly/releases) .
+1. Unzip `extension.zip`
+2. Open `edge://extensions` (Edge) or `chrome://extensions` (Chrome), enable **Developer mode**
+3. Click **Load unpacked** and select the unzipped folder
 
-Opening the `edge://extensions` page in the Edge or `chrome://extensions` page in Chrome,
-simply drag and drop the downloaded `extension.zip` file into the browser to complete the installation.
+## 🤝 Build & Test
 
-<details>
- <summary> Another installation method for Edge & Chrome </summary>
+```bash
+pnpm lint            # ESLint
+pnpm run typecheck   # vue-tsc
+pnpm exec vitest run # unit tests
+pnpm exec playwright test        # offline e2e (extension mount / keyboard / perf)
+E2E_ONLINE=1 pnpm exec playwright test tests/e2e/background.spec.ts  # online API smoke (optional)
+```
 
-#### Edge
+## 📚 Documentation
 
-> Ensure you installed [extension.zip](https://github.com/hakadao/BewlyBewly/releases) and decompress this file.
+- [Architecture](docs/architecture.md) — build outputs, style injection, content script splitting, background message protocol
+- [Keyboard navigation](docs/keyboard-navigation.md) — shortcuts, configurable wheel mode, state restore, limitations
+- [Upstream divergence](docs/upstream-divergence.md) — differences from the archived upstream
+- [Dependency policy](docs/dependency-policy.md) — pinned versions and upgrade checklist
+- [Performance](docs/performance.md) — first-paint baseline, optimizations and evaluation notes
 
-1. Type in `edge://extensions/` in the address bar and press Enter
-2. Turn on `Developer mode` then press `Load Unpacked` <br/> <img width="655" alt="image" src="https://user-images.githubusercontent.com/33394391/232246901-e3544c16-bde2-480d-b770-ca5242793963.png">
-3. Load the decompressed extension folder in your browser
-
-#### Chrome
->
-> Ensure you installed [extension.zip](https://github.com/hakadao/BewlyBewly/releases) and decompress this file.
-
-1. Type in `chrome://extensions/` in the address bar and press Enter
-2. Turn on `Developer mode` then press `Load Unpacked` <br/> <img width="655" alt="Snipaste_2022-03-27_18-17-04" src="https://user-images.githubusercontent.com/33394391/160276882-13da0484-92c1-47dd-add8-7655c5c2bf1c.png">
-3. Load the decompressed extension folder in your browser
-
-</details>
-
-## 🤝 Contribution & Build
+## 🤝 Contribution
 
 See [CONTRIBUTING.md](docs/CONTRIBUTING.md)
 
-### Contributors
-
-[![Contributors](https://contrib.rocks/image?repo=hakadao/BewlyBewly)](https://github.com/BewlyBewly/BewlyBewly/graphs/contributors)
-
 ## ❤️ Credits
 
-- [vitesse-webext](https://github.com/antfu/vitesse-webext) - The template used for this project
+- [BewlyBewly](https://github.com/BewlyBewly/BewlyBewly) — the original project this fork is based on
+- [vitesse-webext](https://github.com/antfu/vitesse-webext) — the template used for this project
 - [UserScripts/bilibiliHome](https://github.com/indefined/UserScripts/tree/master/bilibiliHome),
-[bilibili-app-recommend](https://github.com/magicdawn/bilibili-app-recommend) - Reference source for obtaining the access key
-- [Bilibili-Evolved](https://github.com/the1812/Bilibili-Evolved) - Partial implementation of functionalities
+  [bilibili-app-recommend](https://github.com/magicdawn/bilibili-app-recommend) — reference sources for the access key
+- [Bilibili-Evolved](https://github.com/the1812/Bilibili-Evolved) — partial implementation of functionalities
 - [bilibili-API-collect](https://github.com/SocialSisterYi/bilibili-API-collect)
+
+## 📄 License
+
+See [LICENSE](LICENSE).

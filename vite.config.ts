@@ -1,13 +1,13 @@
 /// <reference types="vitest" />
 
-import { dirname, relative } from 'node:path'
+import type { UserConfig } from 'vite'
 
+import { dirname, relative } from 'node:path'
 import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite'
 import replace from '@rollup/plugin-replace'
 import Vue from '@vitejs/plugin-vue'
 import UnoCSS from 'unocss/vite'
 import AutoImport from 'unplugin-auto-import/vite'
-import type { UserConfig } from 'vite'
 import { defineConfig } from 'vite'
 
 import { isDev, isFirefox, isSafari, port, r } from './scripts/utils'
@@ -39,7 +39,9 @@ export const sharedConfig: UserConfig = {
       runtimeOnly: true,
       compositionOnly: true,
       strictMessage: false,
-      include: [r('./src/_locales/**')],
+      include: [
+        r('./src/_locales/**'),
+      ],
     }),
 
     // https://github.com/unocss/unocss
@@ -77,7 +79,9 @@ export const sharedConfig: UserConfig = {
 
 export default defineConfig(({ command }) => ({
   ...sharedConfig,
-  base: command === 'serve' ? `http://localhost:${port}/` : '/dist/',
+  base: command === 'serve'
+    ? `http://localhost:${port}/`
+    : '/dist/',
   server: {
     port,
     hmr: {
@@ -85,7 +89,9 @@ export default defineConfig(({ command }) => ({
     },
   },
   build: {
-    outDir: r(isFirefox ? 'extension-firefox/dist' : isSafari ? 'extension-safari/dist' : 'extension/dist'),
+    outDir: r(isFirefox
+      ? 'extension-firefox/dist'
+      : isSafari ? 'extension-safari/dist' : 'extension/dist'),
     emptyOutDir: false,
     sourcemap: false, // https://github.com/vitejs/vite-plugin-vue/issues/35
     // https://developer.chrome.com/docs/webstore/program_policies/#:~:text=Code%20Readability%20Requirements
@@ -99,6 +105,8 @@ export default defineConfig(({ command }) => ({
       },
     },
     minify: 'terser',
+    // lightningcss 无法解析 ::view-transition-old(*::after) 这类选择器，改用 esbuild 压缩 CSS
+    cssMinify: 'esbuild',
   },
   plugins: [
     ...sharedConfig.plugins!,

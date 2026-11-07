@@ -1,89 +1,86 @@
-# BewlyBewly
+# BewlyBewly（Dynesshely Fork）
 
-[English](README.md) | 官话 - 简体中文 | [官話 - 繁体中文](README-cmn_TW.md) | [廣東話](README-jyut.md)
+[English](README.md) | 官话 - 简体中文 | [官話 - 繁體中文](README-cmn_TW.md) | [廣東話](README-jyut.md)
 
 <p align="center" style="margin-bottom: 0px !important;">
 <img width="300" alt="BewlyBewly icon" src="https://cdn.jsdelivr.net/gh/BewlyBewly/Imgs/logos/bewlybewly-vtuber-logo.png"><br/>
 </p>
 
-<p align="center">只需对您的 Bilibili 主页进行一些小更改即可。</p>
-
-<!-- ![min1](https://github.com/hakadao/BewlyBewly/assets/33394391/951f9e2a-d0e1-452c-83a9-dc6d85c4d441)
-![min2](https://github.com/hakadao/BewlyBewly/assets/33394391/3e75dd20-f60b-4645-b434-23a24c72959c) -->
-
-## 👋 介绍
+<p align="center">对 Bilibili 主页做一些小改动。</p>
 
 > [!IMPORTANT]
-> BewlyBewly 主要专注页面的调整和优化，而不是完善功能和提升效率。
+> 本仓库是已归档上游项目 [BewlyBewly](https://github.com/BewlyBewly/BewlyBewly) 的社区 Fork。
+> 上游已于 `v0.41.1`（2025-02-26）停止维护，本 Fork 继续维护，并加入新特性、性能优化与稳定性修复。
 >
-> 由于效率和维护难度的原因，暗色模式只会适应常用页面，而不会适应不常用的页面。
+> 上游侧重页面外观调整；本 Fork 额外提供键盘驱动的高效浏览交互，并针对 B 站接口/DOM 变更做了加固。
 
-> [!CAUTION]
-> [BLBewly](https://apps.apple.com/us/app/blbewly/id6742200021) 是 Safari 上的免费 BewlyBewly 扩展程序。我们感谢 [𝗦𝘁𝗲𝘃𝗲 𝕏](https://x.com/st7evechou) 帮助我们免费将应用发布到 Safari。
-> 但是，Safari 版本遇到的问题不在我们的维护范围内，我们不考虑 Safari 维护。
+## ✨ Fork 特性
 
-> [!CAUTION]
-> 如果您正在安装此扩展程序，您的浏览器可能会提示它可以读取您的浏览历史记录。
->
-> 这是因为 BewlyBewly 使用了["tabs" 权限](https://developer.chrome.com/docs/extensions/reference/api/tabs)，该权限也可用于读取每个标签页，从而了解浏览历史，但在这里并未使用。
->
-> **一些浏览器会提到最坏的情况和最高的风险，以确保您在安装后的安全。**
-> 此外，这个项目是开源的，所以您可以看到它究竟做了什么。
-
-BewlyBewly 是一个用于 BiliBili 的浏览器扩展，旨在通过重新设计 BiliBili 用户界面来提升用户体验。设计灵感来自于 YouTube、Vision OS 和 iOS，从而实现了更具视觉吸引力和用户友好性的界面。
-
-该项目使用 [vitesse-webext](https://github.com/antfu/vitesse-webext) 模板进行开发。如果没有这个模板，可能无法开发出这个项目。
+- **键盘卡片导航**
+  - 滚轮逐张切换卡片（默认锁定页面滚动），方向键 / Home / End 移动高亮
+  - `Enter` 在新标签页打开高亮视频，`Space` 在当前标签页打开
+  - `1`–`6` 切换首页标签页，`/` 聚焦搜索框，`?` 显示快捷键帮助面板，`d` 打开卡片右键菜单
+  - 页面自动跟随高亮卡片；从播放页返回后恢复滚动位置与高亮卡片
+- **滚轮模式可配置**：锁定页面并逐张切换，或正常滚动页面、高亮跟随视口
+- **支持原生页面**：搜索页等 B 站原生卡片同样可用键盘导航
+- **内容特性**：推荐原因展示、各首页 Tab 独立记忆网格布局、内置壁纸按天轮换
+- **性能**：页面样式按页注入、字体子集化、content script 拆分为 ESM 分包 + 轻量 loader
+- **稳定性**：修复后台消息注册、ForYou 无限重载、原生滚动容器、定时器/监听清理
 
 ## ⬇️ 安装
 
 > [!NOTE]
-> 本项目不再通过浏览器扩展商店分发，请从 [Releases](https://github.com/Dynesshely/BewlyBewly/releases) 下载 `extension.zip` 或自行本地构建。
+> 本 Fork **不再通过浏览器扩展商店分发**。请从 [Releases](https://github.com/Dynesshely/BewlyBewly/releases)
+> 下载 `extension.zip`，或在本地构建。
 
-### 本地安装
+### 本地构建
 
-[CI](https://github.com/hakadao/BewlyBewly/actions)：使用最新代码自动构建
+```bash
+# 需要 Node.js ^22.12 或 >=24，pnpm 9
+pnpm install
+pnpm build
+pnpm run pack:zip   # 生成 extension.zip
+```
 
-[Releases](https://github.com/hakadao/BewlyBewly/releases)：稳定版
+### 加载未打包扩展（Edge / Chrome）
 
-#### Edge 和 Chrome（推荐）
+> 如果已安装商店版 BewlyBewly，请先禁用或移除，避免重复注入。
 
-> 确保您下载了 [extension.zip](https://github.com/hakadao/BewlyBewly/releases)。
+1. 解压 `extension.zip`
+2. 打开 `edge://extensions`（Edge）或 `chrome://extensions`（Chrome），开启「开发者模式」
+3. 点击「加载已解压的扩展程序」，选择解压后的文件夹
 
-在 Edge 浏览器中打开 `edge://extensions` 或者在 Chrome 浏览器中打开 `chrome://extensions` 界面，只需将下载的 `extension.zip` 文件拖放到浏览器中即可完成安装。
+## 🤝 构建与测试
 
-<details>
- <summary> Edge & Chrome 的另一种安装方法 </summary>
+```bash
+pnpm lint            # ESLint
+pnpm run typecheck   # vue-tsc
+pnpm exec vitest run # 单元测试
+pnpm exec playwright test        # 离线 e2e（扩展挂载 / 键盘导航 / 性能基线）
+E2E_ONLINE=1 pnpm exec playwright test tests/e2e/background.spec.ts  # 在线接口冒烟（可选）
+```
 
-#### Edge
+## 📚 文档
 
-> 确保您下载了 [extension.zip](https://github.com/hakadao/BewlyBewly/releases) 并解压缩该文件。
+- [架构说明](docs/architecture.md) — 构建产物、样式注入、content script 拆分、后台消息协议
+- [键盘导航](docs/keyboard-navigation.md) — 快捷键、滚轮模式、状态恢复与已知限制
+- [与上游差异](docs/upstream-divergence.md) — 相对归档上游的改动清单
+- [依赖策略](docs/dependency-policy.md) — 锁定版本与升级检查清单
+- [性能记录](docs/performance.md) — 首屏基线、优化项与评估结论
 
-1. 在地址栏输入 `edge://extensions/` 并按回车
-2. 打开 `开发者模式` 并点击 `加载已解压的拓展程序` <br/> <img width="655" alt="image" src="https://user-images.githubusercontent.com/33394391/232246901-e3544c16-bde2-480d-b770-ca5242793963.png">
-3. 在浏览器中加载解压后的扩展文件夹
+## 🤝 贡献
 
-#### Chrome
+见 [CONTRIBUTING.md](docs/CONTRIBUTING.md)
 
-> 确保您下载了 [extension.zip](https://github.com/hakadao/BewlyBewly/releases) 并解压缩该文件。
+## ❤️ 致谢
 
-1. 在地址栏输入 `chrome://extensions/` 并按回车
-2. 打开 `开发者模式` 并点击 `加载已解压的拓展程序` <br/> <img width="655" alt="Snipaste_2022-03-27_18-17-04" src="https://user-images.githubusercontent.com/33394391/160276882-13da0484-92c1-47dd-add8-7655c5c2bf1c.png">
-3. 在浏览器中加载解压后的扩展文件夹
-
-</details>
-
-## 🤝 贡献与构建项目
-
-查看 [CONTRIBUTING.md](docs/CONTRIBUTING-cmn_CN.md)
-
-### 贡献者
-
-[![Contributors](https://contrib.rocks/image?repo=hakadao/BewlyBewly)](https://github.com/BewlyBewly/BewlyBewly/graphs/contributors)
-
-## ❤️ 鸣谢
-
-- [vitesse-webext](https://github.com/antfu/vitesse-webext) - 该项目使用的模板
-- [UserScripts/bilibiliHome](https://github.com/indefined/UserScripts/tree/master/bilibiliHome),
-[bilibili-app-recommend](https://github.com/magicdawn/bilibili-app-recommend) - 获取访问密钥的参考来源
-- [Bilibili-Evolved](https://github.com/the1812/Bilibili-Evolved) - 部分功能实现
+- [BewlyBewly](https://github.com/BewlyBewly/BewlyBewly) — 本项目基于的原始项目
+- [vitesse-webext](https://github.com/antfu/vitesse-webext) — 开发模板
+- [UserScripts/bilibiliHome](https://github.com/indefined/UserScripts/tree/master/bilibiliHome)、
+  [bilibili-app-recommend](https://github.com/magicdawn/bilibili-app-recommend) — access key 获取方式参考
+- [Bilibili-Evolved](https://github.com/the1812/Bilibili-Evolved) — 部分功能实现参考
 - [bilibili-API-collect](https://github.com/SocialSisterYi/bilibili-API-collect)
+
+## 📄 许可证
+
+见 [LICENSE](LICENSE)。

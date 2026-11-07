@@ -1,3 +1,6 @@
+> [!NOTE]
+> 呢個檔案對應已歸檔上游版本；最新說明請見 [README.md](README.md) 或 [简体中文](README-cmn_CN.md)。
+
 # BewlyBewly
 
 [English](README.md) | [官话 - 简体中文](README-cmn_CN.md) | [官話 - 繁體中文](README-cmn_TW.md) | 廣東話

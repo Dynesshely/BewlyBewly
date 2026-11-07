@@ -1,17 +1,19 @@
 <script setup lang="ts">
-import { onKeyStroke } from '@vueuse/core'
-import type { Ref } from 'vue'
+import type { GridVideoElement } from '../types'
 
+import type { GridLayoutType } from '~/logic'
+import type { AppForYouResult, Item as AppVideoItem } from '~/models/video/appForYou'
+import type { forYouResult, Item as VideoItem } from '~/models/video/forYou'
+import { onKeyStroke } from '@vueuse/core'
 import { useBewlyApp } from '~/composables/useAppProvider'
 import { FilterType, useFilter } from '~/composables/useFilter'
+import { useGridLayoutClass } from '~/composables/useGridLayout'
 import { LanguageType } from '~/enums/appEnums'
-import type { GridLayoutType } from '~/logic'
 import { accessKey, settings } from '~/logic'
-import type { AppForYouResult, Item as AppVideoItem } from '~/models/video/appForYou'
 import { Type as ThreePointV2Type } from '~/models/video/appForYou'
-import type { forYouResult, Item as VideoItem } from '~/models/video/forYou'
 import api from '~/utils/api'
 import { TVAppKey } from '~/utils/authProvider'
+
 import { isVerticalVideo } from '~/utils/uriParse'
 
 const props = defineProps<{
@@ -25,39 +27,50 @@ const emit = defineEmits<{
 
 const filterFunc = useFilter(
   ['is_followed'],
-  [FilterType.duration, FilterType.viewCount, FilterType.title, FilterType.user, FilterType.user],
-  [['duration'], ['stat', 'view'], ['title'], ['owner', 'name'], ['owner', 'mid']],
+  [
+    FilterType.duration,
+    FilterType.viewCount,
+    FilterType.title,
+    FilterType.user,
+    FilterType.user,
+  ],
+  [
+    ['duration'],
+    ['stat', 'view'],
+    ['title'],
+    ['owner', 'name'],
+    ['owner', 'mid'],
+  ],
 )
 const appFilterFunc = useFilter(
   ['bottom_rcmd_reason'],
-  [FilterType.filterOutVerticalVideos, FilterType.duration, FilterType.viewCountStr, FilterType.title, FilterType.user, FilterType.user],
-  [['uri'], ['player_args', 'duration'], ['cover_left_text_1'], ['title'], ['mask', 'avatar', 'text'], ['mask', 'avatar', 'up_id']],
+  [
+    FilterType.filterOutVerticalVideos,
+    FilterType.duration,
+    FilterType.viewCountStr,
+    FilterType.title,
+    FilterType.user,
+    FilterType.user,
+  ],
+  [
+    ['uri'],
+    ['player_args', 'duration'],
+    ['cover_left_text_1'],
+    ['title'],
+    ['mask', 'avatar', 'text'],
+    ['mask', 'avatar', 'up_id'],
+  ],
 )
 
-// https://github.com/starknt/BewlyBewly/blob/fad999c2e482095dc3840bb291af53d15ff44130/src/contentScripts/views/Home/components/ForYou.vue#L16
-interface VideoElement {
-  uniqueId: string
-  item?: VideoItem
-}
+type VideoElement = GridVideoElement<VideoItem>
+type AppVideoElement = GridVideoElement<AppVideoItem>
 
-interface AppVideoElement {
-  uniqueId: string
-  item?: AppVideoItem
-}
-
-const gridClass = computed((): string => {
-  if (props.gridLayout === 'adaptive')
-    return 'grid-adaptive'
-  if (props.gridLayout === 'twoColumns')
-    return 'grid-two-columns'
-  return 'grid-one-column'
-})
+const gridClass = useGridLayoutClass(toRef(props, 'gridLayout'))
 
 const videoList = ref<VideoElement[]>([])
 const appVideoList = ref<AppVideoElement[]>([])
 const isLoading = ref<boolean>(false)
 const needToLoginFirst = ref<boolean>(false)
-const containerRef = ref<HTMLElement>() as Ref<HTMLElement>
 const refreshIdx = ref<number>(1)
 const noMoreContent = ref<boolean>(false)
 const { handleReachBottom, handlePageRefresh, haveScrollbar } = useBewlyApp()
@@ -66,6 +79,8 @@ const videoCardRef = ref(null)
 const showDislikeDialog = ref<boolean>(false)
 const selectedDislikeReason = ref<number>(1)
 const PAGE_SIZE = 30
+let emptyRetryCount = 0
+const loadStatus = ref<'idle' | 'loading' | 'loaded' | 'empty' | 'error'>('idle')
 
 onKeyStroke((e: KeyboardEvent) => {
   if (showDislikeDialog.value) {
@@ -121,6 +136,7 @@ async function initData() {
 async function getData() {
   emit('beforeLoading')
   isLoading.value = true
+  loadStatus.value = 'loading'
   try {
     if (settings.value.recommendationMode === 'web') {
       await getRecommendVideos()
@@ -129,6 +145,10 @@ async function getData() {
       for (let i = 0; i < 3; i++)
         await getAppRecommendVideos()
     }
+  }
+  catch (e) {
+    console.warn('[BewlyBewly] 推荐加载失败', e)
+    loadStatus.value = 'error'
   }
   finally {
     isLoading.value = false
@@ -157,9 +177,11 @@ function initPageAction() {
 async function getRecommendVideos() {
   try {
     let i = 0
-    if (!filterFunc.value || (videoList.value.length < PAGE_SIZE && filterFunc.value)) {
+    if (!filterFunc.value || videoList.value.length < PAGE_SIZE) {
       const pendingVideos: VideoElement[] = Array.from({
-        length: videoList.value.length < PAGE_SIZE ? PAGE_SIZE - videoList.value.length : PAGE_SIZE,
+        length: videoList.value.length < PAGE_SIZE
+          ? PAGE_SIZE - videoList.value.length
+          : PAGE_SIZE,
       }, () => ({
         uniqueId: `unique-id-${(videoList.value.length || 0) + i++})}`,
       } satisfies VideoElement))
@@ -167,12 +189,25 @@ async function getRecommendVideos() {
       videoList.value.push(...pendingVideos)
     }
 
-    const response: forYouResult = await api.video.getRecommendVideos({
-      fresh_idx: refreshIdx.value++,
-      ps: PAGE_SIZE,
-    })
+    let response: forYouResult | undefined
+    try {
+      response = await api.video.getRecommendVideos({
+        fresh_idx: refreshIdx.value++,
+        ps: PAGE_SIZE,
+      })
+    }
+    catch {
+      response = undefined
+    }
+    // 扩展后台消息通道不可用时，直接从页面同源请求（可携带 B 站 cookie）
+    if (!response) {
+      response = await fetch(
+        `https://api.bilibili.com/x/web-interface/index/top/feed/rcmd?ps=${PAGE_SIZE}&fresh_idx=1&fresh_type=3`,
+        { credentials: 'include' },
+      ).then(r => r.json()).catch(() => undefined) as forYouResult | undefined
+    }
 
-    if (!response.data) {
+    if (!response?.data) {
       noMoreContent.value = true
       return
     }
@@ -223,11 +258,28 @@ async function getRecommendVideos() {
   }
   finally {
     const filledItems = videoList.value.filter(video => video.item)
-    videoList.value = filledItems
+    if (filledItems.length > 0) {
+      videoList.value = filledItems
+      loadStatus.value = 'loaded'
+    }
 
     if (!needToLoginFirst.value) {
       await nextTick()
-      if (!await haveScrollbar() || filledItems.length < PAGE_SIZE || filledItems.length < 1) {
+      if (filledItems.length < 1) {
+        // 没有有效数据（未登录/接口异常）：最多重试 2 次后保留骨架卡片并停止请求，
+        // 避免无限重渲染把滚动位置重置
+        if (emptyRetryCount < 2) {
+          emptyRetryCount++
+          getRecommendVideos()
+        }
+        else {
+          loadStatus.value = 'empty'
+          if (!videoList.value.length)
+            videoList.value = Array.from({ length: PAGE_SIZE }, (_, i) => ({ uniqueId: `unique-id-${i}` } satisfies VideoElement))
+        }
+      }
+      else if (!await haveScrollbar()) {
+        // 内容不足一屏，继续填充
         getRecommendVideos()
       }
     }
@@ -237,9 +289,11 @@ async function getRecommendVideos() {
 async function getAppRecommendVideos() {
   try {
     let i = 0
-    if (!appFilterFunc.value || (appVideoList.value.length < PAGE_SIZE && appFilterFunc.value)) {
+    if (!appFilterFunc.value || appVideoList.value.length < PAGE_SIZE) {
       const pendingVideos: AppVideoElement[] = Array.from({
-        length: appVideoList.value.length < PAGE_SIZE ? PAGE_SIZE - appVideoList.value.length : PAGE_SIZE,
+        length: appVideoList.value.length < PAGE_SIZE
+          ? PAGE_SIZE - appVideoList.value.length
+          : PAGE_SIZE,
       }, () => ({
         uniqueId: `unique-id-${(appVideoList.value.length || 0) + i++})}`,
       } satisfies AppVideoElement))
@@ -249,10 +303,16 @@ async function getAppRecommendVideos() {
 
     const response: AppForYouResult = await api.video.getAppRecommendVideos({
       access_key: accessKey.value,
-      s_locale: settings.value.language === LanguageType.Mandarin_TW || settings.value.language === LanguageType.Cantonese ? 'zh-Hant_TW' : 'zh-Hans_CN',
-      c_locate: settings.value.language === LanguageType.Mandarin_TW || settings.value.language === LanguageType.Cantonese ? 'zh-Hant_TW' : 'zh-Hans_CN',
+      s_locale: settings.value.language === LanguageType.Mandarin_TW || settings.value.language === LanguageType.Cantonese
+        ? 'zh-Hant_TW'
+        : 'zh-Hans_CN',
+      c_locate: settings.value.language === LanguageType.Mandarin_TW || settings.value.language === LanguageType.Cantonese
+        ? 'zh-Hant_TW'
+        : 'zh-Hans_CN',
       appkey: TVAppKey.appkey,
-      idx: appVideoList.value.length > 0 ? appVideoList.value[appVideoList.value.length - 1].item?.idx : 1,
+      idx: appVideoList.value.length > 0
+        ? appVideoList.value[appVideoList.value.length - 1].item?.idx
+        : 1,
     })
 
     if (response.code === 0) {
@@ -302,11 +362,25 @@ async function getAppRecommendVideos() {
   }
   finally {
     const filledItems = appVideoList.value.filter(video => video.item)
-    appVideoList.value = filledItems
+    if (filledItems.length > 0) {
+      appVideoList.value = filledItems
+      loadStatus.value = 'loaded'
+    }
 
     if (!needToLoginFirst.value) {
       await nextTick()
-      if (!await haveScrollbar() || filledItems.length < PAGE_SIZE || filledItems.length < 1) {
+      if (filledItems.length < 1) {
+        if (emptyRetryCount < 2) {
+          emptyRetryCount++
+          getAppRecommendVideos()
+        }
+        else {
+          loadStatus.value = 'empty'
+          if (!appVideoList.value.length)
+            appVideoList.value = Array.from({ length: PAGE_SIZE }, (_, i) => ({ uniqueId: `unique-id-${i}` } satisfies AppVideoElement))
+        }
+      }
+      else if (!await haveScrollbar()) {
         getAppRecommendVideos()
       }
     }
@@ -328,9 +402,14 @@ defineExpose({ initData })
       </Button>
     </Empty>
 
+    <div v-else-if="loadStatus === 'error'" flex="~ justify-center items-center" mt-6>
+      <Button type="primary" @click="initData()">
+        {{ $t('common.operation.refresh') }}
+      </Button>
+    </div>
+
     <div
       v-else
-      ref="containerRef"
       m="b-0 t-0" relative w-full h-full
       :class="gridClass"
     >

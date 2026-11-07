@@ -1,10 +1,10 @@
-import { useStorageLocal } from '~/composables/useStorageLocal'
 import type { wallpaperItem } from '~/constants/imgs'
 import type { HomeSubPage } from '~/contentScripts/views/Home/types'
 import type { AppPage } from '~/enums/appEnums'
+import { useStorageLocal } from '~/composables/useStorageLocal'
 
-export const storageDemo = useStorageLocal('webext-demo', 'Storage Demo')
-export const accessKey = useStorageLocal('accessKey', '')
+export const storageDemo = useStorageLocal<string>('webext-demo', 'Storage Demo')
+export const accessKey = useStorageLocal<string>('accessKey', '')
 
 export interface Settings {
   touchScreenOptimization: boolean
@@ -215,7 +215,7 @@ export const originalSettings: Settings = {
   useOriginalBilibiliHomepage: false,
 }
 
-export const settings = useStorageLocal('settings', ref<Settings>(originalSettings), { mergeDefaults: true })
+export const settings = useStorageLocal<Settings>('settings', ref<Settings>(originalSettings), { mergeDefaults: true })
 
 export type GridLayoutType = 'adaptive' | 'twoColumns' | 'oneColumn'
 
@@ -223,11 +223,13 @@ export interface GridLayout {
   home: GridLayoutType
 }
 
-export const gridLayout = useStorageLocal('gridLayout', ref<GridLayout>({
+export const gridLayout = useStorageLocal<GridLayout>('gridLayout', ref<GridLayout>({
   home: 'adaptive',
 }), { mergeDefaults: true })
 
-export const sidePanel = useStorageLocal('sidePanel', ref<{
+export const sidePanel = useStorageLocal<{
+  home: boolean
+}>('sidePanel', ref<{
   home: boolean
 }>({
   home: true,

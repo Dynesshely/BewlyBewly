@@ -1,22 +1,23 @@
+import { settings } from '~/logic/storage'
+import { isHomePage, isInIframe } from '~/utils/main'
+import { injectPageStyle } from '~/utils/style'
+
 import './common'
 import './shadowDom'
 import './thirdParties'
-
-import { settings } from '~/logic/storage'
-import { isHomePage, isInIframe } from '~/utils/main'
 
 async function setupStyles() {
   const currentUrl = document.URL
 
   // homepage 首页
   if (isHomePage()) {
-    await import('./pages/homePage.scss')
+    await injectPageStyle('homePage')
     document.documentElement.classList.add('homePage')
   }
 
   // notifications page 消息页
   else if (/https?:\/\/message\.bilibili\.com\.*/.test(currentUrl)) {
-    await import('./pages/notificationsPage.scss')
+    await injectPageStyle('notificationsPage')
     document.documentElement.classList.add('notificationsPage')
 
     if (isInIframe() && settings.value.openNotificationsPageAsDrawer) {
@@ -29,8 +30,9 @@ async function setupStyles() {
     // moments
     /https?:\/\/t\.bilibili\.com\.*/.test(currentUrl)
     // moment detail, new articles page
-    || /https?:\/\/www\.bilibili\.com\/opus\/.*/.test(currentUrl)) {
-    await import('./pages/momentsPage.scss')
+    || /https?:\/\/www\.bilibili\.com\/opus\/.*/.test(currentUrl)
+  ) {
+    await injectPageStyle('momentsPage')
     document.documentElement.classList.add('momentsPage')
   }
 
@@ -39,7 +41,7 @@ async function setupStyles() {
     /https?:\/\/(?:www\.)?bilibili\.com\/account\/history.*/.test(currentUrl)
     || /https?:\/\/(?:www\.)?bilibili\.com\/history.*/.test(currentUrl)
   ) {
-    await import('./pages/historyPage.scss')
+    await injectPageStyle('historyPage')
     document.documentElement.classList.add('historyPage')
   }
 
@@ -48,25 +50,25 @@ async function setupStyles() {
     /https?:\/\/(?:www\.)?bilibili\.com\/watchlater\/list.*/.test(currentUrl)
     || /https?:\/\/(?:www\.)?bilibili\.com\/watchlater\/#\/list.*/.test(currentUrl)
   ) {
-    await import('./pages/watchLaterPage.scss')
+    await injectPageStyle('watchLaterPage')
     document.documentElement.classList.add('watchLaterPage')
   }
 
   // user note page 笔记页
   else if (/https?:\/\/space.bilibili\.com\.*\/v\/note-list/.test(currentUrl)) {
-    await import('./pages/notePage.scss')
+    await injectPageStyle('notePage')
     document.documentElement.classList.add('notePage')
   }
 
   // user space page 空间页
   else if (/https?:\/\/space.bilibili\.com\.*/.test(currentUrl)) {
-    await import('./pages/userSpacePage.scss')
+    await injectPageStyle('userSpacePage')
     document.documentElement.classList.add('userSpacePage')
   }
 
   // search page 搜索结果页
   else if (/https?:\/\/search.bilibili\.com\.*/.test(currentUrl)) {
-    await import('./pages/searchPage.scss')
+    await injectPageStyle('searchPage')
     document.documentElement.classList.add('searchPage')
   }
 
@@ -80,7 +82,7 @@ async function setupStyles() {
     // 视频合集
     || /https?:\/\/(?:www\.)?bilibili\.com\/list\/.*/.test(currentUrl)
   ) {
-    await import('./pages/videoPage.scss')
+    await injectPageStyle('videoPage')
     document.documentElement.classList.add('videoPage')
   }
 
@@ -88,65 +90,67 @@ async function setupStyles() {
     // anime playback & movie page 番剧播放页与电影播放页
     /https?:\/\/(?:www\.)?bilibili\.com\/bangumi\/play\/.*/.test(currentUrl)
   ) {
-    await import('./pages/animePlayback&MoviePage.scss')
+    await injectPageStyle('animePlayback&MoviePage')
     document.documentElement.classList.add('animePlaybackAndMoviePage')
   }
 
   // anime page & chinese anime page 番剧页 与 国创动漫
   else if (
-    /https?:\/\/(?:www\.)?bilibili\.com\/(?:anime|guochuang).*/.test(currentUrl)) {
-    await import('./pages/animePage.scss')
+    /https?:\/\/(?:www\.)?bilibili\.com\/(?:anime|guochuang).*/.test(currentUrl)
+  ) {
+    await injectPageStyle('animePage')
     document.documentElement.classList.add('animePage')
   }
 
   // channel page e.g. tv shows, movie, variety shows & mooc pages 分区页
   else if (
-    /https?:\/\/(?:www\.)?bilibili\.com\/(?:tv|movie|variety|mooc|documentary).*/.test(currentUrl)) {
-    await import('./pages/channelPage.scss')
+    /https?:\/\/(?:www\.)?bilibili\.com\/(?:tv|movie|variety|mooc|documentary).*/.test(currentUrl)
+  ) {
+    await injectPageStyle('channelPage')
     document.documentElement.classList.add('channelPage')
   }
 
   // articles, articles list & articles ranking pages 专栏页, 专栏列表页, 专栏排行榜页
   else if (/https?:\/\/(?:www\.)?bilibili\.com\/read.*/.test(currentUrl)) {
-    await import('./pages/articlesPage.scss')
+    await injectPageStyle('articlesPage')
     document.documentElement.classList.add('articlesPage')
   }
 
   // topic page 话题页
   else if (/https?:\/\/(?:www\.)?bilibili\.com\/v\/topic\/detail\/.*/.test(currentUrl)) {
-    await import('./pages/topicPage.scss')
+    await injectPageStyle('topicPage')
     document.documentElement.classList.add('topicPage')
   }
 
   // 404 page 404页
   else if (/^https?:\/\/(?:www\.)?bilibili\.com\/404.*$/.test(currentUrl)) {
-    await import('./pages/error404Page.scss')
+    await injectPageStyle('error404Page')
     document.documentElement.classList.add('error404Page')
   }
 
   // creative center page 创作中心页
   else if (/^https?:\/\/member\.bilibili\.com\/platform.*$/.test(currentUrl)) {
-    await import('./forceDark.scss')
+    await injectPageStyle('forceDark')
     document.documentElement.classList.add('forceDark')
-    await import('./pages/creativeCenterPage.scss')
+    await injectPageStyle('creativeCenterPage')
     document.documentElement.classList.add('creativeCenterPage')
   }
 
   // account settings page 帳戶設定頁，除了大會員頁
   else if (/^https?:\/\/account\.bilibili\.com\/(?!big).*$/.test(currentUrl)) {
-    await import('./pages/accountSettingsPage.scss')
+    await injectPageStyle('accountSettingsPage')
     document.documentElement.classList.add('accountSettingsPage')
   }
 
   // premium page bilibili 大會員頁
   else if (/^https?:\/\/account\.bilibili\.com\/big.*$/.test(currentUrl)) {
-    await import('./pages/premiumPage.scss')
+    await injectPageStyle('premiumPage')
     document.documentElement.classList.add('premiumPage')
   }
 
   // login page 登入頁
   else if (/^https?:\/\/passport\.bilibili\.com\/login.*$/.test(currentUrl)) {
-    await import('./pages/loginPage.scss')
+    await injectPageStyle('loginPage')
     document.documentElement.classList.add('loginPage')
   }
 }

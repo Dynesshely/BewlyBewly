@@ -146,5 +146,12 @@ export const useMainStore = defineStore('main', () => {
     return activatedCover.value
   }
 
-  return { dockItems, homeTabs, getBiliWebPageURLByPage, getDockItemByPage, setActivatedCover, getActivatedCover }
+  return {
+    dockItems,
+    homeTabs,
+    getBiliWebPageURLByPage,
+    getDockItemByPage,
+    setActivatedCover,
+    getActivatedCover,
+  }
 })

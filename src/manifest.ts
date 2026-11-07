@@ -1,7 +1,7 @@
-import fs from 'fs-extra'
 import type { Manifest } from 'webextension-polyfill'
-
 import type PkgType from '../package.json'
+
+import fs from 'fs-extra'
 import { isDev, isFirefox, isSafari, port, r } from '../scripts/utils'
 
 export async function getManifest() {
@@ -27,7 +27,10 @@ export async function getManifest() {
     // Setting `persistent` to true in Manifest V3 results in an error in Firefox
     // https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/background
     background: (isFirefox || isSafari)
-      ? { scripts: ['./dist/background/index.js'], persistent: isFirefox ? undefined : false }
+      ? {
+          scripts: ['./dist/background/index.js'],
+          persistent: isFirefox ? undefined : false,
+        }
       : { service_worker: './dist/background/index.js' },
 
     icons: {
@@ -83,14 +86,12 @@ export async function getManifest() {
         js: ['./dist/inject/index.js'],
         run_at: 'document_start',
         all_frames: true,
-        // eslint-disable-next-line ts/ban-ts-comment
-        // @ts-expect-error
         world: 'MAIN',
       },
     ],
     web_accessible_resources: [
       {
-        resources: ['dist/contentScripts/style.css', 'assets/*'],
+        resources: ['dist/contentScripts/style.css', 'dist/styles/pages/*', 'assets/*'],
         matches: ['<all_urls>'],
         // matches: ['./assets/*'],
       },

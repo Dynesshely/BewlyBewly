@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { useEventListener, useThrottleFn, useToggle } from '@vueuse/core'
 import type { Ref } from 'vue'
-
 import type { BewlyAppProvider } from '~/composables/useAppProvider'
+
+import type { DockItem } from '~/stores/mainStore'
+import { useEventListener, useThrottleFn, useToggle } from '@vueuse/core'
 import { useDark } from '~/composables/useDark'
+import { useKeyboardCardNavigation } from '~/composables/useKeyboardCardNavigation'
 import { BEWLY_MOUNTED, DRAWER_VIDEO_ENTER_PAGE_FULL, DRAWER_VIDEO_EXIT_PAGE_FULL, IFRAME_PAGE_SWITCH_BEWLY, IFRAME_PAGE_SWITCH_BILI, OVERLAY_SCROLL_BAR_SCROLL } from '~/constants/globalEvents'
 import { AppPage } from '~/enums/appEnums'
 import { settings } from '~/logic'
-import { type DockItem, useMainStore } from '~/stores/mainStore'
+import { useMainStore } from '~/stores/mainStore'
 import { useSettingsStore } from '~/stores/settingsStore'
 import { isHomePage, isInIframe, isNotificationPage, isVideoOrBangumiPage, openLinkToNewTab, queryDomUntilFound, scrollToTop } from '~/utils/main'
 import emitter from '~/utils/mitt'
@@ -76,7 +78,9 @@ const iframePageURL = computed((): string => {
     return ''
   const currentDockItemConfig = settings.value.dockItemsConfig.find(e => e.page === activatedPage.value)
   if (currentDockItemConfig) {
-    return currentDockItemConfig.useOriginalBiliPage || !mainStore.getDockItemByPage(activatedPage.value)?.hasBewlyPage ? mainStore.getBiliWebPageURLByPage(activatedPage.value) : ''
+    return currentDockItemConfig.useOriginalBiliPage || !mainStore.getDockItemByPage(activatedPage.value)?.hasBewlyPage
+      ? mainStore.getBiliWebPageURLByPage(activatedPage.value)
+      : ''
   }
   return ''
 })
@@ -129,16 +133,17 @@ watch(
       window.history.replaceState({}, '', url.toString())
     }
 
-    if (scrollbarRef.value) {
-      const osInstance = scrollbarRef.value.osInstance()
-      osInstance.elements().viewport.scrollTop = 0
-    }
+    if (scrollbarRef.value)
+      scrollbarRef.value.scrollTop = 0
     isFirstTimeActivatedPageChange.value = false
   },
   { immediate: true },
 )
 
-watch([() => showTopBar.value, () => activatedPage.value], () => {
+watch([
+  () => showTopBar.value,
+  () => activatedPage.value,
+], () => {
   // Remove the original Bilibili top bar when using original bilibili page to avoid two top bars showing
   const biliHeader = document.querySelector('.bili-header') as HTMLElement | null
   if (biliHeader && isHomePage()) {
@@ -150,6 +155,12 @@ watch([() => showTopBar.value, () => activatedPage.value], () => {
     }
   }
 }, { immediate: true })
+
+useKeyboardCardNavigation(() => scrollbarRef.value
+  ? {
+      elements: () => ({ viewport: scrollbarRef.value, scrollOffsetElement: scrollbarRef.value }),
+    }
+  : null)
 
 // Setup necessary settings watchers
 setupNecessarySettingsWatchers()
@@ -201,8 +212,7 @@ function handleDockItemClick(dockItem: DockItem) {
 }
 
 function changeActivatePage(pageName: AppPage) {
-  const osInstance = scrollbarRef.value?.osInstance()
-  const scrollTop: number = osInstance.elements().viewport.scrollTop
+  const scrollTop: number = scrollbarRef.value?.scrollTop ?? 0
 
   if (activatedPage.value === pageName) {
     if (activatedPage.value !== AppPage.Search) {
@@ -217,34 +227,36 @@ function changeActivatePage(pageName: AppPage) {
 }
 
 function handleBackToTop(targetScrollTop = 0 as number) {
-  const osInstance = scrollbarRef.value?.osInstance()
-  if (osInstance) {
-    scrollToTop(osInstance.elements().viewport, targetScrollTop)
+  if (scrollbarRef.value) {
+    scrollToTop(scrollbarRef.value, targetScrollTop)
     topBarRef.value?.toggleTopBarVisible(true)
   }
 
   iframePageRef.value?.handleBackToTop()
 }
 
+let osScrollRaf = 0
 function handleOsScroll() {
-  emitter.emit(OVERLAY_SCROLL_BAR_SCROLL)
+  if (osScrollRaf)
+    return
 
-  const osInstance = scrollbarRef.value?.osInstance()
-  const { viewport } = osInstance.elements()
-  const { scrollTop, scrollHeight, clientHeight } = viewport // get scroll offset
+  osScrollRaf = requestAnimationFrame(() => {
+    osScrollRaf = 0
+    emitter.emit(OVERLAY_SCROLL_BAR_SCROLL)
 
-  if (scrollTop === 0) {
-    reachTop.value = true
-  }
-  else {
-    reachTop.value = false
-  }
+    const el = scrollbarRef.value
+    if (!el)
+      return
+    const { scrollTop, scrollHeight, clientHeight } = el // get scroll offset
 
-  if (clientHeight + scrollTop >= scrollHeight - 300)
-    handleThrottledReachBottom()
+    reachTop.value = scrollTop === 0
 
-  if (isHomePage())
-    topBarRef.value?.handleScroll()
+    if (clientHeight + scrollTop >= scrollHeight - 300)
+      handleThrottledReachBottom()
+
+    if (isHomePage())
+      topBarRef.value?.handleScroll()
+  })
 }
 
 function openIframeDrawer(url: string) {
@@ -275,16 +287,11 @@ function openIframeDrawer(url: string) {
  */
 async function haveScrollbar() {
   await nextTick()
-  const osInstance = scrollbarRef.value?.osInstance()
+  const el = scrollbarRef.value
   // If the scrollbarRef is not ready, return false
-  if (osInstance) {
-    const { viewport } = osInstance.elements()
-    const { scrollHeight } = viewport // get scroll offset
-    return scrollHeight > window.innerHeight
-  }
-  else {
-    return false
-  }
+  if (el)
+    return el.scrollHeight > window.innerHeight
+  return false
 }
 
 // In drawer video, watch btn className changed and post message to parent
@@ -395,7 +402,7 @@ provide<BewlyAppProvider>('BEWLY_APP', {
     >
       <Transition name="fade">
         <template v-if="showBewlyPage">
-          <OverlayScrollbarsComponent ref="scrollbarRef" element="div" h-inherit defer @os-scroll="handleOsScroll">
+          <div ref="scrollbarRef" class="bewly-scroll-container" @scroll="handleOsScroll">
             <main m-auto max-w="$bew-page-max-width">
               <div
                 p="t-[calc(var(--bew-top-bar-height)+10px)]" m-auto
@@ -406,7 +413,7 @@ provide<BewlyAppProvider>('BEWLY_APP', {
                 </Transition>
               </div>
             </main>
-          </OverlayScrollbarsComponent>
+          </div>
         </template>
       </Transition>
 
@@ -429,5 +436,14 @@ provide<BewlyAppProvider>('BEWLY_APP', {
   > * > * {
     filter: var(--bew-filter-force-dark);
   }
+}
+</style>
+
+<style scoped>
+.bewly-scroll-container {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
 }
 </style>

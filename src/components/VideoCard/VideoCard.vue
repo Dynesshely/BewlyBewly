@@ -1,21 +1,21 @@
 <script lang="ts" setup>
-import { Icon } from '@iconify/vue'
 import type { CSSProperties } from 'vue'
-import { useToast } from 'vue-toastification'
+import type { Video } from './types'
+import type { VideoInfo } from '~/models/video/videoInfo'
 
+import type { VideoPreviewResult } from '~/models/video/videoPreview'
+import { Icon } from '@iconify/vue'
+import { useToast } from 'vue-toastification'
 import Button from '~/components/Button.vue'
 import { useBewlyApp } from '~/composables/useAppProvider'
 import { accessKey, settings } from '~/logic'
-import type { VideoInfo } from '~/models/video/videoInfo'
-import type { VideoPreviewResult } from '~/models/video/videoPreview'
 import { useMainStore } from '~/stores/mainStore'
 import api from '~/utils/api'
 import { getTvSign, TVAppKey } from '~/utils/authProvider'
 import { calcCurrentTime, calcTimeSince, numFormatter } from '~/utils/dataFormatter'
-import { getCSRF, removeHttpFromUrl } from '~/utils/main'
 
+import { getCSRF, removeHttpFromUrl } from '~/utils/main'
 import Tooltip from '../Tooltip.vue'
-import type { Video } from './types'
 import { getCurrentTime, getCurrentVideoUrl } from './utils'
 import VideoCardAuthorAvatar from './VideoCardAuthor/components/VideoCardAuthorAvatar.vue'
 import VideoCardAuthorName from './VideoCardAuthor/components/VideoCardAuthorName.vue'
@@ -183,7 +183,9 @@ function handleMoreBtnClick(event: MouseEvent) {
    * if (screen height - bottom > 406px) then context-menu offset upwards
    * Why 406? Because the current context-menu is not a responsive layout, it can be temporarily referred to as 406
    */
-  const offsetTop = window.innerHeight - bottom > 406 ? 0 : -406 - height
+  const offsetTop = window.innerHeight - bottom > 406
+    ? 0
+    : -406 - height
 
   showVideoOptions.value = false
   videoOptionsFloatingStyles.value = {
@@ -238,6 +240,8 @@ provide('getVideoType', () => props.type!)
 <template>
   <div
     :style="{ contentVisibility }"
+    data-video-card
+    :data-video-url="videoUrl || ''"
     intrinsic-size-300px
     duration-300 ease-in-out
     rounded="$bew-radius"
@@ -274,7 +278,7 @@ provide('getVideoType', () => props.type!)
             <!-- Video cover -->
             <Picture
               :src="`${removeHttpFromUrl(video.cover)}@672w_378h_1c_!web-home-common-cover`"
-              loading="eager"
+              loading="lazy"
               w="full" max-w-full align-middle aspect-video object-cover
               rounded="$bew-radius"
             />

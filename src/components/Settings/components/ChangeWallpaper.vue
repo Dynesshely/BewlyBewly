@@ -15,7 +15,9 @@ const uploadWallpaperRef = ref(null)
 
 const isGlobal = computed(() => props.type === 'global')
 const isBuildInWallpaper = computed(() => {
-  return isGlobal.value ? settings.value.wallpaperMode === 'buildIn' : settings.value.searchPageWallpaperMode === 'buildIn'
+  return isGlobal.value
+    ? settings.value.wallpaperMode === 'buildIn'
+    : settings.value.searchPageWallpaperMode === 'buildIn'
 })
 
 function changeWallpaperType(type: 'buildIn' | 'byUrl') {

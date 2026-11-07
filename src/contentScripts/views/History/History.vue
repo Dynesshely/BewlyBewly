@@ -1,11 +1,12 @@
 <script setup lang="ts">
+import type { List as HistoryItem, HistoryResult } from '~/models/history/history'
+import type { List as HistorySearchItem, HistorySearchResult } from '~/models/video/historySearch'
+
 import { useDateFormat } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
-
 import { useBewlyApp } from '~/composables/useAppProvider'
-import type { HistoryResult, List as HistoryItem } from '~/models/history/history'
+import { useListPageActions } from '~/composables/useListPageActions'
 import { Business } from '~/models/history/history'
-import type { HistorySearchResult, List as HistorySearchItem } from '~/models/video/historySearch'
 import { useMainStore } from '~/stores/mainStore'
 import api from '~/utils/api'
 import { calcCurrentTime } from '~/utils/dataFormatter'
@@ -14,13 +15,13 @@ import { getCSRF, removeHttpFromUrl } from '~/utils/main'
 const { t } = useI18n()
 const { setActivatedCover } = useMainStore()
 
-const isLoading = ref<boolean>()
+const isLoading = ref<boolean>(false)
 const noMoreContent = ref<boolean>(false)
 const historyList = reactive<Array<HistoryItem>>([])
 const currentPageNum = ref<number>(1)
 const keyword = ref<string>()
 const historyStatus = ref<boolean>()
-const { handlePageRefresh, handleReachBottom, haveScrollbar } = useBewlyApp()
+const { haveScrollbar } = useBewlyApp()
 
 const HistoryBusiness = computed(() => {
   return Business
@@ -29,30 +30,24 @@ const HistoryBusiness = computed(() => {
 onMounted(() => {
   getHistoryList()
   getHistoryPauseStatus()
-
-  initPageAction()
 })
 
-function initPageAction() {
-  handleReachBottom.value = () => {
-    if (isLoading.value)
-      return
-    if (noMoreContent.value)
-      return
-
+useListPageActions({
+  isLoading,
+  noMoreContent,
+  reachBottom: () => {
     if (keyword.value)
       searchHistoryList()
     else
       getHistoryList()
-  }
-
-  handlePageRefresh.value = () => {
+  },
+  refresh: () => {
     historyList.length = 0
     currentPageNum.value = 1
     noMoreContent.value = false
     getHistoryList()
-  }
-}
+  },
+})
 
 /**
  * Get history list
@@ -83,7 +78,8 @@ function getHistoryList() {
           getHistoryList()
         }
       }
-    }).finally(() => {
+    })
+    .finally(() => {
       isLoading.value = false
     })
 }
@@ -108,7 +104,8 @@ function searchHistoryList() {
 
         noMoreContent.value = false
       }
-    }).finally(() => {
+    })
+    .finally(() => {
       isLoading.value = false
     })
 }

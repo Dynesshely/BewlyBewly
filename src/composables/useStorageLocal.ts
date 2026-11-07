@@ -1,9 +1,9 @@
 import type {
-  MaybeRef,
   RemovableRef,
   StorageLikeAsync,
   UseStorageAsyncOptions,
 } from '@vueuse/core'
+import type { MaybeRef } from 'vue'
 import {
   useStorageAsync,
 } from '@vueuse/core'
@@ -19,10 +19,10 @@ const storageLocal: StorageLikeAsync = {
   },
 
   async getItem(key: string) {
-    return (await storage.local.get(key))[key]
+    return ((await storage.local.get(key))[key] as string | null) ?? null
   },
 }
 
 export function useStorageLocal<T>(key: string, initialValue: MaybeRef<T>, options?: UseStorageAsyncOptions<T>): RemovableRef<T> {
-  return useStorageAsync(key, initialValue, storageLocal, options)
+  return useStorageAsync<T>(key, initialValue, storageLocal, options) as RemovableRef<T>
 }

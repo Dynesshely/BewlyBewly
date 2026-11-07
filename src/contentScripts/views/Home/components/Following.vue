@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import type { Ref } from 'vue'
-
 import type { Author } from '~/components/VideoCard/types'
-import { useBewlyApp } from '~/composables/useAppProvider'
 import type { GridLayoutType } from '~/logic'
-import { settings } from '~/logic'
-import type { FollowingLiveResult, List as FollowingLiveItem } from '~/models/live/getFollowingLiveList'
+import type { List as FollowingLiveItem, FollowingLiveResult } from '~/models/live/getFollowingLiveList'
 import type { DataItem as MomentItem, MomentResult } from '~/models/moment/moment'
+import { useBewlyApp } from '~/composables/useAppProvider'
+import { useGridLayoutClass } from '~/composables/useGridLayout'
+import { useListPageActions } from '~/composables/useListPageActions'
+import { settings } from '~/logic'
 import api from '~/utils/api'
 
 // https://github.com/starknt/BewlyBewly/blob/fad999c2e482095dc3840bb291af53d15ff44130/src/contentScripts/views/Home/components/ForYou.vue#L16
@@ -31,13 +31,7 @@ const emit = defineEmits<{
   (e: 'afterLoading'): void
 }>()
 
-const gridClass = computed((): string => {
-  if (props.gridLayout === 'adaptive')
-    return 'grid-adaptive'
-  if (props.gridLayout === 'twoColumns')
-    return 'grid-two-columns'
-  return 'grid-one-column'
-})
+const gridClass = useGridLayoutClass(toRef(props, 'gridLayout'))
 
 const videoList = ref<VideoElement[]>([])
 /**
@@ -47,37 +41,24 @@ const livePage = ref<number>(1)
 const liveVideoList = ref<LiveVideoElement[]>([])
 const isLoading = ref<boolean>(false)
 const needToLoginFirst = ref<boolean>(false)
-const containerRef = ref<HTMLElement>() as Ref<HTMLElement>
 const offset = ref<string>('')
 const updateBaseline = ref<string>('')
 const noMoreContent = ref<boolean>(false)
-const { handleReachBottom, handlePageRefresh, haveScrollbar } = useBewlyApp()
+const { haveScrollbar } = useBewlyApp()
+const { rebindPageActions } = useListPageActions({
+  isLoading,
+  noMoreContent,
+  reachBottom: () => getData(),
+  refresh: () => initData(),
+})
 
 onMounted(() => {
   initData()
-  initPageAction()
 })
 
 onActivated(() => {
-  initPageAction()
+  rebindPageActions()
 })
-
-function initPageAction() {
-  handleReachBottom.value = async () => {
-    if (isLoading.value)
-      return
-    if (noMoreContent.value)
-      return
-
-    getData()
-  }
-  handlePageRefresh.value = async () => {
-    if (isLoading.value)
-      return
-
-    initData()
-  }
-}
 
 async function initData() {
   offset.value = ''
@@ -167,7 +148,9 @@ async function getFollowedUsersVideos() {
 
   try {
     // 如果 videoList 不是空的，获取最后一个真实视频的 uniqueId 和 bvid
-    let lastVideo: VideoElement | null = videoList.value.length > 0 ? videoList.value.slice(-1)[0] : null
+    let lastVideo: VideoElement | null = videoList.value.length > 0
+      ? videoList.value.slice(-1)[0]
+      : null
     const lastUniqueId = lastVideo ? lastVideo.uniqueId : ''
     let lastBvid = lastVideo ? lastVideo.bvid : ''
 
@@ -274,7 +257,6 @@ defineExpose({ initData })
     </Empty>
     <div
       v-else
-      ref="containerRef"
       m="b-0 t-0" relative w-full h-full
       :class="gridClass"
     >

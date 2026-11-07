@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-
 import type { FavoriteCategory, FavoriteResource } from '~/components/TopBar/types'
+
+import type { Media as FavoriteItem, FavoritesResult } from '~/models/video/favorite'
+import type { List as CategoryItem, FavoritesCategoryResult } from '~/models/video/favoriteCategory'
+import { useI18n } from 'vue-i18n'
 import { useBewlyApp } from '~/composables/useAppProvider'
+import { useListPageActions } from '~/composables/useListPageActions'
 import { TOP_BAR_VISIBILITY_CHANGE } from '~/constants/globalEvents'
 import { settings } from '~/logic'
-import type { FavoritesResult, Media as FavoriteItem } from '~/models/video/favorite'
-import type { FavoritesCategoryResult, List as CategoryItem } from '~/models/video/favoriteCategory'
 import api from '~/utils/api'
 import { getCSRF, getUserID, openLinkToNewTab, removeHttpFromUrl } from '~/utils/main'
 import emitter from '~/utils/mitt'
@@ -23,7 +24,7 @@ const activatedCategoryCover = ref<string>('')
 const shouldMoveCtrlBarUp = ref<boolean>(false)
 const currentPageNum = ref<number>(1)
 const keyword = ref<string>('')
-const { handlePageRefresh, handleReachBottom, haveScrollbar } = useBewlyApp()
+const { haveScrollbar } = useBewlyApp()
 const isLoading = ref<boolean>(false)
 const isFullPageLoading = ref<boolean>(false)
 const noMoreContent = ref<boolean>(false)
@@ -45,7 +46,6 @@ onMounted(() => {
     }
   })
 
-  initPageAction()
   initData()
 })
 
@@ -58,25 +58,17 @@ onUnmounted(() => {
   emitter.off(TOP_BAR_VISIBILITY_CHANGE)
 })
 
-function initPageAction() {
-  handleReachBottom.value = async () => {
-    if (isLoading.value)
-      return
-    if (noMoreContent.value)
-      return
-
-    await getFavoriteResources(selectedCategory.value!.id, ++currentPageNum.value, keyword.value)
-  }
-
-  handlePageRefresh.value = () => {
-    if (isLoading.value)
-      return
+useListPageActions({
+  isLoading,
+  noMoreContent,
+  reachBottom: () => getFavoriteResources(selectedCategory.value!.id, ++currentPageNum.value, keyword.value),
+  refresh: () => {
     favoriteResources.length = 0
     currentPageNum.value = 1
     noMoreContent.value = false
     handleSearch()
-  }
-}
+  },
+})
 
 async function getFavoriteCategories() {
   await api.favorite.getFavoriteCategories({

@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { useThrottleFn } from '@vueuse/core'
+import type { GridLayoutIcon } from './types'
 
+import type { HomeTab } from '~/stores/mainStore'
+import { useThrottleFn } from '@vueuse/core'
 import { useBewlyApp } from '~/composables/useAppProvider'
 import { TOP_BAR_VISIBILITY_CHANGE } from '~/constants/globalEvents'
 import { gridLayout, settings } from '~/logic'
-import type { HomeTab } from '~/stores/mainStore'
 import { useMainStore } from '~/stores/mainStore'
-import emitter from '~/utils/mitt'
 
-import type { GridLayoutIcon } from './types'
+import emitter from '~/utils/mitt'
 import { HomeSubPage } from './types'
 
 const mainStore = useMainStore()
@@ -102,8 +102,7 @@ onUnmounted(() => {
 
 function handleChangeTab(tab: HomeTab) {
   if (activatedPage.value === tab.page) {
-    const osInstance = scrollbarRef.value?.osInstance()
-    const scrollTop = osInstance.elements().viewport.scrollTop as number
+    const scrollTop = (scrollbarRef.value?.scrollTop ?? 0) as number
 
     if ((!settings.value.useSearchPageModeOnHomePage && scrollTop > 0) || (settings.value.useSearchPageModeOnHomePage && scrollTop > 510)) {
       handleThrottledBackToTop(settings.value.useSearchPageModeOnHomePage ? 510 : 0)

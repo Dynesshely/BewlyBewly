@@ -1,19 +1,19 @@
 <script setup lang="ts">
+import type { HoveringDockItem } from './types'
+import type { DockItem } from '~/stores/mainStore'
 import { Icon } from '@iconify/vue'
+
 import { useElementSize, useWindowSize } from '@vueuse/core'
 import { computed, ref } from 'vue'
-
 import { useBewlyApp } from '~/composables/useAppProvider'
 import { useDark } from '~/composables/useDark'
 import { useDelayedHover } from '~/composables/useDelayedHover'
 import { AppPage } from '~/enums/appEnums'
 import { settings } from '~/logic'
-import type { DockItem } from '~/stores/mainStore'
 import { useMainStore } from '~/stores/mainStore'
-import { isHomePage, openLinkToNewTab } from '~/utils/main'
 
+import { isHomePage, openLinkToNewTab } from '~/utils/main'
 import Tooltip from '../Tooltip.vue'
-import type { HoveringDockItem } from './types'
 
 const props = defineProps<{
   activatedPage: AppPage
@@ -102,13 +102,23 @@ function computeDockItem(): DockItem[] {
     const missingItems = mainStore.dockItems.filter(dock => !settings.value.dockItemsConfig.some(item => item.page === dock.page))
     settings.value.dockItemsConfig = [
       ...settings.value.dockItemsConfig,
-      ...missingItems.map(dock => ({ page: dock.page, visible: true, openInNewTab: false, useOriginalBiliPage: false })),
+      ...missingItems.map(dock => ({
+        page: dock.page,
+        visible: true,
+        openInNewTab: false,
+        useOriginalBiliPage: false,
+      })),
     ]
   }
   // if dockItemVisibilityList not fresh , set it to default
   else if (!Array.isArray(settings.value.dockItemsConfig) || settings.value.dockItemsConfig.length !== mainStore.dockItems.length) {
     settings.value.dockItemsConfig = mainStore.dockItems.map(dock =>
-      ({ page: dock.page, visible: true, openInNewTab: false, useOriginalBiliPage: false }),
+      ({
+        page: dock.page,
+        visible: true,
+        openInNewTab: false,
+        useOriginalBiliPage: false,
+      }),
     )
   }
 

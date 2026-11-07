@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { useDateFormat } from '@vueuse/core'
-import { useI18n } from 'vue-i18n'
-
-import { useBewlyApp } from '~/composables/useAppProvider'
-import { settings } from '~/logic'
 import type { List as VideoItem, WatchLaterResult } from '~/models/video/watchLater'
+import { useDateFormat } from '@vueuse/core'
+
+import { useI18n } from 'vue-i18n'
+import { useBewlyApp } from '~/composables/useAppProvider'
+import { useListPageActions } from '~/composables/useListPageActions'
+import { settings } from '~/logic'
 import { useMainStore } from '~/stores/mainStore'
 import api from '~/utils/api'
 import { calcCurrentTime } from '~/utils/dataFormatter'
@@ -14,16 +15,15 @@ const { t } = useI18n()
 const { openIframeDrawer } = useBewlyApp()
 const { setActivatedCover } = useMainStore()
 
-const isLoading = ref<boolean>()
-const noMoreContent = ref<boolean>()
+const isLoading = ref<boolean>(false)
+const noMoreContent = ref<boolean>(false)
 const allWatchLaterList = ref<VideoItem[]>([])
 const currentWatchLaterList = ref<VideoItem[]>([])
 const watchLaterCount = ref<number>(0)
-const { handlePageRefresh, handleReachBottom, haveScrollbar } = useBewlyApp()
+const { haveScrollbar } = useBewlyApp()
 const pageNum = ref<number>(1)
 
 onMounted(() => {
-  initPageAction()
   initData()
 })
 
@@ -41,18 +41,12 @@ function getData() {
   getCurrentWatchLaterList()
 }
 
-function initPageAction() {
-  handlePageRefresh.value = async () => {
-    if (isLoading.value)
-      return
-
-    initData()
-  }
-
-  handleReachBottom.value = async () => {
-    getData()
-  }
-}
+useListPageActions({
+  isLoading,
+  noMoreContent,
+  reachBottom: () => getData(),
+  refresh: () => initData(),
+})
 
 /**
  * Get watch later list
@@ -168,55 +162,46 @@ function handleMouseEnter(item: VideoItem) {
       <Empty v-if="watchLaterCount === 0 && !isLoading" />
       <template v-else>
         <!-- watcher later list -->
-        <TransitionGroup name="list">
-          <ALink
-            v-for="(item, index) in currentWatchLaterList"
-            :key="item.aid"
-            :href="`https://www.bilibili.com/list/watchlater?bvid=${item.bvid}`"
-            type="videoCard"
-            class="group"
-            flex cursor-pointer
-            @mouseenter="handleMouseEnter(item)"
+        <div class="watch-later-list">
+          <template
+            v-for="(watchItem, watchIndex) in currentWatchLaterList"
+            :key="watchItem.aid"
           >
-            <section
-              rounded="$bew-radius"
-              flex="~ gap-6 col md:col lg:row items-start"
-              relative
-              group-hover:bg="$bew-fill-2"
-              duration-300 w-full
-              p-2 m-1
-              content-visibility-auto
+            <ALink
+              :href="`https://www.bilibili.com/list/watchlater?bvid=${watchItem.bvid}`"
+              type="videoCard"
+              class="group"
+              flex cursor-pointer
+              @mouseenter="handleMouseEnter(watchItem)"
             >
-              <!-- Cover -->
-              <div
-                pos="relative"
-                bg="$bew-skeleton"
-                w="full md:full lg:250px"
-                flex="shrink-0"
+              <section
                 rounded="$bew-radius"
-                overflow-hidden
-                aspect-video
+                flex="~ gap-6 col md:col lg:row items-start"
+                relative
+                group-hover:bg="$bew-fill-2"
+                duration-300 w-full
+                p-2 m-1
+                content-visibility-auto
               >
-                <img
-                  w="full"
-                  aspect-video
-                  :src="removeHttpFromUrl(`${item.pic}@480w_270h_1c`)"
-                  :alt="item.title"
-                  object-cover
-                >
-
-                <!-- <div
-                  pos="absolute bottom-0 right-0"
-                  bg="black opacity-60"
-                  m="2"
-                  p="x-2 y-1"
-                  text="white xs"
-                  rounded-8
-                >
-                  {{ calcCurrentTime(item.duration) }}
-                </div> -->
+                <!-- Cover -->
                 <div
+                  pos="relative"
+                  bg="$bew-skeleton"
+                  w="full md:full lg:250px"
+                  flex="shrink-0"
+                  rounded="$bew-radius"
+                  overflow-hidden
+                  aspect-video
+                >
+                  <img
+                    w="full"
+                    aspect-video
+                    :src="removeHttpFromUrl(`${watchItem.pic}@480w_270h_1c`)"
+                    :alt="watchItem.title"
+                    object-cover
+                  >
 
+                  <!-- <div
                   pos="absolute bottom-0 right-0"
                   bg="black opacity-60"
                   m="2"
@@ -224,88 +209,100 @@ function handleMouseEnter(item: VideoItem) {
                   text="white xs"
                   rounded-8
                 >
-                  <!--  When progress = -1 means that the user watched the full video -->
-                  {{
-                    `${
-                      item.progress === -1
-                        ? calcCurrentTime(item.duration)
-                        : calcCurrentTime(item.progress)
-                    } /
-                      ${calcCurrentTime(item.duration)}`
-                  }}
-                </div>
-                <div w-full pos="absolute bottom-0" bg="white opacity-60">
-                  <Progress
-                    :percentage="
-                      (item.progress / item.duration) * 100
-                    "
-                  />
-                </div>
-              </div>
+                  {{ calcCurrentTime(watchItem.duration) }}
+                </div> -->
+                  <div
 
-              <!-- Description -->
-              <div flex justify-between w-full h-full>
-                <div flex="~ col">
-                  <a
-                    class="keep-two-lines"
-                    overflow="hidden"
-                    un-text="lg overflow-ellipsis"
-                    @click.stop.prevent="handleLinkClick(`https://www.bilibili.com/list/watchlater?bvid=${item.bvid}`)"
+                    pos="absolute bottom-0 right-0"
+                    bg="black opacity-60"
+                    m="2"
+                    p="x-2 y-1"
+                    text="white xs"
+                    rounded-8
                   >
-                    {{ item.title }}
-                  </a>
-                  <a
-                    un-text="$bew-text-2 sm"
-                    m="t-4 b-2"
-                    flex="~"
-                    items-center
-                    cursor-pointer
-                    w-fit
-                    rounded="$bew-radius"
-                    hover:color="$bew-theme-color"
-                    hover:bg="$bew-theme-color-10"
-                    duration-300
-                    pr-2
-                    :href="`//space.bilibili.com/${item.owner.mid}`" target="_blank"
-                    @click.stop
-                  >
-                    <img
-                      :src="removeHttpFromUrl(`${item.owner.face}@40w_40h_1c`)"
-                      w-30px
-                      aspect-square
-                      object-cover
-                      alt=""
-                      rounded="1/2"
-                      mr-2
-                    >
-                    {{ item.owner.name }}
-                  </a>
-                  <p display="block xl:none" text="$bew-text-3 sm" mt-auto mb-2>
+                    <!--  When progress = -1 means that the user watched the full video -->
                     {{
-                      useDateFormat(item.pubdate * 1000, 'YYYY-MM-DD HH:mm:ss')
-                        .value
+                      `${
+                        watchItem.progress === -1
+                          ? calcCurrentTime(watchItem.duration)
+                          : calcCurrentTime(watchItem.progress)
+                      } /
+                      ${calcCurrentTime(watchItem.duration)}`
                     }}
-                  </p>
+                  </div>
+                  <div w-full pos="absolute bottom-0" bg="white opacity-60">
+                    <Progress
+                      :percentage="
+                        (watchItem.progress / watchItem.duration) * 100
+                      "
+                    />
+                  </div>
                 </div>
 
-                <div flex items-center>
-                  <!-- <span>{{ item.progress === -1 ? $t('watch_later.watched') : '' }}</span> -->
+                <!-- Description -->
+                <div flex justify-between w-full h-full>
+                  <div flex="~ col">
+                    <a
+                      class="keep-two-lines"
+                      overflow="hidden"
+                      un-text="lg overflow-ellipsis"
+                      @click.stop.prevent="handleLinkClick(`https://www.bilibili.com/list/watchlater?bvid=${watchItem.bvid}`)"
+                    >
+                      {{ watchItem.title }}
+                    </a>
+                    <a
+                      un-text="$bew-text-2 sm"
+                      m="t-4 b-2"
+                      flex="~"
+                      items-center
+                      cursor-pointer
+                      w-fit
+                      rounded="$bew-radius"
+                      hover:color="$bew-theme-color"
+                      hover:bg="$bew-theme-color-10"
+                      duration-300
+                      pr-2
+                      :href="`//space.bilibili.com/${watchItem.owner.mid}`" target="_blank"
+                      @click.stop
+                    >
+                      <img
+                        :src="removeHttpFromUrl(`${watchItem.owner.face}@40w_40h_1c`)"
+                        w-30px
+                        aspect-square
+                        object-cover
+                        alt=""
+                        rounded="1/2"
+                        mr-2
+                      >
+                      {{ watchItem.owner.name }}
+                    </a>
+                    <p display="block xl:none" text="$bew-text-3 sm" mt-auto mb-2>
+                      {{
+                        useDateFormat(watchItem.pubdate * 1000, 'YYYY-MM-DD HH:mm:ss')
+                          .value
+                      }}
+                    </p>
+                  </div>
 
-                  <button
-                    text="2xl $bew-text-3"
-                    hover:color="$bew-theme-color"
-                    opacity-0 group-hover:opacity-100
-                    p-2
-                    duration-300
-                    @click.prevent.stop="deleteWatchLaterItem(index, item.aid)"
-                  >
-                    <div i-tabler:trash />
-                  </button>
+                  <div flex items-center>
+                    <!-- <span>{{ watchItem.progress === -1 ? $t('watch_later.watched') : '' }}</span> -->
+
+                    <button
+                      text="2xl $bew-text-3"
+                      hover:color="$bew-theme-color"
+                      opacity-0 group-hover:opacity-100
+                      p-2
+                      duration-300
+                      @click.prevent.stop="deleteWatchLaterItem(watchIndex, watchItem.aid)"
+                    >
+                      <div i-tabler:trash />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </section>
-          </ALink>
-        </TransitionGroup>
+              </section>
+            </ALink>
+          </template>
+        </div>
         <!-- loading -->
         <Transition name="fade">
           <loading

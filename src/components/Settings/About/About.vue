@@ -22,7 +22,7 @@ const isSafari = computed((): boolean =>
 const safariHelpers = computed((): { name: string, avatar: string, url: string, desc: string }[] => [
   {
     name: 'exgphe',
-    avatar: '/assets/twitterUsers/exgphe.png',
+    avatar: '/assets/twitterUsers/exgphe.webp',
     url: 'https://github.com/exgphe',
     desc: t('settings.safari_helpers_desc1'),
   },
@@ -135,7 +135,7 @@ async function checkGitHubRelease() {
     <div max-w-800px mx-auto>
       <div relative w-200px m-auto>
         <img
-          :src="`${browser.runtime.getURL('/assets/bewly-vtuber-style-logo.png')}`" alt="" width="200"
+          :src="`${browser.runtime.getURL('/assets/bewly-vtuber-style-logo.webp')}`" alt="" width="200" loading="lazy"
         >
 
         <a
@@ -238,7 +238,7 @@ async function checkGitHubRelease() {
                 >https://afdian.com/@hakadao</a>
               </p>
               <img
-                :src="browser.runtime.getURL('/assets/sponsor/afdian.jpg')" alt=""
+                :src="browser.runtime.getURL('/assets/sponsor/afdian.webp')" alt=""
                 max-w-400px w-full
               >
 
@@ -250,7 +250,7 @@ async function checkGitHubRelease() {
                 >https://buymeacoffee.com/hakadao</a>
               </p>
               <img
-                :src="browser.runtime.getURL('/assets/sponsor/bmc.png')" alt=""
+                :src="browser.runtime.getURL('/assets/sponsor/bmc.webp')" alt=""
                 max-w-150px w-full
               >
             </Dialog>

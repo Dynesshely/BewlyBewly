@@ -8,7 +8,10 @@ const scrollListWrap = ref<HTMLElement>() as Ref<HTMLElement>
 // const showRightMask = ref<boolean>(false)
 const showScrollMask = ref<boolean>(true)
 
-watch([() => settings.value.enableHorizontalScrolling, scrollListWrap], ([enableHorizontalScrolling, scrollListWrap]) => {
+watch([
+  () => settings.value.enableHorizontalScrolling,
+  scrollListWrap,
+], ([enableHorizontalScrolling, scrollListWrap]) => {
   if (!scrollListWrap)
     return
 

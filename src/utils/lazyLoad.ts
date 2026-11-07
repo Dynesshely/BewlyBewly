@@ -60,7 +60,9 @@ declare function cancelIdleCallback(handle: number): void;
   }
   else {
     runWhenIdle = (runner, timeout?) => {
-      const handle: number = requestIdleCallback(runner, typeof timeout === 'number' ? { timeout } : undefined)
+      const handle: number = requestIdleCallback(runner, typeof timeout === 'number'
+        ? { timeout }
+        : undefined)
       let disposed = false
       return {
         dispose() {

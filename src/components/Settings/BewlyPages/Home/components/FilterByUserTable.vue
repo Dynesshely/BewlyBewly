@@ -42,7 +42,9 @@ async function handleEditFilter(index: number, focusItem: 'keyword' | 'remark' =
   editingFilter.value = { ...settings.value.filterByUser[index] }
   await nextTick()
 
-  const inputElement = focusItem === 'keyword' ? keywordRef.value : remarkRef.value
+  const inputElement = focusItem === 'keyword'
+    ? keywordRef.value
+    : remarkRef.value
   if (Array.isArray(inputElement)) {
     inputElement[0]?.focus()
   }

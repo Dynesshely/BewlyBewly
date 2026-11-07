@@ -43,16 +43,24 @@ const { mainAppRef } = useBewlyApp()
 const showDialog = ref<boolean>(false)
 
 const dialogWidth = computed(() => {
-  return typeof props.width === 'number' ? `${props.width}px` : props.width || '400px'
+  return typeof props.width === 'number'
+    ? `${props.width}px`
+    : props.width || '400px'
 })
 const dialogMaxWidth = computed(() => {
-  return typeof props.maxWidth === 'number' ? `${props.maxWidth}px` : props.maxWidth || 'unset'
+  return typeof props.maxWidth === 'number'
+    ? `${props.maxWidth}px`
+    : props.maxWidth || 'unset'
 })
 const dialogContentHeight = computed(() => {
-  return typeof props.contentHeight === 'number' ? `${props.contentHeight}px` : props.contentHeight || 'auto'
+  return typeof props.contentHeight === 'number'
+    ? `${props.contentHeight}px`
+    : props.contentHeight || 'auto'
 })
 const dialogContentMaxHeight = computed(() => {
-  return typeof props.contentMaxHeight === 'number' ? `${props.contentMaxHeight}px` : props.contentMaxHeight || 'auto'
+  return typeof props.contentMaxHeight === 'number'
+    ? `${props.contentMaxHeight}px`
+    : props.contentMaxHeight || 'auto'
 })
 
 onKeyStroke('Alt', (e: KeyboardEvent) => {

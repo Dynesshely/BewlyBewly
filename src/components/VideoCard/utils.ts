@@ -4,7 +4,9 @@ export function getAuthorJumpUrl(author?: Author) {
   if (!author)
     return ''
 
-  return author.authorUrl || (author.mid ? `//space.bilibili.com/${author.mid}` : '')
+  return author.authorUrl || (author.mid
+    ? `//space.bilibili.com/${author.mid}`
+    : '')
 }
 
 export function getCurrentTime(videoElement: Ref<HTMLVideoElement | null>) {
@@ -17,5 +19,7 @@ export function getCurrentTime(videoElement: Ref<HTMLVideoElement | null>) {
 export function getCurrentVideoUrl(video: Video, videoCurrentTime: Ref<number | null>) {
   const baseUrl = `https://www.bilibili.com/video/${video.bvid ?? `av${video.aid}`}`
   const currentTime = videoCurrentTime.value
-  return currentTime && currentTime > 5 ? `${baseUrl}/?t=${currentTime}` : baseUrl
+  return currentTime && currentTime > 5
+    ? `${baseUrl}/?t=${currentTime}`
+    : baseUrl
 }

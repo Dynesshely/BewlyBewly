@@ -2,7 +2,7 @@ import { settings } from '~/logic'
 
 // DISABLED WHEN IN TOUCHSCREEN OPTIMIZATION IS ENABLED IN SETTINGS
 export function useDelayedHover({ enterDelay = 300, leaveDelay = 300, beforeEnter, enter, beforeLeave, leave }:
-{ enterDelay?: number, leaveDelay?: number, beforeEnter?: Function, enter: Function, beforeLeave?: Function, leave: Function }) {
+{ enterDelay?: number, leaveDelay?: number, beforeEnter?: (...args: any[]) => any, enter: (...args: any[]) => any, beforeLeave?: (...args: any[]) => any, leave: (...args: any[]) => any }) {
   const el = ref<HTMLElement>()
 
   let enterTimer: any | undefined

@@ -15,7 +15,7 @@ function toData(data: Promise<any>): Promise<any> {
 
 // if need sendResponse, use this
 // return a FetchAfterHandler function
-function sendResponseHandler(sendResponse: Function) {
+function sendResponseHandler(sendResponse: (...args: any[]) => any) {
   return (data: any) => sendResponse(data)
 }
 
@@ -52,34 +52,56 @@ interface API {
   afterHandle: ((response: Response) => Response | Promise<Response>)[]
 }
 // 重载API 可以为函数
-type APIFunction = (message: Message, sender?: any, sendResponse?: Function) => any
+type APIFunction = (message: Message, sender?: any, sendResponse?: (...args: any[]) => any) => any
 export type APIType = API | APIFunction
 interface APIMAP {
   [key: string]: APIType
 }
 // 工厂函数API_LISTENER_FACTORY
 function apiListenerFactory(API_MAP: APIMAP) {
-  return async (message: Message, sender?: Browser.Runtime.MessageSender, sendResponse?: Function) => {
-    const contentScriptQuery = message.contentScriptQuery
+  return (message: unknown, sender?: Browser.Runtime.MessageSender, sendResponse?: (...args: any[]) => any) => {
+    // webextension-polyfill 0.12 起 onMessage 回调参数类型为 unknown
+    const msg = message as Message
+    const contentScriptQuery = msg.contentScriptQuery
     // 检测是否有contentScriptQuery
-    if (!contentScriptQuery || !API_MAP[contentScriptQuery])
-      return console.error(`Cannot find this contentScriptQuery: ${contentScriptQuery}`)
-    if (API_MAP[contentScriptQuery] instanceof Function)
-      return (API_MAP[contentScriptQuery] as APIFunction)(message, sender, sendResponse)
+    if (!contentScriptQuery || !API_MAP[contentScriptQuery]) {
+      console.error(`Cannot find this contentScriptQuery: ${contentScriptQuery}`)
+      return false
+    }
+    if (typeof API_MAP[contentScriptQuery] === 'function') {
+      ;(API_MAP[contentScriptQuery] as APIFunction)(msg, sender, sendResponse)
+      return true
+    }
 
     const api = API_MAP[contentScriptQuery] as API
 
+    // MV3 下必须显式 return true 保持消息通道，再异步 sendResponse；
+    // 只返回 Promise 时 webextension-polyfill 可能拿不到结果
+
+    const senderStoreId = sender?.tab?.cookieStoreId
     // eslint-disable-next-line node/prefer-global/process
-    if (process.env.FIREFOX && sender && sender.tab && sender.tab.cookieStoreId) {
-      const cookies = await browser.cookies.getAll({ storeId: sender.tab.cookieStoreId })
-      return doRequest(message, api, sendResponse, cookies)
+    if (process.env.FIREFOX && senderStoreId) {
+      browser.cookies.getAll({ storeId: senderStoreId })
+        .then(cookies => doRequest(msg, api, sendResponse, cookies))
+        .then((data: any) => sendResponse?.(data))
+        .catch((e: any) => {
+          console.error(e)
+          sendResponse?.(undefined)
+        })
+      return true
     }
 
-    return doRequest(message, api, sendResponse)
+    doRequest(msg, api, sendResponse)
+      ?.then((data: any) => sendResponse?.(data))
+      .catch((e: any) => {
+        console.error(e)
+        sendResponse?.(undefined)
+      })
+    return true
   }
 }
 
-function doRequest(message: Message, api: API, sendResponse?: Function, cookies?: Browser.Cookies.Cookie[]) {
+function doRequest(message: Message, api: API, sendResponse?: (...args: any[]) => any, cookies?: Browser.Cookies.Cookie[]) {
   try {
     let { contentScriptQuery, ...rest } = message
     // rest above two part body or params

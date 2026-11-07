@@ -21,10 +21,16 @@ export function parseBilibiliUri(uri: string): BilibiliUri {
   const searchParams = new URLSearchParams(params)
   return {
     cid: searchParams.get('cid'),
-    player_height: searchParams.get('player_height') ? Number.parseInt(searchParams.get('player_height')!) : null,
+    player_height: searchParams.get('player_height')
+      ? Number.parseInt(searchParams.get('player_height')!)
+      : null,
     player_preload: searchParams.get('player_preload'),
-    player_rotate: searchParams.get('player_rotate') ? Number.parseInt(searchParams.get('player_rotate')!) : null,
-    player_width: searchParams.get('player_width') ? Number.parseInt(searchParams.get('player_width')!) : null,
+    player_rotate: searchParams.get('player_rotate')
+      ? Number.parseInt(searchParams.get('player_rotate')!)
+      : null,
+    player_width: searchParams.get('player_width')
+      ? Number.parseInt(searchParams.get('player_width')!)
+      : null,
     report_flow_data: searchParams.get('report_flow_data'),
     trackid: searchParams.get('trackid'),
   }

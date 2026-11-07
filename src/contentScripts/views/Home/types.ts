@@ -17,6 +17,12 @@ export interface RankingType {
   type?: string
 }
 
+/** 网格列表项：视频/动态/直播等的通用外壳，避免各页面重复声明同样结构 */
+export interface GridVideoElement<T = unknown> {
+  uniqueId: string
+  item?: T
+}
+
 export interface GridLayoutIcon {
   icon: string
   iconActivated: string

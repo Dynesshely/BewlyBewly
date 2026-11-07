@@ -32,7 +32,9 @@ const target = computed(() => {
     return '_blank'
   }
   if (openMode.value === 'currentTabIfNotHomepage') {
-    return isHomePage() ? '_blank' : '_top'
+    return isHomePage()
+      ? '_blank'
+      : '_top'
   }
   if (openMode.value === 'currentTab') {
     return '_top'

@@ -1,17 +1,19 @@
-import 'vue-toastification/dist/index.css'
+import type { App } from 'vue'
 
 import { createPinia } from 'pinia'
-import type { App } from 'vue'
 import Toast, { POSITION } from 'vue-toastification'
-import { getCurrentContext } from 'webext-bridge'
-
 import components from '~/components'
+
 import { i18n } from '~/utils/i18n'
+import 'vue-toastification/dist/index.css'
 
 const pinia = createPinia()
 
 export async function setupApp(app: App) {
-  const context = getCurrentContext()
+  // webext-bridge v6 移除了 getCurrentContext，这里按运行环境自行判断
+  const context = typeof window !== 'undefined' && /^(?:chrome|moz)-extension:/.test(window.location.protocol)
+    ? 'popup'
+    : 'content-script'
 
   // Inject a globally available `$app` object in template
   app.config.globalProperties.$app = { context }

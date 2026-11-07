@@ -50,7 +50,10 @@ export function setupNecessarySettingsWatchers() {
   )
 
   watch(
-    [() => settings.value.customizeFont, () => settings.value.fontFamily],
+    [
+      () => settings.value.customizeFont,
+      () => settings.value.fontFamily,
+    ],
     () => {
       if (typeof settings.value.customizeFont === 'boolean')
         settings.value.customizeFont = 'recommend'
@@ -217,7 +220,10 @@ export function setupNecessarySettingsWatchers() {
   let styleEL: HTMLStyleElement | null = null
   let bewlyStyleEL: HTMLStyleElement | null = null
   watch(
-    [() => settings.value.customizeCSS, () => settings.value.customizeCSSContent],
+    [
+      () => settings.value.customizeCSS,
+      () => settings.value.customizeCSSContent,
+    ],
     () => {
       const bewlyEl: HTMLElement | null = document.querySelector('#bewly')
       const bewlyShadow: ShadowRoot | null = bewlyEl?.shadowRoot || null

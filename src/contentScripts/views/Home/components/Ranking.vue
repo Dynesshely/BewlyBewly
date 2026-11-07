@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-
-import { useBewlyApp } from '~/composables/useAppProvider'
-import type { GridLayoutType } from '~/logic'
-import { settings } from '~/logic'
-import type { List as RankingVideoItem, RankingResult } from '~/models/video/ranking'
-import type { List as RankingPgcItem, RankingPgcResult } from '~/models/video/rankingPgc'
-import api from '~/utils/api'
-
 import type { RankingType } from '../types'
+
+import type { GridLayoutType } from '~/logic'
+import type { RankingResult, List as RankingVideoItem } from '~/models/video/ranking'
+import type { List as RankingPgcItem, RankingPgcResult } from '~/models/video/rankingPgc'
+import { useI18n } from 'vue-i18n'
+import { useBewlyApp } from '~/composables/useAppProvider'
+import { useGridLayoutClass } from '~/composables/useGridLayout'
+import { settings } from '~/logic'
+
+import api from '~/utils/api'
 
 const props = defineProps<{
   gridLayout: GridLayoutType
@@ -23,47 +24,141 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const { handleBackToTop, handlePageRefresh } = useBewlyApp()
 
-const gridClass = computed((): string => {
-  if (props.gridLayout === 'adaptive') {
-    // eslint-disable-next-line ts/no-use-before-define
-    if (!activatedRankingType.value.seasonType)
-      return 'grid-adaptive-video'
-    else
-      return 'grid-adaptive-bangumi'
-  }
-
-  if (props.gridLayout === 'twoColumns')
-    return 'grid-two-columns'
-  return 'grid-one-column'
-})
+const gridClass = useGridLayoutClass(
+  toRef(props, 'gridLayout'),
+  // eslint-disable-next-line ts/no-use-before-define
+  computed(() => activatedRankingType.value.seasonType ? 'grid-adaptive-bangumi' : 'grid-adaptive-video'),
+)
 
 const rankingTypes = computed((): RankingType[] => {
   return [
-    { id: 1, name: t('ranking.all'), rid: 0 },
-    { id: 2, name: t('topbar.logo_dropdown.anime'), seasonType: 1 },
-    { id: 3, name: t('topbar.logo_dropdown.chinese_anime'), seasonType: 4 },
-    { id: 4, name: t('ranking.chinese_anime_related'), rid: 168 },
-    { id: 5, name: t('topbar.logo_dropdown.documentary_films'), seasonType: 3 },
-    { id: 6, name: t('topbar.logo_dropdown.animations'), rid: 1 },
-    { id: 7, name: t('topbar.logo_dropdown.music'), rid: 3 },
-    { id: 8, name: t('topbar.logo_dropdown.dance'), rid: 129 },
-    { id: 9, name: t('topbar.logo_dropdown.gaming'), rid: 4 },
-    { id: 10, name: t('topbar.logo_dropdown.knowledge'), rid: 36 },
-    { id: 11, name: t('topbar.logo_dropdown.technology'), rid: 188 },
-    { id: 12, name: t('topbar.logo_dropdown.sports'), rid: 234 },
-    { id: 13, name: t('topbar.logo_dropdown.cars'), rid: 223 },
-    { id: 14, name: t('topbar.logo_dropdown.life'), rid: 160 },
-    { id: 15, name: t('topbar.logo_dropdown.foods'), rid: 211 },
-    { id: 16, name: t('topbar.logo_dropdown.animals'), rid: 217 },
-    { id: 17, name: t('topbar.logo_dropdown.kichiku'), rid: 119 },
-    { id: 18, name: t('topbar.logo_dropdown.fashion'), rid: 155 },
-    { id: 19, name: t('topbar.logo_dropdown.showbiz'), rid: 5 },
-    { id: 20, name: t('topbar.logo_dropdown.cinephile'), rid: 181 },
-    { id: 21, name: t('topbar.logo_dropdown.movies'), seasonType: 2 },
-    { id: 22, name: t('topbar.logo_dropdown.tv_shows'), seasonType: 5 },
-    { id: 23, name: t('topbar.logo_dropdown.variety_shows'), seasonType: 7 },
-    { id: 24, name: t('ranking.original_content'), rid: 0, type: 'origin' },
-    { id: 25, name: t('ranking.debut_work'), rid: 0, type: 'rookie' },
+    {
+      id: 1,
+      name: t('ranking.all'),
+      rid: 0,
+    },
+    {
+      id: 2,
+      name: t('topbar.logo_dropdown.anime'),
+      seasonType: 1,
+    },
+    {
+      id: 3,
+      name: t('topbar.logo_dropdown.chinese_anime'),
+      seasonType: 4,
+    },
+    {
+      id: 4,
+      name: t('ranking.chinese_anime_related'),
+      rid: 168,
+    },
+    {
+      id: 5,
+      name: t('topbar.logo_dropdown.documentary_films'),
+      seasonType: 3,
+    },
+    {
+      id: 6,
+      name: t('topbar.logo_dropdown.animations'),
+      rid: 1,
+    },
+    {
+      id: 7,
+      name: t('topbar.logo_dropdown.music'),
+      rid: 3,
+    },
+    {
+      id: 8,
+      name: t('topbar.logo_dropdown.dance'),
+      rid: 129,
+    },
+    {
+      id: 9,
+      name: t('topbar.logo_dropdown.gaming'),
+      rid: 4,
+    },
+    {
+      id: 10,
+      name: t('topbar.logo_dropdown.knowledge'),
+      rid: 36,
+    },
+    {
+      id: 11,
+      name: t('topbar.logo_dropdown.technology'),
+      rid: 188,
+    },
+    {
+      id: 12,
+      name: t('topbar.logo_dropdown.sports'),
+      rid: 234,
+    },
+    {
+      id: 13,
+      name: t('topbar.logo_dropdown.cars'),
+      rid: 223,
+    },
+    {
+      id: 14,
+      name: t('topbar.logo_dropdown.life'),
+      rid: 160,
+    },
+    {
+      id: 15,
+      name: t('topbar.logo_dropdown.foods'),
+      rid: 211,
+    },
+    {
+      id: 16,
+      name: t('topbar.logo_dropdown.animals'),
+      rid: 217,
+    },
+    {
+      id: 17,
+      name: t('topbar.logo_dropdown.kichiku'),
+      rid: 119,
+    },
+    {
+      id: 18,
+      name: t('topbar.logo_dropdown.fashion'),
+      rid: 155,
+    },
+    {
+      id: 19,
+      name: t('topbar.logo_dropdown.showbiz'),
+      rid: 5,
+    },
+    {
+      id: 20,
+      name: t('topbar.logo_dropdown.cinephile'),
+      rid: 181,
+    },
+    {
+      id: 21,
+      name: t('topbar.logo_dropdown.movies'),
+      seasonType: 2,
+    },
+    {
+      id: 22,
+      name: t('topbar.logo_dropdown.tv_shows'),
+      seasonType: 5,
+    },
+    {
+      id: 23,
+      name: t('topbar.logo_dropdown.variety_shows'),
+      seasonType: 7,
+    },
+    {
+      id: 24,
+      name: t('ranking.original_content'),
+      rid: 0,
+      type: 'origin',
+    },
+    {
+      id: 25,
+      name: t('ranking.debut_work'),
+      rid: 0,
+      type: 'rookie',
+    },
   ]
 })
 
@@ -134,7 +229,9 @@ function getRankingVideos() {
   isLoading.value = true
   api.ranking.getRankingVideos({
     rid: activatedRankingType.value.rid,
-    type: 'type' in activatedRankingType.value ? activatedRankingType.value.type : 'all',
+    type: 'type' in activatedRankingType.value
+      ? activatedRankingType.value.type
+      : 'all',
   }).then((response: RankingResult) => {
     if (response.code === 0) {
       const { list } = response.data

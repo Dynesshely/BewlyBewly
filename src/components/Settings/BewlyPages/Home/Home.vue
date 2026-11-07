@@ -96,7 +96,9 @@ function handleCloseQRCodeDialog() {
 }
 
 function handleExport(filterType: 'title' | 'user') {
-  const filters = filterType === 'title' ? settings.value.filterByTitle : settings.value.filterByUser
+  const filters = filterType === 'title'
+    ? settings.value.filterByTitle
+    : settings.value.filterByUser
   const jsonString = JSON.stringify(filters, null, 2) // Pretty print JSON
   const blob = new Blob([jsonString], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
@@ -134,7 +136,9 @@ function handleImport(filterType: 'title' | 'user') {
     }
     catch (error) {
       console.error(`Error importing filter by ${filterType}:`, error)
-      toast.error(`Failed to import ${filterType} filters: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      toast.error(`Failed to import ${filterType} filters: ${error instanceof Error
+        ? error.message
+        : 'Unknown error'}`)
     }
     finally {
       input.remove()

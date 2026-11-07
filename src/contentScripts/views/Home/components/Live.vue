@@ -1,16 +1,14 @@
 <script setup lang="ts">
-import type { Ref } from 'vue'
-
-import { useBewlyApp } from '~/composables/useAppProvider'
+import type { GridVideoElement } from '../types'
 import type { GridLayoutType } from '~/logic'
-import type { FollowingLiveResult, List as FollowingLiveItem } from '~/models/live/getFollowingLiveList'
+import type { List as FollowingLiveItem, FollowingLiveResult } from '~/models/live/getFollowingLiveList'
+import { useBewlyApp } from '~/composables/useAppProvider'
+import { useGridLayoutClass } from '~/composables/useGridLayout'
+import { useListPageActions } from '~/composables/useListPageActions'
+
 import api from '~/utils/api'
 
-// https://github.com/starknt/BewlyBewly/blob/fad999c2e482095dc3840bb291af53d15ff44130/src/contentScripts/views/Home/components/ForYou.vue#L16
-interface VideoElement {
-  uniqueId: string
-  item?: FollowingLiveItem
-}
+type VideoElement = GridVideoElement<FollowingLiveItem>
 
 const props = defineProps<{
   gridLayout: GridLayoutType
@@ -21,47 +19,28 @@ const emit = defineEmits<{
   (e: 'afterLoading'): void
 }>()
 
-const gridClass = computed((): string => {
-  if (props.gridLayout === 'adaptive')
-    return 'grid-adaptive'
-  if (props.gridLayout === 'twoColumns')
-    return 'grid-two-columns'
-  return 'grid-one-column'
-})
+const gridClass = useGridLayoutClass(toRef(props, 'gridLayout'))
 
 const videoList = ref<VideoElement[]>([])
 const isLoading = ref<boolean>(false)
 const needToLoginFirst = ref<boolean>(false)
-const containerRef = ref<HTMLElement>() as Ref<HTMLElement>
 const page = ref<number>(1)
 const noMoreContent = ref<boolean>(false)
-const { handleReachBottom, handlePageRefresh, haveScrollbar } = useBewlyApp()
+const { haveScrollbar } = useBewlyApp()
+const { rebindPageActions } = useListPageActions({
+  isLoading,
+  noMoreContent,
+  reachBottom: () => getData(),
+  refresh: () => initData(),
+})
 
 onMounted(() => {
   initData()
-  initPageAction()
 })
 
 onActivated(() => {
-  initPageAction()
+  rebindPageActions()
 })
-
-function initPageAction() {
-  handleReachBottom.value = async () => {
-    if (isLoading.value)
-      return
-    if (noMoreContent.value)
-      return
-
-    getData()
-  }
-  handlePageRefresh.value = async () => {
-    if (isLoading.value)
-      return
-
-    initData()
-  }
-}
 
 async function initData() {
   page.value = 1
@@ -168,7 +147,6 @@ defineExpose({ initData })
     </Empty>
     <div
       v-else
-      ref="containerRef"
       m="b-0 t-0" relative w-full h-full
       :class="gridClass"
     >

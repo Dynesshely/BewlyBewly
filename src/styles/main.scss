@@ -177,3 +177,11 @@ img {
 .dark::view-transition-new(root) {
   z-index: 1;
 }
+
+/* 键盘导航选中的视频卡片 */
+[data-video-card][data-keyboard-active] {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 4px;
+  border-radius: var(--bew-radius);
+  box-shadow: 0 0 0 6px color-mix(in oklab, var(--bew-theme-color), transparent 80%);
+}

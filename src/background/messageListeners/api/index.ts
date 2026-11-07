@@ -39,11 +39,8 @@ const FullAPI = Object.assign({}, ...API_COLLECTION)
 const handleMessage = apiListenerFactory(FullAPI)
 
 export function setupApiMsgLstnrs() {
-  browser.runtime.onConnect.removeListener(handleConnect)
-  browser.runtime.onConnect.addListener(handleConnect)
-}
-
-function handleConnect() {
+  // 内容脚本的 api 调用只发 sendMessage、不建立端口，
+  // 必须在此处直接注册 onMessage；重复注册会覆盖旧监听
   browser.runtime.onMessage.removeListener(handleMessage)
   browser.runtime.onMessage.addListener(handleMessage)
 }

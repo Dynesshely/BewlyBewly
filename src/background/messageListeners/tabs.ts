@@ -9,18 +9,14 @@ export enum TABS_MESSAGE {
   OPEN_LINK_IN_BACKGROUND = 'openLinkInBackground',
 }
 
-function handleMessage(message: Message) {
-  if (message.contentScriptQuery === TABS_MESSAGE.OPEN_LINK_IN_BACKGROUND) {
-    return browser.tabs.create({ url: message.url, active: false })
+function handleMessage(message: unknown) {
+  const msg = message as Message
+  if (msg.contentScriptQuery === TABS_MESSAGE.OPEN_LINK_IN_BACKGROUND) {
+    return browser.tabs.create({ url: msg.url, active: false })
   }
 }
 
 export function setupTabMsgLstnrs() {
-  browser.runtime.onMessage.removeListener(handleConnect)
-  browser.runtime.onMessage.addListener(handleConnect)
-}
-
-function handleConnect() {
   browser.runtime.onMessage.removeListener(handleMessage)
   browser.runtime.onMessage.addListener(handleMessage)
 }

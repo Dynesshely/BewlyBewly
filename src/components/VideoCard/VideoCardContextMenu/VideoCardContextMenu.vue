@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import type { CSSProperties } from 'vue'
-import { useI18n } from 'vue-i18n'
+import type { Video } from '../types'
 
+import { useI18n } from 'vue-i18n'
 import { useBewlyApp } from '~/composables/useAppProvider'
 import { Type as ThreePointV2Type } from '~/models/video/appForYou'
 import { openLinkToNewTab } from '~/utils/main'
-import { openLinkInBackground } from '~/utils/tabs'
 
-import type { Video } from '../types'
+import { openLinkInBackground } from '~/utils/tabs'
 import DislikeDialog from './components/DislikeDialog.vue'
 
 const props = defineProps<{
@@ -51,21 +51,57 @@ enum VideoOption {
 const commonOptions = computed((): { command: VideoOption, name: string, icon: string, color?: string }[][] => {
   let result = [
     [
-      { command: VideoOption.OpenInNewTab, name: t('video_card.operation.open_in_new_tab'), icon: 'i-solar:square-top-down-bold-duotone' },
-      { command: VideoOption.OpenInBackground, name: t('video_card.operation.open_in_background'), icon: 'i-solar:square-top-down-bold-duotone' },
-      { command: VideoOption.OpenInNewWindow, name: t('video_card.operation.open_in_new_window'), icon: 'i-solar:maximize-square-3-bold-duotone' },
-      { command: VideoOption.OpenInCurrentTab, name: t('video_card.operation.open_in_current_tab'), icon: 'i-solar:square-top-down-bold-duotone' },
-      { command: VideoOption.OpenInDrawer, name: t('video_card.operation.open_in_drawer'), icon: 'i-solar:archive-up-minimlistic-bold-duotone' },
+      {
+        command: VideoOption.OpenInNewTab,
+        name: t('video_card.operation.open_in_new_tab'),
+        icon: 'i-solar:square-top-down-bold-duotone',
+      },
+      {
+        command: VideoOption.OpenInBackground,
+        name: t('video_card.operation.open_in_background'),
+        icon: 'i-solar:square-top-down-bold-duotone',
+      },
+      {
+        command: VideoOption.OpenInNewWindow,
+        name: t('video_card.operation.open_in_new_window'),
+        icon: 'i-solar:maximize-square-3-bold-duotone',
+      },
+      {
+        command: VideoOption.OpenInCurrentTab,
+        name: t('video_card.operation.open_in_current_tab'),
+        icon: 'i-solar:square-top-down-bold-duotone',
+      },
+      {
+        command: VideoOption.OpenInDrawer,
+        name: t('video_card.operation.open_in_drawer'),
+        icon: 'i-solar:archive-up-minimlistic-bold-duotone',
+      },
     ],
 
     [
-      { command: VideoOption.CopyVideoLink, name: t('video_card.operation.copy_video_link'), icon: 'i-solar:copy-bold-duotone' },
-      { command: VideoOption.CopyBVNumber, name: t('video_card.operation.copy_bv_number'), icon: 'i-solar:copy-bold-duotone' },
-      { command: VideoOption.CopyAVNumber, name: t('video_card.operation.copy_av_number'), icon: 'i-solar:copy-bold-duotone' },
+      {
+        command: VideoOption.CopyVideoLink,
+        name: t('video_card.operation.copy_video_link'),
+        icon: 'i-solar:copy-bold-duotone',
+      },
+      {
+        command: VideoOption.CopyBVNumber,
+        name: t('video_card.operation.copy_bv_number'),
+        icon: 'i-solar:copy-bold-duotone',
+      },
+      {
+        command: VideoOption.CopyAVNumber,
+        name: t('video_card.operation.copy_av_number'),
+        icon: 'i-solar:copy-bold-duotone',
+      },
     ],
 
     [
-      { command: VideoOption.ViewTheOriginalCover, name: t('video_card.operation.view_the_original_cover'), icon: 'i-solar:gallery-minimalistic-bold-duotone' },
+      {
+        command: VideoOption.ViewTheOriginalCover,
+        name: t('video_card.operation.view_the_original_cover'),
+        icon: 'i-solar:gallery-minimalistic-bold-duotone',
+      },
     ],
   ]
   if (getVideoType() === 'bangumi' || getVideoType() === 'live') {

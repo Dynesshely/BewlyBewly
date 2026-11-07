@@ -45,7 +45,9 @@ export function numFormatter(num: number | string): string {
   const item = lookup.slice().reverse().find((item) => {
     return num >= item.value
   })
-  return item ? (num / item.value).toFixed(digits).replace(rx, '$1') + item.symbol : '0'
+  return item
+    ? (num / item.value).toFixed(digits).replace(rx, '$1') + item.symbol
+    : '0'
 }
 
 export function calcTimeSince(date: number | string | Date) {
@@ -77,8 +79,19 @@ export function calcCurrentTime(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60)
   const seconds = totalSeconds % 60
 
-  if (hours <= 0)
-    return `${minutes < 10 ? `0${minutes}` : minutes}:${seconds < 10 ? `0${seconds}` : seconds}`
+  if (hours <= 0) {
+    return `${minutes < 10
+      ? `0${minutes}`
+      : minutes}:${seconds < 10
+      ? `0${seconds}`
+      : seconds}`
+  }
 
-  return `${hours < 10 ? `0${hours}` : hours}:${minutes < 10 ? `0${minutes}` : minutes}:${seconds < 10 ? `0${seconds}` : seconds}`
+  return `${hours < 10
+    ? `0${hours}`
+    : hours}:${minutes < 10
+    ? `0${minutes}`
+    : minutes}:${seconds < 10
+    ? `0${seconds}`
+    : seconds}`
 }

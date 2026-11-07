@@ -1,13 +1,13 @@
 <script setup lang="ts">
+import type { HistoryItem, SuggestionItem, SuggestionResponse } from './searchHistoryProvider'
 import { onKeyStroke, useDebounceFn } from '@vueuse/core'
-import DOMPurify from 'dompurify'
 
+import DOMPurify from 'dompurify'
 import { settings } from '~/logic'
 import api from '~/utils/api'
 import { findLeafActiveElement } from '~/utils/element'
-import { isHomePage } from '~/utils/main'
 
-import type { HistoryItem, SuggestionItem, SuggestionResponse } from './searchHistoryProvider'
+import { isHomePage } from '~/utils/main'
 import {
   addSearchHistory,
   clearAllSearchHistory,
@@ -78,12 +78,17 @@ const handleInput = useDebounceFn(() => {
 async function navigateToSearchResultPage(keyword: string) {
   if (keyword) {
     let target = '_blank'
-    if (settings.value.searchBarLinkOpenMode === 'currentTabIfNotHomepage')
-      target = isHomePage() ? '_blank' : '_self'
-    else if (settings.value.searchBarLinkOpenMode === 'currentTab')
+    if (settings.value.searchBarLinkOpenMode === 'currentTabIfNotHomepage') {
+      target = isHomePage()
+        ? '_blank'
+        : '_self'
+    }
+    else if (settings.value.searchBarLinkOpenMode === 'currentTab') {
       target = '_self'
-    else if (settings.value.searchBarLinkOpenMode === 'newTab')
+    }
+    else if (settings.value.searchBarLinkOpenMode === 'newTab') {
       target = '_blank'
+    }
 
     window.open(`//search.bilibili.com/all?keyword=${encodeURIComponent(keyword)}`, target)
     const searchItem = {

@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { Ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import browser from 'webextension-polyfill'
-
-import HorizontalScrollView from '~/components/HorizontalScrollView.vue'
 import type { Result as TimetableItem, TimetableResult } from '~/models/anime/timeTable'
+import { useI18n } from 'vue-i18n'
+
+import browser from 'webextension-polyfill'
+import HorizontalScrollView from '~/components/HorizontalScrollView.vue'
 import api from '~/utils/api'
 import { removeHttpFromUrl } from '~/utils/main'
 
@@ -65,7 +65,7 @@ defineExpose({ refreshAnimeTimeTable })
               :h="item.is_today ? '48px' : '36px'"
               mr-4
               :style="{
-                backgroundImage: `url(${browser.runtime.getURL('/assets/anime-timetable-icons.png')})`,
+                backgroundImage: `url(${browser.runtime.getURL('/assets/anime-timetable-icons.webp')})`,
                 backgroundPosition: item.is_today
                   ? `-56px ${-36 + (item.day_of_week - 1) * -72}px`
                   : `-146px ${-36 + (item.day_of_week - 1) * -72}px`,

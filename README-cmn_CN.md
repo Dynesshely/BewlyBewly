@@ -67,6 +67,9 @@ E2E_ONLINE=1 pnpm exec playwright test tests/e2e/background.spec.ts  # 在线接
 - [与上游差异](docs/upstream-divergence.md) — 相对归档上游的改动清单
 - [依赖策略](docs/dependency-policy.md) — 锁定版本与升级检查清单
 - [性能记录](docs/performance.md) — 首屏基线、优化项与评估结论
+- [AI 初筛](docs/ai-filter.md) — 可选的卡片初筛（OpenAI 兼容接口、隐私与降级说明）
+- [隐私说明](PRIVACY.md) — 扩展读取、存储与发送的数据范围
+- [更新日志](CHANGELOG.md) — 本 fork 的性能、功能与修复记录
 
 ## 🤝 贡献
 

@@ -17,7 +17,9 @@ const contentScriptsDir = isFirefox
  */
 export default defineConfig({
   ...sharedConfig,
-  base: '/dist/',
+  // 必须用相对 base：ESM bundle 里的动态 import 以 entry URL 为基准解析 chunk，
+  // 若写成 '/dist/' 会被解析到页面域（https://www.bilibili.com/dist/chunks/*）而全部加载失败
+  base: './',
   build: {
     watch: isDev
       ? {

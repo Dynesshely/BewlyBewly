@@ -267,18 +267,26 @@ function injectApp() {
   const resetStyleEl = document.createElement('style')
   resetStyleEl.textContent = `${RESET_BEWLY_CSS}`
   styleEl.setAttribute('rel', 'stylesheet')
-  styleEl.setAttribute('href', browser.runtime.getURL('dist/contentScripts/style.css'))
+  styleEl.setAttribute('href', browser.runtime.getURL('dist/contentScripts/esm/style.css'))
   shadowDOM.appendChild(resetStyleEl)
   shadowDOM.appendChild(styleEl)
   shadowDOM.appendChild(root)
   container.style.opacity = '0'
   container.style.transition = 'opacity 0.5s'
-  styleEl.onload = () => {
+  let revealed = false
+  const reveal = () => {
+    if (revealed)
+      return
+    revealed = true
     // To prevent abrupt style transitions caused by sudden style changes
     setTimeout(() => {
       container.style.opacity = '1'
     }, 500)
   }
+  styleEl.onload = reveal
+  // 样式加载失败或长时间未响应时也要显示内容，避免整页黑屏
+  styleEl.onerror = reveal
+  setTimeout(reveal, 3000)
 
   // startShadowDOMStyleInjection()
 

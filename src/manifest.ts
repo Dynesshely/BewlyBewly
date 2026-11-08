@@ -92,7 +92,6 @@ export async function getManifest() {
     web_accessible_resources: [
       {
         resources: [
-          'dist/contentScripts/style.css',
           'dist/contentScripts/esm/*',
           'dist/styles/pages/*',
           'assets/*',

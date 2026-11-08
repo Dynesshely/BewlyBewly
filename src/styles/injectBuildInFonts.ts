@@ -1,6 +1,7 @@
 import browser from 'webextension-polyfill'
 
 import { injectCSS } from '~/utils/main'
+import { FONT_SLICE_CSS } from './fontSlices'
 
 injectCSS(`
   @font-face {
@@ -14,10 +15,8 @@ injectCSS(`
     src: url(${browser.runtime.getURL('/assets/fonts/Onest[wght].woff2')}) format("woff2-variations");
   }
 
-  @font-face {
-    font-family: "ShangguSansSCVF";
-    src: url(${browser.runtime.getURL('/assets/fonts/ShangguSansSC-VF.woff2')}) format("woff2-variations");
-  }
+  /* 中文变量字体按 unicode-range 切片：浏览器只会下载页面实际用到的切片 */
+  ${FONT_SLICE_CSS}
 
   @font-face {
     font-family: "CJKEmDash";

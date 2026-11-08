@@ -54,6 +54,18 @@ TopBar / OldTopBar 的未读消息与动态轮询已从独立 `setInterval` 迁�
 - 读不到标题的卡片直接放行，避免误杀；
 - 设置页开关「在原生页面应用标题过滤」，默认关闭。
 
+## 字体切片（按 unicode-range 按需下载）
+
+内置中文变量字体原先由 GB2312 子集化的单个 1.81 MB 文件提供。现在改为按码位切片：
+
+- `scripts/font-slices.py` 把字体切成 24 片（每片 1000 个码位区间），输出到
+  `assets/fonts/sc/sans-*.woff2`，并生成 `src/styles/fontSlices.ts`（`@font-face` +
+  `unicode-range`）；
+- 浏览器只会下载页面实际用到的切片，而不是一次性拉取整个字体；
+- 单文件 `ShangguSansSC-VF.woff2` 保留作为切片源。
+
+重新生成：`pnpm run fonts:slices`（需要 Python + fontTools）。
+
 ## 列表渲染窗口化（评估，暂缓）
 
 当前每页 30 张卡片、DOM 节点约 30–90 个，虚拟化的收益有限；但实现风险较高：

@@ -44,7 +44,9 @@
     "test:e2e:online": "cross-env BILIBILI_ONLINE_PROBE=1 playwright test tests/e2e/dom-probe.spec.ts",
     "typecheck": "vue-tsc",
     "postinstall": "npx simple-git-hooks",
-    "knip": "knip"
+    "knip": "knip",
+    "fonts:subset": "python scripts/font-subset.py",
+    "fonts:slices": "python scripts/font-slices.py"
   },
   "dependencies": {
     "@types/md5": "^2.3.6",

@@ -29,7 +29,7 @@ test.describe('键盘卡片导航', () => {
       const page = await context.newPage()
 
       // 用本地快照替代真实 B 站首页
-      await routeBilibiliDocument(context, HOME_FIXTURE)
+      await routeBilibiliDocument(page, HOME_FIXTURE)
 
       await page.goto('https://www.bilibili.com/', { waitUntil: 'domcontentloaded' })
       await expect(page.locator('#bewly')).toHaveCount(1, { timeout: 30_000 })
@@ -100,7 +100,7 @@ test.describe('键盘卡片导航', () => {
 
     try {
       const page = await context.newPage()
-      await routeBilibiliDocument(context, HOME_FIXTURE)
+      await routeBilibiliDocument(page, HOME_FIXTURE)
       await page.goto('https://www.bilibili.com/', { waitUntil: 'domcontentloaded' })
       await expect(page.locator('#bewly')).toHaveCount(1, { timeout: 30_000 })
       await page.waitForFunction(

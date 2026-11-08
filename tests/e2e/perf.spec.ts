@@ -29,7 +29,7 @@ test.describe('首屏性能基线', () => {
 
     try {
       const page = await context.newPage()
-      await routeBilibiliDocument(context, HOME_FIXTURE)
+      await routeBilibiliDocument(page, HOME_FIXTURE)
 
       const start = Date.now()
       await page.goto('https://www.bilibili.com/', { waitUntil: 'domcontentloaded' })

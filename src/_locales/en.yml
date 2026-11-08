@@ -1,3 +1,19 @@
+command_palette:
+  placeholder: Type a command…
+  tab_for_you: Go to For You
+  tab_following: Go to Following
+  tab_series: Go to Series
+  tab_trending: Go to Trending
+  tab_ranking: Go to Ranking
+  tab_live: Go to Live
+  cycle_sort: Cycle card sort order
+  cycle_filter: Cycle card filter
+  toggle_info: Toggle detailed card info
+  focus_search: Focus search bar
+  show_help: Show keyboard shortcuts
+  open_settings: Open settings
+  empty: No matching command
+
 keyboard_help:
   title: Keyboard shortcuts
   hint: Press ? again or click outside to close
@@ -8,6 +24,10 @@ keyboard_help:
   tabs: Switch home tabs
   search: Focus the search bar
   help: Show / hide this help
+  command_palette: Open the command palette
+  sort_filter: Cycle card sort / filter
+  info_detail: Toggle detailed card info
+  queue: Add card to local watch queue
 
 common:
   view_all: View ALL

@@ -9,6 +9,74 @@ const ACTIVE_ATTR = 'data-keyboard-active'
 const WHEEL_THRESHOLD = 55
 const NAV_STATE_KEY = 'bewly-keyboard-nav-state'
 
+export type CardSortMode = 'default' | 'views' | 'duration' | 'newest'
+export type CardFilterMode = 'all' | 'unwatched' | 'long' | 'followed'
+
+export const cardSortMode = ref<CardSortMode>('default')
+export const cardFilterMode = ref<CardFilterMode>('all')
+
+const SORT_ORDER: CardSortMode[] = [
+  'default',
+  'views',
+  'duration',
+  'newest',
+]
+const FILTER_ORDER: CardFilterMode[] = ['all', 'unwatched', 'long', 'followed']
+
+function parseViews(raw: string | null): number {
+  if (!raw)
+    return 0
+  const text = raw.trim().replace(/,/g, '')
+  const num = Number.parseFloat(text)
+  if (Number.isNaN(num))
+    return 0
+  if (text.includes('亿'))
+    return num * 1e8
+  if (text.includes('万'))
+    return num * 1e4
+  return num
+}
+
+function parseDuration(raw: string | null): number {
+  if (!raw)
+    return 0
+  return raw.split(':').reduce((acc, part) => acc * 60 + (Number.parseInt(part, 10) || 0), 0)
+}
+
+function parsePublished(raw: string | null): number {
+  if (!raw)
+    return 0
+  const m = raw.match(/(\d+)\s*(分钟|小时|[天周年]|个月)/)
+  if (m) {
+    const value = Number.parseInt(m[1], 10)
+    const unit: Record<string, number> = {
+      分钟: 60,
+      小时: 3600,
+      天: 86400,
+      周: 604800,
+      个月: 2592000,
+      年: 31536000,
+    }
+    return Date.now() - value * (unit[m[2]] ?? 0) * 1000
+  }
+  const ts = new Date(raw).getTime()
+  return Number.isNaN(ts)
+    ? 0
+    : ts
+}
+
+function matchesFilter(card: HTMLElement): boolean {
+  const filter = cardFilterMode.value
+  if (filter === 'all')
+    return true
+  if (filter === 'followed')
+    return card.getAttribute('data-video-followed') === '1'
+  if (filter === 'long')
+    return parseDuration(card.getAttribute('data-video-duration')) >= 600
+  // unwatched：没有观看进度标记视为未看
+  return card.getAttribute('data-video-progress') === null
+}
+
 /**
  * 首页视频卡片的键盘 / 滚轮导航。
  *
@@ -38,6 +106,11 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
       return bewlyCards
     // 搜索页等原生页面：回退到 B 站原生卡片
     return Array.from(document.querySelectorAll<HTMLElement>(NATIVE_CARD_SELECTOR))
+  }
+
+  /** 仅返回当前可见（未被筛选隐藏）的卡片 */
+  function getVisibleCards(): HTMLElement[] {
+    return getCards().filter(card => card.style.display !== 'none')
   }
 
   function findActiveIndex(cards: HTMLElement[]): number {
@@ -148,12 +221,16 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
   }
 
   function extractCardInfo(card: HTMLElement) {
-    const title = card.querySelector('h3, [class*="title"]')?.textContent?.trim() ?? ''
+    const title = (card.getAttribute('data-video-title') || card.querySelector('h3, [class*="title"]')?.textContent?.trim()) ?? ''
     const meta = card.textContent?.replace(/\s+/g, ' ').trim().slice(0, 160) ?? ''
     return {
       title: title || meta.slice(0, 60),
       meta,
       url: card.getAttribute('data-video-url') || '',
+      author: card.getAttribute('data-video-author') || '',
+      view: card.getAttribute('data-video-view') || '',
+      duration: card.getAttribute('data-video-duration') || '',
+      reason: card.querySelector('.video-reason')?.textContent?.trim() || '',
     }
   }
 
@@ -163,8 +240,54 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
     input?.focus()
   }
 
-  function setActive(index: number) {
+  /** 按当前筛选/排序取卡片，并同步高亮到结果第一张 */
+  function applyFilterAndSort(shouldScroll = true) {
     const cards = getCards()
+    if (!cards.length)
+      return
+    const kept = cards.filter((card: HTMLElement) => matchesFilter(card))
+    const hidden = cards.filter((card: HTMLElement) => !kept.includes(card))
+    hidden.forEach(card => card.style.display = 'none')
+    kept.forEach((card: HTMLElement) => {
+      if (card.style.display === 'none')
+        card.style.removeProperty('display')
+    })
+
+    const sorted = [...kept]
+    const sort = cardSortMode.value
+    if (sort !== 'default') {
+      sorted.sort((a: HTMLElement, b: HTMLElement) => {
+        if (sort === 'views')
+          return parseViews(b.getAttribute('data-video-view')) - parseViews(a.getAttribute('data-video-view'))
+        if (sort === 'duration')
+          return parseDuration(b.getAttribute('data-video-duration')) - parseDuration(a.getAttribute('data-video-duration'))
+        return parsePublished(b.getAttribute('data-video-published')) - parsePublished(a.getAttribute('data-video-published'))
+      })
+    }
+
+    // 通过 order 属性让 DOM 顺序与排序结果一致（仅影响 flex/grid 顺序）
+    cards.forEach((card: HTMLElement, index: number) => card.style.order = String(sorted.includes(card)
+      ? sorted.indexOf(card)
+      : 10000 + index))
+
+    const first = sorted[0]
+    if (first) {
+      const index = cards.indexOf(first)
+      activeIndex = index
+      applyActive(cards, index)
+      if (shouldScroll)
+        scrollCardIntoView(first)
+    }
+    emitter.emit('keyboard-filter-change', {
+      sort: cardSortMode.value,
+      filter: cardFilterMode.value,
+      visible: kept.length,
+      total: cards.length,
+    })
+  }
+
+  function setActive(index: number) {
+    const cards = getVisibleCards()
     if (!cards.length)
       return
 
@@ -201,7 +324,7 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
   }
 
   function openActive(target: '_blank' | '_self') {
-    const cards = getCards()
+    const cards = getVisibleCards()
     const current = findActiveIndex(cards)
     const index = current >= 0
       ? current
@@ -229,12 +352,18 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
   function handleKeydown(event: KeyboardEvent) {
     if (event.defaultPrevented || event.isComposing)
       return
+    // Ctrl/Cmd + K：打开命令面板
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+      event.preventDefault()
+      emitter.emit('toggle-command-palette')
+      return
+    }
     if (event.ctrlKey || event.metaKey || event.altKey)
       return
     if (hasOpenModal() || isEditableTarget(event.target))
       return
 
-    const cards = getCards()
+    const cards = getVisibleCards()
     if (!cards.length)
       return
 
@@ -297,6 +426,31 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
         event.preventDefault()
         openContextMenu(cards[base])
         break
+      case 's': {
+        event.preventDefault()
+        const next = SORT_ORDER[(SORT_ORDER.indexOf(cardSortMode.value) + 1) % SORT_ORDER.length]
+        cardSortMode.value = next
+        applyFilterAndSort()
+        break
+      }
+      case 'f': {
+        event.preventDefault()
+        const next = FILTER_ORDER[(FILTER_ORDER.indexOf(cardFilterMode.value) + 1) % FILTER_ORDER.length]
+        cardFilterMode.value = next
+        applyFilterAndSort()
+        break
+      }
+      case 'i':
+        event.preventDefault()
+        emitter.emit('toggle-card-info-detail')
+        break
+      case 'q': {
+        event.preventDefault()
+        const card = cards[base]
+        if (card)
+          emitter.emit('queue-card', extractCardInfo(card))
+        break
+      }
       case '?':
         event.preventDefault()
         emitter.emit('toggle-keyboard-help')
@@ -322,7 +476,7 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
       return
     try {
       const vpRect = instance.elements().viewport.getBoundingClientRect()
-      const visible = cards.find((card) => {
+      const visible = cards.filter(card => card.style.display !== 'none').find((card) => {
         const rect = card.getBoundingClientRect()
         return rect.bottom > vpRect.top + 96 && rect.top < vpRect.bottom - 32
       })
@@ -418,6 +572,18 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
     }
   }
 
+  emitter.on('command-cycle-sort', () => {
+    const next = SORT_ORDER[(SORT_ORDER.indexOf(cardSortMode.value) + 1) % SORT_ORDER.length]
+    cardSortMode.value = next
+    applyFilterAndSort()
+  })
+  emitter.on('command-cycle-filter', () => {
+    const next = FILTER_ORDER[(FILTER_ORDER.indexOf(cardFilterMode.value) + 1) % FILTER_ORDER.length]
+    cardFilterMode.value = next
+    applyFilterAndSort()
+  })
+  emitter.on('command-focus-search', () => focusSearchBar())
+
   onMounted(() => {
     shadowRootEl = document.querySelector('#bewly')?.shadowRoot ?? null
     window.addEventListener('keydown', handleKeydown)
@@ -436,6 +602,9 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
   })
 
   onUnmounted(() => {
+    emitter.off('command-cycle-sort')
+    emitter.off('command-cycle-filter')
+    emitter.off('command-focus-search')
     window.removeEventListener('keydown', handleKeydown)
     window.removeEventListener('pagehide', saveNavigationState)
     document.removeEventListener('wheel', handleWheel, { capture: true })

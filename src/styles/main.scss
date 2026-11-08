@@ -179,6 +179,12 @@ img {
 }
 
 /* 键盘导航选中的视频卡片 */
+[data-video-card] {
+  transition:
+    outline-color 120ms ease-out,
+    box-shadow 120ms ease-out;
+}
+
 [data-video-card][data-keyboard-active] {
   outline: 2px solid var(--bew-theme-color);
   outline-offset: 4px;

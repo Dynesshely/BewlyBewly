@@ -8,6 +8,10 @@ const items = [
   { keys: 'Space', desc: 'keyboard_help.open_current' },
   { keys: '1 - 6', desc: 'keyboard_help.tabs' },
   { keys: '/', desc: 'keyboard_help.search' },
+  { keys: 'Ctrl/Cmd + K', desc: 'keyboard_help.command_palette' },
+  { keys: 's / f', desc: 'keyboard_help.sort_filter' },
+  { keys: 'i', desc: 'keyboard_help.info_detail' },
+  { keys: 'q', desc: 'keyboard_help.queue' },
   { keys: '?', desc: 'keyboard_help.help' },
 ]
 </script>

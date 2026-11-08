@@ -55,6 +55,24 @@ const selectedDislikeOpt = ref<{ dislikeReasonId: number }>()
 
 const videoCurrentTime = ref<number | null>(null)
 
+const videoAuthorName = computed(() => {
+  const author = props.video?.author
+  if (!author)
+    return ''
+  return Array.isArray(author)
+    ? author.map(a => a.name).filter(Boolean).join(', ')
+    : (author.name ?? '')
+})
+
+const videoAuthorFollowed = computed(() => {
+  const author = props.video?.author
+  if (!author)
+    return false
+  return Array.isArray(author)
+    ? author.some(a => a.followed)
+    : !!author.followed
+})
+
 const videoUrl = computed(() => {
   if (removed.value || !props.video)
     return undefined
@@ -242,6 +260,11 @@ provide('getVideoType', () => props.type!)
     :style="{ contentVisibility }"
     data-video-card
     :data-video-url="videoUrl || ''"
+    :data-video-title="video?.title || ''"
+    :data-video-duration="video?.duration ?? video?.durationStr ?? ''"
+    :data-video-view="video?.view ?? video?.viewStr ?? ''"
+    :data-video-author="videoAuthorName"
+    :data-video-followed="videoAuthorFollowed ? '1' : ''"
     intrinsic-size-300px
     duration-300 ease-in-out
     rounded="$bew-radius"

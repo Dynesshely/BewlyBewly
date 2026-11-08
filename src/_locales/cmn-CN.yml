@@ -1,3 +1,19 @@
+command_palette:
+  placeholder: 输入命令…
+  tab_for_you: 前往个性推荐
+  tab_following: 前往正在关注
+  tab_series: 前往订阅剧集
+  tab_trending: 前往热门视频
+  tab_ranking: 前往排行
+  tab_live: 前往直播
+  cycle_sort: 切换卡片排序
+  cycle_filter: 切换卡片筛选
+  toggle_info: 切换卡片详细信息
+  focus_search: 聚焦搜索框
+  show_help: 显示快捷键帮助
+  open_settings: 打开设置
+  empty: 没有匹配的命令
+
 keyboard_help:
   title: 键盘快捷键
   hint: 再次按 ? 或点击空白处关闭
@@ -8,6 +24,10 @@ keyboard_help:
   tabs: 切换首页标签页
   search: 聚焦搜索框
   help: 显示 / 隐藏本帮助
+  command_palette: 打开命令面板
+  sort_filter: 切换卡片排序 / 筛选
+  info_detail: 切换卡片详细信息
+  queue: 把卡片加入本地待看队列
 
 common:
   view_all: 查看更多

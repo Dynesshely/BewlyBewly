@@ -26,15 +26,35 @@ const [showSettings, toggleSettings] = useToggle(false)
 
 // 键盘快捷键帮助 / 当前卡片信息条 / 接口失败提示
 const showKeyboardHelp = ref(false)
-const activeCardInfo = ref<{ title: string, meta: string, url: string } | null>(null)
+const showCommandPalette = ref(false)
+const activeCardInfo = ref<{ title: string, meta: string, url: string, author?: string, view?: string, duration?: string, reason?: string } | null>(null)
+const showCardInfoDetail = ref(false)
+interface QueueItem { title: string, url: string }
+const queuedCards = ref<QueueItem[]>([])
 const apiErrorVisible = ref(false)
 let apiErrorTimer: ReturnType<typeof setTimeout> | null = null
 
 emitter.on('toggle-keyboard-help', () => {
   showKeyboardHelp.value = !showKeyboardHelp.value
 })
-emitter.on('keyboard-active-card', (info: { title: string, meta: string, url: string }) => {
+emitter.on('toggle-command-palette', () => {
+  showCommandPalette.value = !showCommandPalette.value
+})
+emitter.on('command-open-settings', () => {
+  showSettings.value = true
+})
+emitter.on('keyboard-active-card', (info: { title: string, meta: string, url: string, author?: string, view?: string, duration?: string, reason?: string }) => {
   activeCardInfo.value = info
+})
+emitter.on('toggle-card-info-detail', () => {
+  showCardInfoDetail.value = !showCardInfoDetail.value
+})
+emitter.on('queue-card', (info: { title: string, url: string }) => {
+  if (!info.url)
+    return
+  if (queuedCards.value.some(item => item.url === info.url))
+    return
+  queuedCards.value.push({ title: info.title, url: info.url })
 })
 emitter.on('api-error', () => {
   apiErrorVisible.value = true
@@ -378,8 +398,12 @@ onUnmounted(() => {
   document.removeEventListener('scroll', handleWindowScroll)
   reachBottomObserver?.disconnect()
   reachBottomObserver = null
+  emitter.off('toggle-command-palette')
+  emitter.off('command-open-settings')
   emitter.off('toggle-keyboard-help')
   emitter.off('keyboard-active-card')
+  emitter.off('toggle-card-info-detail')
+  emitter.off('queue-card')
   emitter.off('api-error')
   if (apiErrorTimer)
     clearTimeout(apiErrorTimer)
@@ -481,9 +505,18 @@ onUnmounted(() => {
 
     <KeyboardShortcutHelp v-if="showKeyboardHelp" @close="showKeyboardHelp = false" />
 
+    <CommandPalette v-if="showCommandPalette" @close="showCommandPalette = false" />
+
     <div v-if="activeCardInfo" class="bewly-active-info">
       <span class="bewly-active-info-title">{{ activeCardInfo.title }}</span>
-      <span v-if="activeCardInfo.meta" class="bewly-active-info-meta">{{ activeCardInfo.meta }}</span>
+      <template v-if="showCardInfoDetail">
+        <span v-if="activeCardInfo.author" class="bewly-active-info-meta">{{ activeCardInfo.author }}</span>
+        <span v-if="activeCardInfo.view" class="bewly-active-info-meta">{{ activeCardInfo.view }}</span>
+        <span v-if="activeCardInfo.duration" class="bewly-active-info-meta">{{ activeCardInfo.duration }}</span>
+        <span v-if="activeCardInfo.reason" class="bewly-active-info-meta">{{ activeCardInfo.reason }}</span>
+      </template>
+      <span v-else-if="activeCardInfo.meta" class="bewly-active-info-meta">{{ activeCardInfo.meta }}</span>
+      <span v-if="queuedCards.length" class="bewly-active-info-queue">{{ queuedCards.length }}</span>
     </div>
 
     <div v-if="apiErrorVisible" class="bewly-api-error">
@@ -527,6 +560,37 @@ onUnmounted(() => {
   pointer-events: none;
   font-size: 13px;
   color: var(--bew-text-1);
+  animation: bewly-info-in 120ms ease-out;
+}
+
+.bewly-active-info-queue {
+  flex-shrink: 0;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--bew-theme-color);
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+
+@keyframes bewly-info-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bewly-active-info {
+    animation: none;
+  }
 }
 
 .bewly-active-info-title {

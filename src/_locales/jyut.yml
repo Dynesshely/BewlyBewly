@@ -1,3 +1,19 @@
+command_palette:
+  placeholder: 輸入指令…
+  tab_for_you: 去個人推薦
+  tab_following: 去正在關注
+  tab_series: 去訂閱劇集
+  tab_trending: 去熱門影片
+  tab_ranking: 去排行
+  tab_live: 去直播
+  cycle_sort: 切換卡片排序
+  cycle_filter: 切換卡片篩選
+  toggle_info: 切換卡片詳細資訊
+  focus_search: 聚焦搜尋框
+  show_help: 顯示快捷鍵說明
+  open_settings: 開啟設定
+  empty: 冇符合嘅指令
+
 keyboard_help:
   title: 鍵盤快捷鍵
   hint: 再按 ? 或點擊空白處關閉
@@ -8,6 +24,10 @@ keyboard_help:
   tabs: 切換主頁分頁
   search: 聚焦搜尋框
   help: 顯示 / 隱藏本說明
+  command_palette: 打開命令面板
+  sort_filter: 切換卡片排序 / 篩選
+  info_detail: 切換卡片詳細資訊
+  queue: 將卡片加入本地待看清單
 
 common:
   view_all: 睇晒佢哋

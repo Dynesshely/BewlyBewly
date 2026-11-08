@@ -105,6 +105,8 @@ export interface Settings {
   keyboardNavLockScroll: boolean
   /** 键盘卡片导航总开关；关闭后恢复原版鼠标点选 + 正常滚动 */
   keyboardNavEnabled: boolean
+  /** 接管页拦截原版 B 站脚本（提升性能） */
+  nativeGuardEnabled: boolean
 
   // filter setting
   disableFilterForFollowedUser: boolean
@@ -219,6 +221,7 @@ export const originalSettings: Settings = {
   recommendationMode: 'web',
   keyboardNavLockScroll: true,
   keyboardNavEnabled: true,
+  nativeGuardEnabled: true,
 
   // filter setting
   disableFilterForFollowedUser: false,

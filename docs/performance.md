@@ -20,6 +20,19 @@
 - 修复 `queryDomUntilFound` 的 `setInterval` 泄漏（改 MutationObserver）。
 - TopBar / OldTopBar 的未读轮询定时器在卸载时清理；App 的 window scroll 监听改为命名函数并在卸载时移除。
 
+## 接管页原版脚本拦截
+
+在首页、空间、历史、消息、动态等被 Bewly 完全接管的页面，原版 B 站页面虽被隐藏，
+但整套脚本仍会执行（渲染节点、轮询推荐、上报埋点、加载 iframe）。现在：
+
+- `document_start` 阶段由 `src/contentScripts/nativeGuard.ts` 挂 MutationObserver；
+- 原版 `script` 一插入就改 `type` 并移除，预加载 `link` 与 `iframe` 一并清理；
+- 保留 `application/json` / `application/ld+json` / `importmap` 数据岛；
+- 设置页提供「接管页拦截原版 B 站脚本」开关，关闭后恢复原版行为。
+
+实测（本机，首页）：开启拦截后 DOM 内 `<script>` 18 → 0、`<iframe>` 1 → 0，
+首屏卡片渲染不受影响。已知限制：拦截依赖 `document_start` 时序，非接管页不启用。
+
 ## 列表渲染窗口化（评估，暂缓）
 
 当前每页 30 张卡片、DOM 节点约 30–90 个，虚拟化的收益有限；但实现风险较高：

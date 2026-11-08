@@ -10,6 +10,7 @@ import { runWhenIdle } from '~/utils/lazyLoad'
 import { compareVersions, injectCSS, isHomePage, isInIframe, isNotificationPage, isVideoOrBangumiPage } from '~/utils/main'
 import { SVG_ICONS } from '~/utils/svgIcons'
 import { version } from '../../package.json'
+import { muteNativeScripts, setNativeGuardEnabled } from './nativeGuard'
 import App from './views/App.vue'
 
 import '~/styles'
@@ -29,6 +30,18 @@ if (isFirefox) {
 }
 
 const currentUrl = document.URL
+
+/** 是否属于「Bewly 完全接管、原版页面被隐藏」的页面 */
+function isFullyTakenOverPage(): boolean {
+  if (isInIframe() || settings.value.useOriginalBilibiliHomepage)
+    return false
+  return isHomePage()
+    || /^https?:\/\/space\.bilibili\.com/.test(currentUrl)
+    || /^https?:\/\/(?:www\.)?bilibili\.com\/(?:history|account\/history)/.test(currentUrl)
+    || /^https?:\/\/message\.bilibili\.com/.test(currentUrl)
+    || /^https?:\/\/t\.bilibili\.com(?!\/vote|\/share)/.test(currentUrl)
+    || /^https?:\/\/(?:www\.)?bilibili\.com\/watchlater\/(?:#\/list|list)/.test(currentUrl)
+}
 
 function isSupportedPages(): boolean {
   if (isInIframe())
@@ -161,6 +174,15 @@ window.addEventListener(BEWLY_MOUNTED, () => {
   if (beforeLoadedStyleEl)
     document.documentElement.removeChild(beforeLoadedStyleEl)
 })
+
+// 接管页：在 document_start 阶段拦截原版脚本，避免原版页面在后台空跑
+if (isFullyTakenOverPage() && settings.value.nativeGuardEnabled) {
+  muteNativeScripts()
+}
+else {
+  // 非接管页或用户关闭拦截：不拦截，并同步镜像标记
+  setNativeGuardEnabled(false)
+}
 
 // Set the original Bilibili top bar to `display: none` to prevent it from showing before the load
 // see: https://github.com/BewlyBewly/BewlyBewly/issues/967

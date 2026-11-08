@@ -307,6 +307,8 @@ settings:
   keyboard_nav_lock_scroll_desc: 开启后滚轮逐张切换卡片且页面不滚动；关闭后滚轮正常滚动页面，高亮跟随视口内卡片
   keyboard_nav_enabled: 开启键盘卡片导航
   keyboard_nav_enabled_desc: 开启后方向键/滚轮切换高亮卡片；关闭后恢复鼠标点选与正常滚动
+  native_guard_enabled: 接管页拦截原版 B 站脚本
+  native_guard_enabled_desc: 在 Bewly 完全接管的页面上停止原版脚本运行以提升性能；关闭后保留原版行为
   ai_enabled: AI 初筛卡片
   ai_enabled_desc: 将卡片标题等公开信息发送到你配置的 AI 服务进行打分与重排
   ai_base_url: AI 接口 Base URL

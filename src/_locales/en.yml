@@ -13,6 +13,8 @@ command_palette:
   show_help: Show keyboard shortcuts
   open_settings: Open settings
   ai_filter: AI screen current page
+  keyboard_mode_on: Enable keyboard card navigation
+  keyboard_mode_off: Disable keyboard card navigation
   empty: No matching command
 
 keyboard_help:
@@ -308,6 +310,8 @@ settings:
   always_show_tabs_on_home_page: Always show tabs on the home page
   keyboard_nav_lock_scroll: 'Keyboard navigation: lock page scroll'
   keyboard_nav_lock_scroll_desc: 'When enabled, the wheel switches cards and the page stays still; when disabled, the wheel scrolls the page and the highlight follows the viewport'
+  keyboard_nav_enabled: Enable keyboard card navigation
+  keyboard_nav_enabled_desc: 'Keyboard: arrows / wheel switch the highlighted card; off restores mouse + normal scrolling'
   ai_enabled: AI screen cards on load
   ai_enabled_desc: Send card titles and public metadata to your configured AI service to score and re-order recommendations
   ai_base_url: AI base URL

@@ -103,6 +103,8 @@ export interface Settings {
   recommendationMode: 'web' | 'app'
   /** 滚轮锁定页面并逐张切换卡片；关闭后滚轮正常滚动页面、高亮跟随视口 */
   keyboardNavLockScroll: boolean
+  /** 键盘卡片导航总开关；关闭后恢复原版鼠标点选 + 正常滚动 */
+  keyboardNavEnabled: boolean
 
   // filter setting
   disableFilterForFollowedUser: boolean
@@ -216,6 +218,7 @@ export const originalSettings: Settings = {
 
   recommendationMode: 'web',
   keyboardNavLockScroll: true,
+  keyboardNavEnabled: true,
 
   // filter setting
   disableFilterForFollowedUser: false,

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import { settings } from '~/logic'
 import emitter from '~/utils/mitt'
 
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -52,6 +53,14 @@ const commands = computed<Command[]>(() => [
     label: t('command_palette.tab_live'),
     hint: '6',
     run: () => emitter.emit('switch-home-tab', 5),
+  },
+  {
+    id: 'keyboard-mode',
+    label: settings.value.keyboardNavEnabled
+      ? t('command_palette.keyboard_mode_off')
+      : t('command_palette.keyboard_mode_on'),
+    hint: settings.value.keyboardNavEnabled ? 'ON' : 'OFF',
+    run: () => emitter.emit('command-toggle-keyboard-mode'),
   },
   {
     id: 'sort',

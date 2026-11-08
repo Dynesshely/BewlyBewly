@@ -13,6 +13,8 @@ command_palette:
   show_help: 顯示快捷鍵說明
   open_settings: 開啟設定
   ai_filter: AI 初篩目前頁面
+  keyboard_mode_on: 開啟鍵盤卡片導航
+  keyboard_mode_off: 關閉鍵盤卡片導航（恢復滑鼠操作）
   empty: 沒有符合的指令
 
 keyboard_help:
@@ -304,6 +306,8 @@ settings:
   always_show_tabs_on_home_page: 總是顯示首頁標籤欄
   keyboard_nav_lock_scroll: 鍵盤導航：鎖定頁面滾動
   keyboard_nav_lock_scroll_desc: 開啟後滾輪逐張切換卡片且頁面不滾動；關閉後滾輪正常滾動頁面，高亮跟隨視口內卡片
+  keyboard_nav_enabled: 開啟鍵盤卡片導航
+  keyboard_nav_enabled_desc: 開啟後方向鍵/滾輪切換高亮卡片；關閉後恢復滑鼠點選與正常滾動
   ai_enabled: AI 初篩卡片
   ai_enabled_desc: 將卡片標題等公開資訊傳送到你設定的 AI 服務進行評分與重排
   ai_base_url: AI 介面 Base URL

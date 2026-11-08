@@ -1,4 +1,4 @@
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, watch } from 'vue'
 import { settings } from '~/logic'
 import { isAiFilterReady, recordAiHistory, scoreCards } from '~/utils/ai'
 import emitter from '~/utils/mitt'
@@ -367,7 +367,14 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
   }
 
   /** 卡片列表变化（无限加载、组件重建）后补回高亮 */
+  /** 键盘模式切换时清理或恢复高亮 */
+  function clearActiveHighlight() {
+    shadowRootEl?.querySelectorAll(`[${ACTIVE_ATTR}]`).forEach(el => el.removeAttribute(ACTIVE_ATTR))
+  }
+
   function ensureActive() {
+    if (!settings.value.keyboardNavEnabled)
+      return
     const cards = getCards()
     if (!cards.length)
       return
@@ -420,12 +427,15 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
   function handleKeydown(event: KeyboardEvent) {
     if (event.defaultPrevented || event.isComposing)
       return
-    // Ctrl/Cmd + K：打开命令面板
+    // Ctrl/Cmd + K：命令面板是全局入口，键盘模式关闭时也要可用（用于重新开启）
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
       event.preventDefault()
       emitter.emit('toggle-command-palette')
       return
     }
+    // 键盘模式关闭：不接管其他按键，恢复原版鼠标点选
+    if (!settings.value.keyboardNavEnabled)
+      return
     if (event.ctrlKey || event.metaKey || event.altKey)
       return
     if (hasOpenModal() || isEditableTarget(event.target))
@@ -567,6 +577,9 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
   }
 
   function handleWheel(event: WheelEvent) {
+    // 键盘模式关闭：不接管滚轮，恢复原版滚动
+    if (!settings.value.keyboardNavEnabled)
+      return
     // 模式二：不接管滚轮，页面正常滚动，高亮跟随视口内卡片
     if (!settings.value.keyboardNavLockScroll) {
       requestAnimationFrame(followActiveToViewport)
@@ -655,12 +668,35 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
     cardFilterMode.value = next
     applyFilterAndSort()
   })
+  watch(() => settings.value.keyboardNavEnabled, (enabled) => {
+    syncKeyboardModeFlag()
+    if (enabled) {
+      ensureActive()
+    }
+    else {
+      clearActiveHighlight()
+    }
+  })
+
   emitter.on('command-focus-search', () => focusSearchBar())
+  function syncKeyboardModeFlag() {
+    document.documentElement.toggleAttribute('data-keyboard-nav-disabled', !settings.value.keyboardNavEnabled)
+  }
+
+  emitter.on('command-toggle-keyboard-mode', () => {
+    settings.value.keyboardNavEnabled = !settings.value.keyboardNavEnabled
+    syncKeyboardModeFlag()
+    if (!settings.value.keyboardNavEnabled)
+      clearActiveHighlight()
+    else
+      ensureActive()
+  })
   emitter.on('command-run-ai-filter', () => {
     void runAiFilter()
   })
 
   onMounted(() => {
+    syncKeyboardModeFlag()
     shadowRootEl = document.querySelector('#bewly')?.shadowRoot ?? null
     window.addEventListener('keydown', handleKeydown)
     window.addEventListener('pagehide', saveNavigationState)
@@ -681,6 +717,7 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
     emitter.off('command-cycle-sort')
     emitter.off('command-cycle-filter')
     emitter.off('command-focus-search')
+    emitter.off('command-toggle-keyboard-mode')
     emitter.off('command-run-ai-filter')
     window.removeEventListener('keydown', handleKeydown)
     window.removeEventListener('pagehide', saveNavigationState)

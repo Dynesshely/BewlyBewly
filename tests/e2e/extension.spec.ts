@@ -26,7 +26,7 @@ test.describe('扩展挂载冒烟测试', () => {
       const page = await context.newPage()
 
       // 用本地快照替代真实 B 站首页，避免依赖线上环境
-      await context.route('https://www.bilibili.com/**', (route) => {
+      await context.route(/^https:\/\/www\.bilibili\.com(\/.*)?$/, (route) => {
         route.fulfill({
           status: 200,
           contentType: 'text/html; charset=utf-8',

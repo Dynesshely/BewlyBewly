@@ -27,7 +27,7 @@ test.describe('键盘卡片导航', () => {
       const page = await context.newPage()
 
       // 用本地快照替代真实 B 站首页
-      await context.route('https://www.bilibili.com/**', (route) => {
+      await context.route(/^https:\/\/www\.bilibili\.com(\/.*)?$/, (route) => {
         route.fulfill({
           status: 200,
           contentType: 'text/html; charset=utf-8',
@@ -104,7 +104,7 @@ test.describe('键盘卡片导航', () => {
 
     try {
       const page = await context.newPage()
-      await context.route('https://www.bilibili.com/**', (route) => {
+      await context.route(/^https:\/\/www\.bilibili\.com(\/.*)?$/, (route) => {
         route.fulfill({
           status: 200,
           contentType: 'text/html; charset=utf-8',

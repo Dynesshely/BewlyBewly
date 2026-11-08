@@ -27,7 +27,7 @@ test.describe('首屏性能基线', () => {
 
     try {
       const page = await context.newPage()
-      await context.route('https://www.bilibili.com/**', (route) => {
+      await context.route(/^https:\/\/www\.bilibili\.com(\/.*)?$/, (route) => {
         route.fulfill({
           status: 200,
           contentType: 'text/html; charset=utf-8',

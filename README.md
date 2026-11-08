@@ -58,7 +58,7 @@ pnpm run pack:zip   # produces extension.zip
 pnpm lint            # ESLint
 pnpm run typecheck   # vue-tsc
 pnpm exec vitest run # unit tests
-pnpm exec playwright test        # offline e2e (extension mount / keyboard / perf)
+pnpm exec playwright test        # offline e2e (extension mount / keyboard / perf, local only)
 E2E_ONLINE=1 pnpm exec playwright test tests/e2e/background.spec.ts  # online API smoke (optional)
 ```
 

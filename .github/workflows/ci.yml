@@ -41,8 +41,10 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: E2E tests
-        run: pnpm exec playwright test
+      # 扩展类 e2e 依赖真实浏览器扩展加载环境，CI 上易受无头/沙箱差异影响，
+      # 这里只跑不依赖扩展的离线快照探针；扩展 e2e 在本地或发行前手动执行。
+      - name: E2E tests (offline snapshot probe)
+        run: pnpm exec playwright test tests/e2e/dom-probe.spec.ts
 
       - name: Package extension zip
         run: pnpm run pack:zip

@@ -69,6 +69,7 @@ E2E_ONLINE=1 pnpm exec playwright test tests/e2e/background.spec.ts  # online AP
 - [Upstream divergence](docs/upstream-divergence.md) — differences from the archived upstream
 - [Dependency policy](docs/dependency-policy.md) — pinned versions and upgrade checklist
 - [Performance](docs/performance.md) — first-paint baseline, optimizations and evaluation notes
+- [AI filtering](docs/ai-filter.md) — optional AI screening of cards (OpenAI-compatible API, privacy and fallback)
 
 ## 🤝 Contribution
 

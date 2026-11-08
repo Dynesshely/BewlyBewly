@@ -1,5 +1,6 @@
 import { onMounted, onUnmounted } from 'vue'
 import { settings } from '~/logic'
+import { isAiFilterReady, scoreCards } from '~/utils/ai'
 import emitter from '~/utils/mitt'
 
 const CARD_SELECTOR = '[data-video-card]'
@@ -286,6 +287,49 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
     })
   }
 
+  /** 用 AI 评分对当前页卡片重排并打标（失败静默保持原状） */
+  async function runAiFilter() {
+    if (!isAiFilterReady())
+      return
+    const cards = getVisibleCards()
+    if (!cards.length)
+      return
+    emitter.emit('ai-filter-start', { total: cards.length })
+    const metas = cards.map(card => ({
+      id: card.getAttribute('data-video-url') || '',
+      title: card.getAttribute('data-video-title') || '',
+      author: card.getAttribute('data-video-author') || '',
+      duration: card.getAttribute('data-video-duration') || '',
+      view: card.getAttribute('data-video-view') || '',
+      reason: card.querySelector('.video-reason')?.textContent?.trim() || '',
+    })).filter(meta => meta.id)
+    const scores = await scoreCards(metas)
+    const scored = Object.values(scores)
+    if (!scored.length) {
+      emitter.emit('ai-filter-done', { ok: false })
+      return
+    }
+    // 排序 + 角标
+    cards.sort((a, b) => (scores[b.getAttribute('data-video-url') || '']?.score ?? -1) - (scores[a.getAttribute('data-video-url') || '']?.score ?? -1))
+    cards.forEach((card, index) => {
+      card.style.order = String(index)
+      const score = scores[card.getAttribute('data-video-url') || '']
+      if (score) {
+        card.setAttribute('data-ai-score', String(score.score))
+        card.setAttribute('data-ai-category', score.category)
+      }
+    })
+    const first = cards[0]
+    const all = getCards()
+    const index = all.indexOf(first)
+    if (index >= 0) {
+      activeIndex = index
+      applyActive(all, index)
+      scrollCardIntoView(first)
+    }
+    emitter.emit('ai-filter-done', { ok: true, count: scored.length })
+  }
+
   function setActive(index: number) {
     const cards = getVisibleCards()
     if (!cards.length)
@@ -451,6 +495,11 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
           emitter.emit('queue-card', extractCardInfo(card))
         break
       }
+      case 'Q': {
+        event.preventDefault()
+        void runAiFilter()
+        break
+      }
       case '?':
         event.preventDefault()
         emitter.emit('toggle-keyboard-help')
@@ -583,6 +632,9 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
     applyFilterAndSort()
   })
   emitter.on('command-focus-search', () => focusSearchBar())
+  emitter.on('command-run-ai-filter', () => {
+    void runAiFilter()
+  })
 
   onMounted(() => {
     shadowRootEl = document.querySelector('#bewly')?.shadowRoot ?? null
@@ -605,6 +657,7 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
     emitter.off('command-cycle-sort')
     emitter.off('command-cycle-filter')
     emitter.off('command-focus-search')
+    emitter.off('command-run-ai-filter')
     window.removeEventListener('keydown', handleKeydown)
     window.removeEventListener('pagehide', saveNavigationState)
     document.removeEventListener('wheel', handleWheel, { capture: true })

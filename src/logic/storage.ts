@@ -65,6 +65,18 @@ export interface Settings {
   wallpaper: string
   /** 自动轮换内置壁纸（每天一张） */
   wallpaperAutoSwitch: boolean
+
+  // AI 信息初筛
+  /** 是否启用 AI 卡片初筛 */
+  aiFilterEnabled: boolean
+  /** OpenAI 兼容接口的 base URL（如 https://api.openai.com/v1） */
+  aiBaseURL: string
+  /** API Key，仅保存在扩展本地存储 */
+  aiApiKey: string
+  /** 模型名（如 gpt-4o-mini） */
+  aiModel: string
+  /** 自定义筛选偏好提示词 */
+  aiUserPrompt: string
   enableWallpaperMasking: boolean
   wallpaperMaskOpacity: number
   wallpaperBlurIntensity: number
@@ -172,6 +184,12 @@ export const originalSettings: Settings = {
   wallpaperMode: 'buildIn',
   wallpaper: '',
   wallpaperAutoSwitch: false,
+
+  aiFilterEnabled: false,
+  aiBaseURL: '',
+  aiApiKey: '',
+  aiModel: 'gpt-4o-mini',
+  aiUserPrompt: '',
   enableWallpaperMasking: false,
   wallpaperMaskOpacity: 80,
   wallpaperBlurIntensity: 0,

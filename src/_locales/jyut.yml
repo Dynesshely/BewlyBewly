@@ -12,6 +12,7 @@ command_palette:
   focus_search: 聚焦搜尋框
   show_help: 顯示快捷鍵說明
   open_settings: 開啟設定
+  ai_filter: AI 初篩目前頁面
   empty: 冇符合嘅指令
 
 keyboard_help:
@@ -24,6 +25,7 @@ keyboard_help:
   tabs: 切換主頁分頁
   search: 聚焦搜尋框
   help: 顯示 / 隱藏本說明
+  ai_filter: 對目前頁面執行 AI 初篩
   command_palette: 打開命令面板
   sort_filter: 切換卡片排序 / 篩選
   info_detail: 切換卡片詳細資訊
@@ -300,6 +302,14 @@ settings:
   always_show_tabs_on_home_page: 永遠顯示主頁分頁欄
   keyboard_nav_lock_scroll: 鍵盤導航：鎖定頁面滾動
   keyboard_nav_lock_scroll_desc: 開啟後滾輪逐張切換卡片且頁面不滾動；關閉後滾輪正常滾動頁面，高亮跟隨視口內卡片
+  ai_enabled: AI 初篩卡片
+  ai_enabled_desc: 將卡片標題等公開資訊傳送到你設定嘅 AI 服務進行評分與重排
+  ai_base_url: AI 介面 Base URL
+  ai_api_key: AI API Key
+  ai_model: AI 模型
+  ai_user_prompt: AI 篩選偏好
+  ai_user_prompt_desc: 可選：話畀 AI 知你嘅偏好（例如唔睇遊戲區、偏好長影片）
+  ai_user_prompt_placeholder: 例如：偏好科技與長影片，跳過標題黨
 
   # Compatibility
   # Common

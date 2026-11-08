@@ -78,6 +78,12 @@ const commands = computed<Command[]>(() => [
     run: () => emitter.emit('command-focus-search'),
   },
   {
+    id: 'ai-filter',
+    label: t('command_palette.ai_filter'),
+    hint: 'Shift+Q',
+    run: () => emitter.emit('command-run-ai-filter'),
+  },
+  {
     id: 'help',
     label: t('command_palette.show_help'),
     hint: '?',

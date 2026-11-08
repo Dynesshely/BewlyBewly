@@ -1,6 +1,7 @@
 import browser from 'webextension-polyfill'
 
 import { apiListenerFactory } from '../../utils'
+import API_AI from './ai'
 import API_ANIME from './anime'
 import API_AUTH from './auth'
 import API_FAVORITE from './favorite'
@@ -15,6 +16,7 @@ import API_VIDEO from './video'
 import API_WATCHLATER from './watchLater'
 
 export const API_COLLECTION = {
+  AI: API_AI,
   AUTH: API_AUTH,
   ANIME: API_ANIME,
   HISTORY: API_HISTORY,

@@ -27,6 +27,8 @@ const [showSettings, toggleSettings] = useToggle(false)
 // 键盘快捷键帮助 / 当前卡片信息条 / 接口失败提示
 const showKeyboardHelp = ref(false)
 const showCommandPalette = ref(false)
+const aiFilterStatus = ref('')
+let aiFilterTimer: ReturnType<typeof setTimeout> | null = null
 const activeCardInfo = ref<{ title: string, meta: string, url: string, author?: string, view?: string, duration?: string, reason?: string } | null>(null)
 const showCardInfoDetail = ref(false)
 interface QueueItem { title: string, url: string }
@@ -48,6 +50,17 @@ emitter.on('keyboard-active-card', (info: { title: string, meta: string, url: st
 })
 emitter.on('toggle-card-info-detail', () => {
   showCardInfoDetail.value = !showCardInfoDetail.value
+})
+emitter.on('ai-filter-start', ({ total }: { total: number }) => {
+  aiFilterStatus.value = `AI 初筛中… (${total})`
+})
+emitter.on('ai-filter-done', ({ ok }: { ok: boolean }) => {
+  aiFilterStatus.value = ok ? 'AI 初筛完成' : 'AI 初筛失败'
+  if (aiFilterTimer)
+    clearTimeout(aiFilterTimer)
+  aiFilterTimer = setTimeout(() => {
+    aiFilterStatus.value = ''
+  }, 2500)
 })
 emitter.on('queue-card', (info: { title: string, url: string }) => {
   if (!info.url)
@@ -404,6 +417,10 @@ onUnmounted(() => {
   emitter.off('keyboard-active-card')
   emitter.off('toggle-card-info-detail')
   emitter.off('queue-card')
+  emitter.off('ai-filter-start')
+  emitter.off('ai-filter-done')
+  if (aiFilterTimer)
+    clearTimeout(aiFilterTimer)
   emitter.off('api-error')
   if (apiErrorTimer)
     clearTimeout(apiErrorTimer)
@@ -519,6 +536,10 @@ onUnmounted(() => {
       <span v-if="queuedCards.length" class="bewly-active-info-queue">{{ queuedCards.length }}</span>
     </div>
 
+    <div v-if="aiFilterStatus" class="bewly-ai-status">
+      {{ aiFilterStatus }}
+    </div>
+
     <div v-if="apiErrorVisible" class="bewly-api-error">
       {{ $t('common.request_failed') }}
     </div>
@@ -604,6 +625,21 @@ onUnmounted(() => {
   flex-shrink: 0;
   color: var(--bew-text-3);
   font-size: 12px;
+}
+
+.bewly-ai-status {
+  position: fixed;
+  left: 50%;
+  bottom: 60px;
+  z-index: 10005;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--bew-theme-color);
+  color: #fff;
+  font-size: 12px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  box-shadow: var(--bew-shadow-1);
 }
 
 .bewly-api-error {

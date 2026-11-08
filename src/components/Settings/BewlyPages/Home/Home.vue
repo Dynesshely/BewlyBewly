@@ -189,6 +189,20 @@ function handleToggleHomeTab(tab: any) {
         <template #desc>
           <p>{{ $t('settings.recommendation_mode_desc') }}</p>
         </template>
+
+        <style scoped>
+          .bewly-settings-input {
+          width: 260px;
+          max-width: 100%;
+          padding: 6px 10px;
+          border-radius: 8px;
+          border: 1px solid var(--bew-border-color);
+          background: var(--bew-fill-1);
+          color: var(--bew-text-1);
+          font-size: 13px;
+          outline: none;
+          }
+        </style>
         <div w-full flex rounded="$bew-radius" bg="$bew-fill-1" p-1>
           <div
             flex-1 py-1 cursor-pointer text-center rounded="$bew-radius"
@@ -423,6 +437,29 @@ function handleToggleHomeTab(tab: any) {
         </template>
         <Radio v-model="settings.keyboardNavLockScroll" />
       </SettingsItem>
+      <SettingsItem :title="$t('settings.ai_filter_enabled')">
+        <template #desc>
+          <span>{{ $t('settings.ai_filter_enabled_desc') }}</span>
+        </template>
+        <Radio v-model="settings.aiFilterEnabled" />
+      </SettingsItem>
+      <template v-if="settings.aiFilterEnabled">
+        <SettingsItem :title="$t('settings.ai_base_url')">
+          <input v-model="settings.aiBaseURL" class="bewly-settings-input" placeholder="https://api.openai.com/v1">
+        </SettingsItem>
+        <SettingsItem :title="$t('settings.ai_api_key')">
+          <input v-model="settings.aiApiKey" class="bewly-settings-input" type="password" placeholder="sk-...">
+        </SettingsItem>
+        <SettingsItem :title="$t('settings.ai_model')">
+          <input v-model="settings.aiModel" class="bewly-settings-input" placeholder="gpt-4o-mini">
+        </SettingsItem>
+        <SettingsItem :title="$t('settings.ai_user_prompt')">
+          <template #desc>
+            <span>{{ $t('settings.ai_user_prompt_desc') }}</span>
+          </template>
+          <input v-model="settings.aiUserPrompt" class="bewly-settings-input" :placeholder="$t('settings.ai_user_prompt_placeholder')">
+        </SettingsItem>
+      </template>
     </SettingsItemGroup>
 
     <SettingsItemGroup :title="$t('settings.group_search_page_mode')">

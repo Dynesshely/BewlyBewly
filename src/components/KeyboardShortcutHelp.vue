@@ -12,6 +12,7 @@ const items = [
   { keys: 's / f', desc: 'keyboard_help.sort_filter' },
   { keys: 'i', desc: 'keyboard_help.info_detail' },
   { keys: 'q', desc: 'keyboard_help.queue' },
+  { keys: 'Shift + Q', desc: 'keyboard_help.ai_filter' },
   { keys: '?', desc: 'keyboard_help.help' },
 ]
 </script>

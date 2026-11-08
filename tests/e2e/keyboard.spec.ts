@@ -1,8 +1,10 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { chromium, expect, test } from '@playwright/test'
+
+import { routeBilibiliDocument } from './utils'
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const EXTENSION_DIR = join(ROOT, 'extension')
@@ -27,13 +29,7 @@ test.describe('键盘卡片导航', () => {
       const page = await context.newPage()
 
       // 用本地快照替代真实 B 站首页
-      await context.route(/^https:\/\/www\.bilibili\.com(\/.*)?$/, (route) => {
-        route.fulfill({
-          status: 200,
-          contentType: 'text/html; charset=utf-8',
-          body: readFileSync(HOME_FIXTURE, 'utf-8'),
-        })
-      })
+      await routeBilibiliDocument(context, HOME_FIXTURE)
 
       await page.goto('https://www.bilibili.com/', { waitUntil: 'domcontentloaded' })
       await expect(page.locator('#bewly')).toHaveCount(1, { timeout: 30_000 })
@@ -104,13 +100,7 @@ test.describe('键盘卡片导航', () => {
 
     try {
       const page = await context.newPage()
-      await context.route(/^https:\/\/www\.bilibili\.com(\/.*)?$/, (route) => {
-        route.fulfill({
-          status: 200,
-          contentType: 'text/html; charset=utf-8',
-          body: readFileSync(HOME_FIXTURE, 'utf-8'),
-        })
-      })
+      await routeBilibiliDocument(context, HOME_FIXTURE)
       await page.goto('https://www.bilibili.com/', { waitUntil: 'domcontentloaded' })
       await expect(page.locator('#bewly')).toHaveCount(1, { timeout: 30_000 })
       await page.waitForFunction(

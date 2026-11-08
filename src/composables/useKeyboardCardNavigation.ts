@@ -232,6 +232,8 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
       view: card.getAttribute('data-video-view') || '',
       duration: card.getAttribute('data-video-duration') || '',
       reason: card.querySelector('.video-reason')?.textContent?.trim() || '',
+      aiScore: card.getAttribute('data-ai-score') || '',
+      aiCategory: card.getAttribute('data-ai-category') || '',
     }
   }
 
@@ -309,17 +311,27 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
       emitter.emit('ai-filter-done', { ok: false })
       return
     }
-    // 排序 + 角标
+    // 排序 + 角标 + 可选只保留「推荐」
+    const onlyRecommended = settings.value.aiFilterOnlyRecommended
     cards.sort((a, b) => (scores[b.getAttribute('data-video-url') || '']?.score ?? -1) - (scores[a.getAttribute('data-video-url') || '']?.score ?? -1))
-    cards.forEach((card, index) => {
-      card.style.order = String(index)
+    let visibleCount = 0
+    cards.forEach((card) => {
       const score = scores[card.getAttribute('data-video-url') || '']
       if (score) {
         card.setAttribute('data-ai-score', String(score.score))
         card.setAttribute('data-ai-category', score.category)
       }
+      const isRecommended = score?.category === '推荐'
+      if (onlyRecommended && score && !isRecommended)
+        card.style.display = 'none'
+      else
+        card.style.removeProperty('display')
+      if (card.style.display !== 'none') {
+        card.style.order = String(visibleCount)
+        visibleCount++
+      }
     })
-    const first = cards[0]
+    const first = cards.find(card => card.style.display !== 'none') ?? cards[0]
     const all = getCards()
     const index = all.indexOf(first)
     if (index >= 0) {
@@ -327,7 +339,7 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
       applyActive(all, index)
       scrollCardIntoView(first)
     }
-    emitter.emit('ai-filter-done', { ok: true, count: scored.length })
+    emitter.emit('ai-filter-done', { ok: true, count: scored.length, visible: visibleCount })
   }
 
   function setActive(index: number) {

@@ -29,7 +29,7 @@ const showKeyboardHelp = ref(false)
 const showCommandPalette = ref(false)
 const aiFilterStatus = ref('')
 let aiFilterTimer: ReturnType<typeof setTimeout> | null = null
-const activeCardInfo = ref<{ title: string, meta: string, url: string, author?: string, view?: string, duration?: string, reason?: string } | null>(null)
+const activeCardInfo = ref<{ title: string, meta: string, url: string, author?: string, view?: string, duration?: string, reason?: string, aiScore?: string, aiCategory?: string } | null>(null)
 const showCardInfoDetail = ref(false)
 interface QueueItem { title: string, url: string }
 const queuedCards = ref<QueueItem[]>([])
@@ -45,7 +45,7 @@ emitter.on('toggle-command-palette', () => {
 emitter.on('command-open-settings', () => {
   showSettings.value = true
 })
-emitter.on('keyboard-active-card', (info: { title: string, meta: string, url: string, author?: string, view?: string, duration?: string, reason?: string }) => {
+emitter.on('keyboard-active-card', (info: { title: string, meta: string, url: string, author?: string, view?: string, duration?: string, reason?: string, aiScore?: string, aiCategory?: string }) => {
   activeCardInfo.value = info
 })
 emitter.on('toggle-card-info-detail', () => {
@@ -54,8 +54,12 @@ emitter.on('toggle-card-info-detail', () => {
 emitter.on('ai-filter-start', ({ total }: { total: number }) => {
   aiFilterStatus.value = `AI 初筛中… (${total})`
 })
-emitter.on('ai-filter-done', ({ ok }: { ok: boolean }) => {
-  aiFilterStatus.value = ok ? 'AI 初筛完成' : 'AI 初筛失败'
+emitter.on('ai-filter-done', ({ ok, visible }: { ok: boolean, visible?: number }) => {
+  aiFilterStatus.value = ok
+    ? `AI 初筛完成${typeof visible === 'number'
+      ? `（保留 ${visible} 个）`
+      : ''}`
+    : 'AI 初筛失败'
   if (aiFilterTimer)
     clearTimeout(aiFilterTimer)
   aiFilterTimer = setTimeout(() => {
@@ -531,6 +535,7 @@ onUnmounted(() => {
         <span v-if="activeCardInfo.view" class="bewly-active-info-meta">{{ activeCardInfo.view }}</span>
         <span v-if="activeCardInfo.duration" class="bewly-active-info-meta">{{ activeCardInfo.duration }}</span>
         <span v-if="activeCardInfo.reason" class="bewly-active-info-meta">{{ activeCardInfo.reason }}</span>
+        <span v-if="activeCardInfo.aiScore" class="bewly-active-info-ai">AI {{ activeCardInfo.aiScore }}{{ activeCardInfo.aiCategory ? ` · ${activeCardInfo.aiCategory}` : '' }}</span>
       </template>
       <span v-else-if="activeCardInfo.meta" class="bewly-active-info-meta">{{ activeCardInfo.meta }}</span>
       <span v-if="queuedCards.length" class="bewly-active-info-queue">{{ queuedCards.length }}</span>
@@ -582,6 +587,15 @@ onUnmounted(() => {
   font-size: 13px;
   color: var(--bew-text-1);
   animation: bewly-info-in 120ms ease-out;
+}
+
+.bewly-active-info-ai {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--bew-theme-color);
+  color: #fff;
+  font-size: 11px;
 }
 
 .bewly-active-info-queue {

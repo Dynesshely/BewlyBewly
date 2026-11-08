@@ -453,6 +453,12 @@ function handleToggleHomeTab(tab: any) {
         <SettingsItem :title="$t('settings.ai_model')">
           <input v-model="settings.aiModel" class="bewly-settings-input" placeholder="gpt-4o-mini">
         </SettingsItem>
+        <SettingsItem :title="$t('settings.ai_filter_only_recommended')">
+          <template #desc>
+            <span>{{ $t('settings.ai_filter_only_recommended_desc') }}</span>
+          </template>
+          <Radio v-model="settings.aiFilterOnlyRecommended" />
+        </SettingsItem>
         <SettingsItem :title="$t('settings.ai_user_prompt')">
           <template #desc>
             <span>{{ $t('settings.ai_user_prompt_desc') }}</span>

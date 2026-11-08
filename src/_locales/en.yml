@@ -314,6 +314,8 @@ settings:
   ai_api_key: AI API key
   ai_model: AI model
   ai_user_prompt: AI screening preference
+  ai_filter_only_recommended: 'AI screening: keep only recommended'
+  ai_filter_only_recommended_desc: 'After screening, hide cards classified as ads/low quality/duplicates'
   ai_user_prompt_desc: 'Optional: tell the AI what you prefer (e.g. no gaming, prefer long videos)'
   ai_user_prompt_placeholder: e.g. I prefer tech and long-form videos, skip clickbait titles
 

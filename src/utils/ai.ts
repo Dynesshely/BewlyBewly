@@ -24,18 +24,19 @@ interface CacheEntry {
   at: number
 }
 
-function readCache(): Record<string, CacheEntry> {
+async function readCache(): Promise<Record<string, CacheEntry>> {
   try {
-    return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}')
+    const data = await browser.storage.local.get(CACHE_KEY)
+    return (data[CACHE_KEY] as Record<string, CacheEntry>) ?? {}
   }
   catch {
     return {}
   }
 }
 
-function writeCache(cache: Record<string, CacheEntry>) {
+async function writeCache(cache: Record<string, CacheEntry>) {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(cache))
+    await browser.storage.local.set({ [CACHE_KEY]: cache })
   }
   catch {
     // ignore quota errors
@@ -52,7 +53,7 @@ export async function scoreCards(cards: CardMeta[]): Promise<Record<string, AiSc
   if (!cards.length || !isAiFilterReady())
     return result
 
-  const cache = readCache()
+  const cache = await readCache()
   const now = Date.now()
   const pending: CardMeta[] = []
   for (const card of cards) {
@@ -91,7 +92,7 @@ export async function scoreCards(cards: CardMeta[]): Promise<Record<string, AiSc
       result[item.id] = score
       cache[item.id] = { score, at: now }
     }
-    writeCache(cache)
+    await writeCache(cache)
   }
   catch {
     // 静默降级：保持原顺序

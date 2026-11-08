@@ -310,6 +310,8 @@ settings:
   ai_api_key: AI API Key
   ai_model: AI 模型
   ai_user_prompt: AI 篩選偏好
+  ai_filter_only_recommended: AI 初篩：只保留推薦
+  ai_filter_only_recommended_desc: 初篩後隱藏被判定為廣告/低質/重複的卡片
   ai_user_prompt_desc: 可選：告訴 AI 你的偏好（如不看遊戲區、偏好長影片）
   ai_user_prompt_placeholder: 例如：偏好科技與長影片，跳過標題黨
 

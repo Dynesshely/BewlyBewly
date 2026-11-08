@@ -77,6 +77,8 @@ export interface Settings {
   aiModel: string
   /** 自定义筛选偏好提示词 */
   aiUserPrompt: string
+  /** AI 初筛后只保留「推荐」分类的卡片 */
+  aiFilterOnlyRecommended: boolean
   enableWallpaperMasking: boolean
   wallpaperMaskOpacity: number
   wallpaperBlurIntensity: number
@@ -190,6 +192,7 @@ export const originalSettings: Settings = {
   aiApiKey: '',
   aiModel: 'gpt-4o-mini',
   aiUserPrompt: '',
+  aiFilterOnlyRecommended: false,
   enableWallpaperMasking: false,
   wallpaperMaskOpacity: 80,
   wallpaperBlurIntensity: 0,

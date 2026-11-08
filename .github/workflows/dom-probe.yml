@@ -26,8 +26,8 @@ jobs:
           run_install: |
             - args: [--frozen-lockfile]
 
-      - name: Install Edge for Playwright
-        run: pnpm exec playwright install --with-deps msedge
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Run online DOM probe
         run: pnpm run test:e2e:online

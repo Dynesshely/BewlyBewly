@@ -314,6 +314,8 @@ settings:
   keyboard_nav_enabled_desc: 'Keyboard: arrows / wheel switch the highlighted card; off restores mouse + normal scrolling'
   native_guard_enabled: Block original Bilibili scripts on taken-over pages
   native_guard_enabled_desc: Improve performance by stopping the original page scripts on pages Bewly fully takes over; turn off to keep original behavior
+  native_filter_enabled: Apply title filters on native pages
+  native_filter_enabled_desc: Hide matching cards on search / recommendation / ranking pages (marking only, never removing nodes)
   ai_enabled: AI screen cards on load
   ai_enabled_desc: Send card titles and public metadata to your configured AI service to score and re-order recommendations
   ai_base_url: AI base URL

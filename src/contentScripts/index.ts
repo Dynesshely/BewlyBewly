@@ -8,6 +8,7 @@ import { setupApp } from '~/logic/common-setup'
 import RESET_BEWLY_CSS from '~/styles/reset.css?raw'
 import { runWhenIdle } from '~/utils/lazyLoad'
 import { compareVersions, injectCSS, isHomePage, isInIframe, isNotificationPage, isVideoOrBangumiPage } from '~/utils/main'
+import { markNativeFilteredCards } from '~/utils/nativeFilter'
 import { SVG_ICONS } from '~/utils/svgIcons'
 import { version } from '../../package.json'
 import { muteNativeScripts, setNativeGuardEnabled } from './nativeGuard'
@@ -228,6 +229,10 @@ async function onDOMLoaded() {
       await injectAppWhenIdle()
     }
   }
+
+  // 原生页面（搜索页等）的屏蔽词过滤：标记式隐藏，可逆
+  if (settings.value.nativeFilterEnabled && !isFullyTakenOverPage())
+    markNativeFilteredCards()
 
   // Reset the original Bilibili top bar display style
   if (removeOriginalTopBar)

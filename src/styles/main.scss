@@ -191,3 +191,8 @@ img {
   border-radius: var(--bew-radius);
   box-shadow: 0 0 0 6px color-mix(in oklab, var(--bew-theme-color), transparent 80%);
 }
+
+/* 原生页面过滤：只隐藏标记卡片，不删除节点，可逆 */
+[data-bewly-filtered="native"] {
+  display: none !important;
+}

@@ -107,6 +107,8 @@ export interface Settings {
   keyboardNavEnabled: boolean
   /** 接管页拦截原版 B 站脚本（提升性能） */
   nativeGuardEnabled: boolean
+  /** 在原生页面（搜索页等）应用屏蔽词过滤 */
+  nativeFilterEnabled: boolean
 
   // filter setting
   disableFilterForFollowedUser: boolean
@@ -222,6 +224,7 @@ export const originalSettings: Settings = {
   keyboardNavLockScroll: true,
   keyboardNavEnabled: true,
   nativeGuardEnabled: true,
+  nativeFilterEnabled: false,
 
   // filter setting
   disableFilterForFollowedUser: false,

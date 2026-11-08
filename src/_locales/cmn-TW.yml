@@ -310,6 +310,8 @@ settings:
   keyboard_nav_enabled_desc: 開啟後方向鍵/滾輪切換高亮卡片；關閉後恢復滑鼠點選與正常滾動
   native_guard_enabled: 接管頁攔截原版 B 站腳本
   native_guard_enabled_desc: 在 Bewly 完全接管的頁面上停止原版腳本執行以提升效能；關閉後保留原版行為
+  native_filter_enabled: 在原生頁面套用標題過濾
+  native_filter_enabled_desc: 在搜尋頁 / 推薦 / 排行等原生頁面隱藏符合卡片（僅標記，不刪除節點）
   ai_enabled: AI 初篩卡片
   ai_enabled_desc: 將卡片標題等公開資訊傳送到你設定的 AI 服務進行評分與重排
   ai_base_url: AI 介面 Base URL

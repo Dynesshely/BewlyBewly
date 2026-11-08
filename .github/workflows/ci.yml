@@ -55,10 +55,4 @@ jobs:
           name: bewlybewly-extension
           path: extension.zip
           if-no-files-found: error
-
-      - name: Upload extension artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: bewlybewly-extension
-          path: extension.zip
-          if-no-files-found: error
+          overwrite: true

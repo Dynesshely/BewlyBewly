@@ -1,6 +1,6 @@
 import { onMounted, onUnmounted } from 'vue'
 import { settings } from '~/logic'
-import { isAiFilterReady, scoreCards } from '~/utils/ai'
+import { isAiFilterReady, recordAiHistory, scoreCards } from '~/utils/ai'
 import emitter from '~/utils/mitt'
 
 const CARD_SELECTOR = '[data-video-card]'
@@ -340,6 +340,18 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
       scrollCardIntoView(first)
     }
     emitter.emit('ai-filter-done', { ok: true, count: scored.length, visible: visibleCount })
+    void recordAiHistory({
+      at: Date.now(),
+      total: cards.length,
+      scored: scored.length,
+      kept: visibleCount,
+    })
+    void recordAiHistory({
+      at: Date.now(),
+      total: cards.length,
+      scored: scored.length,
+      kept: visibleCount,
+    })
   }
 
   function setActive(index: number) {

@@ -311,6 +311,10 @@ settings:
   ai_user_prompt: AI 筛选偏好
   ai_filter_only_recommended: AI 初筛：只保留推荐
   ai_filter_only_recommended_desc: 初筛后隐藏被判定为广告/低质/重复的卡片
+  ai_history: AI 初筛历史
+  ai_history_desc: 本地保留的最近初筛记录（存于扩展存储）
+  ai_history_refresh: 刷新
+  ai_history_summary: '共 {total} 张，保留 {kept} 张'
   ai_user_prompt_desc: 可选：告诉 AI 你的偏好（如不看游戏区、偏好长视频）
   ai_user_prompt_placeholder: 例如：偏好科技与长视频，跳过标题党
 

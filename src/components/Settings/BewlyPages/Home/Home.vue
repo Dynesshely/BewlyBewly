@@ -180,6 +180,22 @@ function handleToggleHomeTab(tab: any) {
   else
     tab.visible = true
 }
+
+const aiHistory = ref<{ at: number, total: number, scored: number, kept: number }[]>([])
+
+async function loadAiHistory() {
+  try {
+    const data = await browser.storage.local.get('bewly-ai-history')
+    aiHistory.value = (data['bewly-ai-history'] as any[]) ?? []
+  }
+  catch {
+    aiHistory.value = []
+  }
+}
+
+onMounted(() => {
+  void loadAiHistory()
+})
 </script>
 
 <template>
@@ -191,6 +207,24 @@ function handleToggleHomeTab(tab: any) {
         </template>
 
         <style scoped>
+          .bewly-ai-history {
+          max-height: 140px;
+          overflow-y: auto;
+          padding: 8px 12px;
+          margin: 4px 0 8px;
+          border-radius: 8px;
+          background: var(--bew-fill-1);
+          font-size: 12px;
+          color: var(--bew-text-2);
+          }
+
+          .bewly-ai-history-row {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 3px 0;
+          }
+
           .bewly-settings-input {
           width: 260px;
           max-width: 100%;
@@ -445,7 +479,18 @@ function handleToggleHomeTab(tab: any) {
       </SettingsItem>
       <template v-if="settings.aiFilterEnabled">
         <SettingsItem :title="$t('settings.ai_base_url')">
-          <input v-model="settings.aiBaseURL" class="bewly-settings-input" placeholder="https://api.openai.com/v1">
+          <div flex="~ gap-2 items-center" flex-wrap>
+            <input v-model="settings.aiBaseURL" class="bewly-settings-input" placeholder="https://api.openai.com/v1">
+            <Button size="sm" type="secondary" @click="settings.aiBaseURL = 'https://api.openai.com/v1'">
+              OpenAI
+            </Button>
+            <Button size="sm" type="secondary" @click="settings.aiBaseURL = 'https://api.deepseek.com/v1'">
+              DeepSeek
+            </Button>
+            <Button size="sm" type="secondary" @click="settings.aiBaseURL = 'https://open.bigmodel.cn/api/paas/v4'">
+              GLM
+            </Button>
+          </div>
         </SettingsItem>
         <SettingsItem :title="$t('settings.ai_api_key')">
           <input v-model="settings.aiApiKey" class="bewly-settings-input" type="password" placeholder="sk-...">
@@ -459,6 +504,20 @@ function handleToggleHomeTab(tab: any) {
           </template>
           <Radio v-model="settings.aiFilterOnlyRecommended" />
         </SettingsItem>
+        <SettingsItem :title="$t('settings.ai_history')">
+          <template #desc>
+            <span>{{ $t('settings.ai_history_desc') }}</span>
+          </template>
+          <Button size="sm" type="secondary" @click="loadAiHistory()">
+            {{ $t('settings.ai_history_refresh') }}
+          </Button>
+        </SettingsItem>
+        <div v-if="aiHistory.length" class="bewly-ai-history">
+          <div v-for="item in aiHistory" :key="item.at" class="bewly-ai-history-row">
+            <span>{{ new Date(item.at).toLocaleString() }}</span>
+            <span>{{ $t('settings.ai_history_summary', { total: item.total, kept: item.kept }) }}</span>
+          </div>
+        </div>
         <SettingsItem :title="$t('settings.ai_user_prompt')">
           <template #desc>
             <span>{{ $t('settings.ai_user_prompt_desc') }}</span>

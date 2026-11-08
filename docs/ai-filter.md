@@ -33,6 +33,11 @@
 - **只保留推荐**：初筛后隐藏被判定为「广告 / 低质 / 重复」的卡片，仅保留「推荐」。
 - **信息条展示分数**：高亮卡片的信息条会显示 `AI <分数> · <分类>`。
 
+## 提供商与历史
+
+- 设置页提供 OpenAI / DeepSeek / GLM 的 Base URL 快捷填充，其他 OpenAI 兼容服务也可直接填写。
+- 每次初筛会记录一条历史（时间、卡片总数、保留数），保存在扩展 `storage.local`，设置页可刷新查看。
+
 ## 已知限制
 
 - 依赖 OpenAI 兼容的 `/chat/completions` 与 `response_format: json_object`。

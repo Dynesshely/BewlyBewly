@@ -99,3 +99,36 @@ export async function scoreCards(cards: CardMeta[]): Promise<Record<string, AiSc
   }
   return result
 }
+
+const HISTORY_KEY = 'bewly-ai-history'
+const HISTORY_LIMIT = 20
+
+export interface AiHistoryEntry {
+  at: number
+  total: number
+  scored: number
+  kept: number
+}
+
+export async function readAiHistory(): Promise<AiHistoryEntry[]> {
+  try {
+    const data = await browser.storage.local.get(HISTORY_KEY)
+    return (data[HISTORY_KEY] as AiHistoryEntry[]) ?? []
+  }
+  catch {
+    return []
+  }
+}
+
+export async function recordAiHistory(entry: AiHistoryEntry): Promise<void> {
+  try {
+    const history = await readAiHistory()
+    history.unshift(entry)
+    await browser.storage.local.set({
+      [HISTORY_KEY]: history.slice(0, HISTORY_LIMIT),
+    })
+  }
+  catch {
+    // ignore
+  }
+}

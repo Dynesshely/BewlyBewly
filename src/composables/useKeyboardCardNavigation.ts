@@ -424,7 +424,14 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
     }))
   }
 
+  function isFocusBrowseMode(): boolean {
+    return document.documentElement.classList.contains('bewly-focus-browse')
+  }
+
   function handleKeydown(event: KeyboardEvent) {
+    // 聚焦浏览模式自己处理方向键与滚轮
+    if (isFocusBrowseMode())
+      return
     if (event.defaultPrevented || event.isComposing)
       return
     // Ctrl/Cmd + K：命令面板是全局入口，键盘模式关闭时也要可用（用于重新开启）
@@ -577,6 +584,9 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
   }
 
   function handleWheel(event: WheelEvent) {
+    // 聚焦浏览模式自己处理滚轮
+    if (isFocusBrowseMode())
+      return
     // 键盘模式关闭：不接管滚轮，恢复原版滚动
     if (!settings.value.keyboardNavEnabled)
       return

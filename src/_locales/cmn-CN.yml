@@ -13,6 +13,9 @@ command_palette:
   show_help: 显示快捷键帮助
   open_settings: 打开设置
   ai_filter: AI 初筛当前页
+  focus_browse: 进入聚焦浏览（封面流）
+  focus_browse_on: 进入聚焦浏览（封面流）
+  focus_browse_off: 退出聚焦浏览
   keyboard_mode_on: 开启键盘卡片导航
   keyboard_mode_off: 关闭键盘卡片导航（恢复鼠标操作）
   empty: 没有匹配的命令

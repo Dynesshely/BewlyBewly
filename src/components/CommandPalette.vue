@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import { isFocusBrowseActive } from '~/composables/useFocusBrowse'
 import { settings } from '~/logic'
 import emitter from '~/utils/mitt'
 
@@ -53,6 +54,14 @@ const commands = computed<Command[]>(() => [
     label: t('command_palette.tab_live'),
     hint: '6',
     run: () => emitter.emit('switch-home-tab', 5),
+  },
+  {
+    id: 'focus-browse',
+    label: isFocusBrowseActive()
+      ? t('command_palette.focus_browse_off')
+      : t('command_palette.focus_browse_on'),
+    hint: 'F',
+    run: () => emitter.emit('command-toggle-focus-browse'),
   },
   {
     id: 'keyboard-mode',

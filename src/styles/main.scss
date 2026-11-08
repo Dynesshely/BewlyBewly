@@ -196,3 +196,125 @@ img {
 [data-bewly-filtered="native"] {
   display: none !important;
 }
+
+/* 侧卡压暗，让主卡成为唯一视觉焦点 */
+/* ===== 聚焦浏览（Cover Flow） ===== */
+.bewly-focus-browse [data-video-card] {
+  background: var(--bew-elevated);
+  border-radius: var(--bew-radius);
+  overflow: hidden;
+  /* 高度由内容决定：封面 + 标题/UP/播放量信息区 */
+  height: auto;
+  /* 刻意不使用 -webkit-font-smoothing: antialiased：
+     它会禁用 Windows ClearType 次像素抗锯齿，让文字变细变虚 */
+}
+
+/* 主卡：不建立独立合成层，文字按原生分辨率绘制 */
+.bewly-focus-browse [data-video-card][data-keyboard-active] {
+  will-change: auto;
+  backface-visibility: visible;
+}
+
+/*
+ * 主卡文字清晰度：覆盖全局 `.bewly-wrapper *` 的 antialiased。
+ * -webkit-font-smoothing: antialiased 会关闭 Windows ClearType 次像素渲染，
+ * 文字看起来偏细、发灰；聚焦浏览时主卡是唯一焦点，恢复系统默认抗锯齿。
+ */
+.bewly-focus-browse [data-video-card][data-keyboard-active],
+.bewly-focus-browse [data-video-card][data-keyboard-active] * {
+  -webkit-font-smoothing: auto;
+  -moz-osx-font-smoothing: auto;
+  text-rendering: auto;
+  font-synthesis: none;
+}
+
+/* ===== 聚焦浏览：卡片内排版 ===== */
+
+/* 封面与信息区之间的间距（卡片已有 16px 内边距，这里再补一段） */
+.bewly-focus-browse [data-video-card][data-keyboard-active] > div > div > a > div:last-child {
+  margin-top: var(--bew-focus-gap, 18px) !important;
+}
+
+/* 信息区外层：头像与文字顶部对齐（默认 stretch 会让头像下沉） */
+.bewly-focus-browse [data-video-card][data-keyboard-active] > div > div > a > div:last-child {
+  align-items: flex-start !important;
+}
+
+/* 头像：组件用 inline style 写死 34px，这里用属性选择器覆盖并放大 */
+.bewly-focus-browse [data-video-card][data-keyboard-active] div[style*="width: 34px"] {
+  width: var(--bew-focus-avatar, 44px) !important;
+  height: var(--bew-focus-avatar, 44px) !important;
+  margin-right: 16px !important;
+  margin-top: 2px !important;
+}
+
+.bewly-focus-browse [data-video-card][data-keyboard-active] div[style*="width: 34px"] img,
+.bewly-focus-browse [data-video-card][data-keyboard-active] div[style*="width: 34px"] > a {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* 标题：略放大，行高放松 */
+.bewly-focus-browse [data-video-card][data-keyboard-active] h3 {
+  font-size: var(--bew-focus-title, 18px);
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+/* 时间 / 标签胶囊：加大内边距与圆角 */
+.bewly-focus-browse [data-video-card][data-keyboard-active] span[bg*="$bew-fill-1"],
+.bewly-focus-browse [data-video-card][data-keyboard-active] span[bg*="$bew-theme-color-20"] {
+  padding: 3px 10px;
+  line-height: 1.6;
+  border-radius: calc(var(--bew-radius) * 1.5);
+}
+
+/* 胶囊行与上方播放量之间留白 */
+.bewly-focus-browse [data-video-card][data-keyboard-active] div[mt-2] {
+  margin-top: 10px;
+}
+
+/* 封面圆角：略小于卡片圆角，形成内嵌层次 */
+.bewly-focus-browse [data-video-card][data-keyboard-active] .vertical-card-cover {
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.bewly-focus-browse [data-video-card][data-keyboard-active] .vertical-card-cover img {
+  border-radius: 14px;
+}
+
+/* 主卡内的封面图片也按原生分辨率绘制，不做平滑插值 */
+.bewly-focus-browse [data-video-card][data-keyboard-active] img {
+  image-rendering: -webkit-optimize-contrast;
+}
+
+/* 侧卡压暗，让主卡成为唯一视觉焦点；主卡不生成该层，保证文字走原生抗锯齿 */
+.bewly-focus-browse [data-video-card]:not([data-keyboard-active])::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  border-radius: inherit;
+  pointer-events: none;
+  background: rgb(0 0 0 / var(--bew-focus-dim, 0));
+  transition: background 320ms ease;
+}
+
+.bewly-focus-browse [data-video-card][data-keyboard-active] {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 0;
+  box-shadow: 0 24px 60px rgb(0 0 0 / 45%);
+}
+
+/* 卡片本身已含完整信息，底部固定信息条隐藏避免重复 */
+.bewly-focus-browse .bewly-active-info {
+  display: none;
+}
+
+/* 兜底：尚未被 JS 摆位的卡片不能以文档流尺寸显示（否则会撑成巨大区块） */
+.bewly-focus-browse [data-bewly-focus] [data-video-card]:not([data-bewly-focus-ready]) {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+}

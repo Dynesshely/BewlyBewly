@@ -5,6 +5,7 @@ import type { BewlyAppProvider } from '~/composables/useAppProvider'
 import type { DockItem } from '~/stores/mainStore'
 import { useEventListener, useThrottleFn, useToggle } from '@vueuse/core'
 import { useDark } from '~/composables/useDark'
+import { useFocusBrowse } from '~/composables/useFocusBrowse'
 import { useKeyboardCardNavigation } from '~/composables/useKeyboardCardNavigation'
 import { BEWLY_MOUNTED, DRAWER_VIDEO_ENTER_PAGE_FULL, DRAWER_VIDEO_EXIT_PAGE_FULL, IFRAME_PAGE_SWITCH_BEWLY, IFRAME_PAGE_SWITCH_BILI, OVERLAY_SCROLL_BAR_SCROLL } from '~/constants/globalEvents'
 import { AppPage } from '~/enums/appEnums'
@@ -222,6 +223,7 @@ useKeyboardCardNavigation(() => scrollbarRef.value
       elements: () => ({ viewport: scrollbarRef.value, scrollOffsetElement: scrollbarRef.value }),
     }
   : null)
+useFocusBrowse()
 
 // Setup necessary settings watchers
 watch(() => showBewlyPage.value, () => nextTick(setupReachBottomObserver))

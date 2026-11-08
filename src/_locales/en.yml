@@ -13,6 +13,9 @@ command_palette:
   show_help: Show keyboard shortcuts
   open_settings: Open settings
   ai_filter: AI screen current page
+  focus_browse: Enter focus browse (cover flow)
+  focus_browse_on: Open focus browse (cover flow)
+  focus_browse_off: Exit focus browse
   keyboard_mode_on: Enable keyboard card navigation
   keyboard_mode_off: Disable keyboard card navigation
   empty: No matching command

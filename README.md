@@ -65,6 +65,7 @@ E2E_ONLINE=1 pnpm exec playwright test tests/e2e/background.spec.ts  # online AP
 ## 📚 Documentation
 
 - [Architecture](docs/architecture.md) — build outputs, style injection, content script splitting, background message protocol
+- [Focus browse (cover flow)](docs/focus-browse.md) — fixed-focus horizontal card track
 - [Keyboard navigation](docs/keyboard-navigation.md) — shortcuts, configurable wheel mode, state restore, limitations
 - [Upstream divergence](docs/upstream-divergence.md) — differences from the archived upstream
 - [Dependency policy](docs/dependency-policy.md) — pinned versions and upgrade checklist

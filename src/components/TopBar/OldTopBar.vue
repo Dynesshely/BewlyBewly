@@ -10,8 +10,9 @@ import { AppPage } from '~/enums/appEnums'
 import { settings } from '~/logic'
 import api from '~/utils/api'
 import { getUserID, isHomePage } from '~/utils/main'
-
 import emitter from '~/utils/mitt'
+
+import { every } from '~/utils/scheduler'
 import ChannelsPop from './components/ChannelsPop.vue'
 import FavoritesPop from './components/FavoritesPop.vue'
 import HistoryPop from './components/HistoryPop.vue'
@@ -299,27 +300,24 @@ onMounted(() => {
   })
 })
 
-let unreadPollTimer: ReturnType<typeof setInterval> | null = null
+let stopUnreadPoll: (() => void) | null = null
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
   emitter.off(OVERLAY_SCROLL_BAR_SCROLL)
-  if (unreadPollTimer) {
-    clearInterval(unreadPollTimer)
-    unreadPollTimer = null
-  }
+  stopUnreadPoll?.()
+  stopUnreadPoll = null
 })
 
 async function initData() {
   await getUserInfo()
 
-  if (unreadPollTimer)
-    clearInterval(unreadPollTimer)
-  // automatically update notifications and moments count
-  unreadPollTimer = setInterval(() => {
+  stopUnreadPoll?.()
+  // 页面隐藏时自动暂停的轮询（共享调度器，全页面一个定时器）
+  stopUnreadPoll = every(updateInterval, () => {
     getUnreadMessageCount()
     getTopBarNewMomentsCount()
-  }, updateInterval)
+  })
 }
 
 function handleScroll() {

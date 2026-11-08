@@ -66,6 +66,10 @@ TopBar / OldTopBar 的未读消息与动态轮询已从独立 `setInterval` 迁�
 
 重新生成：`pnpm run fonts:slices`（需要 Python + fontTools）。
 
+**验证结果**：本机（Windows）系统字体（HarmonyOS / PingFang / Microsoft YaHei）优先命中，
+内置字体不会触发下载；只有系统缺少中文字体或用户显式选择内置字体时，浏览器才会按
+unicode-range 拉取实际用到的切片（通常 2–5 片，而非整份 1.81 MB）。
+
 ## 列表渲染窗口化（评估，暂缓）
 
 当前每页 30 张卡片、DOM 节点约 30–90 个，虚拟化的收益有限；但实现风险较高：

@@ -35,6 +35,8 @@ keyboard_help:
   sort_filter: 切換卡片排序 / 篩選
   info_detail: 切換卡片詳細資訊
   queue: 將卡片加入本地待看清單
+  focus_browse: 進入聚焦瀏覽（封面流）
+  focus_browse_exit: 退出聚焦瀏覽 / 閂浮層
 
 common:
   view_all: 睇晒佢哋

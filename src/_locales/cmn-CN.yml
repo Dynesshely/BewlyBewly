@@ -35,6 +35,8 @@ keyboard_help:
   sort_filter: 切换卡片排序 / 筛选
   info_detail: 切换卡片详细信息
   queue: 把卡片加入本地待看队列
+  focus_browse: 进入聚焦浏览（封面流）
+  focus_browse_exit: 退出聚焦浏览 / 关闭浮层
 
 common:
   view_all: 查看更多

@@ -21,6 +21,14 @@
 | i | 切换底部信息条的精简 / 详细 |
 | q | 把当前卡片加入本地待看队列（显示在信息条角标） |
 
+## 聚焦浏览模式
+
+进入聚焦浏览（Cover Flow）后，键盘由 `useFocusBrowse` 接管，详见 [focus-browse.md](./focus-browse.md)：
+
+- 方向键 / 滚轮：切换上一张 / 下一张；
+- `Enter`：新标签页打开当前卡片；`Space`：当前标签页真实跳转（URL 变更，不是页面内预览）；
+- `Ctrl/Cmd + K`：命令面板仍然可用；`Esc`：先关闭命令面板等浮层，再按一次才退出聚焦浏览。
+
 ## 高亮
 
 - 通过 `data-keyboard-active` 属性标记（不用 class，避免 Vue 重渲染覆盖）。

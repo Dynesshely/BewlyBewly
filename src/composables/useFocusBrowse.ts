@@ -500,6 +500,40 @@ export function focusMove(delta: number) {
   emitter.emit('focus-browse-change', { active: true, index: activeIndex })
 }
 
+/** 浮层（命令面板 / 快捷键帮助 / 对话框）打开时不接管按键 */
+function hasOpenOverlay(): boolean {
+  const root = document.querySelector('#bewly')?.shadowRoot
+  return !!root?.querySelector('.command-palette-mask, .keyboard-help-mask, .dialog')
+}
+
+/** 事件真实目标是否是可编辑元素（shadow DOM 会把 target 重定向到宿主） */
+function isEditableEvent(event: KeyboardEvent): boolean {
+  const path = event.composedPath?.() ?? []
+  const el = (path[0] ?? event.target) as HTMLElement | null
+  if (!el || el.nodeType !== 1)
+    return false
+  if ((el as HTMLElement).isContentEditable)
+    return true
+  const tag = el.tagName
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT')
+    return true
+  return !!el.closest?.('input, textarea, select, [contenteditable="true"]')
+}
+
+/** 打开当前 active 卡片 */
+export function openFocusActiveCard(target: '_blank' | '_self') {
+  if (!isFocusBrowseActive())
+    return
+  const card = cardEls[activeIndex]
+  const url = activeUrl
+    || card?.getAttribute('data-video-url')
+    || card?.querySelector<HTMLAnchorElement>('a[href*="/video/"]')?.getAttribute('href')
+    || ''
+  if (!url)
+    return
+  window.open(url, target)
+}
+
 export function isFocusBrowseActive(): boolean {
   return document.documentElement.classList.contains(FOCUS_CLASS)
 }
@@ -513,9 +547,25 @@ export function useFocusBrowse() {
   function onKeydown(event: KeyboardEvent) {
     if (!isFocusBrowseActive())
       return
+    // 命令面板等浮层打开时，按键交给浮层自己处理（否则 Esc 会同时退出聚焦模式）
+    if (hasOpenOverlay() || event.defaultPrevented || event.isComposing)
+      return
+    // 输入框内打字时不接管方向键与空格
+    if (isEditableEvent(event))
+      return
     if (event.key === 'Escape') {
       event.preventDefault()
       exitFocusBrowse()
+      return
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      openFocusActiveCard('_blank')
+      return
+    }
+    if (event.key === ' ') {
+      event.preventDefault()
+      openFocusActiveCard('_self')
       return
     }
     if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
@@ -530,7 +580,7 @@ export function useFocusBrowse() {
   }
 
   function onWheel(event: WheelEvent) {
-    if (!isFocusBrowseActive())
+    if (!isFocusBrowseActive() || hasOpenOverlay())
       return
     event.preventDefault()
     event.stopPropagation()

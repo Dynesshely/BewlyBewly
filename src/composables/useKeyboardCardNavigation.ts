@@ -429,17 +429,17 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
   }
 
   function handleKeydown(event: KeyboardEvent) {
-    // 聚焦浏览模式自己处理方向键与滚轮
-    if (isFocusBrowseMode())
-      return
     if (event.defaultPrevented || event.isComposing)
       return
-    // Ctrl/Cmd + K：命令面板是全局入口，键盘模式关闭时也要可用（用于重新开启）
+    // Ctrl/Cmd + K：命令面板是全局入口，聚焦浏览模式下也要可用
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
       event.preventDefault()
       emitter.emit('toggle-command-palette')
       return
     }
+    // 其余按键交给聚焦浏览模式自己处理
+    if (isFocusBrowseMode())
+      return
     // 键盘模式关闭：不接管其他按键，恢复原版鼠标点选
     if (!settings.value.keyboardNavEnabled)
       return

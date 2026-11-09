@@ -13,6 +13,7 @@ const items = [
   { keys: 'i', desc: 'keyboard_help.info_detail' },
   { keys: 'q', desc: 'keyboard_help.queue' },
   { keys: 'Ctrl/Cmd + K → 聚焦浏览', desc: 'keyboard_help.focus_browse' },
+  { keys: 'Esc', desc: 'keyboard_help.focus_browse_exit' },
   { keys: 'Shift + Q', desc: 'keyboard_help.ai_filter' },
   { keys: '?', desc: 'keyboard_help.help' },
 ]

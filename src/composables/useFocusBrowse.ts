@@ -18,6 +18,14 @@ const ACTIVE_ATTR = 'data-keyboard-active'
 const FOCUS_CLASS = 'bewly-focus-browse'
 
 const MAX_VISIBLE = 5
+/** 卡片之间的水平间隙（px） */
+const CARD_GAP = 18
+/** 侧卡绕 Y 轴的翻转角度（度）：恢复 Cover Flow / 3D Flip 的纵深观感 */
+const FLIP_DEG = 20
+/** 侧卡向屏幕内侧后退的距离（px），越远退得越多 */
+const FLIP_DEPTH = 110
+/** 侧卡自身的透视距离（px） */
+const FLIP_PERSPECTIVE = 1600
 
 let rootEl: HTMLElement | null = null
 let cardEls: HTMLElement[] = []
@@ -73,6 +81,8 @@ function resolveStage(cards: HTMLElement[]): HTMLElement | null {
 }
 
 let transitionsSettled = false
+/** 统一卡片高度（偶数）；0 表示需要重新测量 */
+let cardHeight = 0
 
 function applyTransforms() {
   // wrapper 可能被 Vue 重新渲染替换，每次都确保聚焦类存在（信息条隐藏等规则依赖它）
@@ -99,87 +109,86 @@ function applyTransforms() {
   const pad = 16
   const mainW = coverW + pad * 2
   // 卡片绝对定位在舞台内，换算成视口中心坐标
-  const centerX = (stageRect
+  // 舞台中心取整数像素：translate(-50%,-50%) 的基准必须是整数，否则仍是亚像素
+  const centerX = Math.round(stageRect
     ? vw / 2 - stageRect.left
     : vw / 2)
-  const centerY = (stageRect
+  const centerY = Math.round(stageRect
     ? vh / 2 - stageRect.top - 6
     : vh / 2 - 6)
 
   cards.forEach((card, index) => {
     const offset = index - activeIndex
-    // 关键：即使超出可见范围，也要把它摆在轨道上的正确位置（只是不可见），
-    // 否则它从文档流默认位置过渡到目标位置时，会从屏幕底部"飞"到一侧。
-    const beyond = Math.abs(offset) >= MAX_VISIBLE
+    const abs = Math.abs(offset)
+    const isActive = offset === 0
+    // 超出可见范围的卡片也要摆在轨道上的正确位置（只是不可见），
+    // 否则它从文档流位置过渡到目标位置时会"飞"进来。
+    const beyond = abs >= MAX_VISIBLE
+
     card.style.visibility = beyond
       ? 'hidden'
       : 'visible'
-    card.style.pointerEvents = offset === 0 && !beyond
+    card.style.pointerEvents = isActive && !beyond
       ? 'auto'
       : 'none'
 
-    const abs = Math.abs(offset)
-    const isActive = offset === 0
-    // 越远越小；主卡恒为 1，保证文字清晰
-    const scale = isActive
-      ? 1
-      : Math.max(0.62, 1 - abs * 0.16)
-    // 主卡两侧各露约半张，形成强烈的 cover flow 纵深
-    const translateX = offset * (mainW * 0.86)
-    // 主卡不做 Z 位移：perspective 下的 Z 位移会带来非整数倍放大，导致文字被重采样而变糊
-    const translateZ = isActive
-      ? 0
-      : -abs * 60
-    // 主卡不旋转，保持正对视线
+    // 整行卡片同尺寸（scale 恒为 1）：不缩放，保证整行观感连续
+    const scale = 1
+    // 位移 = 卡片宽 + 间隙：卡片之间不重叠，形成一条真正的整行
+    const translateX = offset * (mainW + CARD_GAP)
+    // 3D Flip：侧卡朝屏幕中心翻转并向后退出纵深，主卡正对视线。
+    // 主卡刻意不参与 3D 变换 —— 它是唯一需要看清文字的卡片，
+    // 落在 3D 合成上下文里会被重采样而发虚。
     const rotateY = isActive
       ? 0
       : (offset > 0
-          ? -30
-          : 30)
-    const opacity = isActive
-      ? 1
-      : Math.max(0.38, 1 - abs * 0.2)
+          ? -FLIP_DEG
+          : FLIP_DEG)
+    const translateZ = isActive
+      ? 0
+      : -Math.min(abs, 3) * FLIP_DEPTH
+    // 不透明度保持一致（避免侧卡"半透明"失去整行感），主次由压暗层区分
+    const opacity = 1
 
+    // ===== 唯一的位置来源：left/top 永远固定在舞台中心，位移全部走 transform =====
+    // 这样切换时 left/top 不变，只有 transform 有过渡 → 纯水平翻页，不再抖动
     card.style.position = 'absolute'
+    card.style.left = `${centerX}px`
+    card.style.top = `${centerY}px`
     card.style.width = `${mainW}px`
-    card.style.height = 'auto'
+    card.style.height = cardHeight
+      ? `${cardHeight}px`
+      : 'auto'
     card.style.margin = '0'
-    card.style.padding = `${isActive ? pad : 0}px`
     card.style.boxSizing = 'border-box'
-    card.style.borderRadius = isActive ? '20px' : 'var(--bew-radius)'
-    card.style.background = isActive ? 'var(--bew-elevated)' : 'transparent'
-    // 主卡浮起：柔和大阴影，与页面背景拉开层次
-    card.style.outline = isActive ? '1.5px solid color-mix(in oklab, var(--bew-theme-color), transparent 72%)' : ''
+    card.style.padding = `${pad}px`
+    card.style.borderRadius = '20px'
+    card.style.background = 'var(--bew-elevated)'
+    card.style.overflow = 'hidden'
+    card.style.backdropFilter = 'none'
+    card.style.filter = 'none'
+    card.style.transformOrigin = 'center center'
+
+    // 描边与阴影随 active 平滑变化
+    card.style.outline = isActive
+      ? '1.5px solid color-mix(in oklab, var(--bew-theme-color), transparent 72%)'
+      : '0 solid transparent'
     card.style.outlineOffset = '0'
     card.style.boxShadow = isActive
       ? '0 24px 64px rgb(0 0 0 / 18%), 0 6px 16px rgb(0 0 0 / 8%)'
       : '0 12px 30px rgb(0 0 0 / 32%)'
-    // 主卡：整数像素定位（不用百分比 transform），文字落在像素网格上不产生亚像素模糊
-    if (isActive) {
-      card.style.left = `${Math.round(centerX - mainW / 2)}px`
-      // 垂直位置在测量卡片高度后由 placeActiveCardVertically() 精确设置
-      card.style.top = '0px'
-      card.style.transform = 'none'
-    }
-    else {
-      card.style.left = `${centerX}px`
-      card.style.top = `${centerY}px`
-    }
-    card.style.zIndex = String(100 + (offset === 0
-      ? 50
-      : -abs))
-    // 主卡：整数像素定位，无 3D 变换（文字最清晰）
-    // 侧卡：保留 3D 透视，营造纵深
-    if (!isActive) {
-      card.style.transform = `translate(-50%, -50%) translateX(${translateX}px) translateZ(${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`
-    }
+
+    card.style.transform = isActive
+      ? 'translate(-50%, -50%)'
+      : `translate(-50%, -50%) translateX(${translateX}px) perspective(${FLIP_PERSPECTIVE}px) translateZ(${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`
     card.style.opacity = String(beyond
       ? 0
       : opacity)
     card.style.setProperty('--bew-focus-dim', String(isActive
       ? 0
-      : Math.min(0.55, abs * 0.2)))
-    // 主卡不加 will-change / backface-visibility：避免浏览器提前用低分辨率图层光栅化
+      : Math.min(0.6, 0.28 + (abs - 1) * 0.16)))
+
+    // 主卡不建立独立合成层，保证文字清晰；侧卡走合成层换取动画性能
     if (isActive) {
       card.style.willChange = 'auto'
       card.style.backfaceVisibility = 'visible'
@@ -188,19 +197,11 @@ function applyTransforms() {
       card.style.willChange = 'transform, opacity'
       card.style.backfaceVisibility = 'hidden'
     }
-    // 不使用模糊滤镜：侧卡靠压暗与缩放表达层次，避免离屏合成导致整体发虚
-    card.style.filter = 'none'
-    // 首次布局禁用过渡：卡片从文档流位置到轨道位置应瞬间就位，不产生"飞入"
+
+    // 首次布局禁用过渡（避免从文档流位置"飞入"），之后才有平移动画
     card.style.transition = transitionsSettled
-      ? 'transform 320ms cubic-bezier(.22,.61,.36,1), opacity 320ms ease'
+      ? 'transform 380ms cubic-bezier(.22,.61,.36,1), opacity 380ms ease, box-shadow 380ms ease, outline-color 380ms ease'
       : 'none'
-    card.style.transformOrigin = 'center center'
-    card.style.borderRadius = 'var(--bew-radius)'
-    card.style.overflow = 'hidden'
-    card.style.boxShadow = offset === 0
-      ? '0 24px 60px rgb(0 0 0 / 45%)'
-      : '0 12px 30px rgb(0 0 0 / 35%)'
-    card.style.backdropFilter = 'none'
     card.setAttribute('data-bewly-focus-ready', '')
   })
 
@@ -211,7 +212,7 @@ function applyTransforms() {
   applyTypographyVars(layoutScale)
 
   // 所有卡片宽度已就位，此时测量高度才有意义
-  placeActiveCardVertically(stageRect?.top ?? 0)
+  normalizeCardHeights()
 }
 
 /** 记录被隐藏的非卡片元素，退出时恢复 */
@@ -304,19 +305,43 @@ function clearTypographyVars() {
  * 卡片高度是 auto，用 translateY(-50%) 会得到小数像素坐标，文字被重采样而发糊。
  * 这里实测高度后直接用整数 top 定位，保证落在像素网格上。
  */
-function placeActiveCardVertically(stageTop: number) {
-  const card = cardEls[activeIndex]
-  if (!card)
+/**
+ * 卡片高度规整。
+ *
+ * 所有卡片都用 translate(-50%, -50%) 居中，-50% 等于高度的一半。
+ * 高度为奇数时这一半带 0.5px，文字会落在半像素上被重采样而发糊。
+ * 这里统一把高度取成偶数，保证 translate 的偏移是整数像素。
+ */
+/**
+ * 统一所有卡片的高度。
+ *
+ * 每次布局都按当前内容重新测量：标题行数、发布时间胶囊等会让不同卡片的内容高度不同，
+ * 一旦沿用第一次缓存的高度，内容更高的卡片就会被裁切（胶囊溢出到卡片外）。
+ * 取所有卡片的最大自然高度可以保证任何一张卡都不会被裁切，
+ * 同时统一高度让切换时不会出现高度突跳。
+ */
+function normalizeCardHeights() {
+  if (cardHeight) {
+    for (const card of cardEls)
+      card.style.height = `${cardHeight}px`
     return
-  // 高度取整：卡片内部信息行的起点也落在整数像素，避免文字亚像素模糊
-  const height = Math.ceil(card.offsetHeight)
-  if (!height)
+  }
+  // 两阶段测量：先把所有卡片恢复 auto（写入），再统一读取（一次重排），
+  // 避免逐张卡片写-读交替触发 N 次强制同步布局。
+  for (const card of cardEls)
+    card.style.height = 'auto'
+  let maxHeight = 0
+  for (const card of cardEls) {
+    const height = card.offsetHeight
+    if (height > maxHeight)
+      maxHeight = height
+  }
+  if (!maxHeight)
     return
-  card.style.height = `${height}px`
-  // 目标：卡片在视口中垂直居中，且**最终视口坐标**落在整数像素上。
-  // 舞台自身 top 可能带小数，因此这里把它的分数部分一并抵消。
-  const targetY = Math.round((window.innerHeight - height) / 2)
-  card.style.top = `${targetY - stageTop}px`
+  // 偶数高度保证 translate(-50%, -50%) 的偏移是整数像素，文字不糊
+  cardHeight = Math.ceil(maxHeight / 2) * 2
+  for (const card of cardEls)
+    card.style.height = `${cardHeight}px`
 }
 
 function applyStageStyle(stage: HTMLElement) {
@@ -324,9 +349,8 @@ function applyStageStyle(stage: HTMLElement) {
   stage.style.position = 'relative'
   stage.style.height = '100vh'
   stage.style.minHeight = '100vh'
-  stage.style.perspective = '1600px'
-  stage.style.perspectiveOrigin = '50% 50%'
-  // 刻意不使用 preserve-3d：那会把主卡也拖进 3D 合成上下文，导致文字被低分辨率光栅化
+  // 纯二维轨道：不使用 perspective / preserve-3d，
+  // 既避免主卡被拖进 3D 合成上下文而发糊，也让滑动画面上没有透视变形
   stage.style.transformStyle = 'flat'
   stage.style.overflow = 'visible'
   stage.style.display = 'block'
@@ -359,6 +383,7 @@ export function enterFocusBrowse() {
   rootEl = resolveStage(cardEls)
   if (!rootEl)
     return
+  cardHeight = 0
 
   // 记录 active
   activeIndex = Math.max(0, cardEls.findIndex(card => card.hasAttribute(ACTIVE_ATTR)))
@@ -379,6 +404,8 @@ export function enterFocusBrowse() {
   emitter.emit('focus-browse-change', { active: true, index: activeIndex })
 
   resizeObserver = new ResizeObserver(() => {
+    // 视口变化会改变卡片宽度 → 内容换行与高度都会变，必须重新量高度
+    cardHeight = 0
     cancelAnimationFrame(rafId)
     rafId = requestAnimationFrame(() => applyTransforms())
   })
@@ -386,6 +413,7 @@ export function enterFocusBrowse() {
 
   // 卡片被替换或追加时重新应用（Vue 重渲染会换掉 DOM 节点）
   let pending = false
+  let lastCount = cardEls.length
   const mutationObserver = new MutationObserver(() => {
     if (pending)
       return
@@ -398,7 +426,26 @@ export function enterFocusBrowse() {
       if (!next.length)
         return
       hideNonCardBranches(rootEl, next)
-      applyTransforms()
+      // 只在卡片数量真的变化时才禁用过渡；否则每次 DOM 变动都重置会造成视觉"跳一下"
+      if (next.length !== lastCount) {
+        lastCount = next.length
+        transitionsSettled = false
+        // 卡片数量变化意味着内容整体变化，旧的统一高度不再可靠
+        cardHeight = 0
+        applyTransforms()
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            transitionsSettled = true
+          })
+        })
+      }
+      else {
+        // 内容异步补全（标题换行、封面信息）后可能撑破统一高度：
+        // 一旦检测到裁切就重新量高度，避免发布时间胶囊再次溢出卡片
+        if (cardHeight && next.some(card => card.scrollHeight > card.clientHeight + 1))
+          cardHeight = 0
+        applyTransforms()
+      }
     })
   })
   mutationObserver.observe(rootEl, { childList: true, subtree: true })
@@ -414,6 +461,7 @@ export function exitFocusBrowse() {
   // 清理所有可能残留聚焦类的元素（wrapper 可能已被替换）
   document.querySelector('#bewly')?.shadowRoot?.querySelectorAll(`.${FOCUS_CLASS}`).forEach(el => el.classList.remove(FOCUS_CLASS))
   transitionsSettled = false
+  cardHeight = 0
   clearTypographyVars()
   restoreHiddenBranches()
   resetStage(rootEl)

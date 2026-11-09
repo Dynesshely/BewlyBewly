@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onKeyStroke, useEventListener } from '@vueuse/core'
+import { useEventListener } from '@vueuse/core'
 
 import { DRAWER_VIDEO_ENTER_PAGE_FULL, DRAWER_VIDEO_EXIT_PAGE_FULL } from '~/constants/globalEvents'
 import { settings } from '~/logic'
@@ -46,7 +46,14 @@ onMounted(() => {
   show.value = true
   headerShow.value = true
   nextTick(() => {
+    // 先聚焦 iframe 元素，再把焦点交给其子文档，避免首次按键被父页面截获
     iframeRef.value?.focus()
+    try {
+      iframeRef.value?.contentWindow?.focus()
+    }
+    catch {
+      // 跨域时忽略
+    }
   })
 })
 
@@ -115,6 +122,12 @@ async function releaseIframeResources() {
   iframeRef.value = null
 }
 
+/** iframe 每次加载完成：显示内容、并把 Esc 监听重新挂到新的子文档上 */
+function onIframeLoad() {
+  showIframe.value = true
+  bindIframeEscListener()
+}
+
 function handleOpenInNewTab() {
   if (iframeRef.value) {
     window.open(iframeRef.value.contentWindow?.location.href.replace(/\/$/, ''), '_blank')
@@ -126,30 +139,59 @@ const isEscPressed = ref<boolean>(false)
 const escPressedTimer = ref<NodeJS.Timeout | null>(null)
 const disableEscPress = ref<boolean>(false)
 
-nextTick(() => {
-  onKeyStroke('Escape', (e: KeyboardEvent) => {
-    e.preventDefault()
-    if (settings.value.closeDrawerWithoutPressingEscAgain) {
-      clearTimeout(escPressedTimer.value!)
-      handleClose()
-      return
-    }
-    if (disableEscPress.value)
-      return
-    if (isEscPressed.value) {
-      handleClose()
-    }
-    else {
-      isEscPressed.value = true
-      if (escPressedTimer.value) {
-        clearTimeout(escPressedTimer.value)
-      }
-      escPressedTimer.value = setTimeout(() => {
-        isEscPressed.value = false
-      }, 1300)
-    }
-  }, { target: iframeRef.value?.contentWindow })
+/**
+ * Esc 关闭抽屉。
+ *
+ * 之前只把监听挂在 iframe 的 contentWindow 上，导致两种情形失效：
+ * - 抽屉刚打开时焦点还在父窗口（iframe.focus() 不会把焦点交给 iframe 的子文档），
+ *   此时按 Esc 事件只在父页面派发，抽屉收不到；
+ * - 用户必须先用鼠标点进 iframe 区域，Esc 才生效。
+ *
+ * 现在父窗口与 iframe 子文档各挂一份：两者的事件不会冒泡到对方，不存在重复触发。
+ */
+function handleEscKeydown(e: KeyboardEvent) {
+  e.preventDefault()
+  if (settings.value.closeDrawerWithoutPressingEscAgain) {
+    if (escPressedTimer.value)
+      clearTimeout(escPressedTimer.value)
+    handleClose()
+    return
+  }
+  if (disableEscPress.value)
+    return
+  if (isEscPressed.value) {
+    handleClose()
+  }
+  else {
+    isEscPressed.value = true
+    if (escPressedTimer.value)
+      clearTimeout(escPressedTimer.value)
+    escPressedTimer.value = setTimeout(() => {
+      isEscPressed.value = false
+    }, 1300)
+  }
+}
+
+// 父窗口：抽屉打开后焦点通常仍停留在父页面
+useEventListener(window, 'keydown', (e: KeyboardEvent) => {
+  if (e.key === 'Escape')
+    handleEscKeydown(e)
 })
+
+// iframe 子文档：焦点在预览页里时由它兜底。
+// 每次 load 都要重新注册 —— 同源导航后旧文档的监听会随旧 window 一起丢弃。
+let escBoundWindow: Window | null = null
+function bindIframeEscListener() {
+  const win = iframeRef.value?.contentWindow
+  if (!win || win === escBoundWindow)
+    return
+  escBoundWindow = win
+  win.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key === 'Escape')
+      handleEscKeydown(e)
+  })
+}
+watch(iframeRef, bindIframeEscListener, { immediate: true })
 
 watchEffect(() => {
   if (isInIframe())
@@ -267,7 +309,7 @@ watchEffect(() => {
             pointer-events-auto
             pos="relative left-0"
             w-full
-            h-full @load="showIframe = true"
+            h-full @load="onIframeLoad"
           />
         </Transition>
       </div>

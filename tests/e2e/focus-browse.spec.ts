@@ -113,6 +113,13 @@ test.describe('聚焦浏览（Cover Flow）', () => {
       expect(drawerSrc).toContain(activeUrl.replace(/^https?:\/\//, ''))
       // 聚焦模式仍在，抽屉关闭后可以继续浏览
       expect(await inFocus()).toBe(true)
+
+      // 5) 抽屉打开后不点击页面任何位置，直接按 Esc 也能关闭（默认策略需两下）
+      await page.keyboard.press('Escape')
+      await page.waitForTimeout(300)
+      await page.keyboard.press('Escape')
+      await expect.poll(drawerVisible, { timeout: 10_000 }).toBe(false)
+      expect(await inFocus()).toBe(true)
     }
     finally {
       await context.close()

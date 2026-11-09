@@ -181,6 +181,7 @@ watchEffect(() => {
 
 <template>
   <div
+    class="bewly-iframe-drawer"
     pos="absolute top-0 left-0" of-hidden w-full h-full
     z-999999
   >

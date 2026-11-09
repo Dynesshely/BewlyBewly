@@ -46,6 +46,11 @@ emitter.on('toggle-command-palette', () => {
 emitter.on('command-open-settings', () => {
   showSettings.value = true
 })
+// 聚焦浏览等键盘交互里“在当前页打开”= 内嵌预览抽屉，而不是整页跳转
+emitter.on('open-video-preview', (url: string) => {
+  if (url)
+    openIframeDrawer(url)
+})
 emitter.on('keyboard-active-card', (info: { title: string, meta: string, url: string, author?: string, view?: string, duration?: string, reason?: string, aiScore?: string, aiCategory?: string }) => {
   activeCardInfo.value = info
 })
@@ -419,6 +424,7 @@ onUnmounted(() => {
   reachBottomObserver = null
   emitter.off('toggle-command-palette')
   emitter.off('command-open-settings')
+  emitter.off('open-video-preview')
   emitter.off('toggle-keyboard-help')
   emitter.off('keyboard-active-card')
   emitter.off('toggle-card-info-detail')

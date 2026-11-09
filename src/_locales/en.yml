@@ -26,7 +26,7 @@ keyboard_help:
   move: Move between video cards
   jump: Jump to first / last card
   open_new: Open the video in a new tab
-  open_current: Open the video in the current tab
+  open_current: Open an in-page video preview (embedded player)
   tabs: Switch home tabs
   search: Focus the search bar
   help: Show / hide this help

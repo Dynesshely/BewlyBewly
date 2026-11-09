@@ -503,7 +503,7 @@ export function focusMove(delta: number) {
 /** 浮层（命令面板 / 快捷键帮助 / 对话框）打开时不接管按键 */
 function hasOpenOverlay(): boolean {
   const root = document.querySelector('#bewly')?.shadowRoot
-  return !!root?.querySelector('.command-palette-mask, .keyboard-help-mask, .dialog')
+  return !!root?.querySelector('.command-palette-mask, .keyboard-help-mask, .dialog, .bewly-iframe-drawer')
 }
 
 /** 事件真实目标是否是可编辑元素（shadow DOM 会把 target 重定向到宿主） */
@@ -520,15 +520,33 @@ function isEditableEvent(event: KeyboardEvent): boolean {
   return !!el.closest?.('input, textarea, select, [contenteditable="true"]')
 }
 
+/** 取当前 active 卡片的视频地址 */
+function getActiveCardUrl(): string {
+  const card = cardEls[activeIndex]
+  return activeUrl
+    || card?.getAttribute('data-video-url')
+    || card?.querySelector<HTMLAnchorElement>('a[href*="/video/"]')?.getAttribute('href')
+    || ''
+}
+
+/**
+ * 在当前页打开内嵌预览（iframe 抽屉）。
+ * 与网格模式下点击卡片、或设置里「抽屉打开」一致，不改变地址栏 URL。
+ */
+export function openFocusActiveCardPreview() {
+  if (!isFocusBrowseActive())
+    return
+  const url = getActiveCardUrl()
+  if (!url)
+    return
+  emitter.emit('open-video-preview', url)
+}
+
 /** 打开当前 active 卡片 */
 export function openFocusActiveCard(target: '_blank' | '_self') {
   if (!isFocusBrowseActive())
     return
-  const card = cardEls[activeIndex]
-  const url = activeUrl
-    || card?.getAttribute('data-video-url')
-    || card?.querySelector<HTMLAnchorElement>('a[href*="/video/"]')?.getAttribute('href')
-    || ''
+  const url = getActiveCardUrl()
   if (!url)
     return
   window.open(url, target)
@@ -565,7 +583,7 @@ export function useFocusBrowse() {
     }
     if (event.key === ' ') {
       event.preventDefault()
-      openFocusActiveCard('_self')
+      openFocusActiveCardPreview()
       return
     }
     if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {

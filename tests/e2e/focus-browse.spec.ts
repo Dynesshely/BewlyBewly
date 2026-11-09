@@ -13,7 +13,7 @@ const HOME_FIXTURE = join(ROOT, 'tests', 'e2e', 'fixtures', 'bilibili-home.html'
 test.describe('聚焦浏览（Cover Flow）', () => {
   test.skip(!existsSync(EXTENSION_DIR), '先运行 pnpm build 生成 extension/ 目录')
 
-  test('聚焦模式下快捷键：Ctrl+K 命令面板、回车新标签、空格当前标签', async () => {
+  test('聚焦模式下快捷键：Ctrl+K 命令面板、回车新标签、空格页面内预览', async () => {
     const context = await chromium.launchPersistentContext('', {
       channel: 'chromium',
       headless: true,
@@ -101,9 +101,18 @@ test.describe('聚焦浏览（Cover Flow）', () => {
       }
       await page.bringToFront()
 
-      // 4) 空格：当前标签页跳转（URL 变更，而不是页面内预览）
+      // 4) 空格：在当前页打开内嵌预览抽屉（不整页跳转）
       await page.keyboard.press('Space')
-      await expect.poll(() => page.url(), { timeout: 10_000 }).toContain(activeUrl)
+      const drawerVisible = () => page.evaluate(() => !!document.querySelector('#bewly')?.shadowRoot?.querySelector('.bewly-iframe-drawer'))
+      await expect.poll(drawerVisible, { timeout: 10_000 }).toBe(true)
+      const drawerSrc = await page.evaluate(() => document
+        .querySelector('#bewly')
+        ?.shadowRoot
+        ?.querySelector('.bewly-iframe-drawer iframe')
+        ?.getAttribute('src') ?? '')
+      expect(drawerSrc).toContain(activeUrl.replace(/^https?:\/\//, ''))
+      // 聚焦模式仍在，抽屉关闭后可以继续浏览
+      expect(await inFocus()).toBe(true)
     }
     finally {
       await context.close()

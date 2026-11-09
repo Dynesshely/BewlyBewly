@@ -26,7 +26,7 @@ keyboard_help:
   move: 在影片卡片間移動
   jump: 跳到第一張 / 最後一張
   open_new: 在新分頁開啟目前影片
-  open_current: 在目前分頁開啟目前影片
+  open_current: 喺當前頁打開視頻預覽（內嵌播放）
   tabs: 切換主頁分頁
   search: 聚焦搜尋框
   help: 顯示 / 隱藏本說明

@@ -26,7 +26,7 @@ keyboard_help:
   move: 在视频卡片间移动
   jump: 跳到第一张 / 最后一张
   open_new: 在新标签页打开当前视频
-  open_current: 在当前标签页打开当前视频
+  open_current: 在当前页打开视频预览（内嵌播放）
   tabs: 切换首页标签页
   search: 聚焦搜索框
   help: 显示 / 隐藏本帮助

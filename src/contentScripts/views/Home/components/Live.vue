@@ -7,6 +7,7 @@ import { useGridLayoutClass } from '~/composables/useGridLayout'
 import { useListPageActions } from '~/composables/useListPageActions'
 
 import api from '~/utils/api'
+import { readPreviewCid } from '../utils/previewCid'
 
 type VideoElement = GridVideoElement<FollowingLiveItem>
 
@@ -167,6 +168,8 @@ defineExpose({ initData })
           tag: video.item.area_name_v2,
           roomid: video.item.roomid,
           liveStatus: video.item.live_status,
+          // 直播条目没有 cid/bvid：这里防御式透传，当前不会触发预览，也不额外发请求
+          cid: readPreviewCid(video.item),
         } : undefined"
         type="live"
         :show-watcher-later="false"

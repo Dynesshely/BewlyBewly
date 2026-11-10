@@ -10,10 +10,15 @@ import { getCSRF, getUserID } from '~/utils/main'
 
 import { getFavoriteFolders, invalidateFavoriteFolders } from './favoriteFolders'
 import { useQuickActionsMessages } from './i18n'
+import {
+  getCachedFavoriteStatus,
+  getCachedLikeStatus,
+  resetInteractionStatusCache,
+  resolveInteractionAid,
+  setLocalFavoriteStatus,
+  setLocalLikeStatus,
+} from './interactionStatus'
 import { migrateLegacyCardQuickActionsSetting } from './preferences'
-
-/** 本次会话内已赞的 aid（服务端成功结果，失败会回滚） */
-const likedAids = reactive(new Set<number>())
 
 /** aid → 已收藏的收藏夹 id 列表（只记录本扩展本次会话成功提交的结果） */
 const favoriteMemberships = ref<Map<number, number[]>>(new Map())
@@ -36,8 +41,9 @@ function isLoggedIn(): boolean {
 }
 
 function resolveAidFromVideo(video: Video): number | null {
-  if (typeof video.aid === 'number' && video.aid > 0)
-    return video.aid
+  const direct = resolveInteractionAid(video)
+  if (direct !== null)
+    return direct
   if (video.bvid) {
     const cached = aidByBvid.get(video.bvid)
     if (cached)
@@ -96,9 +102,14 @@ function readErrorCode(result: { code?: number } | undefined): number | undefine
 /**
  * 单张卡片的点赞 / 收藏状态与操作。
  *
- * - 点赞：同一会话内用内存 Set 记住已赞的 aid，再点即取消；失败回滚；
- * - 收藏：未收藏时打开可多选的收藏夹面板，`add_media_ids` 逗号分隔提交；
- *   已收藏（本会话成功提交过）时再点按钮直接取消（`del_media_ids`）；
+ * 状态来源（按优先级）：
+ * 1. 本会话内本扩展成功提交的操作（写缓存，立即生效）；
+ * 2. hover 时懒查询到的真实状态（内存缓存 5 分钟，见 `interactionStatus.ts`）；
+ * 3. 都没有时按「未操作」显示。
+ *
+ * - 点赞：再点即取消；失败回滚；
+ * - 收藏：未收藏时打开可多选的收藏夹面板（`add_media_ids` 逗号分隔）；
+ *   已收藏（会话记录或服务端查询）时再点直接取消（`del_media_ids`，未知收藏夹时从全部已知收藏夹移除）；
  * - 收藏夹列表缓存 5 分钟；
  * - 未登录时只 toast，不发送任何请求；
  * - 所有请求都有 try/catch，任何异常都不会冒泡到卡片点击逻辑。
@@ -140,14 +151,18 @@ export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefi
 
   const isLiked = computed(() => {
     const currentAid = aid.value
-    return currentAid !== null && likedAids.has(currentAid)
+    if (currentAid === null)
+      return false
+    return getCachedLikeStatus(currentAid) === true
   })
 
   const isFavorited = computed(() => {
     const currentAid = aid.value
     if (currentAid === null)
       return false
-    return (favoriteMemberships.value.get(currentAid)?.length ?? 0) > 0
+    if ((favoriteMemberships.value.get(currentAid)?.length ?? 0) > 0)
+      return true
+    return getCachedFavoriteStatus(currentAid) === true
   })
 
   function toastNeedLogin() {
@@ -228,9 +243,12 @@ export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefi
 
   /**
    * 提交收藏夹变更（差异提交：新增走 add_media_ids，移除走 del_media_ids）。
-   * 失败时回滚会话内的收藏归属并 toast。
+   *
+   * - `removalCandidates` 用于「服务端显示已收藏但本会话不知道在哪些收藏夹」时，
+   *   把已知收藏夹整体作为移除候选（取消收藏）。
+   * - 失败时回滚会话内的收藏归属、真实状态缓存与图标。
    */
-  async function commitFavorite(nextFolderIds: number[]): Promise<boolean> {
+  async function commitFavorite(nextFolderIds: number[], removalCandidates: number[] = []): Promise<boolean> {
     if (favoritePending.value)
       return false
     if (!isLoggedIn()) {
@@ -245,6 +263,8 @@ export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefi
     favoritePending.value = true
     let resolvedAid: number | null = null
     let previousIds: number[] = []
+    let previousStatus = false
+    let optimistic = false
 
     try {
       resolvedAid = await resolveVideoAid(current)
@@ -256,16 +276,31 @@ export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefi
       previousIds = [
         ...(favoriteMemberships.value.get(resolvedAid) ?? []),
       ]
-      const toAdd = nextFolderIds.filter(id => !previousIds.includes(id))
-      const toRemove = previousIds.filter(id => !nextFolderIds.includes(id))
+      previousStatus = favoriteMemberships.value.get(resolvedAid)?.length
+        ? true
+        : getCachedFavoriteStatus(resolvedAid) === true
 
-      if (toAdd.length === 0 && toRemove.length === 0) {
+      const candidates = removalCandidates.length > 0
+        ? removalCandidates
+        : previousIds
+      const toAdd = nextFolderIds.filter(id => !previousIds.includes(id))
+      const toRemove = candidates.filter(id => !nextFolderIds.includes(id))
+
+      if (toAdd.length === 0 && toRemove.length === 0 && previousStatus === (nextFolderIds.length > 0)) {
         toast.info(messages.value.favoriteNoChange)
         return true
       }
 
-      // 乐观更新
+      // 乐观更新：归属 + 状态缓存
       setMembership(resolvedAid, nextFolderIds)
+      setLocalFavoriteStatus(resolvedAid, nextFolderIds.length > 0)
+      optimistic = true
+
+      if (toAdd.length === 0 && toRemove.length === 0) {
+        // 只有状态需要对齐（例如服务端已收藏、本次仅确认）
+        toast.success(messages.value.favoriteOk)
+        return true
+      }
 
       const result = await api.favorite.dealFavoriteResource({
         rid: resolvedAid,
@@ -278,6 +313,7 @@ export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefi
       const code = readErrorCode(result)
       if (code !== 0) {
         setMembership(resolvedAid, previousIds)
+        setLocalFavoriteStatus(resolvedAid, previousStatus)
         if (code === -101 || code === -111)
           toastNeedLogin()
         else
@@ -294,8 +330,10 @@ export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefi
       return true
     }
     catch {
-      if (resolvedAid !== null)
+      if (resolvedAid !== null && optimistic) {
         setMembership(resolvedAid, previousIds)
+        setLocalFavoriteStatus(resolvedAid, previousStatus)
+      }
       toast.error(messages.value.favoriteFail)
       return false
     }
@@ -315,20 +353,40 @@ export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefi
       closeFavoritePanel()
   }
 
-  /** 面板里的「取消收藏」：清空全部收藏夹 */
+  /**
+   * 取消收藏：
+   * - 本会话记录过收藏夹 → 从这些收藏夹移除；
+   * - 只有服务端状态（在 B 站或其它地方收藏的）→ 从全部已知收藏夹移除。
+   */
   async function removeFromFavorites() {
-    const succeeded = await commitFavorite([])
-    if (succeeded) {
-      closeFavoritePanel()
+    const currentAid = aid.value
+    const knownIds = currentAid !== null
+      ? [
+          ...(favoriteMemberships.value.get(currentAid) ?? []),
+        ]
+      : []
+
+    if (knownIds.length > 0) {
+      const succeeded = await commitFavorite([])
+      if (succeeded)
+        closeFavoritePanel()
+      else
+        syncSelectedFolders()
       return
     }
-    // 失败：把勾选恢复成实际归属，避免面板停留在错误状态
-    syncSelectedFolders()
+
+    const folders = await getFavoriteFolders()
+    const allFolderIds = folders.map(folder => folder.id)
+    if (allFolderIds.length === 0) {
+      toast.warning(messages.value.folderEmpty)
+      return
+    }
+    await commitFavorite([], allFolderIds)
   }
 
   /**
    * 收藏按钮点击：
-   * 未收藏 → 打开收藏夹多选面板；已收藏（本会话记录）→ 再点直接取消收藏。
+   * 未收藏 → 打开收藏夹多选面板；已收藏（会话记录或服务端查询）→ 再点直接取消收藏。
    */
   async function handleFavoriteButton() {
     if (!isLoggedIn()) {
@@ -356,8 +414,8 @@ export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefi
 
     likePending.value = true
     let resolvedAid: number | null = null
-    // 乐观更新用的目标状态：未赞 → 赞，已赞 → 取消赞
-    let targetLiked = true
+    const previousLiked = isLiked.value
+    const targetLiked = !previousLiked
 
     try {
       resolvedAid = await resolveVideoAid(current)
@@ -366,14 +424,8 @@ export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefi
         return
       }
 
-      const wasLiked = likedAids.has(resolvedAid)
-      targetLiked = !wasLiked
-
-      // 乐观更新
-      if (targetLiked)
-        likedAids.add(resolvedAid)
-      else
-        likedAids.delete(resolvedAid)
+      // 乐观更新（写缓存，图标立即更新；同时避免下一次 hover 再查）
+      setLocalLikeStatus(resolvedAid, targetLiked)
 
       const result = await api.video.likeVideo({
         aid: resolvedAid,
@@ -383,12 +435,7 @@ export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefi
 
       const code = readErrorCode(result)
       if (code !== 0) {
-        // 回滚
-        if (targetLiked)
-          likedAids.delete(resolvedAid)
-        else
-          likedAids.add(resolvedAid)
-
+        setLocalLikeStatus(resolvedAid, previousLiked)
         if (code === -101 || code === -111)
           toastNeedLogin()
         else
@@ -399,12 +446,8 @@ export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefi
       toast.success(targetLiked ? messages.value.likeOk : messages.value.unlikeOk)
     }
     catch {
-      if (resolvedAid !== null) {
-        if (targetLiked)
-          likedAids.delete(resolvedAid)
-        else
-          likedAids.add(resolvedAid)
-      }
+      if (resolvedAid !== null)
+        setLocalLikeStatus(resolvedAid, previousLiked)
       toast.error(messages.value.likeFail)
     }
     finally {
@@ -430,15 +473,14 @@ export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefi
     closeFavoritePanel,
     toggleFolderSelection,
     submitFavoriteSelection,
-    removeFromFavorites,
     reloadFavoriteFolders: () => loadFavoriteFolders(true),
   }
 }
 
 /** 调试 / 测试用：重置模块级状态 */
 export function resetCardQuickActionsState() {
-  likedAids.clear()
   favoriteMemberships.value = new Map()
   aidByBvid.clear()
   aidInflight.clear()
+  resetInteractionStatusCache()
 }

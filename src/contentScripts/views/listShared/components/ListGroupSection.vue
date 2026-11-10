@@ -32,6 +32,7 @@ const gridClass = computed(() => `bewly-list-grid bewly-list-grid--${props.viewM
         :key="item.key"
         :item="item"
         :view-mode="viewMode"
+        :data-bewly-list-card="String(item.key)"
         @action="emit('action', $event)"
       />
     </div>

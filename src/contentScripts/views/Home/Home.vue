@@ -78,6 +78,106 @@ function setDensity(density: PageDensity) {
 }
 // #endregion
 
+// #region 回到顶部（滚动超过两屏出现）
+const TWO_SCREENS = 2
+/** 首页滚动容器当前的滚动距离 */
+const pageScrollTop = ref<number>(0)
+/** 滚动容器的可见高度（两屏判定用；窗口尺寸变化时更新） */
+const scrollViewportHeight = ref<number>(typeof window !== 'undefined'
+  ? window.innerHeight
+  : 0)
+/** Zen（清屏）模式下隐藏浮动按钮 */
+const zenActive = ref<boolean>(false)
+let scrollRootEl: HTMLElement | null = null
+let scrollFrame = 0
+let zenObserver: MutationObserver | null = null
+
+function readZenActive(): boolean {
+  return document.documentElement.classList.contains('bewly-zen')
+}
+
+function updateViewportHeight(): void {
+  scrollViewportHeight.value = scrollRootEl?.clientHeight || window.innerHeight || 0
+}
+
+const showBackToTop = computed<boolean>(() =>
+  !zenActive.value
+  && pageScrollTop.value > scrollViewportHeight.value * TWO_SCREENS,
+)
+
+function handleScrollRootScroll(): void {
+  if (scrollFrame)
+    return
+  scrollFrame = window.requestAnimationFrame(() => {
+    scrollFrame = 0
+    pageScrollTop.value = scrollRootEl?.scrollTop ?? 0
+  })
+}
+
+function bindScrollRoot(): void {
+  const next = (scrollbarRef.value as HTMLElement | null) ?? null
+  if (next === scrollRootEl)
+    return
+  if (scrollRootEl)
+    scrollRootEl.removeEventListener('scroll', handleScrollRootScroll)
+  scrollRootEl = next
+  if (scrollRootEl) {
+    scrollRootEl.addEventListener('scroll', handleScrollRootScroll, { passive: true })
+    pageScrollTop.value = scrollRootEl.scrollTop
+  }
+  updateViewportHeight()
+}
+
+function unbindScrollRoot(): void {
+  if (scrollRootEl)
+    scrollRootEl.removeEventListener('scroll', handleScrollRootScroll)
+  scrollRootEl = null
+  if (scrollFrame) {
+    window.cancelAnimationFrame(scrollFrame)
+    scrollFrame = 0
+  }
+}
+
+function scrollHomeToTop(): void {
+  const root = scrollRootEl
+  // reduced-motion 下直接跳，不做平滑动画
+  const reducedMotion = typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  if (!root) {
+    window.scrollTo({
+      top: 0,
+      behavior: reducedMotion ? 'auto' : 'smooth',
+    })
+  }
+  else if (reducedMotion) {
+    root.scrollTop = 0
+  }
+  else {
+    root.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+  pageScrollTop.value = 0
+}
+
+/** 回到顶部按钮的位置：避开 Dock / 侧边栏（二者可配置在左 / 右 / 底部） */
+const backToTopStyle = computed<Record<string, string>>(() => {
+  // 首页可见时右下角是 Dock（SideBar 只在非 Bewly 首页时出现），位置以 Dock 设置为准
+  const dockPosition = settings.value.dockPosition
+  const barOnRightEdge = dockPosition === 'right'
+  const barOnBottomEdge = dockPosition === 'bottom'
+  const edge = 24
+  const barGap = 72
+  return {
+    right: `${barOnRightEdge
+      ? edge + barGap
+      : edge}px`,
+    bottom: `${barOnBottomEdge
+      ? edge + barGap
+      : edge}px`,
+  }
+})
+// #endregion
+
 const activatedPage = ref<HomeSubPage>(HomeSubPage.ForYou)
 const pages = {
   [HomeSubPage.ForYou]: defineAsyncComponent(() => import('./components/ForYou.vue')),
@@ -196,12 +296,31 @@ onMounted(() => {
   emitter.on('focus-browse-change', (payload: { active: boolean }) => {
     focusBrowseActive.value = payload.active
   })
+
+  // 回到顶部：绑定滚动容器 + 监听 Zen（清屏）模式开关
+  bindScrollRoot()
+  window.addEventListener('resize', updateViewportHeight)
+  zenActive.value = readZenActive()
+  zenObserver = new MutationObserver(() => {
+    zenActive.value = readZenActive()
+  })
+  zenObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['class'],
+  })
 })
+
+// 滚动容器可能在页面内容挂载后才出现 / 被替换（切子标签、从 iframe 模式切换回来）
+watch(scrollbarRef, () => nextTick(bindScrollRoot))
 
 onUnmounted(() => {
   emitter.off(TOP_BAR_VISIBILITY_CHANGE)
   emitter.off('switch-home-tab')
   emitter.off('focus-browse-change')
+  unbindScrollRoot()
+  window.removeEventListener('resize', updateViewportHeight)
+  zenObserver?.disconnect()
+  zenObserver = null
 })
 
 function handleChangeTab(tab: HomeTab) {
@@ -405,6 +524,21 @@ function toggleTabContentLoading(loading: boolean) {
         </KeepAlive>
       </Transition>
     </main>
+
+    <!-- 回到顶部：滚过两屏出现；Zen 清屏模式下隐藏 -->
+    <Transition name="fade">
+      <button
+        v-if="showBackToTop"
+        type="button"
+        class="home-back-to-top"
+        :style="backToTopStyle"
+        :aria-label="t.backToTop"
+        :title="`${t.backToTop} · ${t.backToTopHint}`"
+        @click="scrollHomeToTop"
+      >
+        <span class="i-tabler:arrow-up" aria-hidden="true" />
+      </button>
+    </Transition>
   </div>
 </template>
 
@@ -453,6 +587,53 @@ function toggleTabContentLoading(loading: boolean) {
 .grid-layout-item-activated {
   --uno: "bg-$bew-theme-color-auto text-$bew-text-auto";
 }
+
+/* #region 回到顶部 */
+.home-back-to-top {
+  position: fixed;
+  z-index: 98;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--bew-theme-color);
+  color: #fff;
+  font-size: 20px;
+  cursor: pointer;
+  box-shadow: var(--bew-shadow-2);
+  transition:
+    transform 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    box-shadow 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--bew-shadow-3);
+  }
+
+  &:active {
+    transform: scale(0.94);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--bew-theme-color);
+    outline-offset: 3px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-back-to-top {
+    transition: none;
+
+    &:hover,
+    &:active {
+      transform: none;
+    }
+  }
+}
+/* #endregion */
 
 /* #region 首页卡片密度（紧凑档） */
 /*

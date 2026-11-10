@@ -7,6 +7,7 @@ import { useGridLayoutClass } from '~/composables/useGridLayout'
 import { useListPageActions } from '~/composables/useListPageActions'
 
 import api from '~/utils/api'
+import { readPreviewCid } from '../utils/previewCid'
 
 type VideoElement = GridVideoElement<MomentItem>
 
@@ -182,6 +183,8 @@ defineExpose({ initData })
           danmakuStr: video.item.modules.module_dynamic.major.pgc?.stat.danmaku,
           capsuleText: video.item.modules.module_author.pub_time,
           epid: video.item.modules.module_dynamic.major.pgc?.epid,
+          // 番剧卡同样防御式透传 cid（预览还要求 bvid，上游没给 bvid 时不会触发，也不额外发请求）
+          cid: readPreviewCid(video.item.modules.module_dynamic.major.pgc),
         } : undefined"
         :show-watcher-later="false"
         :horizontal="gridLayout !== 'adaptive'"

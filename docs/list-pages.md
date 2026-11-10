@@ -115,3 +115,59 @@
 7. 卡片关闭了 `VideoCard` 自带的 hover 稍后再看按钮与「更多」菜单按钮（`:show-watcher-later="false"`、
    `:more-btn="false"`），相关能力改由统一的卡片右上角快捷操作承载；因此收藏页原卡片「更多」菜单入口不再出现。
 8. 时间分组严格按「今天 / 昨天 / 本周（周一为起点）/ 更早」四档划分，上周日的内容即使只隔一天也会落到「更早」。
+
+## 离屏优化（第 10 轮）
+
+历史 / 稍后再看 / 收藏三个列表页都接入了轻量离屏优化：**只做样式级的「渲不渲染」，不卸载任何节点**。
+实现在 `src/contentScripts/views/listShared/useListVirtual.ts`（思路与动态页
+`views/Moments/composables/useVirtualList.ts` 一致，但改成不需要组件 ref 的 DOM 扫描方式）。
+
+### 机制
+
+1. **打标记**：`ListGroupSection` 渲染卡片时给 `ListVideoCard` 加 `data-bewly-list-card="<卡片 key>"`
+   （单根组件，属性落在卡片的 `<article class="bewly-list-card">` 上），三种视图模式共用；
+2. **分带**：两个 `IntersectionObserver`（root 为 App 的 `.bewly-scroll-container`）分别标记
+   「活跃带」（视口上下各 1.5 屏）与「缓冲区」（上下各 3 屏）；
+3. **三态**（写到卡片内联样式，不动其它样式）：
+   - 活跃带 / 键盘导航当前卡：`content-visibility: visible`；
+   - 缓冲区：`content-visibility: auto`；
+   - 更远：`content-visibility: hidden`（跳过渲染与布局，DOM 与组件内部状态完整保留）；
+   三者都带 `contain-intrinsic-size: auto <高度>`；
+4. **高度缓存**：活跃带内的卡片用 `ResizeObserver` 量一次真实高度并按卡片 key 缓存，
+   从未进过活跃带的卡片用 320px 估算；切换密度 / 视图模式时清空缓存重新量；
+5. **列表变化**：根节点上挂 `MutationObserver`（childList 去抖 120ms）处理切页 / 无限滚动 /
+   排序 / 过滤；`count` 变化补一次扫描；键盘高亮属性变化只做局部同步，不重扫整个列表。
+
+### 开关与生效范围
+
+- 开关复用 **设置 → 页面增强 → 动态页 → 离屏优化**（`settings.momentsOptimizeEnabled`，默认开）。
+  同一个设置项同时管动态页与三个列表页，文案可以理解为「长列表离屏优化」；
+- 关闭后立即移除全部内联样式并断开观察器，完全退回改动前的渲染方式（无需刷新）；
+- **三种视图模式（舒适网格 / 紧凑网格 / 时间轴列表）都生效**；分组头吸顶、骨架屏、
+  空状态、分页加载提示不在优化范围内（它们不参与卡片高度计算）。
+
+### 明确不影响的行为
+
+- **hover / focus 快捷操作**：卡片 DOM 与事件监听一律不动，只是离屏卡片不被浏览器渲染；
+- **键盘导航**：全局键盘导航的高亮卡通过 `data-keyboard-active` 识别，会被强制设为
+  `visible`，移动高亮即可见；
+- **无限滚动**：IntersectionObserver 的 root 与滚动容器一致，不影响触底加载；
+- **筛选 / 排序 / 时间分组**：只按卡片 key 缓存高度，重新排序或过滤后 key 稳定、不会串行，
+  密度 / 排序变化会触发重量；
+- **悬停预览**（第 6 轮）：预览视频挂在卡片内部，卡片进入活跃带时正常渲染，可正常预览。
+
+### 已知限制
+
+- **估算高度会带来轻微的滚动条抖动**：从未进入活跃带的卡片按 320px 估算，首次进入活跃带后
+  换成真实高度；列表越长、卡片高度差异越大，滚动条长度变化越明显（这是「不卸载节点」方案的
+  固有取舍，与动态页一致）；
+- 浏览器不支持 `content-visibility` 时自动整体降级（不做任何改动）；
+- 卡片高度在优化开启期间是「布局占位高度」，`contain-intrinsic-size` 会让隐藏卡片的
+  文本无法被浏览器内查找（Ctrl+F）/ 无障碍树跳过，属于该 CSS 特性本身的语义；
+- 本轮未做浏览器验证（按分工由 Lead 统一构建回归）。
+
+### 本轮自测
+
+- `pnpm exec eslint src/contentScripts/views/listShared src/contentScripts/views/History src/contentScripts/views/WatchLater src/contentScripts/views/Favorites --fix`，
+  再裸跑：**0 error 0 warning**；
+- `pnpm run typecheck`：**0 error**。

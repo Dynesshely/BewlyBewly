@@ -17,6 +17,7 @@ import { useListI18n } from '../listShared/i18n'
 import { useListPreferences } from '../listShared/preferences'
 import { buildProgress, formatTimeLabel, groupItemsByTime, sortListItems } from '../listShared/timeline'
 import { useListShortcuts } from '../listShared/useListShortcuts'
+import { useListVirtual } from '../listShared/useListVirtual'
 import { copyToClipboard } from '../listShared/utils'
 import '../listShared/styles/listPage.scss'
 
@@ -189,6 +190,12 @@ const sections = computed<Array<{ key: string, label: string, items: ListCardIte
     label: tl(`group.${group.key}`),
     items: group.items,
   }))
+})
+
+/** 列表页离屏优化（复用动态页开关 settings.momentsOptimizeEnabled，关闭即完全退回原渲染） */
+useListVirtual({
+  count: () => cards.value.length,
+  layoutKey: () => `${viewMode.value}:${sortMode.value}:${filterKeyword.value}`,
 })
 
 const sortNote = computed(() => (showsTimeGroup.value

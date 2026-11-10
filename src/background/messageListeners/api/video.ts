@@ -132,6 +132,28 @@ const API_VIDEO = {
     },
     afterHandle: AHS.J_D,
   },
+  // 是否已点赞
+  hasLikedVideo: {
+    url: 'https://api.bilibili.com/x/web-interface/archive/has/like',
+    _fetch: {
+      method: 'get',
+    },
+    params: {
+      aid: 0,
+    },
+    afterHandle: AHS.J_D,
+  },
+  // 是否已收藏
+  hasFavouredVideo: {
+    url: 'https://api.bilibili.com/x/v2/fav/video/favoured',
+    _fetch: {
+      method: 'get',
+    },
+    params: {
+      aid: 0,
+    },
+    afterHandle: AHS.J_D,
+  },
   getVideoPreview: {
     url: 'https://api.bilibili.com/x/player/wbi/playurl',
     _fetch: {

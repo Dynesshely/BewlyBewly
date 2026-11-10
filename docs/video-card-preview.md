@@ -66,7 +66,9 @@
 | 页面 / 区域 | 是否预览 | 说明 |
 | --- | --- | --- |
 | 首页 → 推荐 / 热门 / 排行 | ✅ | `ForYou` / `Trending` / `Ranking` 映射时已带 `cid` |
-| 首页 → 关注 / 订阅剧集 / 直播 | ❌ | 这三处映射没传 `cid`（接口模型里也没有稳定的 cid），需要时再补 |
+| 首页 → 关注 | ⚠️ 条件生效 | 第 10 轮起防御式透传 `archive.cid` / `player_args.cid` / `page.cid`；moment 接口模型没有稳定 cid 字段，上游没给时不预览（**不会**为补 cid 发额外请求） |
+| 首页 → 订阅剧集 | ❌ | 番剧卡来自 `major.pgc`，没有 `bvid`，预览前置条件（bvid + cid）不满足；`cid` 已防御式透传，等上游补 bvid 后才可能生效 |
+| 首页 → 直播 | ❌ | 直播条目没有 `bvid` / `cid`（模型里也没有）；`cid` 已防御式透传，当前不会触发 |
 | 历史 | ✅（普通投稿） | 透传 `history.bvid` + `history.cid`；番剧 / 直播 / 专栏条目不下发 |
 | 稍后再看 | ✅ | 透传 `item.bvid` + `item.cid`（回退 `item.page.cid`） |
 | 收藏 | ✅（视频） | 透传 `item.ugc.first_cid`；音频收藏没有 cid，不预览 |
@@ -82,8 +84,10 @@
 1. 旧「启用视频预览」（`settings.enableVideoPreview`，通用设置）与新「悬停预览」目前是「与」关系：
    两个都能关。若希望只保留一个开关，可把通用设置里的旧开关移除或改成指向新字段，并同步
    `previewSettings.isCardPreviewEnabled()`（本模块已按新字段为主、旧字段兜底实现）。
-2. 首页「关注 / 订阅剧集 / 直播」若也要预览，需要在这三处的 `video` 映射里补 `cid`
-   （数据源模型里当前没有 cid，可能得确认接口字段，不属于本轮写入范围）。
+2. 首页「关注 / 订阅剧集 / 直播」的 `cid`：第 10 轮已在这三处做**防御式透传**
+   （`cid` / `player_args.cid` / `page.cid`，见 `Home/utils/previewCid.ts`）。
+   其中「关注」能否真正预览取决于 moment 接口是否下发 cid；「订阅剧集 / 直播」还缺 `bvid`，
+   需要等数据源补齐后才会生效 —— 全程没有为补 cid 新增网络请求。
 3. 无需改 `App.vue` / `contentScripts/index.ts`。
 
 ## 6. 已知限制

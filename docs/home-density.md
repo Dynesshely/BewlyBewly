@@ -113,3 +113,17 @@ VideoCard 组件的标题 `<h3 class="keep-two-lines">`（全局组件，本轮�
   锚点会失效，退化为不校正；
 - 让首页提示条（`bewly-active-info`）等固定浮层不受密度影响；
 - 设置页与首页控件都直接写 `settings.homeCardDensity`，没有单独的表单校验（类型由 storage 保证）。
+
+## 首页「回到顶部」浮动按钮（第 10 轮）
+
+- **出现条件**：首页滚动超过 **2 屏**（以首页滚动容器的可见高度为准）时，右下角淡入一个圆形按钮；
+  回到顶部后自动隐藏，切子标签 / 清屏也会同步更新。
+- **交互**：原生 `<button type="button">`，`aria-label` / `title` 来自首页模块内 i18n（中英），
+  Tab 可达；点击平滑滚回顶部，`prefers-reduced-motion: reduce` 时直接跳。
+- **外观**：`--bew-theme-color` 圆形底 + 白色箭头 + `--bew-shadow-2/3`，hover 上浮、active 轻微缩放，
+  reduced-motion 下取消过渡与位移。
+- **不与 Dock 冲突**：按 `settings.dockPosition` 让位 —— Dock 在右侧时右移 72px，在底部时上移 72px；
+  其余情况固定在右下角（24px 边距）。
+- **Zen 清屏模式隐藏**：监听 `<html class="bewly-zen">`（MutationObserver），清屏期间不渲染按钮；
+  退出清屏后若仍在两屏以下，按钮自动回来。
+- **不影响密度切换**：两者互不依赖；密度切换时按钮位置不变，仍按滚动距离判定。

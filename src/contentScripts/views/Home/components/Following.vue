@@ -8,6 +8,7 @@ import { useGridLayoutClass } from '~/composables/useGridLayout'
 import { useListPageActions } from '~/composables/useListPageActions'
 import { settings } from '~/logic'
 import api from '~/utils/api'
+import { readPreviewCid } from '../utils/previewCid'
 
 // https://github.com/starknt/BewlyBewly/blob/fad999c2e482095dc3840bb291af53d15ff44130/src/contentScripts/views/Home/components/ForYou.vue#L16
 interface VideoElement {
@@ -299,6 +300,8 @@ defineExpose({ initData })
           danmakuStr: video.item.modules.module_dynamic.major.archive?.stat.danmaku,
           capsuleText: video.item.modules.module_author.pub_time,
           bvid: video.item.modules.module_dynamic.major.archive?.bvid,
+          // 模型里没有 cid：若上游带了（cid / player_args.cid / page.cid）就透传，供悬停预览使用
+          cid: readPreviewCid(video.item.modules.module_dynamic.major.archive),
           badge: video.item.modules.module_dynamic.major.archive?.badge.text !== '投稿视频' ? {
             bgColor: video.item.modules.module_dynamic.major.archive?.badge.bg_color,
             color: video.item.modules.module_dynamic.major.archive?.badge.color,

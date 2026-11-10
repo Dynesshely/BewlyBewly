@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import type { Video } from '~/components/VideoCard/types'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
+
 import FavoriteFolderPanel from './FavoriteFolderPanel.vue'
+import { cancelQueuedInteractionStatus, ensureInteractionStatus } from './interactionStatus'
 import { useCardQuickActions } from './useCardQuickActions'
 
 const props = withDefaults(defineProps<{
@@ -46,11 +49,34 @@ function handleWatchLater() {
   closeFavoritePanel()
   emit('toggleWatchLater')
 }
+
+const barRef = ref<HTMLElement | null>(null)
+let cardElement: HTMLElement | null = null
+
+/** 悬停 / 键盘聚焦卡片时懒查询真实互动状态（内部有缓存与并发限制） */
+function handleCardInteraction() {
+  ensureInteractionStatus(props.video)
+}
+
+onMounted(() => {
+  cardElement = barRef.value?.closest('[data-video-card]') as HTMLElement | null
+  cardElement?.addEventListener('mouseenter', handleCardInteraction)
+  cardElement?.addEventListener('focusin', handleCardInteraction)
+})
+
+onBeforeUnmount(() => {
+  cardElement?.removeEventListener('mouseenter', handleCardInteraction)
+  cardElement?.removeEventListener('focusin', handleCardInteraction)
+  cardElement = null
+  // 卡片卸载 / 页面切换时取消尚未发出的排队查询
+  cancelQueuedInteractionStatus(props.video)
+})
 </script>
 
 <template>
   <div
     v-if="canLike || canFavorite || showWatchLater"
+    ref="barRef"
     class="bewly-card-actions opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto"
     :class="{ 'is-open': favoritePanelOpen }"
     role="group"

@@ -38,7 +38,7 @@ keyboard_help:
   queue: 把卡片加入本地待看队列
   watch_later: 把当前视频加入稍后再看
   focus_browse: 进入聚焦浏览（封面流）
-  focus_browse_exit: 退出聚焦浏览 / 关闭浮层
+  focus_browse_exit: 退出聚焦浏览 / 清屏 / 关闭浮层
 
 common:
   view_all: 查看更多
@@ -135,6 +135,7 @@ settings:
   keyboard_action_focus_search: 聚焦搜索框
   keyboard_action_toggle_help: 显示 / 隐藏快捷键帮助
   keyboard_action_toggle_focus_browse: 进入 / 退出聚焦浏览
+  keyboard_action_zen_mode: Shift + Z：切换清屏模式（只留内容）
   keyboard_action_command_palette: 打开命令面板
 
   # Settings group
@@ -639,3 +640,4 @@ keyboard_registry:
     article_font_larger: 正文字号增大
     article_back_to_top: 回到顶部
     article_exit: 退出阅读模式 / 关闭目录
+    toggle_zen_mode: 清屏模式（只留内容）

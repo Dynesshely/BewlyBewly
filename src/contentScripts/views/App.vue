@@ -8,6 +8,7 @@ import { useDark } from '~/composables/useDark'
 import { useFocusBrowse } from '~/composables/useFocusBrowse'
 import { useKeyboardCardNavigation } from '~/composables/useKeyboardCardNavigation'
 import { BEWLY_MOUNTED, DRAWER_VIDEO_ENTER_PAGE_FULL, DRAWER_VIDEO_EXIT_PAGE_FULL, IFRAME_PAGE_SWITCH_BEWLY, IFRAME_PAGE_SWITCH_BILI, OVERLAY_SCROLL_BAR_SCROLL } from '~/constants/globalEvents'
+import { comboMatches, resolveShortcut } from '~/constants/shortcuts'
 import { AppPage } from '~/enums/appEnums'
 import { settings } from '~/logic'
 import { useMainStore } from '~/stores/mainStore'
@@ -239,9 +240,174 @@ watch(() => showBewlyPage.value, () => nextTick(setupReachBottomObserver))
 
 setupNecessarySettingsWatchers()
 
+// #region 清屏模式（Shift+Z）
+/** 清屏状态存 sessionStorage：同一标签页刷新保持，新标签页从关闭开始 */
+const ZEN_STORAGE_KEY = 'bewly-zen'
+
+function readZenEnabled(): boolean {
+  try {
+    return sessionStorage.getItem(ZEN_STORAGE_KEY) === '1'
+  }
+  catch {
+    return false
+  }
+}
+
+function storeZenEnabled(on: boolean): void {
+  try {
+    sessionStorage.setItem(ZEN_STORAGE_KEY, on ? '1' : '0')
+  }
+  catch {
+    // 隐私模式 / 存储被禁用：本次会话内仍然生效，只是刷新不保持
+  }
+}
+
+// 初始值直接读存储：避免刷新后先闪一下顶栏 / Dock 再进入清屏
+const zenEnabled = ref<boolean>(readZenEnabled())
+/** 浮层（设置 / 命令面板 / 帮助 / 抽屉 / 对话框）打开时清屏暂时让位 */
+const zenOverlayOpen = ref<boolean>(false)
+/** 根节点上的清屏 class：bewly-zen 常驻，bewly-zen--peek 表示「暂时恢复 UI」 */
+const zenClasses = computed<Record<string, boolean>>(() => ({
+  'bewly-zen': zenEnabled.value,
+  'bewly-zen--peek': zenEnabled.value && zenOverlayOpen.value,
+}))
+/** 清屏时轻量轮询 DOM 浮层（Dialog 等由页面内组件自行渲染，拿不到 ref） */
+let zenPollTimer: number | null = null
+
+/**
+ * 把清屏状态同步到 <html>：页面级样式（原生页增强层浮层入口）靠它隐藏。
+ * 根节点 class 由模板绑定，这里只处理 document 级。
+ */
+function syncZenDocumentClass(): void {
+  const root = document.documentElement
+  root.classList.toggle('bewly-zen', zenEnabled.value)
+  root.classList.toggle('bewly-zen--peek', zenEnabled.value && zenOverlayOpen.value)
+}
+
+function startZenPolling(): void {
+  if (zenPollTimer !== null)
+    return
+  zenPollTimer = window.setInterval(() => {
+    if (document.hidden)
+      return
+    refreshZenOverlayState()
+  }, 400)
+}
+
+function stopZenPolling(): void {
+  if (zenPollTimer === null)
+    return
+  window.clearInterval(zenPollTimer)
+  zenPollTimer = null
+}
+
+function setZenEnabled(on: boolean): void {
+  if (zenEnabled.value === on)
+    return
+  zenEnabled.value = on
+  storeZenEnabled(on)
+  if (on) {
+    refreshZenOverlayState()
+    startZenPolling()
+  }
+  else {
+    stopZenPolling()
+    zenOverlayOpen.value = false
+  }
+  syncZenDocumentClass()
+}
+
+function toggleZenMode(): void {
+  setZenEnabled(!zenEnabled.value)
+}
+
+/** 当前是否有会遮住内容的浮层（含 Dialog 等直接挂在 shadow root 下的组件） */
+function refreshZenOverlayState(): void {
+  const shadowRoot = document.querySelector('#bewly')?.shadowRoot
+  const hasShadowOverlay = Boolean(shadowRoot?.querySelector('.dialog, .command-palette-mask, .keyboard-help-mask, .bewly-iframe-drawer'))
+  const next = Boolean(showSettings.value || showCommandPalette.value || showKeyboardHelp.value || showIframeDrawer.value || hasShadowOverlay)
+  if (zenOverlayOpen.value === next)
+    return
+  zenOverlayOpen.value = next
+  syncZenDocumentClass()
+}
+
+/** 键盘事件是否发生在输入框 / 可编辑区域（shadow DOM 里 target 会被重定向，必须看 composedPath） */
+function isZenEditableTarget(event: KeyboardEvent): boolean {
+  for (const node of event.composedPath()) {
+    if (!(node instanceof HTMLElement))
+      continue
+    if (node.isContentEditable || node.matches?.('input, textarea, select'))
+      return true
+  }
+  return false
+}
+
+/** 清屏的键盘入口：Shift+Z 切换，Esc 退出（浮层打开时让浮层先处理 Esc） */
+function handleZenKeydown(event: KeyboardEvent): void {
+  if (event.defaultPrevented || event.isComposing)
+    return
+  if (event.ctrlKey || event.metaKey || event.altKey)
+    return
+
+  if (event.key === 'Escape') {
+    if (!zenEnabled.value || zenOverlayOpen.value)
+      return
+    // 原生全屏 / 播放器全屏用 Esc 退出，先让它们处理
+    if (document.fullscreenElement)
+      return
+    // 聚焦浏览 / 其它全屏模式有自己的 Esc 语义，先让它们处理
+    if (document.documentElement.classList.contains('bewly-focus-browse'))
+      return
+    if (isZenEditableTarget(event))
+      return
+    event.preventDefault()
+    event.stopPropagation()
+    setZenEnabled(false)
+    return
+  }
+
+  if (!comboMatches(resolveShortcut('toggleZenMode', settings.value.keyboardShortcuts), event))
+    return
+  if (isZenEditableTarget(event)) {
+    // 输入框里 Shift+Z 就是普通大写字母：不吞按键，但要挡住全局快捷键层再处理一次
+    event.stopPropagation()
+    return
+  }
+  event.preventDefault()
+  event.stopPropagation()
+  toggleZenMode()
+}
+// #endregion
+
+// 清屏模式：快捷键 / 设置页共用同一个入口
+emitter.on('toggle-zen-mode', () => {
+  toggleZenMode()
+})
+
+// 设置 / 命令面板 / 帮助 / 视频预览抽屉打开时，清屏暂时恢复 UI（关闭后自动回到清屏）
+watch(
+  [
+    showSettings,
+    showCommandPalette,
+    showKeyboardHelp,
+    showIframeDrawer,
+  ],
+  () => refreshZenOverlayState(),
+)
+
+window.addEventListener('keydown', handleZenKeydown, true)
+
 onMounted(() => {
   nextTick(setupReachBottomObserver)
   window.dispatchEvent(new CustomEvent(BEWLY_MOUNTED))
+
+  // 清屏模式：状态已在声明时从 sessionStorage 恢复，这里只同步 document 级 class
+  syncZenDocumentClass()
+  if (zenEnabled.value) {
+    refreshZenOverlayState()
+    startZenPolling()
+  }
 
   if (isHomePage()) {
     // Force overwrite Bilibili Evolved body tag & html tag background color
@@ -423,10 +589,14 @@ provide<BewlyAppProvider>('BEWLY_APP', {
   haveScrollbar,
 })
 onUnmounted(() => {
+  window.removeEventListener('keydown', handleZenKeydown, true)
+  stopZenPolling()
+  document.documentElement.classList.remove('bewly-zen', 'bewly-zen--peek')
   document.removeEventListener('scroll', handleWindowScroll)
   reachBottomObserver?.disconnect()
   reachBottomObserver = null
   emitter.off('toggle-command-palette')
+  emitter.off('toggle-zen-mode')
   emitter.off('command-open-settings')
   emitter.off('open-video-preview')
   emitter.off('focus-browse-reach-end')
@@ -449,7 +619,7 @@ onUnmounted(() => {
     id="bewly-wrapper"
     ref="mainAppRef"
     class="bewly-wrapper"
-    :class="{ dark: isDark }"
+    :class="[{ dark: isDark }, zenClasses]"
     text="$bew-text-1 size-$bew-base-font-size"
   >
     <!-- Background -->

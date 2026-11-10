@@ -38,7 +38,7 @@ keyboard_help:
   queue: Add card to local watch queue
   watch_later: Add current video to Watch Later
   focus_browse: Enter focus browse (cover flow)
-  focus_browse_exit: Exit focus browse / close overlay
+  focus_browse_exit: Exit focus browse / zen mode / close overlay
 
 common:
   view_all: View ALL
@@ -135,6 +135,7 @@ settings:
   keyboard_action_focus_search: Focus the search bar
   keyboard_action_toggle_help: Show / hide shortcut help
   keyboard_action_toggle_focus_browse: Enter / exit focus browse
+  keyboard_action_zen_mode: 'Shift + Z: toggle zen mode (content only)'
   keyboard_action_command_palette: Open the command palette
 
   # Settings group
@@ -642,3 +643,4 @@ keyboard_registry:
     article_font_larger: Increase the article font size
     article_back_to_top: Back to top
     article_exit: Exit reading mode / close the contents panel
+    toggle_zen_mode: Zen mode (content only)

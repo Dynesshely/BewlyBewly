@@ -345,3 +345,54 @@ img {
   visibility: hidden;
   pointer-events: none;
 }
+
+/* #region 清屏模式（Shift+Z） */
+/*
+ * 清屏模式有两个作用域：
+ * 1. `html.bewly-zen`  —— 这份样式也会被 manifest 注入页面文档，用来隐藏原生页增强层的浮层入口
+ *    与 B 站原生顶栏；
+ * 2. `.bewly-wrapper.bewly-zen` —— 在 #bewly 的 shadow root 内隐藏 Dock / 侧栏 / 顶栏 / 信息条。
+ *
+ * `--peek` 修饰类：打开设置、命令面板、快捷键帮助、视频预览抽屉或页面内 Dialog 时，
+ * 清屏「暂时恢复 UI」，浮层关闭后自动回到清屏（状态本身不变）。
+ */
+
+/* 原生页增强层（视频页 / 列表页 / 搜索页 / 消息页 / 空间页 / 文章页……）的浮层入口 */
+html.bewly-zen:not(.bewly-zen--peek) body > [data-bewly-native-overlay] {
+  display: none !important;
+}
+
+/* B 站原生顶栏：用 visibility 而不是 display，避免原生页面重新布局导致内容跳动 */
+html.bewly-zen:not(.bewly-zen--peek) .bili-header,
+html.bewly-zen:not(.bewly-zen--peek) #biliMainHeader {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* —— 以下规则只在 #bewly 的 shadow root 内命中 —— */
+.bewly-wrapper.bewly-zen:not(.bewly-zen--peek) {
+  /* 顶栏被隐藏后不再为它留高度，页面内容整体上移（peek 时顶栏还在，高度要还原） */
+  --bew-top-bar-height: 0px;
+}
+
+.bewly-wrapper.bewly-zen:not(.bewly-zen--peek) .dock-wrap,
+.bewly-wrapper.bewly-zen:not(.bewly-zen--peek) .dock-edge,
+.bewly-wrapper.bewly-zen:not(.bewly-zen--peek) .dock-content,
+.bewly-wrapper.bewly-zen:not(.bewly-zen--peek) .sidebar-content,
+.bewly-wrapper.bewly-zen:not(.bewly-zen--peek) .sidebar-edge,
+.bewly-wrapper.bewly-zen:not(.bewly-zen--peek) .bewly-active-info,
+.bewly-wrapper.bewly-zen:not(.bewly-zen--peek) .bewly-ai-status {
+  display: none !important;
+}
+
+/* 顶栏外层（TopBar / OldTopBar 都渲染 <header>，外层 div 只包着它和切换按钮） */
+.bewly-wrapper.bewly-zen:not(.bewly-zen--peek) > div:has(> header) {
+  display: none !important;
+}
+
+/* 侧栏 / Dock 隐藏后内容区收窄到近满宽，并去掉为顶栏预留的留白 */
+.bewly-wrapper.bewly-zen:not(.bewly-zen--peek) .bewly-scroll-container main > div {
+  width: calc(100% - 48px) !important;
+  padding-top: 24px !important;
+}
+/* #endregion */

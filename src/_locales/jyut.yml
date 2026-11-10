@@ -38,7 +38,7 @@ keyboard_help:
   queue: 將卡片加入本地待看清單
   watch_later: 將目前影片加入稍後再看
   focus_browse: 進入聚焦瀏覽（封面流）
-  focus_browse_exit: 退出聚焦瀏覽 / 閂浮層
+  focus_browse_exit: Exit focus browse / zen mode / close overlay
 
 common:
   view_all: 睇晒佢哋
@@ -135,6 +135,7 @@ settings:
   keyboard_action_focus_search: 聚焦搜尋框
   keyboard_action_toggle_help: 顯示 / 隱藏快捷鍵說明
   keyboard_action_toggle_focus_browse: 進入 / 退出聚焦瀏覽
+  keyboard_action_zen_mode: 'Shift + Z: toggle zen mode (content only)'
   keyboard_action_command_palette: 開啟命令面板
 
   # Settings group
@@ -638,3 +639,4 @@ keyboard_registry:
     article_font_larger: Increase the article font size
     article_back_to_top: Back to top
     article_exit: Exit reading mode / close the contents panel
+    toggle_zen_mode: Zen mode (content only)

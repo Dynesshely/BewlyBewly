@@ -21,6 +21,7 @@ export type ShortcutActionId
     | 'focusSearch'
     | 'toggleHelp'
     | 'toggleFocusBrowse'
+    | 'toggleZenMode'
     | 'commandPalette'
 
 export interface ShortcutActionDef {
@@ -44,6 +45,7 @@ export const SHORTCUT_ACTIONS: ShortcutActionDef[] = [
   { id: 'focusSearch', defaultKey: '/', labelKey: 'settings.keyboard_action_focus_search' },
   { id: 'toggleHelp', defaultKey: '?', labelKey: 'settings.keyboard_action_toggle_help' },
   { id: 'toggleFocusBrowse', defaultKey: 'Shift+f', labelKey: 'settings.keyboard_action_toggle_focus_browse' },
+  { id: 'toggleZenMode', defaultKey: 'Shift+z', labelKey: 'settings.keyboard_action_zen_mode' },
   { id: 'commandPalette', defaultKey: 'Ctrl+k', labelKey: 'settings.keyboard_action_command_palette' },
 ]
 

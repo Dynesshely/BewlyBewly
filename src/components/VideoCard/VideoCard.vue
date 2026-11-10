@@ -1,15 +1,16 @@
 <script lang="ts" setup>
 import type { CSSProperties } from 'vue'
 import type { Video } from './types'
-import type { VideoInfo } from '~/models/video/videoInfo'
-
-import type { VideoPreviewResult } from '~/models/video/videoPreview'
 import { Icon } from '@iconify/vue'
 import { useToast } from 'vue-toastification'
 import Button from '~/components/Button.vue'
+import { isCardPreviewCtrlBarEnabled } from '~/components/VideoCardPreview/previewSettings'
+import { useCardPreview } from '~/components/VideoCardPreview/useCardPreview'
+import VideoCardPreview from '~/components/VideoCardPreview/VideoCardPreview.vue'
 import { useBewlyApp } from '~/composables/useAppProvider'
 import { accessKey, settings } from '~/logic'
 import { useMainStore } from '~/stores/mainStore'
+
 import api from '~/utils/api'
 import { getTvSign, TVAppKey } from '~/utils/authProvider'
 import { calcCurrentTime, calcTimeSince, numFormatter } from '~/utils/dataFormatter'
@@ -35,6 +36,7 @@ interface Props {
   type?: 'rcmd' | 'appRcmd' | 'bangumi' | 'common'
   showWatcherLater?: boolean
   horizontal?: boolean
+  /** 兼容保留：显式传 false 可关闭这张卡片的悬停预览（缺省视为允许，仍受全局开关与设备条件约束） */
   showPreview?: boolean
   moreBtn?: boolean
 }
@@ -90,41 +92,25 @@ const videoUrl = computed(() => {
 })
 
 const isInWatchLater = ref<boolean>(false)
-const isHover = ref<boolean>(false)
-const mouseEnterTimeOut = ref()
-const mouseLeaveTimeOut = ref()
-const previewVideoUrl = ref<string>('')
 const contentVisibility = ref<'auto' | 'visible'>('auto')
 const videoElement = ref<HTMLVideoElement | null>(null)
 
-watch(() => isHover.value, async (newValue) => {
-  if (!props.video || !newValue)
-    return
+// 悬停预览：全局单实例，卡片只负责在悬停/离开时调度与取消
+const previewCardId = useId()
+const {
+  isActive: isPreviewActive,
+  src: previewSrc,
+  schedule: schedulePreview,
+  cancel: cancelPreview,
+  handlePlaying: onPreviewPlaying,
+  handleEnded: onPreviewEnded,
+  handleFailed: onPreviewFailed,
+} = useCardPreview(previewCardId)
+const previewControls = computed(() => isCardPreviewCtrlBarEnabled())
 
-  if (props.showPreview && settings.value.enableVideoPreview
-    && !previewVideoUrl.value && (props.video.aid || props.video.bvid)) {
-    let cid = props.video.cid
-    if (!cid) {
-      try {
-        const res: VideoInfo = await api.video.getVideoInfo({
-          bvid: props.video.bvid,
-        })
-        if (res.code === 0)
-          cid = res.data.cid
-      }
-      catch {
-
-      }
-    }
-    api.video.getVideoPreview({
-      bvid: props.video.bvid,
-      cid,
-    }).then((res: VideoPreviewResult) => {
-      if (res.code === 0)
-        previewVideoUrl.value = res.data.durl[0].url
-    })
-  }
-})
+function handlePreviewReady(element: HTMLVideoElement) {
+  videoElement.value = element
+}
 
 function toggleWatchLater() {
   if (!props.video)
@@ -161,25 +147,14 @@ function handleMouseEnter() {
 
   // fix #789
   contentVisibility.value = 'visible'
-  if (settings.value.hoverVideoCardDelayed) {
-    mouseEnterTimeOut.value = setTimeout(() => {
-      isHover.value = true
-      clearTimeout(mouseLeaveTimeOut.value)
-    }, 1200)
-  }
-  else {
-    mouseEnterTimeOut.value = setTimeout(() => {
-      isHover.value = true
-      clearTimeout(mouseLeaveTimeOut.value)
-    }, 500)
-  }
+  // showPreview 保持兼容：显式传 false 的卡片不预览（默认 undefined 视为允许）
+  if (props.showPreview !== false)
+    schedulePreview(props.video)
 }
 
 function handelMouseLeave() {
   contentVisibility.value = 'auto'
-  isHover.value = false
-  clearTimeout(mouseEnterTimeOut.value)
-  clearTimeout(mouseLeaveTimeOut.value)
+  cancelPreview()
 }
 
 function handleClick(event: MouseEvent) {
@@ -327,18 +302,16 @@ provide('getVideoType', () => props.type!)
             </div>
 
             <!-- Video preview -->
-            <Transition v-if="!removed && showPreview && settings.enableVideoPreview" name="fade">
-              <video
-                v-if="previewVideoUrl && isHover"
-                ref="videoElement"
-                autoplay muted
-                :controls="settings.enableVideoCtrlBarOnVideoCard"
-                :style="{ pointerEvents: settings.enableVideoCtrlBarOnVideoCard ? 'auto' : 'none' }"
-                pos="absolute top-0 left-0" w-full aspect-video rounded="$bew-radius" bg-black
-                @mouseenter="handleMouseEnter"
-              >
-                <source :src="previewVideoUrl" type="video/mp4">
-              </video>
+            <Transition v-if="!removed" name="fade">
+              <VideoCardPreview
+                v-if="isPreviewActive && previewSrc"
+                :src="previewSrc"
+                :controls="previewControls"
+                @ready="handlePreviewReady"
+                @playing="onPreviewPlaying"
+                @ended="onPreviewEnded"
+                @failed="onPreviewFailed"
+              />
             </Transition>
 
             <!-- Ranking Number -->

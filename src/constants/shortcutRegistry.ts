@@ -186,6 +186,14 @@ export const SHORTCUT_REGISTRY: ShortcutRegistryEntry[] = [
     i18nKey: 'keyboard_help.focus_browse_exit',
   },
   {
+    id: 'global-zen-mode',
+    scope: 'global',
+    keys: defaultKeys('toggleZenMode'),
+    i18nKey: 'keyboard_registry.actions.toggle_zen_mode',
+    shortcutActionId: 'toggleZenMode',
+    emitEvent: 'toggle-zen-mode',
+  },
+  {
     id: 'global-focus-search',
     scope: 'global',
     keys: defaultKeys('focusSearch'),

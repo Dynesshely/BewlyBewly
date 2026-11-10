@@ -13,6 +13,7 @@ import { SVG_ICONS } from '~/utils/svgIcons'
 import { version } from '../../package.json'
 import { setupArticlePage } from './articlePage'
 import { setupChannelPage } from './channelPage'
+import { setupLivePage } from './livePage'
 import { muteNativeScripts, setNativeGuardEnabled } from './nativeGuard'
 import { setupNotificationPage } from './notificationPage'
 import { setupSearchEnhance } from './searchPage'
@@ -239,6 +240,9 @@ async function onDOMLoaded() {
       await injectAppWhenIdle()
     }
   }
+
+  // 直播页增强层（影院 / 弹幕 / 隐藏侧栏 / 快捷键）
+  setupLivePage()
 
   // 视频播放页增强层（影院模式 / 迷你播放器 / 快捷键 / 紧凑信息栏）
   // 内部会自行判断是否原生视频页，非视频页是空操作

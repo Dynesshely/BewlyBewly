@@ -1,0 +1,103 @@
+/**
+ * 直播页增强的页面级样式（作用在 B 站原生 DOM 上，不在 shadow root 内）。
+ *
+ * 直播页没有 adaptedStyles 分支（Bewly 此前不支持直播页），所以这份样式由
+ * `src/contentScripts/livePage` 通过 `?inline` 注入成 `<style id="bewly-live-page-style">`。
+ *
+ * 作用域：
+ *   html.bewly-live-page        模块接管标记（样式只在这个类下生效，卸载即恢复原样）
+ *   html.bewly-live-cinema      影院模式
+ *   html.bewly-live-hide-aside  隐藏右侧栏
+ * 属性标记（由 dom.ts 打在原生节点上，不依赖 B 站的哈希类名）：
+ *   [data-bewly-live-player]    播放器舞台
+ *   [data-bewly-live-aside]     右侧栏（礼物 / 榜单 / 推荐）
+ *   [data-bewly-live-layout]    播放器与侧栏的共同祖先
+ *   [data-bewly-live-ancestor]  播放器祖先链（影院模式下清层叠上下文用）
+ *
+ * 颜色只用 --bew-* 变量；不使用 :has()；!important 只出现在「必须压过 B 站内联样式」
+ * 的布局属性上，范围限定在属性标记之内。
+ */
+
+// #region 影院模式
+html.bewly-live-page.bewly-live-cinema {
+  // 祖先链清场：祖先上只要有 z-index / transform / filter / contain 就会建立层叠上下文，
+  // fixed 的舞台会掉到 body::before 遮罩（z-index 2147483099）下面 ——
+  // 第 4 轮番剧页踩过这个坑（整页变灰、播放器不见），这里照同一套处理。
+  [data-bewly-live-ancestor] {
+    transform: none !important;
+    filter: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    contain: none !important;
+    perspective: none !important;
+    will-change: auto !important;
+    z-index: auto !important;
+  }
+
+  // 舞台铺满视口：直播页上 Bewly 的顶栏并不挂载（isSupportedPages 不含 live），
+  // 原生顶栏会被下面的 body::before 一起压暗，因此从 top: 0 开始铺满即可。
+  [data-bewly-live-player] {
+    position: fixed !important;
+    top: 0 !important;
+    right: 0 !important;
+    left: 0 !important;
+    z-index: 2147483100 !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: auto !important;
+    max-height: 100vh;
+    margin: 0 !important;
+    aspect-ratio: 16 / 9;
+    background-color: color-mix(in oklab, var(--bew-bg), black 60%);
+  }
+
+  [data-bewly-live-player] video,
+  [data-bewly-live-player] iframe,
+  [data-bewly-live-player] canvas {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  [data-bewly-live-aside] {
+    display: none !important;
+  }
+
+  [data-bewly-live-layout] {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  // 压暗页面其余内容：舞台 z-index 更高，浮层（shadow host）更高，都留在遮罩之上
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 2147483099;
+    background: color-mix(in oklab, var(--bew-bg), black 58%);
+    pointer-events: none;
+  }
+}
+// #endregion
+
+// #region 隐藏侧栏
+html.bewly-live-page.bewly-live-hide-aside {
+  [data-bewly-live-aside] {
+    display: none !important;
+  }
+
+  // 侧栏腾出来的宽度还给播放器所在布局
+  [data-bewly-live-player],
+  [data-bewly-live-layout] {
+    width: 100% !important;
+    max-width: none !important;
+  }
+}
+// #endregion
+
+// #region 动效降级
+@media (prefers-reduced-motion: reduce) {
+  html.bewly-live-page [data-bewly-live-player] {
+    transition: none;
+  }
+}
+// #endregion

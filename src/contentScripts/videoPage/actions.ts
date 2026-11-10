@@ -5,6 +5,7 @@ import {
   getPlayerEl,
   getPlayerWrapEl,
   getVideoEl,
+  goToAdjacentEpisode,
   isDanmakuEnabled,
   notifyPlayerResize,
   prefersReducedMotion,
@@ -20,6 +21,9 @@ const HTML_CLASS_MINI = 'bewly-video-mini'
 
 /** 还原迷你播放器后的短暂抑制窗口，避免平滑滚动途中又被判定为「滚出视口」而重新收缩 */
 let suppressMiniUntil = 0
+
+/** 迷你态给「播放器舞台的父级」加的占位高度（番剧页没有 #playerWrap，CSS 变量那条规则管不到它） */
+let stagePlaceholderEl: HTMLElement | null = null
 
 let toastTimer: number | null = null
 
@@ -117,21 +121,42 @@ export function setMini(on: boolean): void {
   ui.mini = on
 
   if (on) {
+    // 先清掉可能残留的旧占位，避免连续进入迷你态时留下多个撑高元素
+    clearStagePlaceholder()
+
     // 记录播放器原始高度，收起成浮窗后左栏仍然占位，避免页面内容跳动
     const wrap = getPlayerWrapEl()
     const height = wrap
       ? Math.round(wrap.getBoundingClientRect().height)
       : 0
-    if (height > 0)
+    if (height > 0) {
       document.documentElement.style.setProperty('--bvp-mini-placeholder', `${height}px`)
+
+      // 普通视频页由 CSS 变量给 .left-container 撑高；番剧页的容器结构不稳定，
+      // 直接给舞台父级写 inline min-height，保证收起浮窗时页面内容不上跳
+      const parent = wrap?.parentElement ?? null
+      if (parent && parent !== document.body) {
+        stagePlaceholderEl = parent
+        parent.style.minHeight = `${height}px`
+      }
+    }
     document.documentElement.classList.add(HTML_CLASS_MINI)
   }
   else {
     document.documentElement.classList.remove(HTML_CLASS_MINI)
     document.documentElement.style.removeProperty('--bvp-mini-placeholder')
+    clearStagePlaceholder()
   }
 
   notifyPlayerResize()
+}
+
+/** 清掉迷你态写的占位高度（退出迷你 / 卸载时调用） */
+export function clearStagePlaceholder(): void {
+  if (stagePlaceholderEl) {
+    stagePlaceholderEl.style.minHeight = ''
+    stagePlaceholderEl = null
+  }
 }
 
 export function setCompact(compact: boolean): void {
@@ -169,6 +194,17 @@ export function restorePlayer(): void {
 
 export function toggleShortcutsHelp(force?: boolean): void {
   ui.helpOpen = force ?? !ui.helpOpen
+}
+
+/**
+ * 番剧 / 电影播放页：切到上一集 / 下一集。
+ *
+ * 页面上没有集数列表时什么也不做（快捷键与帮助面板已按 ui.episodeNav 隐藏）。
+ */
+export function stepEpisode(direction: -1 | 1): void {
+  if (!ui.episodeNav)
+    return
+  goToAdjacentEpisode(direction)
 }
 
 export function seekBy(seconds: number): void {

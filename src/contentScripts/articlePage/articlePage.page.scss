@@ -1,0 +1,124 @@
+/**
+ * 专栏 / 文章页「沉浸阅读」的页面级样式（由 index.ts 注入到 document.documentElement）。
+ *
+ * 为什么放在模块里而不是 adaptedStyles/pages/articlesPage.scss：
+ * 阅读模式要同时覆盖 /read/* 与 /opus/*，而 /opus/* 的页面样式归属 momentsPage.scss
+ * （本轮不在写入范围）；两套规则放一处才能保证「一套规则、两处页面」行为一致，
+ * 卸载时也只需要移除这一个 style 元素。
+ *
+ * 所有选择器都挂在 html.bewly-article-reading 下，退出阅读模式即完全恢复 B 站原样；
+ * 颜色只用 --bew-* 变量，暗色模式自动生效，不硬编码颜色。
+ * 选择器来源见 dom.ts 注释（articlesPage.scss / momentsPage.scss 里确认过的真实类名）。
+ */
+
+html.bewly-article-reading {
+  --bap-content-width: 720px;
+  --bap-font-size: 18px;
+  --bap-line-height: 1.9;
+
+  background-color: var(--bew-bg) !important;
+}
+
+html.bewly-article-reading[data-bewly-font-step="s"] {
+  --bap-font-size: 16px;
+  --bap-line-height: 1.8;
+}
+
+html.bewly-article-reading[data-bewly-font-step="m"] {
+  --bap-font-size: 18px;
+  --bap-line-height: 1.9;
+}
+
+html.bewly-article-reading[data-bewly-font-step="l"] {
+  --bap-font-size: 20px;
+  --bap-line-height: 2;
+}
+
+/* #region 降噪背景 */
+html.bewly-article-reading body {
+  background-color: var(--bew-bg) !important;
+}
+
+html.bewly-article-reading .article-container,
+html.bewly-article-reading .article-container__content,
+html.bewly-article-reading .opus-detail,
+html.bewly-article-reading #app div.bg {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+/* #endregion */
+
+/* #region 隐藏侧栏 / 推荐 / 评论锚点 / 吸顶头 */
+html.bewly-article-reading .right-side-bar,
+html.bewly-article-reading .page-content .right-side,
+html.bewly-article-reading .side-toolbar,
+html.bewly-article-reading .fixed-top-header,
+html.bewly-article-reading .fixed-author-header,
+html.bewly-article-reading .nav-tab-bar,
+html.bewly-article-reading .comment-wrapper,
+html.bewly-article-reading .bili-comment.browser-pc,
+html.bewly-article-reading .reply-box.fixed-box,
+html.bewly-article-reading .article-breadcrumb {
+  display: none !important;
+}
+/* #endregion */
+
+/* #region 正文排版：720px + 三档字号 */
+html.bewly-article-reading [data-bewly-article-content] {
+  max-width: var(--bap-content-width) !important;
+  margin-right: auto !important;
+  margin-left: auto !important;
+  color: var(--bew-text-1);
+  background-color: transparent !important;
+}
+
+html.bewly-article-reading [data-bewly-article-content] {
+  font-size: var(--bap-font-size) !important;
+  line-height: var(--bap-line-height) !important;
+}
+
+/* 正文文本块统一跟档位；行内 span / strong / em 跟随父级，避免破坏图文混排 */
+html.bewly-article-reading [data-bewly-article-content] :is(p, li, blockquote, dd, td) {
+  font-size: var(--bap-font-size) !important;
+  line-height: var(--bap-line-height) !important;
+}
+
+/* 标题按档位等比缩放：B 站的标题字号是写死的 px，只有显式覆盖才会跟着档位走 */
+html.bewly-article-reading [data-bewly-article-content] h1 {
+  font-size: calc(var(--bap-font-size) * 1.6) !important;
+  line-height: 1.4 !important;
+}
+
+html.bewly-article-reading [data-bewly-article-content] h2 {
+  font-size: calc(var(--bap-font-size) * 1.35) !important;
+  line-height: 1.4 !important;
+}
+
+html.bewly-article-reading [data-bewly-article-content] h3 {
+  font-size: calc(var(--bap-font-size) * 1.15) !important;
+  line-height: 1.5 !important;
+}
+
+/* 代码块保持等宽小字号，不跟随正文档位放大 */
+html.bewly-article-reading [data-bewly-article-content] :is(pre, code, kbd) {
+  font-size: calc(var(--bap-font-size) * 0.85) !important;
+}
+
+html.bewly-article-reading [data-bewly-article-content] :is(img, video, iframe) {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+html.bewly-article-reading .article-container .title-container,
+html.bewly-article-reading .opus-module-title {
+  max-width: var(--bap-content-width);
+  margin-right: auto;
+  margin-left: auto;
+}
+/* #endregion */
+
+/* #region 目录跳转留白：避免被吸顶元素挡住 */
+[data-bewly-article-toc-target] {
+  scroll-margin-top: 88px;
+}
+/* #endregion */

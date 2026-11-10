@@ -77,8 +77,39 @@ B 站原生播放页（`www.bilibili.com/video/*`、`/list/*`）不是 Bewly 接
 
 ## 已知限制
 
-- 只接管普通视频页与播放列表页；番剧 / 电影播放页（`/bangumi/play/*`）有自己的适配样式，本模块不介入
+- 番剧 / 电影播放页（`/bangumi/play/*`）同样接入本模块，差异见下文「番剧 / 电影播放页」一节；
+  其他播放页（课堂 `/cheese/*`、直播等）不在接管范围
 - 播放器的内部布局仍由 B 站脚本计算，影院模式的 16:9 兜底样式依赖 `aspect-ratio`；
   极端窗口比例下以原生脚本的重算结果为准
 - 全屏（浏览器全屏）时增强层不在全屏元素内，浮动控件不可见，这是预期行为
 - 分 P / 换集由 B 站自己替换播放器元素，本模块靠 500ms 轮询重新绑定状态，切换瞬间进度可能有一拍延迟
+## 番剧 / 电影播放页（第 4 轮扩展）
+
+番剧 / 电影播放页（`www.bilibili.com/bangumi/play/*`，含电影、国创、纪录片）复用**同一套**
+影院模式、迷你播放器、快捷键、紧凑信息栏与帮助面板，没有第二套 UI：
+
+- 判定：`getNativePlaybackKind()` 返回 `'video'`（`/video/*`、`/list/*`）或
+  `'bangumi'`（`/bangumi/play/*`），`isNativeVideoPage()` 对两者都为真
+- 布局：番剧页的播放器外层没有 `#playerWrap`，改为由 JS 给「播放器外层」打
+  `data-bewly-player-stage`、给祖先链打 `data-bewly-player-stage-ancestor`，
+  `animePlayback&MoviePage.scss` 里的影院 / 迷你样式只认这两个属性，不依赖 CSS Modules 哈希类名
+- 影院模式：播放器舞台 `position: fixed` 铺满视口宽度，其余内容用 `body::before` 遮罩压暗，
+  同时尽力隐藏右侧信息列 / 剧集列表 / 推荐 / 榜单 / 赞助（命中不了的由遮罩压暗）
+- 迷你播放器：同样把舞台 fixed 到右下角；番剧页没有 `.left-container` 可撑高，
+  由 JS 在舞台父级写 `min-height` 占位，避免收起浮窗时页面内容上跳
+- 标题 / UP 主：新增 `[class*="mediainfo_mediaTitle"]`、`.media-info .media-title`、
+  `[class*="upinfo_upName"]`、`.up-info .up-name` 等选择器，读不到时回退 `document.title`
+- 切集：`[` 上一集、`]` 下一集。实现是点击集数列表里相邻的一项
+  （新版 `[class*="numberListItem_number_list_item"]`，旧版 `.ep-list-wrapper .ep-item`），
+  与点原生「上一话 / 下一话」等价；**页面上没有集数列表时（电影单集、结构改版）
+  这两项不会出现在帮助面板里，按键也交还给 B 站原生处理**
+- 原生小窗优先：番剧页同样支持 B 站自己的小窗播放，检测到原生 `.bpx-player-container`
+  已 `position: fixed` 时不再叠加本模块的迷你浮窗
+- 设置开关（`videoPageCinemaMode` / `videoPageMiniPlayer` / `videoPageShortcuts`）对两类页面同时生效
+
+已知限制：
+
+- 番剧页的结构由 CSS Modules 生成，隐藏右栏/推荐用的是 `[class*="..."]` 近似选择器；
+  页面改版后若某块内容没被隐藏，仍会被影院遮罩压暗，不影响观看
+- 切集快捷键依赖集数列表的 DOM 顺序；若 B 站改成虚拟列表（只渲染可视项），相邻集判定可能失效，
+  届时需要按真实结构补充选择器

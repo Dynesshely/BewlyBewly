@@ -16,6 +16,8 @@ export interface ShortcutLabels {
   cinema: string
   pip: string
   restore: string
+  prevEpisode: string
+  nextEpisode: string
   percent: string
   help: string
   escape: string
@@ -91,6 +93,8 @@ const CMN_CN: VideoPageMessages = {
     cinema: '影院模式',
     pip: '画中画',
     restore: '还原迷你播放器',
+    prevEpisode: '上一集',
+    nextEpisode: '下一集',
     percent: '跳到 0%–90%',
     help: '打开 / 关闭快捷键帮助',
     escape: '退出影院 / 关闭帮助',
@@ -135,6 +139,8 @@ const EN: VideoPageMessages = {
     cinema: 'Cinema mode',
     pip: 'Picture-in-picture',
     restore: 'Restore the mini player',
+    prevEpisode: 'Previous episode',
+    nextEpisode: 'Next episode',
     percent: 'Jump to 0%–90%',
     help: 'Toggle this shortcut help',
     escape: 'Exit cinema / close this help',

@@ -389,3 +389,126 @@
 
   // #endregion
 }
+// #region Bewly 播放页增强层（影院模式 / 迷你播放器）
+//
+// 增强层 UI（浮动控件 / 紧凑信息栏 / 快捷键帮助）在 src/contentScripts/videoPage 的独立
+// shadow root 里，由 js 在 <html> 上切换 `.bewly-video-cinema` / `.bewly-video-mini`。
+// 番剧页的播放器外层没有 `#playerWrap` 这种稳定结构，所以统一由 JS 在「播放器外层」
+// 打上 `data-bewly-player-stage`、在祖先链打上 `data-bewly-player-stage-ancestor`，
+// 样式只认这两个属性，不依赖 CSS Modules 的哈希类名。
+.bewly-design.animePlaybackAndMoviePage {
+  // #region 影院模式 / 迷你态共用：让舞台能相对视口定位
+  &.bewly-video-cinema,
+  &.bewly-video-mini {
+    [data-bewly-player-stage-ancestor] {
+      transform: none !important;
+      filter: none !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      contain: none !important;
+      perspective: none !important;
+      will-change: auto !important;
+    }
+  }
+  // #endregion
+
+  // #region 影院模式
+  &.bewly-video-cinema {
+    // 舞台脱离文档流，铺满视口宽度
+    [data-bewly-player-stage] {
+      position: fixed !important;
+      top: 0 !important;
+      right: 0 !important;
+      left: 0 !important;
+      z-index: 2147483100 !important;
+      width: 100vw !important;
+      max-width: 100vw !important;
+      height: auto !important;
+      margin: 0 !important;
+    }
+
+    #bilibili-player,
+    #bilibili-player .bpx-player-container {
+      width: 100% !important;
+      height: auto !important;
+      aspect-ratio: 16 / 9;
+    }
+
+    #bilibili-player .bpx-player-video-wrap,
+    #bilibili-player .bpx-player-video-area {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    // 压暗页面其余内容：舞台（z-index 更高）与增强层留在遮罩之上
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 2147483099;
+      background: color-mix(in oklab, var(--bew-bg), black 58%);
+      pointer-events: none;
+    }
+
+    // 右侧信息列 / 剧集列表 / 推荐 / 榜单 / 赞助：能命中的直接隐藏，
+    // 命中不了的会被上面的遮罩压暗（CSS Modules 类名不稳定，这里只做尽力而为）
+    [class*="mediainfo"],
+    [class*="MediaInfo"],
+    [class*="eplist"],
+    [class*="Eplist"],
+    [class*="upinfo"],
+    [class*="UpInfo"],
+    [class*="recommend"],
+    [class*="Recommend"],
+    [class*="rankList"],
+    [class*="rankView"],
+    [class*="rankTab"],
+    [class*="sponsor"],
+    .main-container .media-info,
+    .main-container .ep-list-wrapper,
+    .main-container .section-ep-wrapper,
+    .main-container .recom-wrapper,
+    .main-container .review-module,
+    .main-container .sponsor-module,
+    .main-container .season-list,
+    .main-container .nav-tools,
+    .main-container .pay-bar {
+      display: none !important;
+    }
+  }
+  // #endregion
+
+  // #region 滚动迷你播放器
+  &.bewly-video-mini {
+    [data-bewly-player-stage] {
+      position: fixed !important;
+      top: auto !important;
+      right: 24px !important;
+      bottom: 24px !important;
+      left: auto !important;
+      z-index: 2147483100 !important;
+      width: min(420px, 34vw) !important; // 与 shadow root 里的 --bvp-mini-width 保持一致
+      height: auto !important;
+      aspect-ratio: 16 / 9;
+      margin: 0 !important;
+      overflow: hidden;
+      background: var(--bew-elevated-solid);
+      border-radius: var(--bew-radius);
+      box-shadow: var(--bew-shadow-3);
+    }
+
+    #bilibili-player,
+    #bilibili-player .bpx-player-container {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    #bilibili-player .bpx-player-video-wrap,
+    #bilibili-player .bpx-player-video-area {
+      width: 100% !important;
+      height: 100% !important;
+    }
+  }
+  // #endregion
+}
+// #endregion

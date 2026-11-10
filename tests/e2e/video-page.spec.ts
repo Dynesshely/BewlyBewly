@@ -219,3 +219,201 @@ test.describe('视频播放页增强', () => {
     }
   })
 })
+
+/**
+ * 番剧 / 电影播放页快照。
+ *
+ * 与视频页的差异正是本次要覆盖的部分：没有 `#playerWrap`（舞台上移到播放器父级）、
+ * 标题 / UP 主在 CSS Modules 类名里、集数列表用 `numberListItem_*`。
+ */
+const BANGUMI_PLAYBACK_FIXTURE = `<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>测试番剧 第1话_哔哩哔哩_bilibili</title>
+    <style>
+      body { margin: 0; font-family: system-ui, sans-serif; }
+      .main-container { max-width: 1600px; margin: 0 auto; padding: 16px; }
+      .player-wrap { background: #000; }
+      #bilibili-player { position: relative; height: 420px; overflow: hidden; }
+      .bpx-player-container { width: 100%; height: 100%; }
+      video { display: block; width: 100%; height: 100%; object-fit: contain; }
+      .mediainfo_mediaInfo__abc { margin: 16px 0; }
+      .mediainfo_mediaTitle__abc { font-size: 20px; }
+      .eplist_ep_list_wrapper__abc { min-height: 1200px; }
+      .numberListItem_number_list_item__abc { padding: 6px 0; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="main-container">
+        <div class="player-wrap">
+          <div id="bilibili-player">
+            <div class="bpx-player-container"><video preload="metadata"></video></div>
+          </div>
+        </div>
+        <div class="mediainfo_mediaInfo__abc">
+          <h1 class="mediainfo_mediaTitle__abc">测试番剧 第1话</h1>
+          <div class="upinfo_upInfoCard__abc"><a class="upinfo_upName__abc">测试 UP 主</a></div>
+        </div>
+        <div class="eplist_ep_list_wrapper__abc" id="ep-list">
+          <div class="numberListItem_number_list_item__abc numberListItem_select__abc" data-ep="1">第1话</div>
+          <div class="numberListItem_number_list_item__abc" data-ep="2">第2话</div>
+          <div class="numberListItem_number_list_item__abc" data-ep="3">第3话</div>
+        </div>
+      </div>
+    </div>
+    <script>
+      document.querySelectorAll('.numberListItem_number_list_item__abc').forEach((el) => {
+        el.addEventListener('click', () => {
+          document.querySelectorAll('.numberListItem_number_list_item__abc').forEach((item) => {
+            item.classList.remove('numberListItem_select__abc')
+          })
+          el.classList.add('numberListItem_select__abc')
+          document.body.dataset.clickedEpisode = el.dataset.ep
+        })
+      })
+    </script>
+  </body>
+</html>`
+
+async function openBangumiPlaybackPage(): Promise<{ context: Awaited<ReturnType<typeof chromium.launchPersistentContext>>, page: Page }> {
+  const context = await chromium.launchPersistentContext('', {
+    channel: 'chromium',
+    headless: true,
+    args: [
+      `--disable-extensions-except=${EXTENSION_DIR}`,
+      `--load-extension=${EXTENSION_DIR}`,
+      '--disable-popup-blocking',
+    ],
+    viewport: { width: 1440, height: 900 },
+  })
+
+  const page = await context.newPage()
+  await page.route('**/*', async (route) => {
+    const request = route.request()
+    const url = new URL(request.url())
+    if (url.hostname === 'www.bilibili.com' && request.resourceType() === 'document') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/html; charset=utf-8',
+        body: BANGUMI_PLAYBACK_FIXTURE,
+      })
+      return
+    }
+    await route.continue()
+  })
+
+  await page.goto('https://www.bilibili.com/bangumi/play/ep123456', { waitUntil: 'domcontentloaded' })
+  return { context, page }
+}
+
+test.describe('番剧 / 电影播放页增强', () => {
+  test.skip(!existsSync(EXTENSION_DIR), '先运行 pnpm build 生成 extension/ 目录')
+
+  test('T / Esc 切换影院模式，隐藏信息列并铺满视口', async () => {
+    const { context, page } = await openBangumiPlaybackPage()
+
+    try {
+      await ensureOverlay(page)
+
+      await page.keyboard.press('t')
+      await expect(page.locator('html')).toHaveClass(/bewly-video-cinema/)
+      await expect(page.locator('.mediainfo_mediaInfo__abc')).toBeHidden()
+
+      // 番剧页没有 #playerWrap：舞台标记在播放器父级上，且被 fixed 到视口顶部
+      const stage = page.locator('[data-bewly-player-stage]')
+      await expect(stage).toHaveCount(1)
+      expect(await stage.evaluate(el => getComputedStyle(el).position)).toBe('fixed')
+      const box = await stage.boundingBox()
+      expect(box).not.toBeNull()
+      expect(box!.width).toBeGreaterThan(1400)
+      expect(box!.y).toBeLessThanOrEqual(1)
+
+      await page.keyboard.press('Escape')
+      await expect(page.locator('html')).not.toHaveClass(/bewly-video-cinema/)
+    }
+    finally {
+      await context.close()
+    }
+  })
+
+  test('滚动后收成迷你浮窗，P 还原', async () => {
+    const { context, page } = await openBangumiPlaybackPage()
+
+    try {
+      await ensureOverlay(page)
+      await page.evaluate(() => window.scrollTo(0, 900))
+      await expect(page.locator('html')).toHaveClass(/bewly-video-mini/)
+
+      const box = await page.locator('[data-bewly-player-stage]').boundingBox()
+      expect(box).not.toBeNull()
+      expect(box!.x + box!.width).toBeGreaterThan(1400)
+      expect(box!.y + box!.height).toBeLessThanOrEqual(900)
+
+      await page.keyboard.press('p')
+      await expect(page.locator('html')).not.toHaveClass(/bewly-video-mini/)
+    }
+    finally {
+      await context.close()
+    }
+  })
+
+  test('] / [ 切换下一集 / 上一集', async () => {
+    const { context, page } = await openBangumiPlaybackPage()
+
+    try {
+      await ensureOverlay(page)
+
+      const clickedEpisode = () => page.evaluate(() => document.body.dataset.clickedEpisode ?? '')
+
+      await page.keyboard.press(']')
+      await expect.poll(clickedEpisode, { timeout: 5_000 }).toBe('2')
+
+      await page.keyboard.press(']')
+      await expect.poll(clickedEpisode, { timeout: 5_000 }).toBe('3')
+
+      await page.keyboard.press('[')
+      await expect.poll(clickedEpisode, { timeout: 5_000 }).toBe('2')
+    }
+    finally {
+      await context.close()
+    }
+  })
+
+  test('帮助面板列出切集，页面上没有集数列表时不列出', async () => {
+    const { context, page } = await openBangumiPlaybackPage()
+
+    try {
+      await ensureOverlay(page)
+
+      const openHelp = () => page.evaluate(() => {
+        document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '?', bubbles: true, cancelable: true }))
+      })
+      const helpLabels = () => page.evaluate(() => Array.from(
+        document
+          .querySelector('#bewly-video-page')
+          ?.shadowRoot
+          ?.querySelectorAll('.bvp-help__label') ?? [],
+      ).map(el => el.textContent?.trim() ?? ''))
+
+      await openHelp()
+      await expect(page.locator('.bvp-help__dialog')).toBeVisible()
+      // 文案跟随界面语言（CI 下是英文），用正则同时匹配中英文
+      const hasNextEpisode = (labels: string[]) => labels.some(label => /next episode|下一集/i.test(label))
+      expect(hasNextEpisode(await helpLabels())).toBe(true)
+      await page.keyboard.press('Escape')
+      await expect(page.locator('.bvp-help__dialog')).toBeHidden()
+
+      // 电影单集场景：删掉集数列表后，切集快捷键与帮助项都应消失
+      await page.evaluate(() => document.querySelector('#ep-list')?.remove())
+      await page.waitForTimeout(800)
+      await openHelp()
+      await expect(page.locator('.bvp-help__dialog')).toBeVisible()
+      expect(hasNextEpisode(await helpLabels())).toBe(false)
+    }
+    finally {
+      await context.close()
+    }
+  })
+})

@@ -3,24 +3,16 @@ import type { ShortcutDefinition } from '../shortcuts'
 
 import { nextTick, ref, watch } from 'vue'
 
-import { settings } from '~/logic'
-
 import { toggleShortcutsHelp } from '../actions'
 import { useMessages } from '../i18n'
-import { VIDEO_PAGE_SHORTCUTS } from '../shortcuts'
+import { getShortcutDefinitions } from '../shortcuts'
 import { ui } from '../state'
 
 const t = useMessages()
 const closeButton = ref<HTMLButtonElement | null>(null)
 
-/** 功能被设置页关掉时，帮助面板里也不再列出对应快捷键 */
-const shortcuts = computed(() => VIDEO_PAGE_SHORTCUTS.filter((item) => {
-  if (item.labelKey === 'cinema')
-    return settings.value.videoPageCinemaMode
-  if (item.labelKey === 'restore')
-    return settings.value.videoPageMiniPlayer
-  return true
-}))
+/** 设置开关 + 页面能力（番剧切集）共同决定帮助里列哪些快捷键 */
+const shortcuts = computed(() => getShortcutDefinitions())
 
 function isSeparator(key: string): boolean {
   return key === '–'

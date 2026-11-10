@@ -991,3 +991,99 @@ html.bewly-design.userSpacePage {
   }
 }
 // #endregion
+// #region 第 4 轮：空间页交互增强（只追加，不改动上方任何规则）
+//
+// 这段样式由 src/contentScripts/spacePage 模块驱动，状态类加在 <html> 上：
+//   .bewly-space-compact                 紧凑密度
+//   .bewly-space-filter-video           只看视频
+//   .bewly-space-filter-article         只看专栏
+//   .bewly-space-filter-dynamic         只看动态
+//   .bewly-space-filter-collection      只看合集
+// 模块扫描内容卡时会在卡片根节点上写标记（卸载时全部移除）：
+//   [data-bewly-space-card]             内容卡
+//   [data-bewly-space-kind]             video / article / dynamic / collection
+//   [data-bewly-space-active]           j/k 当前高亮卡
+//   [data-bewly-space-section-empty]    筛选后整块没有该类内容（由模块计算）
+// 卡片类名全部来自本文件上方已确认的原生 DOM（video-container / large-item /
+// small-item / opus-item / bili-dyn-item / series-item / channel-item）。
+
+// #region 键盘高亮
+html.userSpacePage {
+  [data-bewly-space-active] {
+    position: relative;
+    z-index: 1;
+    border-radius: var(--bew-native-radius, var(--bew-radius));
+    outline: 2px solid var(--bew-theme-color);
+    outline-offset: 3px;
+    box-shadow: 0 0 0 6px var(--bew-theme-color-20);
+    transition:
+      outline-color var(--bew-native-dur, 180ms) var(--bew-native-ease, ease),
+      box-shadow var(--bew-native-dur, 180ms) var(--bew-native-ease, ease);
+  }
+
+  // scrollIntoView 居中滚动时不要被顶部头图 / 导航盖住
+  [data-bewly-space-card] {
+    scroll-margin-block: calc(var(--bew-native-sticky-top, 72px) + 24px) 32px;
+  }
+}
+// #endregion
+
+// #region 内容筛选
+//
+// 只隐藏带类型标记的卡片，不删除节点；切回「全部」时状态类一移除就恢复。
+html.userSpacePage {
+  &.bewly-space-filter-video [data-bewly-space-kind]:not([data-bewly-space-kind="video"]),
+  &.bewly-space-filter-article [data-bewly-space-kind]:not([data-bewly-space-kind="article"]),
+  &.bewly-space-filter-dynamic [data-bewly-space-kind]:not([data-bewly-space-kind="dynamic"]),
+  &.bewly-space-filter-collection [data-bewly-space-kind]:not([data-bewly-space-kind="collection"]) {
+    display: none !important;
+  }
+
+  // 筛选后整块没有该类内容时，把这一块一起收起（原生页没有 :has，标记由 JS 计算）
+  [data-bewly-space-section-empty] {
+    display: none !important;
+  }
+}
+// #endregion
+
+// #region 紧凑密度
+html.userSpacePage.bewly-space-compact {
+  .section-title {
+    font-size: 14px;
+  }
+
+  // 卡片标题收到单行，元信息降一档字号
+  .video-container .text-area .title,
+  .large-item .title,
+  .opus-list .opus-item-title {
+    font-size: 13px;
+    @include native.clamp(1);
+  }
+
+  .video-container .text-area .content,
+  .opus-list .opus-item-content,
+  .opus-list .opus-item-time,
+  .small-item .meta {
+    font-size: 11px;
+  }
+
+  // 标题与封面之间更贴一些
+  .video-container .text-area {
+    padding-top: 6px;
+  }
+
+  // 动态卡在大字号模式下用更小的圆角，信息密度更高
+  .bili-dyn-item {
+    border-radius: var(--bew-native-radius, var(--bew-radius));
+  }
+}
+// #endregion
+
+// #region 动效降级
+@media (prefers-reduced-motion: reduce) {
+  html.userSpacePage [data-bewly-space-active] {
+    transition: none;
+  }
+}
+// #endregion
+// #endregion

@@ -11,6 +11,7 @@ import { createApp, watch } from 'vue'
 import { settings } from '~/logic'
 
 import {
+  clearStagePlaceholder,
   clearToastTimer,
   isMiniRestoreSuppressed,
   readStoredCinema,
@@ -20,13 +21,17 @@ import {
 } from './actions'
 import VideoPageOverlay from './components/VideoPageOverlay.vue'
 import {
+  clearPlayerStage,
+  getNativePlaybackKind,
   getPlayerWrapEl,
   getUploaderName,
   getVideoEl,
   getVideoTitle,
+  hasEpisodeNavigation,
   isDanmakuEnabled,
   isNativeMiniPlayerActive,
   isNativeVideoPage,
+  markPlayerStage,
 } from './dom'
 import { setupShortcuts } from './shortcuts'
 import { resetUiState, ui } from './state'
@@ -56,6 +61,8 @@ let stopSettingsWatch: (() => void) | null = null
 let syncTimer: number | null = null
 let scrollFrame = 0
 let miniEnteredAt = 0
+/** 上一次标记的播放器舞台元素（避免每拍都写 DOM 属性） */
+let stageEl: HTMLElement | null = null
 
 export function setupVideoPage(): void {
   if (hostEl)
@@ -95,6 +102,9 @@ function mount(): void {
   window.addEventListener('scroll', handleScroll, { passive: true })
   window.addEventListener('resize', handleScroll, { passive: true })
 
+  // 先同步一次（打舞台标记 / 探测集数列表），再恢复影院模式
+  sync()
+
   // 设置页可能在播放页打开期间修改开关，这里实时响应（设置存在浏览器存储里，跨上下文同步）
   stopSettingsWatch = watch(
     () => [settings.value.videoPageShortcuts, settings.value.videoPageCinemaMode, settings.value.videoPageMiniPlayer] as const,
@@ -121,7 +131,6 @@ function mount(): void {
   if (settings.value.videoPageCinemaMode && readStoredCinema())
     setCinema(true, { silent: true })
 
-  sync()
   syncTimer = window.setInterval(sync, SYNC_INTERVAL)
   updateScrollState()
 }
@@ -152,6 +161,9 @@ function unmount(): void {
 
   document.documentElement.classList.remove('bewly-video-cinema', 'bewly-video-mini')
   document.documentElement.style.removeProperty('--bvp-mini-placeholder')
+  clearStagePlaceholder()
+  clearPlayerStage()
+  stageEl = null
   clearToastTimer()
 
   if (vueApp) {
@@ -169,10 +181,13 @@ function sync(): void {
   if (!hostEl)
     return
 
-  if (!isNativeVideoPage()) {
+  const kind = getNativePlaybackKind()
+  if (kind === 'none') {
     teardownVideoPage()
     return
   }
+
+  ui.isBangumi = kind === 'bangumi'
 
   if (document.hidden)
     return
@@ -181,6 +196,15 @@ function sync(): void {
   const wrap = getPlayerWrapEl()
 
   ui.ready = Boolean(video && wrap)
+
+  // 舞台标记只在元素变化时写一次：番剧页的影院 / 迷你布局靠这个属性命中
+  if (wrap !== stageEl) {
+    stageEl = wrap
+    markPlayerStage(wrap)
+  }
+
+  // 番剧 / 电影才有集数列表；没有时切集快捷键与帮助项都隐藏
+  ui.episodeNav = kind === 'bangumi' && hasEpisodeNavigation()
 
   if (video) {
     ui.currentTime = Number.isFinite(video.currentTime)

@@ -11,9 +11,11 @@ import { compareVersions, injectCSS, isHomePage, isInIframe, isNotificationPage,
 import { markNativeFilteredCards } from '~/utils/nativeFilter'
 import { SVG_ICONS } from '~/utils/svgIcons'
 import { version } from '../../package.json'
+import { setupArticlePage } from './articlePage'
 import { muteNativeScripts, setNativeGuardEnabled } from './nativeGuard'
 import { setupNotificationPage } from './notificationPage'
 import { setupSearchEnhance } from './searchPage'
+import { setupSpacePage } from './spacePage'
 import { setupVideoPage } from './videoPage'
 import App from './views/App.vue'
 
@@ -243,6 +245,12 @@ async function onDOMLoaded() {
 
   // 搜索结果页增强层（j/k 浏览、密度、快速筛选）
   setupSearchEnhance()
+
+  // 用户空间增强层（筛选、密度、j/k、快速跳转）
+  setupSpacePage()
+
+  // 专栏 / 文章页阅读模式（沉浸阅读 / 进度 / 目录 / 字号）
+  setupArticlePage()
 
   // 原生页面（搜索页等）的屏蔽词过滤：标记式隐藏，可逆
   if (settings.value.nativeFilterEnabled && !isFullyTakenOverPage())

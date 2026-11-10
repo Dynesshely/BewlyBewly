@@ -7,6 +7,7 @@ import {
   seekBy,
   seekToPercent,
   setCinema,
+  stepEpisode,
   toggleCinema,
   toggleDanmaku,
   toggleFullscreen,
@@ -24,6 +25,8 @@ const BIG_SEEK_STEP = 10
 export interface ShortcutDefinition {
   keys: string[]
   labelKey: ShortcutLabelKey
+  /** 只在特定条件下才存在/可用（用于「页面上没有集数列表就不列切集」这类场景） */
+  requires?: 'episodeNav'
 }
 
 /** 快捷键帮助面板的数据源（同时也是行为清单，改这里就是改帮助） */
@@ -71,6 +74,16 @@ export const VIDEO_PAGE_SHORTCUTS: ShortcutDefinition[] = [
   {
     keys: ['P'],
     labelKey: 'restore',
+  },
+  {
+    keys: ['['],
+    labelKey: 'prevEpisode',
+    requires: 'episodeNav',
+  },
+  {
+    keys: [']'],
+    labelKey: 'nextEpisode',
+    requires: 'episodeNav',
   },
   {
     keys: ['0', '–', '9'],
@@ -133,6 +146,16 @@ const SHORTCUT_ACTIONS: ShortcutAction[] = [
     run: () => restorePlayer(),
   },
   {
+    // 番剧 / 电影：切上一集
+    match: key => key === '[',
+    run: () => stepEpisode(-1),
+  },
+  {
+    // 番剧 / 电影：切下一集
+    match: key => key === ']',
+    run: () => stepEpisode(1),
+  },
+  {
     match: key => /^\d$/.test(key),
     run: key => seekToPercent(Number(key) * 10),
   },
@@ -190,6 +213,14 @@ function handleKeyDown(event: KeyboardEvent): void {
     if (lower === 'p') {
       consume(event)
       void togglePictureInPicture()
+      return
+    }
+    // 切集别名：部分键盘 `[` `]` 需要 AltGr，这里同时支持 Shift+, / Shift+. 产生的 `<` `>`
+    if (ui.episodeNav && (key === '<' || key === '>')) {
+      consume(event)
+      stepEpisode(key === '<'
+        ? -1
+        : 1)
     }
     return
   }
@@ -206,6 +237,10 @@ function handleKeyDown(event: KeyboardEvent): void {
   if (lower === 'p' && !settings.value.videoPageMiniPlayer) {
     return
   }
+  // 页面上没有集数列表（电影单集 / 结构改版）时不抢 [ ]，交还给 B 站原生
+  if ((key === '[' || key === ']') && !ui.episodeNav) {
+    return
+  }
 
   for (const action of SHORTCUT_ACTIONS) {
     if (!action.match(key, lower)) {
@@ -215,6 +250,24 @@ function handleKeyDown(event: KeyboardEvent): void {
     action.run(key)
     return
   }
+}
+
+/**
+ * 帮助面板实际展示的快捷键列表。
+ *
+ * 设置页关掉的功能、以及页面上不存在的功能（番剧切集）都不列出，
+ * 保证「帮助里有的按键一定能用」。
+ */
+export function getShortcutDefinitions(): ShortcutDefinition[] {
+  return VIDEO_PAGE_SHORTCUTS.filter((item) => {
+    if (item.labelKey === 'cinema')
+      return settings.value.videoPageCinemaMode
+    if (item.labelKey === 'restore')
+      return settings.value.videoPageMiniPlayer
+    if (item.requires === 'episodeNav')
+      return ui.episodeNav
+    return true
+  })
 }
 
 /**

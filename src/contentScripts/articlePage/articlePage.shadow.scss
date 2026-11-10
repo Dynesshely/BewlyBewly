@@ -1,0 +1,345 @@
+/**
+ * 阅读模式浮层样式（独立 shadow root 内，不影响 B 站页面）。
+ *
+ * 颜色 / 圆角 / 阴影 / 字体全部继承 html 上的 --bew-* 变量，暗色模式自动生效；
+ * 不写死十六进制颜色，只用变量与 color-mix 混合。
+ */
+
+:host {
+  --bap-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --bap-duration: 180ms;
+  --bap-gap: 8px;
+  --bap-edge: 24px;
+
+  position: fixed;
+  inset: 0;
+  z-index: 2147483200;
+  display: block;
+  font-family: inherit;
+  font-size: var(--bew-base-font-size, 14px);
+  line-height: 1.5;
+  color: var(--bew-text-1);
+  pointer-events: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+:host *,
+:host *::before,
+:host *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:host button {
+  font: inherit;
+  color: inherit;
+  appearance: none;
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+:host button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+:host :focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+
+:host svg {
+  display: block;
+  flex: none;
+}
+
+/* #region 顶部进度条 */
+.bap-progress {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 3;
+  height: 2px;
+  pointer-events: none;
+  background: color-mix(in oklab, var(--bew-theme-color), transparent 88%);
+}
+
+.bap-progress__fill {
+  height: 100%;
+  background: var(--bew-theme-color);
+  transition: width 140ms linear;
+}
+/* #endregion */
+
+/* #region 右下角浮动控件 */
+.bap-dock {
+  position: fixed;
+  right: var(--bap-edge);
+  bottom: var(--bap-edge);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--bap-gap);
+  align-items: flex-end;
+  pointer-events: none;
+}
+
+.bap-percent {
+  padding: 2px 10px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 20px;
+  color: var(--bew-text-3);
+  background: var(--bew-elevated);
+  border: 1px solid var(--bew-border-color);
+  border-radius: 10px;
+  box-shadow: var(--bew-shadow-1);
+  opacity: 0.85;
+}
+
+.bap-group {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  pointer-events: none;
+}
+
+.bap-fab {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  height: 34px;
+  padding: 0 12px;
+  font-size: 12px;
+  color: var(--bew-text-2);
+  pointer-events: auto;
+  background: var(--bew-elevated);
+  border: 1px solid var(--bew-border-color);
+  border-radius: 12px;
+  box-shadow: var(--bew-shadow-2);
+  backdrop-filter: var(--bew-filter-glass-1);
+  transition:
+    color var(--bap-duration) var(--bap-ease),
+    background-color var(--bap-duration) var(--bap-ease),
+    border-color var(--bap-duration) var(--bap-ease),
+    opacity var(--bap-duration) var(--bap-ease);
+
+  opacity: 0.72;
+}
+
+.bap-fab:hover {
+  color: var(--bew-text-1);
+  background: var(--bew-elevated-hover);
+  opacity: 1;
+}
+
+.bap-fab[aria-pressed="true"],
+.bap-fab[data-active="true"] {
+  color: var(--bew-theme-color);
+  background: color-mix(in oklab, var(--bew-theme-color), transparent 88%);
+  border-color: color-mix(in oklab, var(--bew-theme-color), transparent 60%);
+  opacity: 1;
+}
+
+.bap-fab--icon {
+  justify-content: center;
+  width: 34px;
+  padding: 0;
+}
+
+.bap-fab__label {
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.bap-font-step {
+  min-width: 28px;
+  font-size: 11px;
+  color: var(--bew-text-3);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+/* #endregion */
+
+/* #region 目录浮层 */
+.bap-toc {
+  position: fixed;
+  right: var(--bap-edge);
+  bottom: calc(var(--bap-edge) + 100px);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  width: min(300px, 84vw);
+  max-height: min(62vh, 560px);
+  overflow: hidden;
+  pointer-events: auto;
+  background: var(--bew-elevated-solid);
+  border: 1px solid var(--bew-border-color);
+  border-radius: var(--bew-radius);
+  box-shadow: var(--bew-shadow-4);
+}
+
+.bap-toc__header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 14px 16px 6px;
+}
+
+.bap-toc__title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  text-wrap: balance;
+}
+
+.bap-toc__meta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--bew-text-3);
+}
+
+.bap-toc__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 8px 10px;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-width: thin;
+}
+
+.bap-toc__item {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--bew-text-2);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 8px;
+  transition:
+    color var(--bap-duration) var(--bap-ease),
+    background-color var(--bap-duration) var(--bap-ease);
+}
+
+.bap-toc__item[data-level="3"] {
+  padding-left: 22px;
+  font-size: 12px;
+  color: var(--bew-text-3);
+}
+
+.bap-toc__item:hover {
+  color: var(--bew-text-1);
+  background: var(--bew-fill-1);
+}
+
+.bap-toc__item[data-active="true"] {
+  color: var(--bew-theme-color);
+  background: color-mix(in oklab, var(--bew-theme-color), transparent 90%);
+}
+
+.bap-toc__empty {
+  padding: 8px 16px 16px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--bew-text-3);
+}
+
+.bap-toc__foot {
+  padding: 8px 16px 12px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--bew-text-4);
+  border-top: 1px solid var(--bew-border-color);
+}
+/* #endregion */
+
+/* #region 吐司 */
+.bap-toast {
+  position: fixed;
+  top: 64px;
+  left: 50%;
+  z-index: 4;
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--bew-text-1);
+  white-space: nowrap;
+  pointer-events: none;
+  background: var(--bew-elevated-solid);
+  border: 1px solid var(--bew-border-color);
+  border-radius: 10px;
+  box-shadow: var(--bew-shadow-3);
+  transform: translateX(-50%);
+}
+/* #endregion */
+
+/* #region 过场 */
+.bap-fade-enter-active,
+.bap-fade-leave-active {
+  transition:
+    opacity var(--bap-duration) var(--bap-ease),
+    transform var(--bap-duration) var(--bap-ease);
+}
+
+.bap-fade-enter-from,
+.bap-fade-leave-to {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+.bap-slide-enter-active,
+.bap-slide-leave-active {
+  transition:
+    opacity var(--bap-duration) var(--bap-ease),
+    transform var(--bap-duration) var(--bap-ease);
+}
+
+.bap-slide-enter-from,
+.bap-slide-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
+}
+/* #endregion */
+
+@media (max-width: 720px) {
+  :host {
+    --bap-edge: 12px;
+  }
+
+  .bap-toc {
+    right: var(--bap-edge);
+    bottom: calc(var(--bap-edge) + 96px);
+    width: calc(100vw - 24px);
+  }
+}
+
+/* #region 动效降级 */
+@media (prefers-reduced-motion: reduce) {
+  :host,
+  :host * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .bap-fade-enter-from,
+  .bap-fade-leave-to,
+  .bap-slide-enter-from,
+  .bap-slide-leave-to {
+    transform: none;
+  }
+
+  .bap-progress__fill {
+    transition: none !important;
+  }
+}
+/* #endregion */

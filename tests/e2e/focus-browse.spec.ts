@@ -120,6 +120,41 @@ test.describe('聚焦浏览（Cover Flow）', () => {
       await page.keyboard.press('Escape')
       await expect.poll(drawerVisible, { timeout: 10_000 }).toBe(false)
       expect(await inFocus()).toBe(true)
+
+      // 6) 浮层（设置面板）内的滚轮不被聚焦模式吞掉
+      await page.keyboard.press('Control+k')
+      await expect.poll(paletteOpen, { timeout: 5_000 }).toBe(true)
+      const settingsItemVisible = () => page.evaluate(() => {
+        const root = document.querySelector('#bewly')?.shadowRoot
+        return Array.from(root?.querySelectorAll('.command-palette-item') ?? [])
+          .some(el => /settings|设置/i.test(el.textContent || ''))
+      })
+      await expect.poll(settingsItemVisible, { timeout: 5_000 }).toBe(true)
+      await page.evaluate(() => {
+        const root = document.querySelector('#bewly')!.shadowRoot!
+        const target = Array.from(root.querySelectorAll('.command-palette-item'))
+          .find(el => /settings|设置/i.test(el.textContent || ''))
+        target?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
+      const settingsOpen = () => page.evaluate(() => !!document.querySelector('#bewly')?.shadowRoot?.querySelector('#settings-window'))
+      await expect.poll(settingsOpen, { timeout: 15_000 }).toBe(true)
+      const settingsScrollTop = () => page.evaluate(() => {
+        const root = document.querySelector('#bewly')?.shadowRoot
+        const win = root?.querySelector('#settings-window')
+        const scroller = win?.querySelector('.os-viewport') || win?.querySelector('[data-overlayscrollbars-viewport]')
+        return scroller ? scroller.scrollTop : 0
+      })
+      await page.mouse.move(700, 450)
+      await page.mouse.wheel(0, 600)
+      await expect.poll(settingsScrollTop, { timeout: 5_000 }).toBeGreaterThan(0)
+      // 关掉设置面板后聚焦模式仍在
+      await page.evaluate(() => {
+        const root = document.querySelector('#bewly')!.shadowRoot!
+        const icon = root.querySelector('#settings-window [i-ic-baseline-clear]')
+        icon?.parentElement?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
+      await expect.poll(settingsOpen, { timeout: 5_000 }).toBe(false)
+      expect(await inFocus()).toBe(true)
     }
     finally {
       await context.close()

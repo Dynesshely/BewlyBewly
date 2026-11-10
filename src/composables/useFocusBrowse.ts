@@ -568,10 +568,16 @@ export function focusMove(delta: number) {
   emitter.emit('focus-browse-change', { active: true, index: activeIndex })
 }
 
-/** 浮层（命令面板 / 快捷键帮助 / 对话框）打开时不接管按键 */
+/**
+ * 浮层（命令面板 / 快捷键帮助 / 设置 / 预览抽屉 / 对话框）打开时不接管按键与滚轮。
+ *
+ * 设置面板的根节点没有 .dialog 类（它是独立的全屏 fixed 布局，内部用 OverlayScrollbars
+ * 自己滚动），所以这里显式用 #settings-window 识别——否则聚焦模式的捕获阶段 wheel
+ * 会 preventDefault，把设置页的滚动一起吞掉。
+ */
 function hasOpenOverlay(): boolean {
   const root = document.querySelector('#bewly')?.shadowRoot
-  return !!root?.querySelector('.command-palette-mask, .keyboard-help-mask, .dialog, .bewly-iframe-drawer')
+  return !!root?.querySelector('.command-palette-mask, .keyboard-help-mask, #settings-window, .dialog, .bewly-iframe-drawer')
 }
 
 /** 事件真实目标是否是可编辑元素（shadow DOM 会把 target 重定向到宿主） */

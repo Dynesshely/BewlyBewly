@@ -6,6 +6,7 @@ import { useI18n } from 'vue-i18n'
 import { settings } from '~/logic'
 
 import { createTransformer } from '~/utils/transformer'
+import { usePagesSettingsMessages } from './Pages/i18n'
 import { MenuType } from './types'
 
 const emit = defineEmits(['close'])
@@ -18,10 +19,13 @@ const settingsMenu = {
   [MenuType.DesktopAndDock]: defineAsyncComponent(() => import('./DesktopAndDock/DesktopAndDock.vue')),
   [MenuType.Appearance]: defineAsyncComponent(() => import('./Appearance/Appearance.vue')),
   [MenuType.BewlyPages]: defineAsyncComponent(() => import('./BewlyPages/BewlyPages.vue')),
+  [MenuType.Pages]: defineAsyncComponent(() => import('./Pages/Pages.vue')),
   [MenuType.Compatibility]: defineAsyncComponent(() => import('./Compatibility/Compatibility.vue')),
   // [MenuType.BilibiliSettings]: defineAsyncComponent(() => import('./BilibiliSettings/BilibiliSettings.vue')),
   [MenuType.About]: defineAsyncComponent(() => import('./About/About.vue')),
 }
+const pagesMessages = usePagesSettingsMessages()
+
 const activatedMenuItem = ref<MenuType>(MenuType.General)
 const title = ref<string>(t('settings.title'))
 const settingsWindow = ref<HTMLDivElement>()
@@ -79,6 +83,12 @@ const settingsMenuItems = computed((): MenuItem[] => {
       icon: 'i-mingcute:table-2-line',
       iconActivated: 'i-mingcute:table-2-fill',
       title: t('settings.menu_bewly_pages'),
+    },
+    {
+      value: MenuType.Pages,
+      icon: 'i-mingcute:layout-grid-line',
+      iconActivated: 'i-mingcute:layout-grid-fill',
+      title: pagesMessages.value.menuTitle,
     },
     {
       value: MenuType.Compatibility,

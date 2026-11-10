@@ -1,5 +1,7 @@
 import type { ShortcutLabelKey } from './i18n'
 
+import { settings } from '~/logic'
+
 import {
   restorePlayer,
   seekBy,
@@ -142,6 +144,11 @@ function consume(event: KeyboardEvent): void {
 }
 
 function handleKeyDown(event: KeyboardEvent): void {
+  // 设置页关闭「增强快捷键」后，本模块完全不接管键盘
+  if (!settings.value.videoPageShortcuts) {
+    return
+  }
+
   // 已经有人（B 站原生 / 其它扩展）处理过的按键一律让行
   if (event.defaultPrevented || event.isComposing) {
     return
@@ -189,6 +196,14 @@ function handleKeyDown(event: KeyboardEvent): void {
 
   // 播放器还没渲染好时不要吞掉按键，避免用户以为快捷键失效
   if (!ui.ready) {
+    return
+  }
+
+  // 对应功能被设置页关掉时，这些按键交还给 B 站原生处理
+  if (lower === 't' && !settings.value.videoPageCinemaMode) {
+    return
+  }
+  if (lower === 'p' && !settings.value.videoPageMiniPlayer) {
     return
   }
 

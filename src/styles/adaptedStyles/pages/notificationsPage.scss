@@ -1,3 +1,5 @@
+@use "native-shared" as native;
+
 .notificationsPage {
   #message-navbar {
     display: none;
@@ -521,3 +523,142 @@ html.bewly-design.notificationsPage {
   }
   // #endregion
 }
+// #region 第 2 轮：消息页视觉层级（只新增，不改动上方既有规则）
+//
+// 选择器全部来自消息页真实 DOM（space-left / side-bar / notify-dot / msg-time 等
+// 已在上面既有规则里使用过），没有凭空新造的类名。
+html.bewly-design.notificationsPage {
+  @include native.tokens;
+}
+
+.bewly-design.notificationsPage {
+  // #region 左栏：分类胶囊 + 未读标记
+  .space-left {
+    border-right: 1px solid var(--bew-border-color);
+
+    .side-bar {
+      .item {
+        // 分类条目从"通栏文字"收敛成胶囊：左右留出内缩，悬停/选中给软背景
+        width: auto;
+        margin: 2px var(--bew-native-gap-sm);
+        padding-inline: var(--bew-native-gap-sm);
+        border-radius: var(--bew-native-radius);
+        transition: background-color var(--bew-native-dur) var(--bew-native-ease);
+
+        a {
+          transition: color var(--bew-native-dur) var(--bew-native-ease);
+        }
+
+        &:hover {
+          background-color: var(--bew-fill-1);
+        }
+
+        &.active {
+          background-color: var(--bew-theme-color-10);
+        }
+      }
+    }
+
+    .title {
+      padding-inline: var(--bew-native-gap);
+      color: var(--bew-text-3);
+      font-size: 12px;
+      letter-spacing: 0.4px;
+    }
+  }
+
+  // 未读点与小数字徽标：统一用主题色，尺寸收敛
+  .notify-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: var(--bew-native-radius-pill);
+    background-color: var(--bew-theme-color);
+    box-shadow: 0 0 0 3px var(--bew-theme-color-20);
+  }
+
+  .notify-number {
+    display: inline-block;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: var(--bew-native-radius-pill);
+    background-color: var(--bew-theme-color);
+    color: var(--bew-text-auto);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 18px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  // #endregion
+
+  // #region 右栏：标题层级 + 条目悬停 + 时间右对齐
+  .space-right {
+    .space-right-top .title {
+      color: var(--bew-text-1);
+      font-size: 16px;
+      font-weight: 600;
+    }
+  }
+
+  // 回复 / @ / 点赞 / 系统四类消息条目统一成可悬停的软表面
+  .reply-card,
+  .at-card,
+  .love-card,
+  .msg-notify {
+    border-radius: var(--bew-native-radius);
+    transition: background-color var(--bew-native-dur) var(--bew-native-ease);
+
+    &:hover {
+      background-color: var(--bew-fill-1);
+    }
+  }
+
+  .msg-time {
+    margin-left: auto;
+
+    .time {
+      color: var(--bew-text-3);
+      font-size: 12px;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+  // #endregion
+
+  // #region 滚动区与暗色微调
+  .message-list {
+    scrollbar-width: thin;
+  }
+
+  &.dark {
+    .space-left .side-bar .item.active {
+      background-color: var(--bew-theme-color-20);
+    }
+
+    .notify-dot {
+      box-shadow: 0 0 0 3px var(--bew-theme-color-30);
+    }
+
+    .reply-card:hover,
+    .at-card:hover,
+    .love-card:hover,
+    .msg-notify:hover {
+      background-color: var(--bew-fill-1);
+    }
+  }
+  // #endregion
+
+  @include native.reduced-motion {
+    .space-left .side-bar .item,
+    .space-left .side-bar .item a,
+    .reply-card,
+    .at-card,
+    .love-card,
+    .msg-notify {
+      transition: none;
+    }
+  }
+}
+// #endregion

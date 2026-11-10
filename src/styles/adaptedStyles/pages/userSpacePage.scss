@@ -1,3 +1,5 @@
+@use "native-shared" as native;
+
 .bewly-design.userSpacePage {
   // #region new user space page
 
@@ -804,3 +806,188 @@
   // #endregion
   // #endregion
 }
+// #region 第 2 轮：空间页视觉层级（只追加，不改动上方既有规则）
+//
+// 只覆盖仓库既有规则里已经出现过、确认属于空间页真实 DOM 的选择器
+// （header-toutu / header-upinfo-bg-shadow / n / nav-bar / video-container 等）。
+html.bewly-design.userSpacePage {
+  @include native.tokens;
+}
+
+.bewly-design.userSpacePage {
+  // #region 头图与 UP 信息：分层
+  .header {
+    .header-toutu {
+      // 头图底部压一层页面底色，避免图片下边缘直接切断内容区。
+      // inset 阴影对 <img> 不生效，对背景图容器生效，两种情况都不会有副作用。
+      box-shadow: inset 0 -96px 96px -48px var(--bew-bg);
+    }
+
+    // 原生那层压在头图上的深色遮罩，换成毛玻璃 + 渐变，让 UP 信息浮在图上
+    .header-upinfo-bg-shadow {
+      backdrop-filter: var(--bew-filter-glass-2);
+      background-image: linear-gradient(to top, var(--bew-bg), transparent);
+    }
+  }
+  // #endregion
+
+  // #region 顶部导航与 UP 数据卡
+  .nav-bar {
+    border-bottom: 1px solid var(--bew-border-color);
+    box-shadow: var(--bew-shadow-1);
+    z-index: 2;
+  }
+
+  .n {
+    .n-inner {
+      background-color: var(--bew-content);
+      backdrop-filter: var(--bew-filter-glass-1);
+      border-radius: var(--bew-native-radius-lg);
+      box-shadow: 0 0 0 1px var(--bew-border-color);
+    }
+
+    // 关注 / 粉丝 / 播放数：统一成可悬停的小数据块
+    .n-data {
+      border-radius: var(--bew-native-radius);
+      transition: background-color var(--bew-native-dur) var(--bew-native-ease);
+
+      &:hover {
+        background-color: var(--bew-fill-1);
+      }
+    }
+
+    .n-data-k {
+      color: var(--bew-text-3);
+      font-size: 12px;
+    }
+
+    .n-data-v {
+      color: var(--bew-text-1);
+      font-size: 16px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .n-btn {
+      border-radius: var(--bew-native-radius-pill);
+    }
+  }
+
+  // 旧版空间页的 UP 信息卡（.user-info）保持同样的标签圆角节奏
+  .user-info {
+    .info-content .info-value {
+      color: var(--bew-text-1);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .info-tags .info-tag .tag-content {
+      border-radius: var(--bew-native-radius-sm);
+    }
+  }
+  // #endregion
+
+  // #region 区块标题与视频网格节奏
+  .section {
+    .section-title {
+      color: var(--bew-text-1);
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .count {
+      color: var(--bew-text-3);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  // 网格卡片：封面圆角与首页统一（原来写死 4px），标题两行、元信息降一级
+  .large-item {
+    .cover,
+    .cover img {
+      border-radius: var(--bew-native-radius);
+    }
+
+    .title {
+      color: var(--bew-text-1);
+      line-height: var(--bew-native-line-height);
+      @include native.clamp(2);
+    }
+  }
+
+  .video-container {
+    transition: transform var(--bew-native-dur) var(--bew-native-ease);
+
+    .text-area {
+      .title {
+        color: var(--bew-text-1);
+        line-height: var(--bew-native-line-height);
+        @include native.clamp(2);
+      }
+
+      .content {
+        color: var(--bew-text-3);
+        font-size: 12px;
+      }
+    }
+  }
+
+  .video-container.can-hover:hover {
+    transform: translateY(var(--bew-native-lift));
+  }
+
+  // 收藏 / 历史那种横向小卡
+  .small-item {
+    border-radius: var(--bew-native-radius);
+    transition: background-color var(--bew-native-dur) var(--bew-native-ease);
+
+    &:hover {
+      background-color: var(--bew-fill-1);
+    }
+
+    .meta {
+      color: var(--bew-text-3);
+    }
+  }
+
+  // 空间页动态流：与首页卡片同一套圆角
+  .feed-card,
+  .bili-dyn-item {
+    border-radius: var(--bew-native-radius-lg);
+    transition: box-shadow var(--bew-native-dur) var(--bew-native-ease);
+  }
+
+  .feed-card:hover,
+  .bili-dyn-item:hover {
+    box-shadow: var(--bew-shadow-1);
+  }
+  // #endregion
+
+  // #region 暗色微调
+  &.dark {
+    .nav-bar {
+      box-shadow: var(--bew-shadow-2);
+    }
+
+    .feed-card:hover,
+    .bili-dyn-item:hover {
+      box-shadow: 0 0 0 1px var(--bew-border-color);
+    }
+  }
+  // #endregion
+
+  @include native.reduced-motion {
+    .n .n-data,
+    .video-container,
+    .small-item,
+    .feed-card,
+    .bili-dyn-item {
+      transition: none;
+    }
+
+    .video-container.can-hover:hover {
+      transform: none;
+    }
+  }
+}
+// #endregion

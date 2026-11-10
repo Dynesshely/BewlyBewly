@@ -89,9 +89,10 @@ export const useMainStore = defineStore('main', () => {
         iconActivated: 'i-tabler:windmill-filled',
         page: AppPage.Moments,
         openInNewTab: false,
-        useOriginalBiliPage: true,
+        useOriginalBiliPage: false,
         url: `https://t.bilibili.com`,
-        hasBewlyPage: false,
+        // 第 2 轮：动态页已有 Bewly 自己的视图（无限流卡片），不再回落到 iframe 原生页
+        hasBewlyPage: true,
       },
     ]
   })

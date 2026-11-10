@@ -16,7 +16,8 @@ const SRC = join('src', 'styles', 'adaptedStyles')
 const OUT = join(target, 'dist', 'styles', 'pages')
 
 const pageFiles = readdirSync(join(SRC, 'pages'))
-  .filter(file => file.endsWith('.scss'))
+  // 下划线开头的是被 @use 的共享片段，本身不参与注入
+  .filter(file => file.endsWith('.scss') && !file.startsWith('_'))
   .map(file => [
     file,
     join(SRC, 'pages', file),

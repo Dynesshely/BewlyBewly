@@ -1,3 +1,5 @@
+import { settings } from '~/logic'
+
 import {
   getDanmakuSwitchEl,
   getPlayerEl,
@@ -63,6 +65,11 @@ function storeCinema(on: boolean): void {
 
 /** 影院模式：播放器铺满视口宽度、隐藏右栏与推荐、页面背景压暗 */
 export function setCinema(on: boolean, options: { silent?: boolean } = {}): void {
+  // 设置页关掉影院模式后，任何入口（快捷键 / 浮动按钮 / 旧 sessionStorage）都不再生效
+  if (on && !settings.value.videoPageCinemaMode) {
+    return
+  }
+
   if (ui.cinema === on) {
     return
   }
@@ -91,10 +98,18 @@ export function setCinema(on: boolean, options: { silent?: boolean } = {}): void
 }
 
 export function toggleCinema(): void {
+  if (!settings.value.videoPageCinemaMode) {
+    return
+  }
   setCinema(!ui.cinema)
 }
 
 export function setMini(on: boolean): void {
+  // 迷你播放器开关关闭时不允许进入收缩态（已经收缩的由减少入口统一还原）
+  if (on && !settings.value.videoPageMiniPlayer) {
+    return
+  }
+
   if (ui.mini === on) {
     return
   }
@@ -130,6 +145,10 @@ export function isMiniRestoreSuppressed(): boolean {
 
 /** 从迷你播放器还原：解除收缩并滚回播放器 */
 export function restorePlayer(): void {
+  if (!settings.value.videoPageMiniPlayer) {
+    return
+  }
+
   const wrap = getPlayerWrapEl()
   // 抑制窗口要覆盖平滑滚动的全过程，且期间既不进也不出迷你态
   suppressMiniUntil = Date.now() + 2200

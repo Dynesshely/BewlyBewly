@@ -1,137 +1,297 @@
 <script setup lang="ts">
-import { openLinkToNewTab } from '~/utils/main'
+import type { MomentCard as MomentCardModel, MomentImage } from './types'
+import Empty from '~/components/Empty.vue'
+import { useBewlyApp } from '~/composables/useAppProvider'
 
+import MomentCardView from './components/MomentCard.vue'
+import MomentLightbox from './components/MomentLightbox.vue'
+import MomentSkeleton from './components/MomentSkeleton.vue'
+import { useMomentsFeed } from './composables/useMomentsFeed'
+import { useMomentsOpen } from './composables/useMomentsOpen'
+import { useMomentsShortcuts } from './composables/useMomentsShortcuts'
 import { NATIVE_MOMENTS_URL, useMomentsI18n } from './i18n'
 
 /**
- * 动态占位页。
+ * 动态页：横向铺开的卡片流。
  *
- * 动态流的真实内容由原生 t.bilibili.com 提供，这里交付：
- * 1. 明确的说明（为什么是占位）；
- * 2. 与最终信息结构一致的骨架（正文 + 图片宫格 + 操作条）；
- * 3. 直达原生动态页的按钮（键盘可达）。
+ * 数据来自 `api.moment.getMoments`（关注 + 推荐的「全部」时间线），
+ * 支持无限加载、九宫格图片、大图预览、正文折叠与 j/k 键盘浏览。
  */
 const { t } = useMomentsI18n()
+const { openVideo, openInNewTab } = useMomentsOpen()
+const { handlePageRefresh, handleReachBottom } = useBewlyApp()
 
-const skeletonCards = [
-  { media: 'image', lines: 3 },
-  { media: 'video', lines: 2 },
-  { media: 'image', lines: 4 },
-] as const
+const {
+  cards,
+  status,
+  loadingMore,
+  hasMore,
+  moreFailed,
+  errorCode,
+  errorMessage,
+  loadFirst,
+  loadMore,
+  retryMore,
+  refresh,
+  LOGIN_REQUIRED_CODE,
+} = useMomentsFeed()
 
-function openNativeMoments() {
-  openLinkToNewTab(NATIVE_MOMENTS_URL)
+const activeIndex = ref<number>(-1)
+const lightbox = ref<{ images: MomentImage[], index: number } | null>(null)
+const feedEndRef = ref<HTMLElement | null>(null)
+let loadMoreObserver: IntersectionObserver | null = null
+
+// 首屏（含下拉刷新导致的空列表）才铺骨架；已有内容时刷新保留旧列表
+const showSkeleton = computed(() => status.value === 'idle' || (status.value === 'loading' && !cards.value.length))
+const errorTitle = computed(() => errorCode.value === LOGIN_REQUIRED_CODE
+  ? t('login_required')
+  : t('load_failed'))
+
+function openCard(card: MomentCardModel) {
+  if (card.type === 'video' || card.type === 'pgc') {
+    openVideo(card.video?.jumpUrl || card.jumpUrl)
+    return
+  }
+  openInNewTab(card.jumpUrl)
 }
+
+function openImages(images: MomentImage[], index: number) {
+  if (!images.length)
+    return
+  lightbox.value = { images, index }
+}
+
+function closeLightbox() {
+  lightbox.value = null
+}
+
+function setLightboxIndex(index: number) {
+  if (!lightbox.value)
+    return
+  lightbox.value = { ...lightbox.value, index }
+}
+
+function handleRefresh() {
+  activeIndex.value = -1
+  refresh()
+}
+
+/**
+ * 兜底触底加载：App.vue 的哨兵只在滚动容器内生效，
+ * 这里再挂一个列表末尾的观察器，键盘浏览到末尾时也能继续加载。
+ */
+function setupLoadMoreObserver() {
+  loadMoreObserver?.disconnect()
+  loadMoreObserver = null
+  const target = feedEndRef.value
+  if (!target || typeof IntersectionObserver === 'undefined')
+    return
+
+  const root = target.closest('.bewly-scroll-container') as HTMLElement | null
+  loadMoreObserver = new IntersectionObserver((entries) => {
+    if (entries.some(entry => entry.isIntersecting))
+      void loadMore()
+  }, {
+    root: root ?? null,
+    rootMargin: '0px 0px 320px 0px',
+    threshold: 0,
+  })
+  loadMoreObserver.observe(target)
+}
+
+function initPageAction() {
+  handleReachBottom.value = () => {
+    void loadMore()
+  }
+  handlePageRefresh.value = () => {
+    activeIndex.value = -1
+    void refresh()
+  }
+}
+
+useMomentsShortcuts({
+  cards,
+  activeIndex,
+  isOverlayOpen: () => lightbox.value !== null,
+  onOpen: openCard,
+})
+
+watch(() => cards.value.length, (length) => {
+  if (activeIndex.value >= length)
+    activeIndex.value = length - 1
+  // 列表变长后重新 observe：observe 会立即回报当前相交状态，
+  // 首屏撑不满视口时能继续把下一屏拉进来
+  nextTick(setupLoadMoreObserver)
+})
+
+// 键盘浏览接近末尾时预取下一页
+watch(activeIndex, (index) => {
+  if (index >= 0 && index >= cards.value.length - 2)
+    void loadMore()
+})
+
+watch(feedEndRef, () => nextTick(setupLoadMoreObserver))
+
+onMounted(() => {
+  initPageAction()
+  void loadFirst()
+})
+
+onUnmounted(() => {
+  handleReachBottom.value = undefined
+  handlePageRefresh.value = undefined
+  loadMoreObserver?.disconnect()
+  loadMoreObserver = null
+})
 </script>
 
 <template>
-  <div class="moments-placeholder">
-    <header class="moments-head">
-      <div class="moments-heading">
-        <span class="moments-badge">{{ t('badge') }}</span>
-        <h2 class="moments-title">
-          {{ t('title') }}
+  <div class="moments-page">
+    <header class="moments-hero">
+      <div class="moments-hero__text">
+        <span class="moments-hero__badge">{{ t('page_badge') }}</span>
+        <h2 class="moments-hero__title">
+          {{ t('page_title') }}
         </h2>
-        <p class="moments-subtitle">
-          {{ t('subtitle') }}
+        <p class="moments-hero__subtitle">
+          {{ t('page_subtitle') }}
         </p>
       </div>
-      <button type="button" class="moments-cta" @click="openNativeMoments">
-        <span class="i-tabler:arrow-up-right" aria-hidden="true" />
-        <span>{{ t('open_native') }}</span>
-      </button>
+      <div class="moments-hero__actions">
+        <span v-if="cards.length" class="moments-hero__count">
+          {{ t('count_loaded', { n: cards.length }) }}
+        </span>
+        <button
+          type="button"
+          class="moments-button"
+          :disabled="status === 'loading'"
+          :title="t('refresh_hint')"
+          @click="handleRefresh"
+        >
+          <span class="i-tabler:refresh" :class="{ 'is-spinning': status === 'loading' }" aria-hidden="true" />
+          <span>{{ t('refresh') }}</span>
+        </button>
+        <a
+          class="moments-button is-ghost"
+          :href="NATIVE_MOMENTS_URL"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <span class="i-tabler:external-link" aria-hidden="true" />
+          <span>{{ t('open_native') }}</span>
+        </a>
+      </div>
     </header>
 
-    <section class="moments-body" :aria-label="t('title')">
-      <div class="moments-skeleton" aria-hidden="true">
-        <article v-for="(card, index) in skeletonCards" :key="index" class="skeleton-card">
-          <div class="skeleton-head">
-            <span class="skeleton-avatar" />
-            <div class="skeleton-meta">
-              <span class="skeleton-line skeleton-line--name" />
-              <span class="skeleton-line skeleton-line--time" />
-            </div>
-          </div>
-          <div class="skeleton-text">
-            <span
-              v-for="line in card.lines"
-              :key="line"
-              class="skeleton-line"
-              :class="{ 'skeleton-line--short': line === card.lines }"
-            />
-          </div>
-          <div
-            class="skeleton-media"
-            :class="card.media === 'video' ? 'skeleton-media--video' : 'skeleton-media--image'"
-          />
-          <div class="skeleton-actions">
-            <span class="skeleton-pill">{{ t('skeleton_like') }}</span>
-            <span class="skeleton-pill">{{ t('skeleton_comment') }}</span>
-            <span class="skeleton-pill">{{ t('skeleton_forward') }}</span>
-          </div>
-        </article>
+    <div class="moments-keys" role="note" :aria-label="t('keyboard_title')">
+      <span class="i-tabler:keyboard" aria-hidden="true" />
+      <span>{{ t('keyboard_hint_bar') }}</span>
+    </div>
+
+    <div v-if="showSkeleton" class="moments-feed">
+      <MomentSkeleton v-for="index in 3" :key="index" />
+    </div>
+
+    <div v-else-if="status === 'error'" class="moments-state">
+      <span class="i-tabler:cloud-off moments-state__icon" aria-hidden="true" />
+      <h3 class="moments-state__title">
+        {{ errorTitle }}
+      </h3>
+      <p v-if="errorMessage" class="moments-state__desc">
+        {{ errorMessage }}
+      </p>
+      <button type="button" class="moments-button" @click="loadFirst">
+        <span class="i-tabler:refresh" aria-hidden="true" />
+        <span>{{ t('retry') }}</span>
+      </button>
+    </div>
+
+    <div v-else-if="!cards.length" class="moments-state">
+      <h3 class="moments-state__title">
+        {{ t('empty_title') }}
+      </h3>
+      <Empty :description="t('empty_desc')" />
+      <button type="button" class="moments-button" @click="loadFirst">
+        <span class="i-tabler:refresh" aria-hidden="true" />
+        <span>{{ t('retry') }}</span>
+      </button>
+    </div>
+
+    <div v-else class="moments-feed" role="feed" :aria-busy="loadingMore">
+      <MomentCardView
+        v-for="(card, index) in cards"
+        :key="card.id"
+        :card="card"
+        :active="index === activeIndex"
+        @activate="activeIndex = index"
+        @open="openCard"
+        @open-images="openImages"
+      />
+
+      <div class="moments-more">
+        <template v-if="moreFailed">
+          <span class="moments-more__hint">{{ t('load_more_failed') }}</span>
+          <button type="button" class="moments-button" @click="retryMore">
+            <span class="i-tabler:refresh" aria-hidden="true" />
+            <span>{{ t('retry') }}</span>
+          </button>
+        </template>
+        <template v-else-if="loadingMore">
+          <span class="moments-more__spinner" aria-hidden="true" />
+          <span class="moments-more__hint">{{ t('loading_more') }}</span>
+        </template>
+        <template v-else-if="hasMore">
+          <button type="button" class="moments-button is-ghost" @click="loadMore">
+            <span>{{ t('load_more') }}</span>
+          </button>
+        </template>
+        <template v-else>
+          <span class="moments-more__hint">{{ t('no_more') }}</span>
+        </template>
       </div>
 
-      <aside class="moments-note">
-        <p class="moments-note-hint">
-          {{ t('skeleton_note') }}
-        </p>
+      <div ref="feedEndRef" class="moments-feed-end" aria-hidden="true" />
+    </div>
 
-        <h3 class="moments-note-title">
-          {{ t('why_title') }}
-        </h3>
-        <p class="moments-note-body">
-          {{ t('why_body') }}
-        </p>
-
-        <h3 class="moments-note-title">
-          {{ t('plan_title') }}
-        </h3>
-        <ul class="moments-note-list">
-          <li>{{ t('plan_1') }}</li>
-          <li>{{ t('plan_2') }}</li>
-          <li>{{ t('plan_3') }}</li>
-        </ul>
-
-        <div class="moments-note-actions">
-          <button type="button" class="moments-cta moments-cta--ghost" @click="openNativeMoments">
-            <span class="i-tabler:external-link" aria-hidden="true" />
-            <span>{{ t('open_native') }}</span>
-          </button>
-          <span class="moments-note-hint">{{ t('open_native_hint') }}</span>
-        </div>
-      </aside>
-    </section>
+    <MomentLightbox
+      v-if="lightbox"
+      :images="lightbox.images"
+      :index="lightbox.index"
+      @close="closeLightbox"
+      @update:index="setLightboxIndex"
+    />
   </div>
 </template>
 
 <style scoped lang="scss">
-.moments-placeholder {
-  --moments-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
-  --moments-duration: 200ms;
+.moments-page {
+  --moment-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  padding-bottom: 40px;
+  gap: 16px;
+  padding-bottom: 48px;
 }
 
-.moments-head {
+.moments-hero {
   display: flex;
   flex-wrap: wrap;
+  gap: 16px;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 16px;
+  padding: 20px;
+  border-radius: var(--bew-radius);
+  background: linear-gradient(120deg, var(--bew-fill-1), transparent 72%);
 }
 
-.moments-heading {
+.moments-hero__text {
   display: flex;
   flex-direction: column;
   gap: 6px;
   max-width: 720px;
 }
 
-.moments-badge {
+.moments-hero__badge {
   align-self: flex-start;
   padding: 0 8px;
   border-radius: 8px;
@@ -141,46 +301,62 @@ function openNativeMoments() {
   line-height: 22px;
 }
 
-.moments-title {
+.moments-hero__title {
   margin: 0;
+  color: var(--bew-text-1);
   font-size: 18px;
   font-weight: 700;
   line-height: 1.5;
-  color: var(--bew-text-1);
   text-wrap: balance;
 }
 
-.moments-subtitle {
+.moments-hero__subtitle {
   margin: 0;
-  font-size: 13px;
-  line-height: 1.5;
   color: var(--bew-text-3);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
-.moments-cta {
-  display: inline-flex;
+.moments-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   align-items: center;
+}
+
+.moments-hero__count {
+  color: var(--bew-text-3);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+
+.moments-button {
+  display: inline-flex;
   gap: 6px;
-  height: 36px;
-  padding: 0 16px;
-  border: none;
-  border-radius: 10px;
+  align-items: center;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
   background: var(--bew-theme-color);
-  color: white;
-  font-size: 13px;
+  color: #fff;
+  font-size: 12px;
   line-height: 1;
   cursor: pointer;
   transition:
-    opacity var(--moments-duration) var(--moments-ease),
-    background var(--moments-duration) var(--moments-ease),
-    transform var(--moments-duration) var(--moments-ease);
+    opacity 180ms var(--moment-ease),
+    background-color 180ms var(--moment-ease),
+    border-color 180ms var(--moment-ease),
+    color 180ms var(--moment-ease);
 
   &:hover {
     opacity: 0.88;
   }
 
-  &:active {
-    transform: scale(0.97);
+  &:disabled {
+    cursor: default;
+    opacity: 0.55;
   }
 
   &:focus-visible {
@@ -188,192 +364,117 @@ function openNativeMoments() {
     outline-offset: 2px;
   }
 
-  &--ghost {
-    border: 1px solid var(--bew-border-color);
+  &.is-ghost {
+    border-color: var(--bew-border-color);
     background: transparent;
     color: var(--bew-text-2);
 
     &:hover {
-      background: var(--bew-fill-2);
+      border-color: var(--bew-theme-color-40);
+      background: var(--bew-fill-1);
       color: var(--bew-text-1);
       opacity: 1;
     }
   }
 }
 
-.moments-body {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: 20px;
-  align-items: start;
-
-  @media (max-width: 980px) {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.moments-skeleton {
+.moments-keys {
   display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.skeleton-card {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-  border: 1px solid var(--bew-border-color);
-  border-radius: var(--bew-radius);
-  background: var(--bew-elevated);
-}
-
-.skeleton-head {
-  display: flex;
+  gap: 8px;
   align-items: center;
-  gap: 10px;
+  padding: 8px 14px;
+  border: 1px dashed var(--bew-border-color);
+  border-radius: 10px;
+  color: var(--bew-text-3);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
-.skeleton-avatar {
-  flex: none;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--bew-skeleton);
-  animation: moments-pulse 1.6s ease-in-out infinite;
-}
-
-.skeleton-meta {
+.moments-feed {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  flex: 1;
-}
-
-.skeleton-text {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.skeleton-line {
-  display: block;
-  height: 10px;
-  border-radius: 5px;
-  background: var(--bew-skeleton);
-  animation: moments-pulse 1.6s ease-in-out infinite;
-
-  &--name {
-    width: 120px;
-  }
-
-  &--time {
-    width: 64px;
-    height: 8px;
-  }
-
-  &--short {
-    width: 62%;
-  }
-}
-
-.skeleton-media {
-  border-radius: 12px;
-  background: var(--bew-skeleton);
-  animation: moments-pulse 1.6s ease-in-out infinite;
-
-  &--image {
-    height: 132px;
-  }
-
-  &--video {
-    height: 108px;
-  }
-}
-
-.skeleton-actions {
-  display: flex;
   gap: 12px;
 }
 
-.skeleton-pill {
-  padding: 2px 10px;
-  border-radius: 8px;
-  background: var(--bew-fill-1);
-  color: var(--bew-text-4);
-  font-size: 12px;
-  line-height: 20px;
-}
-
-.moments-note {
+.moments-state {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 20px;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 20px;
   border: 1px dashed var(--bew-border-color);
   border-radius: var(--bew-radius);
   background: var(--bew-elevated-alt);
+  text-align: center;
 }
 
-.moments-note-title {
-  margin: 8px 0 0;
+.moments-state__icon {
+  color: var(--bew-text-3);
+  font-size: 36px;
+}
+
+.moments-state__title {
+  margin: 0;
+  color: var(--bew-text-1);
   font-size: 14px;
   font-weight: 600;
   line-height: 1.5;
-  color: var(--bew-text-1);
 }
 
-.moments-note-body {
+.moments-state__desc {
   margin: 0;
-  font-size: 13px;
+  max-width: 480px;
+  color: var(--bew-text-3);
+  font-size: 12px;
   line-height: 1.6;
-  color: var(--bew-text-2);
 }
 
-.moments-note-list {
+.moments-more {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 0;
-  padding-left: 18px;
-  color: var(--bew-text-2);
-  font-size: 13px;
-  line-height: 1.6;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
 }
 
-.moments-note-hint {
-  margin: 0;
+.moments-feed-end {
+  height: 1px;
+}
+
+.moments-more__hint {
+  color: var(--bew-text-3);
   font-size: 12px;
   line-height: 1.5;
-  color: var(--bew-text-3);
 }
 
-.moments-note-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  margin-top: 12px;
+.moments-more__spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--bew-border-color);
+  border-top-color: var(--bew-theme-color);
+  border-radius: 50%;
+  animation: moments-spin 720ms linear infinite;
 }
 
-@keyframes moments-pulse {
-  0%,
-  100% {
-    opacity: 0.55;
-  }
+.is-spinning {
+  animation: moments-spin 720ms linear infinite;
+}
 
-  50% {
-    opacity: 1;
+@keyframes moments-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .moments-placeholder *,
-  .moments-placeholder *::before,
-  .moments-placeholder *::after {
-    animation: none !important;
-    transition-duration: 0.01ms !important;
-    transform: none !important;
+  .moments-button {
+    transition: none;
+  }
+
+  .moments-more__spinner,
+  .is-spinning {
+    animation: none;
   }
 }
 </style>

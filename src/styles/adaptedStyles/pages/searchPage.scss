@@ -1,3 +1,5 @@
+@use "native-shared" as native;
+
 .bewly-design.searchPage {
   body {
     background-color: var(--bew-bg) !important;
@@ -48,3 +50,298 @@
   }
   // #endregion
 }
+// #region 第 2 轮：搜索结果页视觉层级（只新增，不改动上方既有规则）
+//
+// 选择器全部来自搜索页真实 DOM（search-layout / search-header / search-conditions 等
+// 摘自 B 站页面快照与仓库已有的 nativeFilter 规则），没有凭空新造的类名。
+html.bewly-design.searchPage {
+  @include native.tokens;
+}
+
+.bewly-design.searchPage {
+  // #region 顶部搜索框与分区导航
+  //
+  // 搜索页头部（.search-header）在 #i_cecream 内，Bewly 顶栏是 fixed 且占位由
+  // removeTopBar.scss 保留，所以这里只做外观（胶囊搜索框 + 分区导航层级），不改 position。
+  .search-header {
+    .search-input-container {
+      .search-input-wrap {
+        background-color: var(--bew-fill-1);
+        border: 1px solid transparent;
+        border-radius: var(--bew-native-radius-pill);
+        transition:
+          background-color var(--bew-native-dur) var(--bew-native-ease),
+          border-color var(--bew-native-dur) var(--bew-native-ease);
+
+        &:hover {
+          background-color: var(--bew-fill-2);
+        }
+
+        &:focus-within {
+          background-color: var(--bew-content-solid);
+          border-color: var(--bew-theme-color-40);
+        }
+      }
+
+      .search-input-el {
+        color: var(--bew-text-1);
+        font-size: 15px;
+        line-height: var(--bew-native-line-height);
+
+        &::placeholder {
+          color: var(--bew-text-3);
+        }
+      }
+
+      .search-button {
+        border-radius: var(--bew-native-radius-pill);
+        @include native.focus-ring;
+      }
+    }
+
+    .search-tabs {
+      .vui_tabs--nav-item {
+        .vui_tabs--nav-link {
+          padding-inline: var(--bew-native-gap-sm);
+          border-radius: var(--bew-native-radius-pill);
+          transition:
+            background-color var(--bew-native-dur) var(--bew-native-ease),
+            color var(--bew-native-dur) var(--bew-native-ease);
+        }
+
+        &:hover .vui_tabs--nav-link {
+          background-color: var(--bew-fill-1);
+        }
+      }
+
+      // 分区数量做成小胶囊，避免裸数字挂在标签后面
+      .vui_tabs--nav-num {
+        min-width: 18px;
+        height: 16px;
+        padding: 0 5px;
+        border-radius: var(--bew-native-radius-pill);
+        background-color: var(--bew-fill-1);
+        color: var(--bew-text-3);
+        font-size: 11px;
+        line-height: 16px;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .vui_tabs--nav-item-active {
+        .vui_tabs--nav-text {
+          color: var(--bew-theme-color);
+          font-weight: 600;
+        }
+
+        .vui_tabs--nav-num {
+          background-color: var(--bew-theme-color-20);
+          color: var(--bew-theme-color);
+        }
+      }
+
+      .vui_tabs--nav-slider {
+        border-radius: var(--bew-native-radius-pill);
+        background-color: var(--bew-theme-color);
+      }
+    }
+  }
+  // #endregion
+
+  .search-line {
+    height: 1px;
+    border: none;
+    background-color: var(--bew-border-color);
+    opacity: 1;
+  }
+
+  // #region 筛选 / 排序栏：吸顶 + 毛玻璃
+  //
+  // 吸顶偏移用 --bew-native-sticky-top（顶栏高度 + 8px），滚动时整条栏浮在结果上方。
+  .search-conditions {
+    position: sticky;
+    top: var(--bew-native-sticky-top);
+    z-index: 3;
+    padding: var(--bew-native-gap-sm) var(--bew-native-gap);
+    background-color: var(--bew-elevated);
+    backdrop-filter: var(--bew-filter-glass-1);
+    border-radius: var(--bew-native-radius-lg);
+    box-shadow: var(--bew-shadow-1);
+    transition: box-shadow var(--bew-native-dur) var(--bew-native-ease);
+
+    .search-condition-row {
+      flex-wrap: wrap;
+    }
+
+    .vui_button {
+      border-radius: var(--bew-native-radius-pill);
+      transition:
+        background-color var(--bew-native-dur) var(--bew-native-ease),
+        border-color var(--bew-native-dur) var(--bew-native-ease),
+        color var(--bew-native-dur) var(--bew-native-ease);
+      @include native.focus-ring;
+    }
+
+    .vui_button--tab {
+      color: var(--bew-text-2);
+
+      &:hover {
+        color: var(--bew-text-1);
+        background-color: var(--bew-fill-1);
+      }
+    }
+
+    .vui_button--tab.vui_button--active {
+      color: var(--bew-theme-color);
+      background-color: var(--bew-theme-color-10);
+      font-weight: 600;
+    }
+
+    .i_button_more {
+      border-radius: var(--bew-native-radius-pill);
+      color: var(--bew-text-2);
+
+      &:hover {
+        color: var(--bew-text-1);
+        background-color: var(--bew-fill-1);
+      }
+    }
+
+    .more-conditions {
+      margin-top: var(--bew-native-gap-sm);
+    }
+  }
+  // #endregion
+
+  // #region 结果区：卡片圆角 / 悬停升起 / 标题两行 / 元信息层级
+  //
+  // 结果区原本是灰底（search-content--gray），跟 Bewly 页面底色割裂，统一成透明，
+  // 让卡片自己承担"表面"层级。
+  .search-content--gray {
+    background-color: transparent;
+  }
+
+  .search-layout {
+    // 结果网格：列宽与断点仍交给 B 站原有的 col_* 栅格，这里只统一行距，
+    // 避免卡片上下贴得过紧（.video-list.row 在首屏结果区与 UP 主卡内都在用）
+    .video-list.row {
+      row-gap: var(--bew-native-gap-lg);
+    }
+
+    .bili-video-card {
+      .bili-video-card__wrap {
+        border-radius: var(--bew-native-radius);
+        transition:
+          background-color var(--bew-native-dur) var(--bew-native-ease),
+          box-shadow var(--bew-native-dur) var(--bew-native-ease),
+          transform var(--bew-native-dur) var(--bew-native-ease);
+      }
+
+      // 上方既有规则已经给了 hover 的高亮环，这里只补"升起"，不覆盖阴影
+      &:hover .bili-video-card__wrap {
+        transform: translateY(var(--bew-native-lift));
+      }
+
+      .bili-video-card__image,
+      .bili-video-card__image--wrap,
+      .bili-video-card__cover,
+      .bili-video-card__mask {
+        border-radius: var(--bew-native-radius);
+      }
+
+      .bili-video-card__image--wrap {
+        overflow: hidden;
+      }
+
+      .bili-video-card__info--tit {
+        color: var(--bew-text-1);
+        font-size: 15px;
+        font-weight: 500;
+        line-height: var(--bew-native-line-height-tight);
+        @include native.clamp(2);
+      }
+
+      .bili-video-card__info--author {
+        color: var(--bew-text-2);
+        font-size: 13px;
+      }
+
+      .bili-video-card__info--date {
+        color: var(--bew-text-3);
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .bili-video-card__stats__duration {
+        border-radius: var(--bew-native-radius-sm);
+      }
+    }
+
+    // "用户" 分类的结果是 UP 主卡（b-user-video-card），做成可悬停的软表面
+    .b-user-video-card {
+      border-radius: var(--bew-native-radius-lg);
+      transition: background-color var(--bew-native-dur) var(--bew-native-ease);
+
+      &:hover {
+        background-color: var(--bew-fill-1);
+      }
+    }
+
+    .search-user-avatar {
+      border-radius: 50%;
+      box-shadow: 0 0 0 1px var(--bew-border-color);
+    }
+
+    .user-name {
+      color: var(--bew-text-1);
+      transition: color var(--bew-native-dur) var(--bew-native-ease);
+
+      &:hover {
+        color: var(--bew-theme-color);
+      }
+    }
+
+    .user-video-desc {
+      color: var(--bew-text-3);
+      font-size: 12px;
+    }
+
+    // 视频 / 用户 / 专栏等结果块之间统一留白
+    .search-all-list + .search-all-list {
+      margin-top: var(--bew-native-gap-xl);
+    }
+  }
+
+  .search-loading-container .loading-text {
+    color: var(--bew-text-3);
+    font-size: 13px;
+  }
+  // #endregion
+
+  // #region 暗色微调
+  &.dark {
+    .search-conditions {
+      // 暗色下毛玻璃后面是纯深色，稍微加实一点并提高阴影，滚动时边界更清楚
+      background-color: color-mix(in oklab, var(--bew-content-solid), transparent 25%);
+      box-shadow: var(--bew-shadow-2);
+    }
+  }
+  // #endregion
+
+  @include native.reduced-motion {
+    .search-input-container .search-input-wrap,
+    .search-tabs .vui_tabs--nav-link,
+    .search-conditions,
+    .search-conditions .vui_button,
+    .search-layout .bili-video-card .bili-video-card__wrap,
+    .search-layout .b-user-video-card,
+    .search-layout .user-name {
+      transition: none;
+    }
+
+    .search-layout .bili-video-card:hover .bili-video-card__wrap {
+      transform: none;
+    }
+  }
+}
+// #endregion

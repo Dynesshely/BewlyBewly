@@ -6,7 +6,9 @@
  * 一个独立 shadow root 的增强层（影院模式 / 迷你播放器 / 快捷键 / 紧凑信息栏）。
  */
 import type { App } from 'vue'
-import { createApp } from 'vue'
+import { createApp, watch } from 'vue'
+
+import { settings } from '~/logic'
 
 import {
   clearToastTimer,
@@ -50,6 +52,7 @@ const SYNC_INTERVAL = 500
 let hostEl: HTMLDivElement | null = null
 let vueApp: App | null = null
 let disposeShortcuts: (() => void) | null = null
+let stopSettingsWatch: (() => void) | null = null
 let syncTimer: number | null = null
 let scrollFrame = 0
 let miniEnteredAt = 0
@@ -86,12 +89,36 @@ function mount(): void {
   vueApp = createApp(VideoPageOverlay)
   vueApp.mount(mountPoint)
 
-  disposeShortcuts = setupShortcuts()
+  if (settings.value.videoPageShortcuts)
+    disposeShortcuts = setupShortcuts()
+
   window.addEventListener('scroll', handleScroll, { passive: true })
   window.addEventListener('resize', handleScroll, { passive: true })
 
-  // 影院模式在同一标签页内跨页面刷新保持
-  if (readStoredCinema())
+  // 设置页可能在播放页打开期间修改开关，这里实时响应（设置存在浏览器存储里，跨上下文同步）
+  stopSettingsWatch = watch(
+    () => [settings.value.videoPageShortcuts, settings.value.videoPageCinemaMode, settings.value.videoPageMiniPlayer] as const,
+    ([shortcutsEnabled, cinemaEnabled, miniEnabled]) => {
+      if (shortcutsEnabled && !disposeShortcuts) {
+        disposeShortcuts = setupShortcuts()
+      }
+      else if (!shortcutsEnabled && disposeShortcuts) {
+        disposeShortcuts()
+        disposeShortcuts = null
+      }
+
+      // 关掉影院模式时立刻退出；关掉迷你播放器时立刻还原
+      if (!cinemaEnabled && ui.cinema)
+        setCinema(false, { silent: true })
+      if (!miniEnabled && ui.mini)
+        setMini(false)
+
+      updateScrollState()
+    },
+  )
+
+  // 影院模式在同一标签页内跨页面刷新保持（功能关闭时不恢复）
+  if (settings.value.videoPageCinemaMode && readStoredCinema())
     setCinema(true, { silent: true })
 
   sync()
@@ -110,6 +137,10 @@ function unmount(): void {
   if (scrollFrame) {
     window.cancelAnimationFrame(scrollFrame)
     scrollFrame = 0
+  }
+  if (stopSettingsWatch) {
+    stopSettingsWatch()
+    stopSettingsWatch = null
   }
   if (disposeShortcuts) {
     disposeShortcuts()
@@ -179,6 +210,13 @@ function handleScroll(): void {
 
 function updateScrollState(): void {
   setCompact(window.scrollY > COMPACT_THRESHOLD)
+
+  // 迷你播放器开关关闭时不再收缩播放器
+  if (!settings.value.videoPageMiniPlayer) {
+    if (ui.mini)
+      setMini(false)
+    return
+  }
 
   // 影院模式下不启用迷你播放器（播放器本来就占满视口）
   if (ui.cinema) {

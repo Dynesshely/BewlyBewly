@@ -1,0 +1,106 @@
+// 原生页面（搜索结果页 / 消息页 / 用户空间）共用的设计令牌与 mixin。
+//
+// 这三个页面都是 B 站原生页面，Bewly 只能按 URL 注入页面级 SCSS
+// （dist/styles/pages/*.css），不能改 DOM，所以本文件只放与 B 站类名无关的东西：
+//   - 令牌：间距 / 圆角 / 行高 / 动效时长与曲线，全部由 --bew-* 派生（暗色自动跟随）
+//   - mixin：卡片表面、悬停升起、截断、键盘焦点、毛玻璃、reduced-motion 降级
+//
+// 文件名以 `_` 开头，不参与页面注入清单；三个页面用 `@use "native-shared" as native`
+// 引入后单独编译该文件时输出为空 CSS，不会污染 dist/styles/pages。
+
+// #region 令牌
+//
+// 用 mixin 而不是 :root 输出：每个页面在自己的根选择器
+// （html.bewly-design.<page>）上 @include 一次，作用域就限定在该页面，
+// 不会泄漏到 Bewly 自己的视图里。
+@mixin tokens {
+  // 间距基准 4px
+  --bew-native-gap-xs: 4px;
+  --bew-native-gap-sm: 8px;
+  --bew-native-gap: 16px;
+  --bew-native-gap-lg: 24px;
+  --bew-native-gap-xl: 32px;
+
+  // 圆角：以 --bew-radius（12px）为基准派生
+  --bew-native-radius-sm: calc(var(--bew-radius) / 1.5); // ≈ 8px
+  --bew-native-radius: var(--bew-radius); // 12px
+  --bew-native-radius-lg: calc(var(--bew-radius) * 1.5); // ≈ 18px
+  --bew-native-radius-pill: 999px;
+
+  // 行高
+  --bew-native-line-height: 1.5;
+  --bew-native-line-height-tight: 1.32;
+
+  // 动效：150–240ms，与第 1 轮列表页/视频页保持同一曲线
+  --bew-native-dur: 180ms;
+  --bew-native-dur-slow: 240ms;
+  --bew-native-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  // 悬停位移
+  --bew-native-lift: -2px;
+  --bew-native-lift-lg: -4px;
+
+  // 吸顶元素相对顶栏的偏移（Bewly 顶栏是 fixed，原生页面从顶栏下方开始）
+  --bew-native-sticky-top: calc(var(--bew-top-bar-height) + var(--bew-native-gap-sm));
+}
+// #endregion
+
+// #region mixin
+
+// 卡片表面：背景 + 1px 描边（用 box-shadow 而不是 border，避免改动盒模型）
+@mixin surface($radius: var(--bew-native-radius)) {
+  background-color: var(--bew-content);
+  border-radius: $radius;
+  box-shadow: 0 0 0 1px var(--bew-border-color);
+}
+
+// 交互过渡：只列会变的属性，不用 all，减少重绘
+@mixin interactive {
+  transition:
+    background-color var(--bew-native-dur) var(--bew-native-ease),
+    border-color var(--bew-native-dur) var(--bew-native-ease),
+    box-shadow var(--bew-native-dur) var(--bew-native-ease),
+    color var(--bew-native-dur) var(--bew-native-ease),
+    transform var(--bew-native-dur) var(--bew-native-ease);
+}
+
+// 悬停升起
+@mixin lift($offset: var(--bew-native-lift)) {
+  transform: translateY($offset);
+  box-shadow: var(--bew-shadow-2);
+}
+
+// 多行截断
+@mixin clamp($lines: 2) {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: $lines;
+  line-clamp: $lines;
+  text-overflow: ellipsis;
+}
+
+// 键盘焦点：只在 :focus-visible 时描边，鼠标点击不出现
+@mixin focus-ring($offset: 2px) {
+  &:focus-visible {
+    outline: 2px solid var(--bew-theme-color);
+    outline-offset: $offset;
+  }
+}
+
+// 毛玻璃浮层：吸顶栏 / 侧栏 / 悬浮卡
+@mixin glass($radius: var(--bew-native-radius-lg)) {
+  background-color: var(--bew-elevated);
+  backdrop-filter: var(--bew-filter-glass-1);
+  border-radius: $radius;
+  box-shadow: var(--bew-shadow-1);
+}
+
+// reduced-motion 降级：去掉位移与过渡，只保留颜色变化（颜色变化不算动效）
+@mixin reduced-motion {
+  @media (prefers-reduced-motion: reduce) {
+    @content;
+  }
+}
+
+// #endregion

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { settings } from '~/logic'
+
 import { restorePlayer, toggleCinema, toggleShortcutsHelp } from '../actions'
 import { useMessages } from '../i18n'
 import { ui } from '../state'
@@ -7,7 +9,12 @@ const t = useMessages()
 </script>
 
 <template>
-  <div class="bvp-fab-group" role="toolbar" :aria-label="t.controls">
+  <div
+    v-if="ui.mini || settings.videoPageCinemaMode || settings.videoPageShortcuts"
+    class="bvp-fab-group"
+    role="toolbar"
+    :aria-label="t.controls"
+  >
     <button
       v-if="ui.mini"
       class="bvp-fab"
@@ -29,6 +36,7 @@ const t = useMessages()
     </button>
 
     <button
+      v-if="settings.videoPageCinemaMode"
       class="bvp-fab"
       type="button"
       data-bvp-action="cinema"
@@ -49,6 +57,7 @@ const t = useMessages()
     </button>
 
     <button
+      v-if="settings.videoPageShortcuts"
       class="bvp-fab"
       type="button"
       data-bvp-action="help"

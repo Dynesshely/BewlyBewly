@@ -10,6 +10,11 @@ export const accessKey = useStorageLocal<string>('accessKey', '')
 /** 键盘打开视频的方式 */
 export type KeyboardOpenAction = 'newTab' | 'currentTab' | 'preview'
 
+/** 列表页视图模式 */
+export type ListViewMode = 'comfortable' | 'compact' | 'list'
+/** 列表页排序模式 */
+export type ListSortMode = 'time' | 'duration' | 'title'
+
 export interface Settings {
   touchScreenOptimization: boolean
   enableGridLayoutSwitcher: boolean
@@ -114,6 +119,21 @@ export interface Settings {
   keyboardSpaceAction: KeyboardOpenAction
   /** 自定义快捷键（只存与默认值不同的项） */
   keyboardShortcuts: Partial<Record<ShortcutActionId, string>>
+
+  // 页面增强（第 1 轮起）
+  /** 视频播放页：影院模式按钮与快捷键 */
+  videoPageCinemaMode: boolean
+  /** 视频播放页：滚动迷你播放器（原生小窗接管时不重复） */
+  videoPageMiniPlayer: boolean
+  /** 视频播放页：增强快捷键（J/K/L 等） */
+  videoPageShortcuts: boolean
+  /** 列表页默认视图 / 排序 */
+  historyViewMode: ListViewMode
+  watchLaterViewMode: ListViewMode
+  favoritesViewMode: ListViewMode
+  listDefaultSort: ListSortMode
+  /** 搜索起始页：粘贴 B 站链接时直接打开 */
+  searchPageDirectPasteEnabled: boolean
   /** 接管页拦截原版 B 站脚本（提升性能） */
   nativeGuardEnabled: boolean
   /** 在原生页面（搜索页等）应用屏蔽词过滤 */
@@ -235,6 +255,15 @@ export const originalSettings: Settings = {
   keyboardEnterAction: 'newTab',
   keyboardSpaceAction: 'preview',
   keyboardShortcuts: {},
+
+  videoPageCinemaMode: true,
+  videoPageMiniPlayer: true,
+  videoPageShortcuts: true,
+  historyViewMode: 'comfortable',
+  watchLaterViewMode: 'comfortable',
+  favoritesViewMode: 'comfortable',
+  listDefaultSort: 'time',
+  searchPageDirectPasteEnabled: true,
   nativeGuardEnabled: true,
   nativeFilterEnabled: false,
 

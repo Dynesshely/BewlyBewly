@@ -3,6 +3,8 @@ import type { ShortcutDefinition } from '../shortcuts'
 
 import { nextTick, ref, watch } from 'vue'
 
+import { settings } from '~/logic'
+
 import { toggleShortcutsHelp } from '../actions'
 import { useMessages } from '../i18n'
 import { VIDEO_PAGE_SHORTCUTS } from '../shortcuts'
@@ -10,6 +12,15 @@ import { ui } from '../state'
 
 const t = useMessages()
 const closeButton = ref<HTMLButtonElement | null>(null)
+
+/** 功能被设置页关掉时，帮助面板里也不再列出对应快捷键 */
+const shortcuts = computed(() => VIDEO_PAGE_SHORTCUTS.filter((item) => {
+  if (item.labelKey === 'cinema')
+    return settings.value.videoPageCinemaMode
+  if (item.labelKey === 'restore')
+    return settings.value.videoPageMiniPlayer
+  return true
+}))
 
 function isSeparator(key: string): boolean {
   return key === '–'
@@ -72,7 +83,7 @@ watch(() => ui.helpOpen, async (open) => {
           {{ t.shortcutsHint }}
         </p>
         <ul class="bvp-help__list">
-          <li v-for="item in VIDEO_PAGE_SHORTCUTS" :key="item.labelKey" class="bvp-help__row">
+          <li v-for="item in shortcuts" :key="item.labelKey" class="bvp-help__row">
             <span class="bvp-help__label">{{ t.shortcut[item.labelKey] }}</span>
             <span class="bvp-help__keys">
               <template v-for="(key, index) in item.keys" :key="`${item.labelKey}-${index}`">

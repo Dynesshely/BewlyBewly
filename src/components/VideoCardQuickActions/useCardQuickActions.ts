@@ -1,4 +1,5 @@
 import type { MaybeRefOrGetter } from 'vue'
+import type { FavoriteFolderOption } from './favoriteFolders'
 import type { Video } from '~/components/VideoCard/types'
 
 import { computed, reactive, ref, toValue } from 'vue'
@@ -7,16 +8,28 @@ import { useToast } from 'vue-toastification'
 import api from '~/utils/api'
 import { getCSRF, getUserID } from '~/utils/main'
 
-import { getDefaultFavoriteFolderId } from './favoriteFolders'
+import { getFavoriteFolders, invalidateFavoriteFolders } from './favoriteFolders'
 import { useQuickActionsMessages } from './i18n'
+import { migrateLegacyCardQuickActionsSetting } from './preferences'
 
-/** 本次会话内已赞 / 已收藏的 aid（服务端返回的成功结果，失败会回滚） */
+/** 本次会话内已赞的 aid（服务端成功结果，失败会回滚） */
 const likedAids = reactive(new Set<number>())
-const favoritedAids = reactive(new Set<number>())
 
-/** bvid → aid 的缓存：卡片数据没有 aid 时用 getVideoInfo 换一次（只在本模块允许额外请求） */
-const aidByBvid = new Map<string, number>()
+/** aid → 已收藏的收藏夹 id 列表（只记录本扩展本次会话成功提交的结果） */
+const favoriteMemberships = ref<Map<number, number[]>>(new Map())
+
+/** bvid → aid 的缓存（reactive：解析成功后让 isLiked / isFavorited 立刻反映新 aid） */
+const aidByBvid = reactive(new Map<string, number>())
 const aidInflight = new Map<string, Promise<number | null>>()
+
+function setMembership(aid: number, folderIds: number[]) {
+  const next = new Map(favoriteMemberships.value)
+  if (folderIds.length > 0)
+    next.set(aid, [...folderIds])
+  else
+    next.delete(aid)
+  favoriteMemberships.value = next
+}
 
 function isLoggedIn(): boolean {
   return Boolean(getUserID()) && Boolean(getCSRF())
@@ -84,16 +97,27 @@ function readErrorCode(result: { code?: number } | undefined): number | undefine
  * 单张卡片的点赞 / 收藏状态与操作。
  *
  * - 点赞：同一会话内用内存 Set 记住已赞的 aid，再点即取消；失败回滚；
- * - 收藏：收藏到「默认收藏夹」（分类缓存 5 分钟），失败回滚且不重复请求；
+ * - 收藏：未收藏时打开可多选的收藏夹面板，`add_media_ids` 逗号分隔提交；
+ *   已收藏（本会话成功提交过）时再点按钮直接取消（`del_media_ids`）；
+ * - 收藏夹列表缓存 5 分钟；
  * - 未登录时只 toast，不发送任何请求；
  * - 所有请求都有 try/catch，任何异常都不会冒泡到卡片点击逻辑。
  */
 export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefined>) {
+  // 旧 localStorage 开关在首次挂载时一次性迁移到 settings（内部有幂等守卫）
+  migrateLegacyCardQuickActionsSetting()
+
   const toast = useToast()
   const messages = useQuickActionsMessages()
 
   const likePending = ref<boolean>(false)
   const favoritePending = ref<boolean>(false)
+
+  const favoritePanelOpen = ref<boolean>(false)
+  const favoriteFolderOptions = ref<FavoriteFolderOption[]>([])
+  const favoriteFolderLoading = ref<boolean>(false)
+  const favoriteFolderFailed = ref<boolean>(false)
+  const selectedFolderIds = ref<number[]>([])
 
   const video = computed(() => toValue(videoSource))
   const aid = computed(() => {
@@ -121,11 +145,201 @@ export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefi
 
   const isFavorited = computed(() => {
     const currentAid = aid.value
-    return currentAid !== null && favoritedAids.has(currentAid)
+    if (currentAid === null)
+      return false
+    return (favoriteMemberships.value.get(currentAid)?.length ?? 0) > 0
   })
 
   function toastNeedLogin() {
     toast.warning(messages.value.needLogin)
+  }
+
+  function pickFallbackFolder(folders: FavoriteFolderOption[]): FavoriteFolderOption | undefined {
+    return folders.find(folder => folder.isDefault)
+      ?? folders.find(folder => !folder.isPrivate)
+      ?? folders[0]
+  }
+
+  /** 面板里的勾选状态：已收藏则回显所属收藏夹，否则预选默认收藏夹 */
+  function syncSelectedFolders() {
+    const currentAid = aid.value
+    const known = currentAid !== null
+      ? (favoriteMemberships.value.get(currentAid) ?? [])
+      : []
+    if (known.length > 0) {
+      selectedFolderIds.value = [...known]
+      return
+    }
+    const fallback = pickFallbackFolder(favoriteFolderOptions.value)
+    selectedFolderIds.value = fallback
+      ? [fallback.id]
+      : []
+  }
+
+  async function loadFavoriteFolders(force = false) {
+    if (force)
+      invalidateFavoriteFolders()
+    favoriteFolderLoading.value = true
+    favoriteFolderFailed.value = false
+    try {
+      const folders = await getFavoriteFolders()
+      favoriteFolderOptions.value = folders
+      if (!folders.length) {
+        favoriteFolderFailed.value = true
+        toast.warning(messages.value.folderEmpty)
+      }
+      syncSelectedFolders()
+    }
+    catch {
+      favoriteFolderFailed.value = true
+      toast.error(messages.value.folderLoadFailed)
+    }
+    finally {
+      favoriteFolderLoading.value = false
+    }
+  }
+
+  async function openFavoritePanel() {
+    if (!isLoggedIn()) {
+      toastNeedLogin()
+      return
+    }
+    if (!video.value)
+      return
+
+    favoritePanelOpen.value = true
+    if (favoriteFolderOptions.value.length > 0) {
+      syncSelectedFolders()
+      return
+    }
+    await loadFavoriteFolders()
+  }
+
+  function closeFavoritePanel() {
+    favoritePanelOpen.value = false
+  }
+
+  function toggleFolderSelection(folderId: number) {
+    const selected = selectedFolderIds.value
+    selectedFolderIds.value = selected.includes(folderId)
+      ? selected.filter(id => id !== folderId)
+      : [...selected, folderId]
+  }
+
+  /**
+   * 提交收藏夹变更（差异提交：新增走 add_media_ids，移除走 del_media_ids）。
+   * 失败时回滚会话内的收藏归属并 toast。
+   */
+  async function commitFavorite(nextFolderIds: number[]): Promise<boolean> {
+    if (favoritePending.value)
+      return false
+    if (!isLoggedIn()) {
+      toastNeedLogin()
+      return false
+    }
+
+    const current = video.value
+    if (!current)
+      return false
+
+    favoritePending.value = true
+    let resolvedAid: number | null = null
+    let previousIds: number[] = []
+
+    try {
+      resolvedAid = await resolveVideoAid(current)
+      if (resolvedAid === null) {
+        toast.error(messages.value.favoriteFail)
+        return false
+      }
+
+      previousIds = [
+        ...(favoriteMemberships.value.get(resolvedAid) ?? []),
+      ]
+      const toAdd = nextFolderIds.filter(id => !previousIds.includes(id))
+      const toRemove = previousIds.filter(id => !nextFolderIds.includes(id))
+
+      if (toAdd.length === 0 && toRemove.length === 0) {
+        toast.info(messages.value.favoriteNoChange)
+        return true
+      }
+
+      // 乐观更新
+      setMembership(resolvedAid, nextFolderIds)
+
+      const result = await api.favorite.dealFavoriteResource({
+        rid: resolvedAid,
+        type: 2,
+        add_media_ids: toAdd.join(','),
+        del_media_ids: toRemove.join(','),
+        csrf: getCSRF(),
+      })
+
+      const code = readErrorCode(result)
+      if (code !== 0) {
+        setMembership(resolvedAid, previousIds)
+        if (code === -101 || code === -111)
+          toastNeedLogin()
+        else
+          toast.error(messages.value.favoriteFail)
+        return false
+      }
+
+      if (toRemove.length > 0 && toAdd.length === 0)
+        toast.success(messages.value.favoriteRemoved)
+      else if (toAdd.length > 0 && toRemove.length === 0)
+        toast.success(messages.value.favoriteOk)
+      else
+        toast.success(messages.value.favoriteUpdated)
+      return true
+    }
+    catch {
+      if (resolvedAid !== null)
+        setMembership(resolvedAid, previousIds)
+      toast.error(messages.value.favoriteFail)
+      return false
+    }
+    finally {
+      favoritePending.value = false
+    }
+  }
+
+  /** 面板里的「收藏」按钮：提交当前多选 */
+  async function submitFavoriteSelection() {
+    if (selectedFolderIds.value.length === 0) {
+      toast.warning(messages.value.folderSelectRequired)
+      return
+    }
+    const succeeded = await commitFavorite([...selectedFolderIds.value])
+    if (succeeded)
+      closeFavoritePanel()
+  }
+
+  /** 面板里的「取消收藏」：清空全部收藏夹 */
+  async function removeFromFavorites() {
+    const succeeded = await commitFavorite([])
+    if (succeeded) {
+      closeFavoritePanel()
+      return
+    }
+    // 失败：把勾选恢复成实际归属，避免面板停留在错误状态
+    syncSelectedFolders()
+  }
+
+  /**
+   * 收藏按钮点击：
+   * 未收藏 → 打开收藏夹多选面板；已收藏（本会话记录）→ 再点直接取消收藏。
+   */
+  async function handleFavoriteButton() {
+    if (!isLoggedIn()) {
+      toastNeedLogin()
+      return
+    }
+    if (isFavorited.value) {
+      await removeFromFavorites()
+      return
+    }
+    await openFavoritePanel()
   }
 
   async function toggleLike() {
@@ -198,75 +412,6 @@ export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefi
     }
   }
 
-  async function addToFavorites() {
-    if (favoritePending.value)
-      return
-    if (!isLoggedIn()) {
-      toastNeedLogin()
-      return
-    }
-
-    const current = video.value
-    if (!current)
-      return
-
-    favoritePending.value = true
-    let resolvedAid: number | null = null
-    let optimisticallyFavorited = false
-
-    try {
-      resolvedAid = await resolveVideoAid(current)
-      if (resolvedAid === null) {
-        toast.error(messages.value.favoriteFail)
-        return
-      }
-
-      if (favoritedAids.has(resolvedAid)) {
-        toast.info(messages.value.favorited)
-        return
-      }
-
-      const folderId = await getDefaultFavoriteFolderId()
-      if (folderId === null) {
-        toast.warning(messages.value.folderMissing)
-        return
-      }
-
-      favoritedAids.add(resolvedAid)
-      optimisticallyFavorited = true
-
-      const result = await api.favorite.dealFavoriteResource({
-        rid: resolvedAid,
-        type: 2,
-        add_media_ids: String(folderId),
-        del_media_ids: '',
-        csrf: getCSRF(),
-      })
-
-      const code = readErrorCode(result)
-      if (code !== 0) {
-        favoritedAids.delete(resolvedAid)
-        optimisticallyFavorited = false
-
-        if (code === -101 || code === -111)
-          toastNeedLogin()
-        else
-          toast.error(messages.value.favoriteFail)
-        return
-      }
-
-      toast.success(messages.value.favoriteOk)
-    }
-    catch {
-      if (optimisticallyFavorited && resolvedAid !== null)
-        favoritedAids.delete(resolvedAid)
-      toast.error(messages.value.favoriteFail)
-    }
-    finally {
-      favoritePending.value = false
-    }
-  }
-
   return {
     messages,
     canLike,
@@ -275,15 +420,25 @@ export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefi
     isFavorited,
     likePending,
     favoritePending,
+    favoritePanelOpen,
+    favoriteFolderOptions,
+    favoriteFolderLoading,
+    favoriteFolderFailed,
+    selectedFolderIds,
     toggleLike,
-    addToFavorites,
+    handleFavoriteButton,
+    closeFavoritePanel,
+    toggleFolderSelection,
+    submitFavoriteSelection,
+    removeFromFavorites,
+    reloadFavoriteFolders: () => loadFavoriteFolders(true),
   }
 }
 
 /** 调试 / 测试用：重置模块级状态 */
 export function resetCardQuickActionsState() {
   likedAids.clear()
-  favoritedAids.clear()
+  favoriteMemberships.value = new Map()
   aidByBvid.clear()
   aidInflight.clear()
 }

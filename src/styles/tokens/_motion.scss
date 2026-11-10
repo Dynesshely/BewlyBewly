@@ -1,0 +1,42 @@
+// 全站动效令牌：时长与缓动。
+//
+// Sass 变量给编译期使用（mixin 默认值、媒体查询条件等）；
+// 对应的 CSS 自定义属性在 `src/styles/main.scss` 的 :root 上暴露，
+// 运行时样式一律用 `var(--bew-motion-*)` / `var(--bew-ease-*)`。
+//
+// 时长档位与第 1–8 轮的设计语言一致：fast 120ms / base 180ms / slow 240ms。
+
+$duration-fast: 120ms;
+$duration-base: 180ms;
+$duration-slow: 240ms;
+
+// ease-out 是各轮页面增强使用的统一曲线（快进慢出，适合悬停 / 面板过场）
+$ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+$ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+$ease-linear: linear;
+
+/// 在 `:root`（以及宿主 shadow root 的 `:host`）上输出动效令牌
+@mixin tokens {
+  --bew-motion-fast: #{$duration-fast};
+  --bew-motion-base: #{$duration-base};
+  --bew-motion-slow: #{$duration-slow};
+
+  --bew-ease-out: #{$ease-out};
+  --bew-ease-in-out: #{$ease-in-out};
+  --bew-ease-linear: #{$ease-linear};
+}
+
+/// reduced-motion 降级：把时长令牌压成 0ms。
+/// 只要过渡 / 动画用的是令牌，就会被这一处统一降级，不需要每个组件各写一遍。
+@mixin reduced-tokens {
+  --bew-motion-fast: 0ms;
+  --bew-motion-base: 0ms;
+  --bew-motion-slow: 0ms;
+}
+
+/// 统一的 `prefers-reduced-motion` 包裹 mixin（全站共用，避免各处重复写 @media）
+@mixin reduced-motion {
+  @media (prefers-reduced-motion: reduce) {
+    @content;
+  }
+}

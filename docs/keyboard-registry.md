@@ -161,3 +161,23 @@ R 沉浸阅读 · [ 字号减小 · ] 字号增大 · T 回到顶部 · Esc 退�
 - 旧帮助面板用过的 `keyboard_help.tabs`（1 - 6 切标签页）与 `keyboard_help.sort_filter`
   两个 key 现在没有被引用（前者本来就没有按键实现，后者被 S / F 两条独立动作取代），
   为兼容保留在四个语言文件里，未删除。
+## 第 9 轮更新：命令面板执行注册表动作
+
+- 新增 `getPaletteExecutableEntries()`（`src/constants/shortcutRegistry.ts`）：返回登记表里带 `emitEvent` 的条目，供命令面板渲染成**可执行**命令；
+- `CommandPalette.vue` 现在把三类条目分开处理：
+  1. **面板内置命令**（首页 tab、键盘模式、设置等）继续排在最前，其中带全局事件的命令标注了 `event` 字段；
+  2. **注册表可执行动作**（`emitEvent`）：按 `event` 与内置命令去重后追加（本轮新增的是清屏 `toggle-zen-mode`；聚焦浏览 / 排序 / 筛选 / 卡片信息 / 搜索 / AI 初筛 / 帮助原本就有内置命令），执行时 `emitter.emit(event)` 并关闭面板；
+  3. **参考条目**（无 `emitEvent`，如视频页 J/K、列表页 V、消息页 U/D 等）：保持灰显 + 「当前页不可用」，`Enter` / 点击无效，上下键自动跳过。
+- 可执行条目展示的按键会应用用户改键（`getEntryKeyTokens`），执行入口统一走 App 层已有事件，因此不会出现「命令面板自己实现一套逻辑」的双触发问题；
+- 命令面板仍是登记表的消费者：新增动作只需在 `SHORTCUT_REGISTRY` 里标 `emitEvent`，面板会自动出现可执行条目。
+
+### 变更文件
+
+- `src/constants/shortcutRegistry.ts`（新增 `getPaletteExecutableEntries`，补充注释）；
+- `src/components/CommandPalette.vue`（内置命令加 `event` 标记、合并注册表可执行动作、搜索与默认列表同步）。
+
+### 已知限制
+
+- 是否「可执行」由登记表是否有 `emitEvent` 决定，不区分页面上下文：事件监听都注册在 App / composables 里，非适用页面执行是安全的空操作（例如非首页执行「切换排序」不会改任何东西）；
+- 命令面板不额外请求网络、不改页面 DOM，只是派发已有事件；
+- 打开设置面板不属于快捷键动作，因此没有登记 `emitEvent`，仍作为面板内置命令存在。

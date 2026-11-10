@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Video } from '~/components/VideoCard/types'
+import FavoriteFolderPanel from './FavoriteFolderPanel.vue'
 import { useCardQuickActions } from './useCardQuickActions'
 
 const props = withDefaults(defineProps<{
@@ -23,15 +24,35 @@ const {
   isFavorited,
   likePending,
   favoritePending,
+  favoritePanelOpen,
+  favoriteFolderOptions,
+  favoriteFolderLoading,
+  favoriteFolderFailed,
+  selectedFolderIds,
   toggleLike,
-  addToFavorites,
+  handleFavoriteButton,
+  closeFavoritePanel,
+  toggleFolderSelection,
+  submitFavoriteSelection,
+  reloadFavoriteFolders,
 } = useCardQuickActions(() => props.video)
+
+function handleLike() {
+  closeFavoritePanel()
+  void toggleLike()
+}
+
+function handleWatchLater() {
+  closeFavoritePanel()
+  emit('toggleWatchLater')
+}
 </script>
 
 <template>
   <div
     v-if="canLike || canFavorite || showWatchLater"
     class="bewly-card-actions opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto"
+    :class="{ 'is-open': favoritePanelOpen }"
     role="group"
     :aria-label="messages.groupLabel"
   >
@@ -44,7 +65,7 @@ const {
       :aria-label="isLiked ? messages.unlike : messages.like"
       :title="isLiked ? messages.unlike : messages.like"
       :disabled="likePending"
-      @click.stop.prevent="toggleLike"
+      @click.stop.prevent="handleLike"
     >
       <span class="i-solar:like-bold-duotone" aria-hidden="true" />
     </button>
@@ -53,12 +74,14 @@ const {
       v-if="canFavorite"
       type="button"
       class="bewly-card-actions__btn"
-      :class="{ 'is-active': isFavorited }"
+      :class="{ 'is-active': isFavorited, 'is-busy': favoritePending }"
       :aria-pressed="isFavorited"
+      :aria-expanded="favoritePanelOpen"
+      aria-haspopup="dialog"
       :aria-label="isFavorited ? messages.favorited : messages.favorite"
       :title="isFavorited ? messages.favorited : messages.favorite"
       :disabled="favoritePending"
-      @click.stop.prevent="addToFavorites"
+      @click.stop.prevent="handleFavoriteButton"
     >
       <span :class="isFavorited ? 'i-mingcute:star-fill' : 'i-mingcute:star-line'" aria-hidden="true" />
     </button>
@@ -71,10 +94,24 @@ const {
       :aria-pressed="watchLaterActive"
       :aria-label="$t('common.save_to_watch_later')"
       :title="watchLaterActive ? $t('common.added') : $t('common.save_to_watch_later')"
-      @click.stop.prevent="emit('toggleWatchLater')"
+      @click.stop.prevent="handleWatchLater"
     >
       <span :class="watchLaterActive ? 'i-mingcute:check-line' : 'i-mingcute:carplay-line'" aria-hidden="true" />
     </button>
+
+    <FavoriteFolderPanel
+      v-if="canFavorite"
+      :open="favoritePanelOpen"
+      :folders="favoriteFolderOptions"
+      :selected-ids="selectedFolderIds"
+      :loading="favoriteFolderLoading"
+      :failed="favoriteFolderFailed"
+      :pending="favoritePending"
+      @toggle-folder="toggleFolderSelection"
+      @submit="submitFavoriteSelection"
+      @retry="reloadFavoriteFolders"
+      @close="closeFavoritePanel"
+    />
   </div>
 </template>
 
@@ -88,6 +125,12 @@ const {
   gap: 4px;
   margin: 4px;
   transition: opacity 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* 收藏面板打开时，即使鼠标移出卡片也保持可见可点 */
+.bewly-card-actions.is-open {
+  pointer-events: auto;
+  opacity: 1;
 }
 
 .bewly-card-actions__btn {
@@ -123,6 +166,10 @@ const {
   border-color: var(--bew-theme-color-40);
 }
 
+.bewly-card-actions__btn.is-busy {
+  cursor: progress;
+}
+
 .bewly-card-actions__btn:disabled {
   cursor: progress;
   opacity: 0.55;
@@ -138,10 +185,6 @@ const {
   .bewly-card-actions,
   .bewly-card-actions__btn {
     transition: none;
-  }
-
-  .bewly-card-actions {
-    transform: none;
   }
 }
 </style>

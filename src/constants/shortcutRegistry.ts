@@ -10,8 +10,9 @@
  * - **只登记与展示**，不执行按键逻辑，也不改各模块内部的 keydown 处理，避免双触发；
  * - 可自定义的动作（见 `constants/shortcuts.ts` 的 SHORTCUT_ACTIONS）用 `shortcutActionId`
  *   引用，展示时取用户改键后的真实组合键；
- * - `emitEvent` 表示该动作在 App 层已有对应的全局事件，可以从命令面板安全触发；
- *   没有 emitEvent 的条目在命令面板里只作参考（标灰 + 「当前页不可用」）。
+ * - `emitEvent` 表示该动作在 App 层已有对应的全局事件：命令面板据此把它渲染成
+ *   **可执行**条目（执行后关闭面板）；没有 emitEvent 的条目在命令面板里只作参考
+ *   （标灰 + 「当前页不可用」）。
  */
 
 import type { ShortcutActionId } from './shortcuts'
@@ -515,7 +516,7 @@ export function groupShortcutsByScope(): ShortcutGroup[] {
     .filter(group => group.entries.length > 0)
 }
 
-/** 命令面板搜索用：只取「没有全局事件、不能安全触发」的参考条目 */
+/** 命令面板用：带有 App 层全局事件、可以直接执行的动作（可按 scope 过滤） */
 export function getPaletteShortcutEntries(
   overrides?: Partial<Record<ShortcutActionId, string>> | null,
   options: { scopes?: Set<ShortcutScope> | null } = {},
@@ -523,6 +524,22 @@ export function getPaletteShortcutEntries(
   const scopes = options.scopes ?? null
   return SHORTCUT_REGISTRY.filter(entry =>
     !entry.emitEvent && (!scopes || scopes.has(entry.scope)),
+  )
+}
+
+/**
+ * 命令面板用：带有 App 层全局事件的动作 —— 可以直接执行。
+ *
+ * 这些事件（设置面板 / 帮助 / 清屏 / 聚焦浏览 / 排序 / 筛选 / 搜索 / AI 初筛 / 卡片信息）
+ * 的监听都注册在 App 与 composables 里，即使在当前页面执行也只是空操作、不会报错，
+ * 因此可以安全地从命令面板触发；面板执行后会自行关闭。
+ */
+export function getPaletteExecutableEntries(
+  options: { scopes?: Set<ShortcutScope> | null } = {},
+): ShortcutRegistryEntry[] {
+  const scopes = options.scopes ?? null
+  return SHORTCUT_REGISTRY.filter(entry =>
+    Boolean(entry.emitEvent) && (!scopes || scopes.has(entry.scope)),
   )
 }
 

@@ -976,15 +976,9 @@ html.bewly-design.userSpacePage {
   }
   // #endregion
 
+  // 动效降级：过渡时长已由全站令牌统一压成 0ms（见 main.scss），
+  // 这里只需要关掉「悬停升起」这类非过渡类动效。
   @include native.reduced-motion {
-    .n .n-data,
-    .video-container,
-    .small-item,
-    .feed-card,
-    .bili-dyn-item {
-      transition: none;
-    }
-
     .video-container.can-hover:hover {
       transform: none;
     }

@@ -118,7 +118,7 @@ html.bewly-design.searchPage {
       .vui_tabs--nav-num {
         min-width: 18px;
         height: 16px;
-        padding: 0 5px;
+        padding: 0 var(--bew-native-gap-xs);
         border-radius: var(--bew-native-radius-pill);
         background-color: var(--bew-fill-1);
         color: var(--bew-text-3);
@@ -328,17 +328,9 @@ html.bewly-design.searchPage {
   }
   // #endregion
 
+  // 动效降级：过渡时长已由全站令牌统一压成 0ms（见 main.scss），
+  // 这里只需要关掉「悬停位移」这类非过渡类动效。
   @include native.reduced-motion {
-    .search-input-container .search-input-wrap,
-    .search-tabs .vui_tabs--nav-link,
-    .search-conditions,
-    .search-conditions .vui_button,
-    .search-layout .bili-video-card .bili-video-card__wrap,
-    .search-layout .b-user-video-card,
-    .search-layout .user-name {
-      transition: none;
-    }
-
     .search-layout .bili-video-card:hover .bili-video-card__wrap {
       transform: none;
     }

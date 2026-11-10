@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { cardQuickActionsEnabled, setCardQuickActionsEnabled } from '~/components/VideoCardQuickActions/preferences'
+import { migrateLegacyCardQuickActionsSetting } from '~/components/VideoCardQuickActions/preferences'
 import { settings } from '~/logic'
 
 import SettingsItem from '../components/SettingsItem.vue'
@@ -15,6 +15,9 @@ import { usePagesSettingsMessages } from './i18n'
  * 搜索结果页密度、用户空间密度、文章页（默认阅读模式 + 字号）。
  * 文案走模块内 i18n（cmn-CN + en），不进入全局 _locales。
  */
+// 打开设置页时也跑一次旧 localStorage 开关迁移（幂等），避免用户先看设置页时看到旧状态
+migrateLegacyCardQuickActionsSetting()
+
 const t = usePagesSettingsMessages()
 
 const viewModeOptions = computed(() => [
@@ -35,10 +38,12 @@ const densityOptions = computed(() => [
   { label: t.value.densityCompact, value: 'compact' },
 ])
 
-/** 视频卡片悬停操作条开关（localStorage 内存态，模块内统一维护） */
+/** 视频卡片悬停操作条开关（第 9 轮起直接读写 settings，卡片侧响应式跟随） */
 const quickActionsModel = computed({
-  get: () => cardQuickActionsEnabled.value,
-  set: (value: boolean) => setCardQuickActionsEnabled(value),
+  get: () => settings.value.enableVideoCardQuickActions !== false,
+  set: (value: boolean) => {
+    settings.value.enableVideoCardQuickActions = value
+  },
 })
 
 /** 文章正文字号三档 */
@@ -103,6 +108,10 @@ const fontSizeOptions = computed(() => [
       <SettingsItem :title="t.momentsDensity" :desc="t.momentsDensityDesc">
         <Select v-model="settings.momentsDensity" :options="densityOptions" w="full" />
       </SettingsItem>
+
+      <SettingsItem :title="t.momentsOptimize" :desc="t.momentsOptimizeDesc">
+        <Radio v-model="settings.momentsOptimizeEnabled" />
+      </SettingsItem>
     </SettingsItemGroup>
 
     <SettingsItemGroup :title="t.groupNotification" :desc="t.groupNotificationDesc">
@@ -124,6 +133,12 @@ const fontSizeOptions = computed(() => [
     <SettingsItemGroup :title="t.groupSpace" :desc="t.groupSpaceDesc">
       <SettingsItem :title="t.spaceDensity">
         <Select v-model="settings.spaceDensity" :options="densityOptions" w="full" />
+      </SettingsItem>
+    </SettingsItemGroup>
+
+    <SettingsItemGroup :title="t.groupChannel" :desc="t.groupChannelDesc">
+      <SettingsItem :title="t.channelDensity" :desc="t.channelDensityDesc">
+        <Select v-model="settings.channelDensity" :options="densityOptions" w="full" />
       </SettingsItem>
     </SettingsItemGroup>
 

@@ -7,6 +7,11 @@
 //
 // 文件名以 `_` 开头，不参与页面注入清单；三个页面用 `@use "native-shared" as native`
 // 引入后单独编译该文件时输出为空 CSS，不会污染 dist/styles/pages。
+//
+// 第 9 轮起，这些 native 令牌**不再写死数值**，全部指向 src/styles/tokens/ 里的全站令牌：
+//   --bew-motion-* / --bew-ease-* / --bew-space-* / --bew-radius-*
+// 因此 reduced-motion 的降级也统一由主样式里「动效令牌压成 0ms」那一处完成。
+@use "../../tokens/motion" as motion;
 
 // #region 令牌
 //
@@ -14,27 +19,30 @@
 // （html.bewly-design.<page>）上 @include 一次，作用域就限定在该页面，
 // 不会泄漏到 Bewly 自己的视图里。
 @mixin tokens {
-  // 间距基准 4px
-  --bew-native-gap-xs: 4px;
-  --bew-native-gap-sm: 8px;
-  --bew-native-gap: 16px;
-  --bew-native-gap-lg: 24px;
-  --bew-native-gap-xl: 32px;
+  // 间距：指向全站间距令牌（4 / 8 / 12 / 16 / 24 / 32）
+  --bew-native-gap-xs: var(--bew-space-4, 4px);
+  --bew-native-gap-sm: var(--bew-space-8, 8px);
+  --bew-native-gap-md: var(--bew-space-12, 12px);
+  --bew-native-gap: var(--bew-space-16, 16px);
+  --bew-native-gap-lg: var(--bew-space-24, 24px);
+  --bew-native-gap-xl: var(--bew-space-32, 32px);
 
-  // 圆角：以 --bew-radius（12px）为基准派生
-  --bew-native-radius-sm: calc(var(--bew-radius) / 1.5); // ≈ 8px
-  --bew-native-radius: var(--bew-radius); // 12px
-  --bew-native-radius-lg: calc(var(--bew-radius) * 1.5); // ≈ 18px
-  --bew-native-radius-pill: 999px;
+  // 圆角：指向全站圆角令牌（sm 8 / md 12 / lg 16 / pill）
+  // 注意 lg 从旧的 calc(--bew-radius * 1.5) ≈ 18px 收敛为全站的 16px。
+  --bew-native-radius-sm: var(--bew-radius-sm, 8px);
+  --bew-native-radius: var(--bew-radius-md, 12px);
+  --bew-native-radius-lg: var(--bew-radius-lg, 16px);
+  --bew-native-radius-pill: var(--bew-radius-pill, 999px);
 
   // 行高
   --bew-native-line-height: 1.5;
   --bew-native-line-height-tight: 1.32;
 
-  // 动效：150–240ms，与第 1 轮列表页/视频页保持同一曲线
-  --bew-native-dur: 180ms;
-  --bew-native-dur-slow: 240ms;
-  --bew-native-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  // 动效：指向全站动效令牌；reduced-motion 下这些令牌会被压成 0ms
+  --bew-native-dur-fast: var(--bew-motion-fast, 120ms);
+  --bew-native-dur: var(--bew-motion-base, 180ms);
+  --bew-native-dur-slow: var(--bew-motion-slow, 240ms);
+  --bew-native-ease: var(--bew-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1));
 
   // 悬停位移
   --bew-native-lift: -2px;
@@ -96,9 +104,10 @@
   box-shadow: var(--bew-shadow-1);
 }
 
-// reduced-motion 降级：去掉位移与过渡，只保留颜色变化（颜色变化不算动效）
+// reduced-motion 降级：统一转发到 tokens/motion 的 mixin（全站同一份 @media 语义）。
+// 时长本身已由主样式把令牌压成 0ms；这里只用来关掉「非过渡类」动效，比如悬停位移。
 @mixin reduced-motion {
-  @media (prefers-reduced-motion: reduce) {
+  @include motion.reduced-motion {
     @content;
   }
 }

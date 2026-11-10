@@ -581,7 +581,7 @@ html.bewly-design.notificationsPage {
     display: inline-block;
     min-width: 18px;
     height: 18px;
-    padding: 0 5px;
+    padding: 0 var(--bew-native-gap-xs);
     border-radius: var(--bew-native-radius-pill);
     background-color: var(--bew-theme-color);
     color: var(--bew-text-auto);
@@ -649,17 +649,6 @@ html.bewly-design.notificationsPage {
     }
   }
   // #endregion
-
-  @include native.reduced-motion {
-    .space-left .side-bar .item,
-    .space-left .side-bar .item a,
-    .reply-card,
-    .at-card,
-    .love-card,
-    .msg-notify {
-      transition: none;
-    }
-  }
 }
 // #endregion
 // #region 第 3 轮：消息页交互增强（只新增，不改动上方既有规则）

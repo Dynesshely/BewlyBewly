@@ -46,6 +46,8 @@ export interface PagesSettingsMessages {
   groupMoments: string
   momentsDensity: string
   momentsDensityDesc: string
+  momentsOptimize: string
+  momentsOptimizeDesc: string
   groupNotification: string
   groupNotificationDesc: string
   notificationOnlyUnread: string
@@ -71,6 +73,10 @@ export interface PagesSettingsMessages {
   groupHomeDesc: string
   homeCardDensity: string
   homeCardDensityDesc: string
+  groupChannel: string
+  groupChannelDesc: string
+  channelDensity: string
+  channelDensityDesc: string
 }
 
 const CMN_CN: PagesSettingsMessages = {
@@ -88,7 +94,7 @@ const CMN_CN: PagesSettingsMessages = {
   cardPreview: '悬停预览',
   cardPreviewDesc: '悬停卡片 0.9 秒后静音播放最多 6 秒的小片段；触屏、减少动态效果偏好，或卡片数据里没有 cid 时不生效',
   cardQuickActions: '悬停操作条',
-  cardQuickActionsDesc: '悬停卡片时在左下角显示点赞 / 收藏 / 稍后再看；未登录时只提示不请求，失败会自动回滚',
+  cardQuickActionsDesc: '悬停卡片时在右下角显示点赞 / 收藏 / 稍后再看；收藏可多选收藏夹，已收藏再点即取消。未登录时只提示不请求，失败会自动回滚',
   groupListPage: '列表页',
   groupListPageDesc: '观看历史 / 稍后再看 / 收藏页的默认视图与排序',
   historyViewMode: '观看历史视图',
@@ -109,6 +115,8 @@ const CMN_CN: PagesSettingsMessages = {
   groupMoments: '动态页',
   momentsDensity: '卡片密度',
   momentsDensityDesc: '动态页卡片流的信息密度，页面顶部工具条也能直接切换',
+  momentsOptimize: '离屏优化',
+  momentsOptimizeDesc: '只渲染视口附近的卡片，滚动到附近时才渲染其余卡片；关闭后所有卡片全部渲染（长列表更吃性能）',
   groupNotification: '消息页',
   groupNotificationDesc: 'B 站原生消息页（message.bilibili.com）的增强浮层',
   notificationOnlyUnread: '默认只看未读',
@@ -134,6 +142,10 @@ const CMN_CN: PagesSettingsMessages = {
   groupHomeDesc: '首页各子标签（推荐 / 关注 / 订阅剧集 / 热门 / 排行 / 直播）的卡片密度',
   homeCardDensity: '卡片密度',
   homeCardDensityDesc: '紧凑档每行多一张卡片、间距更小、标题字号小一档；首页顶部工具条也能直接切换',
+  groupChannel: '分区 / 排行页',
+  groupChannelDesc: 'B 站原生分区页（bilibili.com/v/*、/channel/*）与排行榜页的增强浮层',
+  channelDensity: '列表密度',
+  channelDensityDesc: '紧凑档缩小卡片间距与标题字号，一屏能看到更多内容',
 }
 
 const EN: PagesSettingsMessages = {
@@ -151,7 +163,7 @@ const EN: PagesSettingsMessages = {
   cardPreview: 'Hover preview',
   cardPreviewDesc: 'Hover a card for 0.9s to play a muted clip of up to 6 seconds. Disabled on touch devices, with reduced motion, or when the card data has no cid.',
   cardQuickActions: 'Hover action bar',
-  cardQuickActionsDesc: 'Show like / favorite / watch-later buttons at the bottom-left of a hovered card. Not signed in? You get a hint instead of a request; failures roll back automatically.',
+  cardQuickActionsDesc: 'Show like / favorite / watch-later buttons at the bottom-right of a hovered card. Favorites support multi-folder selection, and clicking again removes them. Not signed in? You get a hint instead of a request; failures roll back automatically.',
   groupListPage: 'List pages',
   groupListPageDesc: 'Default view mode and sorting for history, watch later and favorites',
   historyViewMode: 'History view',
@@ -172,6 +184,8 @@ const EN: PagesSettingsMessages = {
   groupMoments: 'Moments page',
   momentsDensity: 'Card density',
   momentsDensityDesc: 'Information density of the moments feed. The toolbar on the page can switch it too.',
+  momentsOptimize: 'Off-screen optimization',
+  momentsOptimizeDesc: 'Only render cards near the viewport and render the rest as you scroll close. When off, every card renders — heavier on long feeds.',
   groupNotification: 'Notifications page',
   groupNotificationDesc: 'Enhancement overlay on the native Bilibili notifications page (message.bilibili.com)',
   notificationOnlyUnread: 'Only show unread by default',
@@ -197,6 +211,10 @@ const EN: PagesSettingsMessages = {
   groupHomeDesc: 'Card density for every home tab (For You / Following / Series / Trending / Ranking / Live)',
   homeCardDensity: 'Card density',
   homeCardDensityDesc: 'Compact shows one more card per row, with tighter gaps and a smaller title. The toolbar on the home page can switch it too.',
+  groupChannel: 'Channel / ranking pages',
+  groupChannelDesc: 'Enhancement overlay on native Bilibili channel pages (bilibili.com/v/*, /channel/*) and ranking pages',
+  channelDensity: 'List density',
+  channelDensityDesc: 'Compact tightens card gaps and the title size so more content fits on one screen.',
 }
 
 /** 模块自建 i18n：只覆盖简中与英文，其余语言回退简中 */

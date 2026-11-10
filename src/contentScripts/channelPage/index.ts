@@ -8,12 +8,17 @@
  *
  * 非分区页是空操作；重复调用是幂等的（nativeOverlay 按 hostId 去重）。
  */
+import { watch } from 'vue'
+
+import { settings } from '~/logic'
+
 import { hasNativeOverlay, mountNativeOverlay, unmountNativeOverlay } from '../nativeOverlay'
 import {
   cleanupDom,
   injectPageStyles,
   restorePreferences,
   scanCards,
+  syncDensityFromSettings,
   watchChannelPage,
 } from './actions'
 import shadowCss from './channelPage.shadow.scss?inline'
@@ -29,6 +34,7 @@ const RESCAN_DELAY = 900
 
 let disposeKeyboard: (() => void) | null = null
 let stopWatching: (() => void) | null = null
+let stopSettingsWatch: (() => void) | null = null
 let rescanTimer: number | null = null
 
 export function setupChannelPage(): void {
@@ -64,6 +70,12 @@ export function setupChannelPage(): void {
   stopWatching = watchChannelPage()
   disposeKeyboard = setupKeyboard()
 
+  // 设置页改动实时生效
+  stopSettingsWatch = watch(
+    () => settings.value.channelDensity,
+    () => syncDensityFromSettings(),
+  )
+
   rescanTimer = window.setTimeout(() => {
     rescanTimer = null
     scanCards()
@@ -74,6 +86,10 @@ export function teardownChannelPage(): void {
   if (rescanTimer !== null) {
     window.clearTimeout(rescanTimer)
     rescanTimer = null
+  }
+  if (stopSettingsWatch) {
+    stopSettingsWatch()
+    stopSettingsWatch = null
   }
   if (stopWatching) {
     stopWatching()

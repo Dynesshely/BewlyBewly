@@ -2,6 +2,7 @@
 import type { MomentCard as MomentCardModel, MomentImage } from './types'
 import Empty from '~/components/Empty.vue'
 import { useBewlyApp } from '~/composables/useAppProvider'
+import { settings } from '~/logic'
 
 import MomentCardView from './components/MomentCard.vue'
 import MomentLightbox from './components/MomentLightbox.vue'
@@ -43,31 +44,48 @@ const {
 const { density, setDensity } = useMomentsDensity()
 
 // #region 离屏优化（虚拟列表）
-/** localStorage 开关：默认开，关闭时完全退回「全部渲染」的现状 */
+/**
+ * 离屏优化的真实来源是 settings.momentsOptimizeEnabled
+ * （设置页「页面增强 → 动态页 → 离屏优化」）；页面顶部按钮切换会回写 settings。
+ * 旧版本写在 localStorage 的「bewly-moments-optimize」会在首次使用时一次性迁移后删除。
+ */
 const OPTIMIZE_STORAGE_KEY = 'bewly-moments-optimize'
+const DEFAULT_OPTIMIZE_ENABLED = true
 
-function readOptimizeEnabled(): boolean {
+let optimizeMigrated = false
+
+function migrateLegacyOptimize(): void {
+  if (optimizeMigrated)
+    return
+  optimizeMigrated = true
+
   try {
     const raw = window.localStorage.getItem(OPTIMIZE_STORAGE_KEY)
-    return raw === null
-      ? true
-      : raw !== '0'
+    if (raw === null)
+      return
+    window.localStorage.removeItem(OPTIMIZE_STORAGE_KEY)
+
+    if (settings.value.momentsOptimizeEnabled !== DEFAULT_OPTIMIZE_ENABLED)
+      return
+    settings.value.momentsOptimizeEnabled = raw !== '0'
   }
   catch {
-    return true
+    // 隐私模式 / 存储被禁用时忽略，沿用 settings 默认值
   }
 }
 
-const optimizeEnabled = ref<boolean>(readOptimizeEnabled())
+migrateLegacyOptimize()
+
+/** 直接绑定 settings：页面内切换写回 settings，设置页改动即时改变渲染策略 */
+const optimizeEnabled = computed<boolean>({
+  get: () => settings.value.momentsOptimizeEnabled,
+  set: (value) => {
+    settings.value.momentsOptimizeEnabled = value
+  },
+})
 
 function setOptimizeEnabled(value: boolean) {
   optimizeEnabled.value = value
-  try {
-    window.localStorage.setItem(OPTIMIZE_STORAGE_KEY, value ? '1' : '0')
-  }
-  catch {
-    // 隐私模式 / 存储被禁用：本次会话内仍然生效，只是刷新不保持
-  }
 }
 // #endregion
 

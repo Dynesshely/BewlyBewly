@@ -143,3 +143,35 @@
   若后续只想保留一个开关，需要同时调整通用设置页与 `previewSettings`（本模块已按「新字段为主、旧字段兜底」实现）；
 - 开关变化不会打断正在播放的那一段预览（最多再播 6 秒），下一次悬停生效；
 - 迁移与 settings 的异步读取存在极小的冷启动竞态（与第 5 轮各模块相同）：设置读完后由响应式依赖纠正。
+## 七、第 9 轮：分区密度 + 动态页离屏优化并入设置页
+
+> 把分区 / 排行页的密度与动态页的离屏优化从 localStorage / sessionStorage 收进 settings（字段由 Lead 新增，模块只读使用）。
+
+### 新增分组 / 项
+
+| 分组 | 项 | settings 字段 | 控件 |
+|---|---|---|---|
+| 动态页 | 离屏优化 | `momentsOptimizeEnabled` | Radio（默认开） |
+| 分区 / 排行页 | 列表密度 | `channelDensity` | Select（舒适 / 紧凑） |
+
+「分区 / 排行页」分组插在「用户空间」与「文章页」之间；「离屏优化」作为「动态页」分组的第二项。
+文案仍走模块内 i18n（`src/components/Settings/Pages/i18n.ts`，cmn-CN + en）。
+
+### 模块改动
+
+- **动态页**（`src/contentScripts/views/Moments/Moments.vue`）：离屏优化开关改为绑定 `settings.momentsOptimizeEnabled` 的可写 `computed`，页面顶部按钮切换即回写 settings；设置页改动通过响应式依赖即时改变渲染策略（无需刷新）。旧 localStorage key `bewly-moments-optimize`（`'0'` 表示关闭）一次性迁移后删除。
+- **分区 / 排行页**（`src/contentScripts/channelPage/preferences.ts`、`actions.ts`、`index.ts`）：列表密度改为 `settings.channelDensity`，旧 session key `bewly-channel-density` 迁移后删除；面板展开状态仍在 sessionStorage。入口 `watch(settings.channelDensity)` 实时同步 `<html>` 上的密度类。
+
+### 迁移策略
+
+与第 5 / 7 轮一致：仅当对应 settings 字段仍是默认值时才用旧值覆盖，读完立即删除旧 key；设置页优先。
+
+### 第 9 轮 Lead 接线
+
+无。设置页分组、模块读写、迁移与 watch 均已完成。
+
+### 第 9 轮已知限制
+
+- 动态页离屏优化只影响卡片根节点上的 `content-visibility` / `contain-intrinsic-size`，不卸载节点；关闭后完全退回「全部渲染」；
+- 设置页改动对已打开的分区页实时生效依赖 `settings` 的 storage 同步链路（与前面各轮相同）；
+- 迁移与 settings 异步读取存在极小的冷启动竞态，settings 读完后由响应式依赖 / watch 纠正。

@@ -1,3 +1,7 @@
+@use "./tokens/motion" as motion;
+@use "./tokens/radius" as radius;
+@use "./tokens/spacing" as spacing;
+
 * {
   outline-color: var(--bew-theme-color-80);
   font-feature-settings: "tnum";
@@ -394,5 +398,28 @@ html.bewly-zen:not(.bewly-zen--peek) #biliMainHeader {
 .bewly-wrapper.bewly-zen:not(.bewly-zen--peek) .bewly-scroll-container main > div {
   width: calc(100% - 48px) !important;
   padding-top: 24px !important;
+}
+/* #endregion */
+
+/* #region 设计令牌（第 9 轮收敛） */
+//
+// 动效 / 间距 / 圆角的统一令牌。Sass 侧定义在 src/styles/tokens/，
+// 这里只负责在 :root（以及 shadow host 的 :host）上暴露成 CSS 变量。
+// 已有同名变量（如 variables.scss 的 --bew-radius: 12px）保持不变，这里只补缺。
+:root,
+:host {
+  @include motion.tokens;
+  @include spacing.tokens;
+  @include radius.tokens;
+}
+
+// prefers-reduced-motion 收敛到一处：把动效时长令牌压成 0ms。
+// 页面 / 组件只要过渡用的是 var(--bew-motion-*) 或 var(--bew-native-dur)，
+// 就会随这一处自动降级，不需要每个文件再写一遍 transition: none。
+@media (prefers-reduced-motion: reduce) {
+  :root,
+  :host {
+    @include motion.reduced-tokens;
+  }
 }
 /* #endregion */

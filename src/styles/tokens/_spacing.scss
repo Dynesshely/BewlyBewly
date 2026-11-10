@@ -1,0 +1,21 @@
+// 全站间距令牌：4px 基准的 6 档间距。
+//
+// 命名后缀就是像素值（--bew-space-16 = 16px），便于一眼换算；
+// Sass 变量给编译期使用，CSS 自定义属性在 main.scss 的 :root 暴露。
+
+$space-4: 4px;
+$space-8: 8px;
+$space-12: 12px;
+$space-16: 16px;
+$space-24: 24px;
+$space-32: 32px;
+
+/// 在 `:root` / `:host` 上输出间距令牌
+@mixin tokens {
+  --bew-space-4: #{$space-4};
+  --bew-space-8: #{$space-8};
+  --bew-space-12: #{$space-12};
+  --bew-space-16: #{$space-16};
+  --bew-space-24: #{$space-24};
+  --bew-space-32: #{$space-32};
+}

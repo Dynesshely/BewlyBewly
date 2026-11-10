@@ -1,62 +1,59 @@
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
+
+import { settings } from '~/logic'
 
 /**
- * 是否渲染悬停操作条（点赞 / 收藏 / 稍后再看）。
+ * 悬停操作条（点赞 / 收藏 / 稍后再看）开关。
  *
- * 本轮的设置页开关由 Lead 要求共用 `localStorage`（不新增 storage 字段）：
- * key `bewly-card-quick-actions`，`'1'` 开 / `'0'` 关，缺省视为开启。
- * 设置页「页面增强 → 视频卡片 → 悬停操作条」与卡片渲染共用同一个响应式状态。
+ * 第 9 轮起正式开关是 `settings.enableVideoCardQuickActions`（设置页「页面增强 → 视频卡片 → 悬停操作条」）。
+ * 第 8 轮写在 localStorage 的 `bewly-card-quick-actions` 只用于一次性迁移：
+ * 仅旧值为 `'0'` 且设置仍为默认（开启）时写入关闭，随后删除旧 key。
  */
-export const CARD_QUICK_ACTIONS_STORAGE_KEY = 'bewly-card-quick-actions'
+export const LEGACY_CARD_QUICK_ACTIONS_STORAGE_KEY = 'bewly-card-quick-actions'
 
-const DEFAULT_ENABLED = true
+let migrated = false
 
-function readStored(): boolean {
+/**
+ * 迁移旧的 localStorage 开关。
+ *
+ * 必须在 settings 已经从 storage 读回之后再调用（卡片的 setup / 设置页 setup 都满足），
+ * 避免与 `useStorageAsync` 的异步读取竞态。
+ */
+export function migrateLegacyCardQuickActionsSetting(): void {
+  if (migrated)
+    return
+  migrated = true
+
   try {
-    const raw = window.localStorage.getItem(CARD_QUICK_ACTIONS_STORAGE_KEY)
-    return raw === null
-      ? DEFAULT_ENABLED
-      : raw !== '0'
+    const raw = window.localStorage.getItem(LEGACY_CARD_QUICK_ACTIONS_STORAGE_KEY)
+    if (raw === null)
+      return
+    window.localStorage.removeItem(LEGACY_CARD_QUICK_ACTIONS_STORAGE_KEY)
+
+    if (raw !== '0')
+      return
+    if (settings.value.enableVideoCardQuickActions === false)
+      return
+    settings.value.enableVideoCardQuickActions = false
   }
   catch {
-    return DEFAULT_ENABLED
+    // 隐私模式 / 存储被禁用时忽略，沿用 settings 默认值（开启）
   }
 }
 
-const enabled = ref<boolean>(readStored())
-
-function writeStored(value: boolean) {
-  try {
-    window.localStorage.setItem(CARD_QUICK_ACTIONS_STORAGE_KEY, value ? '1' : '0')
-  }
-  catch {
-    // 隐私模式 / 存储被禁用时忽略，本次会话内仍然按内存值生效
-  }
-}
-
-// 其他标签页改了这个开关时同步（同标签页的写入由 setCardQuickActionsEnabled 负责）
-if (typeof window !== 'undefined') {
-  window.addEventListener('storage', (event) => {
-    if (event.key === CARD_QUICK_ACTIONS_STORAGE_KEY) {
-      enabled.value = event.newValue === null
-        ? DEFAULT_ENABLED
-        : event.newValue !== '0'
-    }
-  })
-}
-
-/** 卡片渲染时用的只读状态 */
-export const cardQuickActionsEnabled = computed(() => enabled.value)
+/** 卡片渲染时用的只读状态（设置页改动会实时反映到卡片） */
+export const cardQuickActionsEnabled = computed(() => settings.value.enableVideoCardQuickActions !== false)
 
 export function isCardQuickActionsEnabled(): boolean {
-  return enabled.value
+  return cardQuickActionsEnabled.value
 }
 
+/** 程序化切换（与设置页共用同一个 settings 字段） */
 export function setCardQuickActionsEnabled(value: boolean): void {
-  enabled.value = value
-  writeStored(value)
+  migrateLegacyCardQuickActionsSetting()
+  settings.value.enableVideoCardQuickActions = value
 }
 
 export function toggleCardQuickActions(): void {
-  setCardQuickActionsEnabled(!enabled.value)
+  setCardQuickActionsEnabled(!isCardQuickActionsEnabled())
 }

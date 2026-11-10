@@ -4,6 +4,7 @@ import { isFocusBrowseActive } from '~/composables/useFocusBrowse'
 import {
   getActiveShortcutScopes,
   getEntryKeyTokens,
+  getPaletteExecutableEntries,
   getPaletteShortcutEntries,
   matchesShortcutQuery,
   scopeLabelKey,
@@ -23,6 +24,8 @@ interface Command {
   reference?: boolean
   /** 快捷键条目所属页面的中文名（参考条目用来区分同名动作） */
   scopeLabel?: string
+  /** 该命令对应的 App 层全局事件名（注册表可执行条目与面板内置命令去重时用） */
+  event?: string
 }
 
 /** 按键片段 → 单行提示（组合键用 +，或关系用空格） */
@@ -79,6 +82,7 @@ const commands = computed<Command[]>(() => [
       ? t('command_palette.focus_browse_off')
       : t('command_palette.focus_browse_on'),
     hint: 'F',
+    event: 'command-toggle-focus-browse',
     run: () => emitter.emit('command-toggle-focus-browse'),
   },
   {
@@ -93,46 +97,85 @@ const commands = computed<Command[]>(() => [
     id: 'sort',
     label: t('command_palette.cycle_sort'),
     hint: 's',
+    event: 'command-cycle-sort',
     run: () => emitter.emit('command-cycle-sort'),
   },
   {
     id: 'filter',
     label: t('command_palette.cycle_filter'),
     hint: 'f',
+    event: 'command-cycle-filter',
     run: () => emitter.emit('command-cycle-filter'),
   },
   {
     id: 'info',
     label: t('command_palette.toggle_info'),
     hint: 'i',
+    event: 'toggle-card-info-detail',
     run: () => emitter.emit('toggle-card-info-detail'),
   },
   {
     id: 'search',
     label: t('command_palette.focus_search'),
     hint: '/',
+    event: 'command-focus-search',
     run: () => emitter.emit('command-focus-search'),
   },
   {
     id: 'ai-filter',
     label: t('command_palette.ai_filter'),
     hint: 'Shift+Q',
+    event: 'command-run-ai-filter',
     run: () => emitter.emit('command-run-ai-filter'),
   },
   {
     id: 'help',
     label: t('command_palette.show_help'),
     hint: '?',
+    event: 'toggle-keyboard-help',
     run: () => emitter.emit('toggle-keyboard-help'),
   },
   {
     id: 'settings',
     label: t('command_palette.open_settings'),
+    event: 'command-open-settings',
     run: () => emitter.emit('command-open-settings'),
   },
 ])
 
 const activeScopes = getActiveShortcutScopes()
+
+/**
+ * 注册表里带 `emitEvent` 的动作：App 层已有全局事件，命令面板可直接执行。
+ * 与面板内置命令按事件名去重，避免同一个动作出现两行（内置命令的文案会随状态变化）。
+ */
+const registryCommands = computed<Command[]>(() => {
+  const coveredEvents = new Set(
+    commands.value
+      .map(cmd => cmd.event)
+      .filter((event): event is string => Boolean(event)),
+  )
+
+  return getPaletteExecutableEntries()
+    .filter(entry => Boolean(entry.emitEvent) && !coveredEvents.has(entry.emitEvent as string))
+    .map((entry) => {
+      const { tokens, chord } = getEntryKeyTokens(entry, settings.value.keyboardShortcuts)
+      const eventName = entry.emitEvent as string
+      return {
+        id: `exec-${entry.id}`,
+        label: t(entry.i18nKey),
+        hint: formatKeyTokens(tokens, chord),
+        event: eventName,
+        run: () => emitter.emit(eventName),
+      } satisfies Command
+    })
+})
+
+/** 可执行命令 = 面板内置命令 + 注册表可执行动作（参考条目由 buildShortcutReferences 补在后面） */
+const executableCommands = computed<Command[]>(() => [
+  ...commands.value,
+  ...registryCommands.value,
+])
 
 /** 注册表里「不能安全触发」的快捷键条目：只展示，标灰 */
 function buildShortcutReferences(onlyCurrentScope: boolean): Command[] {
@@ -161,12 +204,16 @@ const filtered = computed(() => {
   if (!q) {
     // 未输入时不把整张注册表铺开，避免把命令挤下去；只补当前页相关的快捷键
     return [
-      ...commands.value,
+      ...executableCommands.value,
       ...buildShortcutReferences(true),
     ]
   }
 
-  const commandHits = commands.value.filter(cmd => cmd.label.toLowerCase().includes(q))
+  // 命令名 / 按键提示 / id 都参与匹配：可执行动作也能用快捷键片段搜到（例如输入 shift+z）
+  const commandHits = executableCommands.value.filter(cmd =>
+    cmd.label.toLowerCase().includes(q)
+    || (cmd.hint ?? '').toLowerCase().includes(q)
+    || cmd.id.toLowerCase().includes(q))
   const referenceHits = getPaletteShortcutEntries(settings.value.keyboardShortcuts, {})
     .filter((entry) => {
       const scopeLabel = t(scopeLabelKey(entry.scope))

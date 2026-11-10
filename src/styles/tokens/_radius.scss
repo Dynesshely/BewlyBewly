@@ -1,0 +1,17 @@
+// 全站圆角令牌：sm 8px / md 12px / lg 16px / pill 999px。
+//
+// 注意：`src/styles/variables.scss` 里已有 `--bew-radius: 12px`（历史主圆角），
+// 这里**不覆盖**它，只补 `--bew-radius-md` 作为同义别名，以及缺失的 sm / lg / pill。
+
+$radius-sm: 8px;
+$radius-md: 12px;
+$radius-lg: 16px;
+$radius-pill: 999px;
+
+/// 在 `:root` / `:host` 上输出圆角令牌
+@mixin tokens {
+  --bew-radius-sm: #{$radius-sm};
+  --bew-radius-md: #{$radius-md};
+  --bew-radius-lg: #{$radius-lg};
+  --bew-radius-pill: #{$radius-pill};
+}

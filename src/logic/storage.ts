@@ -160,6 +160,12 @@ export interface Settings {
   enableVideoCardPreview: boolean
   /** 首页卡片密度 */
   homeCardDensity: PageDensity
+  /** 视频卡悬停操作条（点赞 / 收藏 / 稍后再看） */
+  enableVideoCardQuickActions: boolean
+  /** 动态页离屏优化（content-visibility 虚拟列表） */
+  momentsOptimizeEnabled: boolean
+  /** 分区 / 热门 / 排行榜页密度 */
+  channelDensity: PageDensity
   /** 接管页拦截原版 B 站脚本（提升性能） */
   nativeGuardEnabled: boolean
   /** 在原生页面（搜索页等）应用屏蔽词过滤 */
@@ -300,6 +306,9 @@ export const originalSettings: Settings = {
   articleFontSize: 'm',
   enableVideoCardPreview: true,
   homeCardDensity: 'comfortable',
+  enableVideoCardQuickActions: true,
+  momentsOptimizeEnabled: true,
+  channelDensity: 'comfortable',
   nativeGuardEnabled: true,
   nativeFilterEnabled: false,
 

@@ -408,6 +408,10 @@
       contain: none !important;
       perspective: none !important;
       will-change: auto !important;
+      // 祖先链上只要有 z-index 就会建立层叠上下文，fixed 的播放器会被压到
+      // body::before 遮罩（z-index 2147483099）下面 —— 实测在番剧页表现为整页变灰。
+      // 这里把祖先的层叠上下文清掉，让播放器真正浮在根层叠上下文上。
+      z-index: auto !important;
     }
   }
   // #endregion

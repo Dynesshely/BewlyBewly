@@ -1,5 +1,6 @@
 export enum MenuType {
   General = 'General',
+  Keyboard = 'Keyboard',
   DesktopAndDock = 'DesktopAndDock',
   Appearance = 'Appearance',
   BewlyPages = 'BewlyPages',

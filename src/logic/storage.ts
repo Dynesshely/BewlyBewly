@@ -1,10 +1,14 @@
 import type { wallpaperItem } from '~/constants/imgs'
+import type { ShortcutActionId } from '~/constants/shortcuts'
 import type { HomeSubPage } from '~/contentScripts/views/Home/types'
 import type { AppPage } from '~/enums/appEnums'
 import { useStorageLocal } from '~/composables/useStorageLocal'
 
 export const storageDemo = useStorageLocal<string>('webext-demo', 'Storage Demo')
 export const accessKey = useStorageLocal<string>('accessKey', '')
+
+/** 键盘打开视频的方式 */
+export type KeyboardOpenAction = 'newTab' | 'currentTab' | 'preview'
 
 export interface Settings {
   touchScreenOptimization: boolean
@@ -105,6 +109,11 @@ export interface Settings {
   keyboardNavLockScroll: boolean
   /** 键盘卡片导航总开关；关闭后恢复原版鼠标点选 + 正常滚动 */
   keyboardNavEnabled: boolean
+  /** `Enter` / `Space` 在当前页打开时的行为：新标签页 / 当前标签页 / 页面内预览 */
+  keyboardEnterAction: KeyboardOpenAction
+  keyboardSpaceAction: KeyboardOpenAction
+  /** 自定义快捷键（只存与默认值不同的项） */
+  keyboardShortcuts: Partial<Record<ShortcutActionId, string>>
   /** 接管页拦截原版 B 站脚本（提升性能） */
   nativeGuardEnabled: boolean
   /** 在原生页面（搜索页等）应用屏蔽词过滤 */
@@ -223,6 +232,9 @@ export const originalSettings: Settings = {
   recommendationMode: 'web',
   keyboardNavLockScroll: true,
   keyboardNavEnabled: true,
+  keyboardEnterAction: 'newTab',
+  keyboardSpaceAction: 'preview',
+  keyboardShortcuts: {},
   nativeGuardEnabled: true,
   nativeFilterEnabled: false,
 

@@ -1,6 +1,12 @@
+import type { ShortcutActionId } from '~/constants/shortcuts'
 import { onMounted, onUnmounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useToast } from 'vue-toastification'
+import { comboMatches, resolveShortcut, SHORTCUT_ACTIONS } from '~/constants/shortcuts'
 import { settings } from '~/logic'
 import { isAiFilterReady, recordAiHistory, scoreCards } from '~/utils/ai'
+import api from '~/utils/api'
+import { getCSRF } from '~/utils/main'
 import emitter from '~/utils/mitt'
 
 const CARD_SELECTOR = '[data-video-card]'
@@ -96,6 +102,7 @@ interface ScrollInstance {
 }
 
 export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance | null | undefined) {
+  const { t } = useI18n()
   let activeIndex = 0
   let wheelAccum = 0
   let observer: MutationObserver | undefined
@@ -398,17 +405,91 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
     return Math.max(1, count)
   }
 
-  function openActive(target: '_blank' | '_self') {
+  /** 取卡片对应的视频地址 */
+  function getCardUrl(card: HTMLElement | undefined): string {
+    return card?.dataset.videoUrl
+      || card?.querySelector<HTMLAnchorElement>('a[href*="/video/"]')?.href
+      || ''
+  }
+
+  function getCurrentCard(): HTMLElement | undefined {
     const cards = getVisibleCards()
     const current = findActiveIndex(cards)
-    const index = current >= 0
+    return cards[current >= 0
       ? current
-      : activeIndex
-    const url = cards[index]?.dataset.videoUrl
-      || cards[index]?.querySelector<HTMLAnchorElement>('a[href*="/video/"]')?.href
+      : activeIndex]
+  }
+
+  /**
+   * 按设置里的打开方式打开当前卡片：
+   * - newTab：新标签页
+   * - currentTab：当前标签页真实跳转
+   * - preview：页面内预览抽屉（iframe）
+   */
+  function openActive(mode: 'newTab' | 'currentTab' | 'preview') {
+    const url = getCardUrl(getCurrentCard())
     if (!url)
       return
-    window.open(url, target)
+    if (mode === 'preview') {
+      emitter.emit('open-video-preview', url)
+    }
+    else {
+      window.open(url, mode === 'newTab'
+        ? '_blank'
+        : '_self')
+    }
+  }
+
+  /** 从卡片里解析出 aid（原生卡片没有 data-video-aid，退回 bvid 查询） */
+  async function resolveAid(card: HTMLElement | undefined): Promise<number> {
+    const direct = Number(card?.getAttribute('data-video-aid') || 0)
+    if (direct > 0)
+      return direct
+    const bvid = getCardUrl(card).match(/\/video\/(BV\w+)/)?.[1]
+    if (!bvid)
+      return 0
+    try {
+      const res = await api.video.getVideoInfo({ bvid })
+      if (res.code === 0)
+        return res.data.aid
+    }
+    catch {
+      // ignore
+    }
+    return 0
+  }
+
+  /** 把当前卡片加入「稍后再看」 */
+  async function addActiveToWatchLater() {
+    const toast = useToast()
+    const aid = await resolveAid(getCurrentCard())
+    if (!aid) {
+      toast.error(t('keyboard_toast.watch_later_failed'))
+      return
+    }
+    try {
+      const res = await api.watchlater.saveToWatchLater({
+        aid,
+        csrf: getCSRF(),
+      })
+      if (res.code === 0)
+        toast.success(t('keyboard_toast.watch_later_ok'))
+      else
+        toast.error(res.message || t('keyboard_toast.watch_later_failed'))
+    }
+    catch {
+      toast.error(t('keyboard_toast.watch_later_failed'))
+    }
+  }
+
+  /** 当前事件命中了哪个自定义动作 */
+  function resolveAction(event: KeyboardEvent): ShortcutActionId | null {
+    const overrides = settings.value.keyboardShortcuts
+    for (const action of SHORTCUT_ACTIONS) {
+      if (comboMatches(resolveShortcut(action.id, overrides), event))
+        return action.id
+    }
+    return null
   }
 
   /** 打开当前卡片右键菜单（原生卡片 / Bewly 卡片均尽力触发） */
@@ -431,8 +512,11 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
   function handleKeydown(event: KeyboardEvent) {
     if (event.defaultPrevented || event.isComposing)
       return
-    // Ctrl/Cmd + K：命令面板是全局入口，聚焦浏览模式下也要可用
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+
+    const overrides = settings.value.keyboardShortcuts
+
+    // 命令面板是全局入口：聚焦浏览模式下、键盘导航关闭时都要可用
+    if (comboMatches(resolveShortcut('commandPalette', overrides), event)) {
       event.preventDefault()
       emitter.emit('toggle-command-palette')
       return
@@ -443,16 +527,11 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
     // 键盘模式关闭：不接管其他按键，恢复原版鼠标点选
     if (!settings.value.keyboardNavEnabled)
       return
-    if (event.ctrlKey || event.metaKey || event.altKey)
-      return
     if (hasOpenModal() || isEditableTarget(event.target))
       return
 
     const cards = getVisibleCards()
     if (!cards.length)
-      return
-
-    if ((event.key === 'Enter' || event.key === ' ') && isFocusOnInteractiveElement())
       return
 
     const current = findActiveIndex(cards)
@@ -461,89 +540,89 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
       : activeIndex
     const columns = getColumns(cards)
 
+    // 方向键 / Home / End 是导航语义（网格模式要按列数换算），保持固定
     switch (event.key) {
       case 'ArrowRight':
         event.preventDefault()
         setActive(base + 1)
-        break
+        return
       case 'ArrowLeft':
         event.preventDefault()
         setActive(base - 1)
-        break
+        return
       case 'ArrowDown':
         event.preventDefault()
         setActive(base + columns)
-        break
+        return
       case 'ArrowUp':
         event.preventDefault()
         setActive(base - columns)
-        break
+        return
       case 'Home':
         event.preventDefault()
         setActive(0)
-        break
+        return
       case 'End':
         event.preventDefault()
         setActive(cards.length - 1)
+        return
+      default:
         break
-      case 'Enter':
-        event.preventDefault()
-        openActive('_blank')
+    }
+
+    const action = resolveAction(event)
+    if (!action)
+      return
+
+    // Enter / Space 落在按钮、链接等可交互元素上时交给原生行为
+    if ((action === 'openNewTab' || action === 'openInPage') && isFocusOnInteractiveElement())
+      return
+
+    event.preventDefault()
+
+    switch (action) {
+      case 'openNewTab':
+        openActive(settings.value.keyboardEnterAction)
         break
-      case ' ':
-        event.preventDefault()
-        openActive('_self')
+      case 'openInPage':
+        openActive(settings.value.keyboardSpaceAction)
         break
-      case '1':
-      case '2':
-      case '3':
-      case '4':
-      case '5':
-      case '6':
-        event.preventDefault()
-        emitter.emit('switch-home-tab', Number(event.key) - 1)
+      case 'watchLater':
+        void addActiveToWatchLater()
         break
-      case '/':
-        event.preventDefault()
-        focusSearchBar()
-        break
-      case 'd':
-        event.preventDefault()
+      case 'contextMenu':
         openContextMenu(cards[base])
         break
-      case 's': {
-        event.preventDefault()
+      case 'cycleSort': {
         const next = SORT_ORDER[(SORT_ORDER.indexOf(cardSortMode.value) + 1) % SORT_ORDER.length]
         cardSortMode.value = next
         applyFilterAndSort()
         break
       }
-      case 'f': {
-        event.preventDefault()
+      case 'cycleFilter': {
         const next = FILTER_ORDER[(FILTER_ORDER.indexOf(cardFilterMode.value) + 1) % FILTER_ORDER.length]
         cardFilterMode.value = next
         applyFilterAndSort()
         break
       }
-      case 'i':
-        event.preventDefault()
+      case 'toggleInfo':
         emitter.emit('toggle-card-info-detail')
         break
-      case 'q': {
-        event.preventDefault()
-        const card = cards[base]
-        if (card)
-          emitter.emit('queue-card', extractCardInfo(card))
+      case 'queueCard':
+        if (cards[base])
+          emitter.emit('queue-card', extractCardInfo(cards[base]))
         break
-      }
-      case 'Q': {
-        event.preventDefault()
+      case 'aiFilter':
         void runAiFilter()
         break
-      }
-      case '?':
-        event.preventDefault()
+      case 'focusSearch':
+        focusSearchBar()
+        break
+      case 'toggleHelp':
         emitter.emit('toggle-keyboard-help')
+        break
+      case 'toggleFocusBrowse':
+        emitter.emit('command-toggle-focus-browse')
         break
       default:
         break

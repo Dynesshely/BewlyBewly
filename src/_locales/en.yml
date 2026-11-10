@@ -35,6 +35,7 @@ keyboard_help:
   sort_filter: Cycle card sort / filter
   info_detail: Toggle detailed card info
   queue: Add card to local watch queue
+  watch_later: Add current video to Watch Later
   focus_browse: Enter focus browse (cover flow)
   focus_browse_exit: Exit focus browse / close overlay
 
@@ -106,6 +107,34 @@ settings:
   menu_home: Home
   menu_compatibility: Compatibility
   menu_about: About
+  menu_keyboard: Keyboard
+  keyboard_open_opt:
+    new_tab: New tab
+    current_tab: Current tab
+    preview: In-page preview
+  group_keyboard_open_mode: Keyboard open mode
+  keyboard_enter_action: Enter opens with
+  keyboard_space_action: Space opens with
+  keyboard_open_mode_desc: How the current card opens when you press the key
+  group_keyboard_shortcuts: Custom shortcuts
+  keyboard_press_key: Press a key…
+  keyboard_disabled: Disabled
+  keyboard_reset: Reset
+  keyboard_restore_defaults: Restore all defaults
+  keyboard_conflict: 'Key already used by “{action}”'
+  keyboard_action_open_new_tab: 'Enter: open current video in a new tab'
+  keyboard_action_open_in_page: 'Space: open current video in page (preview by default)'
+  keyboard_action_watch_later: Add current video to Watch Later
+  keyboard_action_context_menu: "Open current card's context menu"
+  keyboard_action_cycle_sort: Cycle card sort order
+  keyboard_action_cycle_filter: Cycle card filter
+  keyboard_action_toggle_info: Toggle detailed card info
+  keyboard_action_queue_card: Add card to local watch queue
+  keyboard_action_ai_filter: Run AI screening on current page
+  keyboard_action_focus_search: Focus the search bar
+  keyboard_action_toggle_help: Show / hide shortcut help
+  keyboard_action_toggle_focus_browse: Enter / exit focus browse
+  keyboard_action_command_palette: Open the command palette
 
   # Settings group
   group_common: Common
@@ -561,3 +590,7 @@ watch_later:
 search_bar:
   history_title: Search History
   clear_history: Clear search history
+
+keyboard_toast:
+  watch_later_ok: Added to Watch Later
+  watch_later_failed: Failed to add to Watch Later

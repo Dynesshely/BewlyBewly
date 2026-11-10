@@ -35,6 +35,7 @@ keyboard_help:
   sort_filter: 切换卡片排序 / 筛选
   info_detail: 切换卡片详细信息
   queue: 把卡片加入本地待看队列
+  watch_later: 把当前视频加入稍后再看
   focus_browse: 进入聚焦浏览（封面流）
   focus_browse_exit: 退出聚焦浏览 / 关闭浮层
 
@@ -106,6 +107,34 @@ settings:
   menu_home: 首页
   menu_compatibility: 兼容性
   menu_about: 关于
+  menu_keyboard: 键盘与快捷键
+  keyboard_open_opt:
+    new_tab: 新标签页
+    current_tab: 当前标签页
+    preview: 页面内预览
+  group_keyboard_open_mode: 键盘打开方式
+  keyboard_enter_action: Enter 打开方式
+  keyboard_space_action: Space 打开方式
+  keyboard_open_mode_desc: 决定按下对应按键时如何打开当前卡片
+  group_keyboard_shortcuts: 自定义快捷键
+  keyboard_press_key: 请按键…
+  keyboard_disabled: 已禁用
+  keyboard_reset: 恢复默认
+  keyboard_restore_defaults: 恢复全部默认快捷键
+  keyboard_conflict: '该按键已被「{action}」占用'
+  keyboard_action_open_new_tab: Enter：在新标签页打开当前视频
+  keyboard_action_open_in_page: Space：在当前页打开视频（默认页面内预览）
+  keyboard_action_watch_later: 把当前视频加入稍后再看
+  keyboard_action_context_menu: 打开当前卡片的右键菜单
+  keyboard_action_cycle_sort: 切换卡片排序
+  keyboard_action_cycle_filter: 切换卡片筛选
+  keyboard_action_toggle_info: 切换卡片详细信息
+  keyboard_action_queue_card: 把卡片加入本地待看队列
+  keyboard_action_ai_filter: 对当前页执行 AI 初筛
+  keyboard_action_focus_search: 聚焦搜索框
+  keyboard_action_toggle_help: 显示 / 隐藏快捷键帮助
+  keyboard_action_toggle_focus_browse: 进入 / 退出聚焦浏览
+  keyboard_action_command_palette: 打开命令面板
 
   # Settings group
   group_common: 通用
@@ -558,3 +587,7 @@ watch_later:
 search_bar:
   history_title: 搜索历史
   clear_history: 清空搜索历史
+
+keyboard_toast:
+  watch_later_ok: 已加入稍后再看
+  watch_later_failed: 加入稍后再看失败

@@ -78,9 +78,10 @@ test.describe('键盘卡片导航', () => {
       await page.keyboard.press('Enter')
       await expect.poll(() => context.pages().length, { timeout: 10_000 }).toBeGreaterThan(tabsBefore)
 
-      // 空格：当前标签打开
+      // 空格：默认在页面内预览抽屉里打开（可在设置 → 键盘里改成当前页跳转 / 新标签页）
       await page.keyboard.press('Space')
-      await expect.poll(() => page.url(), { timeout: 10_000 }).toContain('/video/BVTEST')
+      const drawerVisible = () => page.evaluate(() => !!document.querySelector('#bewly')?.shadowRoot?.querySelector('.bewly-iframe-drawer'))
+      await expect.poll(drawerVisible, { timeout: 10_000 }).toBe(true)
     }
     finally {
       await context.close()

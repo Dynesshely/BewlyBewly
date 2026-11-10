@@ -35,6 +35,7 @@ keyboard_help:
   sort_filter: 切換卡片排序 / 篩選
   info_detail: 切換卡片詳細資訊
   queue: 把卡片加入本地待看清單
+  watch_later: 把目前影片加入稍後再看
   focus_browse: 進入聚焦瀏覽（封面流）
   focus_browse_exit: 退出聚焦瀏覽 / 關閉浮層
 
@@ -105,6 +106,34 @@ settings:
   menu_home: 首頁
   menu_search_page: 搜尋頁
   menu_about: 關於
+  menu_keyboard: 鍵盤與快捷鍵
+  keyboard_open_opt:
+    new_tab: 新分頁
+    current_tab: 目前分頁
+    preview: 頁面內預覽
+  group_keyboard_open_mode: 鍵盤開啟方式
+  keyboard_enter_action: Enter 開啟方式
+  keyboard_space_action: Space 開啟方式
+  keyboard_open_mode_desc: 決定按下對應按鍵時如何開啟目前卡片
+  group_keyboard_shortcuts: 自訂快捷鍵
+  keyboard_press_key: 請按鍵…
+  keyboard_disabled: 已停用
+  keyboard_reset: 恢復預設
+  keyboard_restore_defaults: 恢復全部預設快捷鍵
+  keyboard_conflict: '該按鍵已被「{action}」佔用'
+  keyboard_action_open_new_tab: Enter：在新分頁開啟目前影片
+  keyboard_action_open_in_page: Space：在目前頁開啟影片（預設頁面內預覽）
+  keyboard_action_watch_later: 把目前影片加入稍後再看
+  keyboard_action_context_menu: 開啟目前卡片的右鍵選單
+  keyboard_action_cycle_sort: 切換卡片排序
+  keyboard_action_cycle_filter: 切換卡片篩選
+  keyboard_action_toggle_info: 切換卡片詳細資訊
+  keyboard_action_queue_card: 把卡片加入本機待看清單
+  keyboard_action_ai_filter: 對目前頁執行 AI 初篩
+  keyboard_action_focus_search: 聚焦搜尋框
+  keyboard_action_toggle_help: 顯示 / 隱藏快捷鍵說明
+  keyboard_action_toggle_focus_browse: 進入 / 退出聚焦瀏覽
+  keyboard_action_command_palette: 開啟命令面板
   menu_compatibility: 相容性
 
   # Settings group
@@ -559,3 +588,7 @@ watch_later:
 search_bar:
   history_title: 搜尋記錄
   clear_history: 清除所有搜尋記錄
+
+keyboard_toast:
+  watch_later_ok: 已加入稍後再看
+  watch_later_failed: 加入稍後再看失敗

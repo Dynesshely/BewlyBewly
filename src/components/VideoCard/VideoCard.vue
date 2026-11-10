@@ -260,6 +260,7 @@ provide('getVideoType', () => props.type!)
     :style="{ contentVisibility }"
     data-video-card
     :data-video-url="videoUrl || ''"
+    :data-video-aid="video?.id ?? ''"
     :data-video-title="video?.title || ''"
     :data-video-duration="video?.duration ?? video?.durationStr ?? ''"
     :data-video-view="video?.view ?? video?.viewStr ?? ''"

@@ -1,4 +1,10 @@
 import { onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useToast } from 'vue-toastification'
+import { comboMatches, resolveShortcut, SHORTCUT_ACTIONS } from '~/constants/shortcuts'
+import { settings } from '~/logic'
+import api from '~/utils/api'
+import { getCSRF } from '~/utils/main'
 import emitter from '~/utils/mitt'
 
 /**
@@ -603,27 +609,33 @@ function getActiveCardUrl(): string {
     || ''
 }
 
-/**
- * 在当前页打开内嵌预览（iframe 抽屉）。
- * 与网格模式下点击卡片、或设置里「抽屉打开」一致，不改变地址栏 URL。
- */
-export function openFocusActiveCardPreview() {
+/** 按指定方式打开当前 active 卡片 */
+export function openFocusActiveCard(mode: 'newTab' | 'currentTab' | 'preview') {
   if (!isFocusBrowseActive())
     return
   const url = getActiveCardUrl()
   if (!url)
     return
-  emitter.emit('open-video-preview', url)
+  if (mode === 'preview') {
+    emitter.emit('open-video-preview', url)
+  }
+  else {
+    window.open(url, mode === 'newTab'
+      ? '_blank'
+      : '_self')
+  }
 }
 
-/** 打开当前 active 卡片 */
-export function openFocusActiveCard(target: '_blank' | '_self') {
-  if (!isFocusBrowseActive())
-    return
-  const url = getActiveCardUrl()
-  if (!url)
-    return
-  window.open(url, target)
+/** 当前事件命中了哪个自定义动作 */
+function resolveFocusAction(event: KeyboardEvent): string | null {
+  const overrides = settings.value.keyboardShortcuts
+  for (const action of SHORTCUT_ACTIONS) {
+    if (action.id === 'commandPalette')
+      continue
+    if (comboMatches(resolveShortcut(action.id, overrides), event))
+      return action.id
+  }
+  return null
 }
 
 export function isFocusBrowseActive(): boolean {
@@ -636,6 +648,45 @@ export function getFocusIndex(): number {
 
 /** 在 App 层安装：监听开关、快捷键与尺寸变化 */
 export function useFocusBrowse() {
+  const { t } = useI18n()
+
+  /** 把当前 active 卡片加入「稍后再看」 */
+  async function addActiveToWatchLater() {
+    const toast = useToast()
+    const card = cardEls[activeIndex]
+    let aid = Number(card?.getAttribute('data-video-aid') || 0)
+    if (!aid) {
+      const bvid = getActiveCardUrl().match(/\/video\/(BV\w+)/)?.[1]
+      if (bvid) {
+        try {
+          const info = await api.video.getVideoInfo({ bvid })
+          if (info.code === 0)
+            aid = info.data.aid
+        }
+        catch {
+          // ignore
+        }
+      }
+    }
+    if (!aid) {
+      toast.error(t('keyboard_toast.watch_later_failed'))
+      return
+    }
+    try {
+      const res = await api.watchlater.saveToWatchLater({
+        aid,
+        csrf: getCSRF(),
+      })
+      if (res.code === 0)
+        toast.success(t('keyboard_toast.watch_later_ok'))
+      else
+        toast.error(res.message || t('keyboard_toast.watch_later_failed'))
+    }
+    catch {
+      toast.error(t('keyboard_toast.watch_later_failed'))
+    }
+  }
+
   function onKeydown(event: KeyboardEvent) {
     if (!isFocusBrowseActive())
       return
@@ -650,14 +701,29 @@ export function useFocusBrowse() {
       exitFocusBrowse()
       return
     }
-    if (event.key === 'Enter') {
+    // 可自定义动作（Enter / Space 的打开方式由设置决定）
+    const action = resolveFocusAction(event)
+    if (action) {
       event.preventDefault()
-      openFocusActiveCard('_blank')
-      return
-    }
-    if (event.key === ' ') {
-      event.preventDefault()
-      openFocusActiveCardPreview()
+      switch (action) {
+        case 'openNewTab':
+          openFocusActiveCard(settings.value.keyboardEnterAction)
+          break
+        case 'openInPage':
+          openFocusActiveCard(settings.value.keyboardSpaceAction)
+          break
+        case 'watchLater':
+          void addActiveToWatchLater()
+          break
+        case 'toggleHelp':
+          emitter.emit('toggle-keyboard-help')
+          break
+        case 'toggleFocusBrowse':
+          exitFocusBrowse()
+          break
+        default:
+          break
+      }
       return
     }
     if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {

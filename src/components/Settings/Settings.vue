@@ -14,6 +14,7 @@ const { t } = useI18n()
 
 const settingsMenu = {
   [MenuType.General]: defineAsyncComponent(() => import('./General/General.vue')),
+  [MenuType.Keyboard]: defineAsyncComponent(() => import('./Keyboard/Keyboard.vue')),
   [MenuType.DesktopAndDock]: defineAsyncComponent(() => import('./DesktopAndDock/DesktopAndDock.vue')),
   [MenuType.Appearance]: defineAsyncComponent(() => import('./Appearance/Appearance.vue')),
   [MenuType.BewlyPages]: defineAsyncComponent(() => import('./BewlyPages/BewlyPages.vue')),
@@ -54,6 +55,12 @@ const settingsMenuItems = computed((): MenuItem[] => {
       icon: 'i-mingcute:settings-3-line',
       iconActivated: 'i-mingcute:settings-3-fill',
       title: t('settings.menu_general'),
+    },
+    {
+      value: MenuType.Keyboard,
+      icon: 'i-mingcute:keyboard-line',
+      iconActivated: 'i-mingcute:keyboard-fill',
+      title: t('settings.menu_keyboard'),
     },
     {
       value: MenuType.DesktopAndDock,

@@ -138,6 +138,20 @@ test.describe('聚焦浏览（Cover Flow）', () => {
       })
       const settingsOpen = () => page.evaluate(() => !!document.querySelector('#bewly')?.shadowRoot?.querySelector('#settings-window'))
       await expect.poll(settingsOpen, { timeout: 15_000 }).toBe(true)
+      // 等设置内容真正渲染（异步 chunk），否则滚动高度还是 0
+      await expect.poll(() => page.evaluate(() => {
+        const root = document.querySelector('#bewly')?.shadowRoot
+        return (root?.querySelectorAll('#settings-window .left-content, #settings-window .keyboard-shortcut-row')?.length ?? 0) > 0
+      }), { timeout: 15_000 }).toBe(true)
+      await expect.poll(() => page.evaluate(() => {
+        const root = document.querySelector('#bewly')?.shadowRoot
+        const win = root?.querySelector('#settings-window')
+        const scroller = win?.querySelector('.os-viewport') || win?.querySelector('[data-overlayscrollbars-viewport]')
+        return scroller
+          ? scroller.scrollHeight - scroller.clientHeight
+          : 0
+      }), { timeout: 10_000 }).toBeGreaterThan(0)
+
       const settingsScrollTop = () => page.evaluate(() => {
         const root = document.querySelector('#bewly')?.shadowRoot
         const win = root?.querySelector('#settings-window')

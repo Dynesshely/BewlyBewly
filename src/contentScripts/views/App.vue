@@ -113,6 +113,10 @@ const handlePageRefresh = ref<() => void>()
 const handleReachBottom = ref<() => void>()
 const handleThrottledPageRefresh = useThrottleFn(() => handlePageRefresh.value?.(), 500)
 const handleThrottledReachBottom = useThrottleFn(() => handleReachBottom.value?.(), 500)
+// 聚焦浏览没有原生滚动，触底哨兵不会触发；由它显式请求下一页
+emitter.on('focus-browse-reach-end', () => {
+  handleThrottledReachBottom()
+})
 const handleThrottledBackToTop = useThrottleFn(() => handleBackToTop(), 1000)
 const topBarRef = ref()
 const reachTop = ref<boolean>(true)
@@ -425,6 +429,7 @@ onUnmounted(() => {
   emitter.off('toggle-command-palette')
   emitter.off('command-open-settings')
   emitter.off('open-video-preview')
+  emitter.off('focus-browse-reach-end')
   emitter.off('toggle-keyboard-help')
   emitter.off('keyboard-active-card')
   emitter.off('toggle-card-info-detail')

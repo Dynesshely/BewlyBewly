@@ -53,17 +53,34 @@ function collectCards(): HTMLElement[] {
   return Array.from(root.querySelectorAll<HTMLElement>('[data-video-card]'))
 }
 
-/** 按 URL 找回 active 卡片索引（DOM 被重新渲染时使用） */
+/**
+ * 按 URL 找回 active 卡片索引（DOM 被重新渲染时使用）。
+ *
+ * 刻意不再回退到 data-keyboard-active 属性：
+ * 卡片是绝对定位、Vue 重渲染会复用节点，旧属性可能残留在别的卡片上
+ * （实测加载更多后属性留在第 0 张，导致视图直接跳回开头）。
+ * URL 无从匹配时（例如骨架卡还没拿到链接）宁可保持索引不变。
+ */
 function findActiveIndex(cards: HTMLElement[]): number {
   if (activeUrl) {
     const idx = cards.findIndex(card => card.getAttribute('data-video-url') === activeUrl)
     if (idx >= 0)
       return idx
   }
-  const byAttr = cards.findIndex(card => card.hasAttribute(ACTIVE_ATTR))
-  if (byAttr >= 0)
-    return byAttr
   return Math.min(activeIndex, Math.max(0, cards.length - 1))
+}
+
+/** 把 data-keyboard-active 收敛到当前 active 卡片上（重渲染后清理残留） */
+function syncActiveAttr() {
+  cardEls.forEach((card, index) => {
+    if (index === activeIndex) {
+      if (!card.hasAttribute(ACTIVE_ATTR))
+        card.setAttribute(ACTIVE_ATTR, '')
+    }
+    else if (card.hasAttribute(ACTIVE_ATTR)) {
+      card.removeAttribute(ACTIVE_ATTR)
+    }
+  })
 }
 
 /** 找到卡片所在的网格容器（把它的定位上下文变成聚焦模式的舞台） */
@@ -81,6 +98,15 @@ function resolveStage(cards: HTMLElement[]): HTMLElement | null {
 }
 
 let transitionsSettled = false
+/** 距末尾多少张时预取下一页 */
+const PREFETCH_DISTANCE = 2
+/** 上次请求加载的时间，避免一次滚动触发多次加载 */
+let lastLoadRequestAt = 0
+/** 加载完成后是否要顺延到下一张（用户继续向前浏览） */
+let pendingAdvance = 0
+/** 顺延那一次不要再触发预取，否则会连续翻页加载 */
+let suppressPrefetch = false
+
 /** 统一卡片高度（偶数）；0 表示需要重新测量 */
 let cardHeight = 0
 
@@ -94,7 +120,13 @@ function applyTransforms() {
   if (fresh.length !== cardEls.length || fresh.some((card, i) => card !== cardEls[i])) {
     cardEls = fresh
     activeIndex = findActiveIndex(fresh)
+    syncActiveAttr()
   }
+  // 骨架卡在数据到达后才有 URL，这里回填，避免下一步 realign 失去锚点
+  const currentCard = cardEls[activeIndex]
+  const currentUrl = currentCard?.getAttribute('data-video-url')
+  if (currentUrl)
+    activeUrl = currentUrl
   const cards = cardEls
   const stage = rootEl
   const stageRect = stage?.getBoundingClientRect()
@@ -428,11 +460,20 @@ export function enterFocusBrowse() {
       hideNonCardBranches(rootEl, next)
       // 只在卡片数量真的变化时才禁用过渡；否则每次 DOM 变动都重置会造成视觉"跳一下"
       if (next.length !== lastCount) {
+        const previousCount = lastCount
         lastCount = next.length
         transitionsSettled = false
         // 卡片数量变化意味着内容整体变化，旧的统一高度不再可靠
         cardHeight = 0
         applyTransforms()
+        // 新内容到达且用户正在向前浏览：顺延到下一张，保持连续体验
+        if (pendingAdvance && cardEls.length > previousCount) {
+          const advance = pendingAdvance
+          pendingAdvance = 0
+          suppressPrefetch = true
+          focusMove(advance)
+          suppressPrefetch = false
+        }
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             transitionsSettled = true
@@ -476,11 +517,38 @@ export function exitFocusBrowse() {
   emitter.emit('focus-browse-change', { active: false })
 }
 
+/**
+ * 通知页面加载更多内容。
+ *
+ * 聚焦模式下卡片是绝对定位在舞台里的，触底哨兵（reachBottomSentinel）被隐藏、
+ * 滚动容器也不再有滚动，原生 IntersectionObserver 永远不会触发，
+ * 所以这里显式发出请求，由 App.vue 转给当前页的 handleReachBottom。
+ */
+function requestMoreCards(willAdvance: boolean) {
+  const now = Date.now()
+  if (now - lastLoadRequestAt >= 1000) {
+    lastLoadRequestAt = now
+    emitter.emit('focus-browse-reach-end', cardEls.length)
+  }
+  // 只有用户确实想继续往前（已经顶到末尾）时才自动顺延；
+  // 单纯预取不应该在数据到达后把视图往前推一张。
+  if (willAdvance)
+    pendingAdvance = 1
+}
+
 /** 切换 active（聚焦模式下由键盘/滚轮调用） */
 export function focusMove(delta: number) {
   if (!document.documentElement.classList.contains(FOCUS_CLASS))
     return
   const next = Math.max(0, Math.min(cardEls.length - 1, activeIndex + delta))
+  if (!suppressPrefetch && delta > 0) {
+    // 顶到末尾：请求加载，等新内容到达后自动顺延一张
+    if (next === activeIndex)
+      requestMoreCards(true)
+    // 接近末尾：只预取，不移动视图
+    else if (next >= cardEls.length - 1 - PREFETCH_DISTANCE)
+      requestMoreCards(false)
+  }
   if (next === activeIndex)
     return
   cardEls[activeIndex]?.removeAttribute(ACTIVE_ATTR)
@@ -594,6 +662,17 @@ export function useFocusBrowse() {
     if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
       event.preventDefault()
       focusMove(-1)
+      return
+    }
+    // Home / End 与网格模式保持一致
+    if (event.key === 'Home') {
+      event.preventDefault()
+      focusMove(-cardEls.length)
+      return
+    }
+    if (event.key === 'End') {
+      event.preventDefault()
+      focusMove(cardEls.length)
     }
   }
 

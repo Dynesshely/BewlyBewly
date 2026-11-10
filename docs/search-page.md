@@ -174,3 +174,81 @@ teardownSearchEnhance()
 - `pnpm run typecheck`（`vue-tsc`）：0 error
 - 未修改 `App.vue` / `contentScripts/index.ts` / `storage.ts` / `_locales` / `nativeOverlay` /
   `main.scss`；未跑 build / playwright；未启动浏览器；未做 git 操作
+
+---
+
+## 附：Bewly 搜索起始页「真实热搜」（第 11 轮 A）
+
+> 本文档主体描述的是**原生搜索结果页**的增强浮层（`src/contentScripts/searchPage/`）。
+> 本附节记录的是 **Bewly 搜索起始页**（`src/contentScripts/views/Search/`）的第 11 轮改动，
+> 两者是不同页面/不同模块，互不依赖。
+
+### 1. 真实热搜数据来源
+
+- 接口：`api.search.getHotSearchWords()`（Lead 已加在 background，只读）
+  → `https://s.search.bilibili.com/main/hotword`；
+- 实际结构：`res.data.trending.list[]`，条目里通常有 `keyword`（检索词）与 `show_name`（展示名）；
+- **防御式解析**（`composables/useHotSearch.ts` 的 `parseHotSearchResponse`）：
+  - 优先 `show_name`，回退 `keyword`，两者都为空就跳过；
+  - `list` 不是数组 / 条目不是对象 / 重复词全部跳过；
+  - 最多取 12 条；一个有效词都没解析出来就视为失败；
+  - 不新增任何接口、不修改 background。
+
+### 2. 展示与「换一批」
+
+- 面板「热门搜索」区显示 **8 条**（池子里最多 **12 条**）；
+- 「换一批」把展示窗口在 12 条池里后移 8 条并循环，例如第二批显示第 9–12 名 + 第 1–4 名；
+  **序号仍然是真实热搜排名**，不重新编号；
+- 序号徽标：胶囊左侧 18px 小徽标，**前三名用主题色**（`--bew-theme-color` / `--bew-theme-color-10`），
+  其余用 `--bew-fill-2` + `--bew-text-3`；
+- 「换一批」在池子不足 8 条或请求中时禁用（`disabled` + `title`）。
+
+### 3. 回落与缓存
+
+| 情况 | 行为 |
+| --- | --- |
+| 请求成功且解析出 ≥1 条 | 显示真实热搜；写入内存缓存；底部提示「来自 B 站实时热搜 · 结果缓存 10 分钟」 |
+| 请求失败 / `code !== 0`（含未登录）/ 返回空 / 结构异常 | 回落到内置词表（12 条，按当前语言），仍显示 8 条；底部提示「热搜加载失败或未登录，已回落到内置词表」并给「重试」 |
+| 缓存命中（10 分钟内） | 直接用缓存，不重复请求 |
+
+- 缓存：模块级内存 `setTimeout`-free 时间戳缓存，TTL **10 分钟**（`HOT_SEARCH_CACHE_TTL`）；
+  只在成功时写入，**失败结果不缓存**，下次进搜索页会重新尝试；
+- 刷新页面 / 收起再打开扩展会重置内存缓存；
+- 提供 `clearHotSearchCache()` 供调试 / 将来设置页「刷新热搜」复用。
+
+### 4. 搜索体验收尾
+
+- **直达粘贴提示的 Escape**：页面内粘贴 BV 号 / 链接出现「已识别…，正在打开」提示后，
+  按 `Esc` 会立即清掉提示与自动消失计时器（此前只能等 2.6 秒自动消失）；
+  监听挂在 `window` 的 keydown（不 preventDefault，不影响搜索框自己的 Esc 行为），组件卸载时解绑并清理计时器。
+- **窄屏不溢出**（≤640px）：
+  - 快捷面板 `max-width: 100%`、padding 20 → 16px；
+  - 胶囊 `max-width: 100%`、文本 `min-width: 0` + 省略号，长热词不会撑破；
+  - 直达表单 `flex-wrap`：输入框独占一行、按钮下一行居中；
+  - 粘贴开关文案允许换行，标题行顶部对齐；
+  - 搜索起始页 `margin-top: 14vh → 8vh`、左右留 12px，logo 与面板间距收窄。
+
+### 5. 文件清单
+
+- 新建 `src/contentScripts/views/Search/composables/useHotSearch.ts`：接口请求、防御式解析、10 分钟内存缓存、回落词池；
+- 修改 `src/contentScripts/views/Search/components/SearchQuickPanel.vue`：
+  真实热搜展示、序号徽标（前三主题色）、换一批轮换、来源提示 / 重试、窄屏样式；
+- 修改 `src/contentScripts/views/Search/Search.vue`：Escape 清理粘贴提示、窄屏布局；
+- 修改 `src/contentScripts/views/Search/i18n.ts`：`hot_title` 改为「热门搜索」，新增 `hot_retry` /
+  `hot_source_remote` / `hot_source_fallback`（移除旧的 `hot_hint`）。
+
+### 6. 已知限制
+
+- 热搜接口未登录也可能可用，但若被风控拦截或返回空，会走回落词表（不报错、不空白）；
+- 10 分钟缓存内「换一批」只是在已取回的 12 条里轮换，**不会重新请求**最新热搜；
+- 池子只有 12 条，第二批必然与第一批有 4 条重叠；
+- 请求期间先显示内置词表（没有骨架屏），拿到结果后原地替换；
+- 热搜请求失败时，既有 API 客户端会触发一次全局「请求失败」提示条（3 秒）——这是基础设施行为，
+  本模块自身不弹任何错误；失败结果不缓存，10 分钟外的下一次进入会重试；
+- 未在浏览器中实测（按分工由 Lead 统一构建与回归）；本轮自测仅 eslint + typecheck。
+
+### 7. 自测记录
+
+- `pnpm exec eslint src/contentScripts/views/Search`：0 error 0 warning；
+- `pnpm run typecheck`（`vue-tsc`）：**0 error**；
+- 未跑 build / playwright；未碰浏览器；未做 git 操作。

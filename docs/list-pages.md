@@ -126,8 +126,11 @@
 
 1. **打标记**：`ListGroupSection` 渲染卡片时给 `ListVideoCard` 加 `data-bewly-list-card="<卡片 key>"`
    （单根组件，属性落在卡片的 `<article class="bewly-list-card">` 上），三种视图模式共用；
-2. **分带**：两个 `IntersectionObserver`（root 为 App 的 `.bewly-scroll-container`）分别标记
-   「活跃带」（视口上下各 1.5 屏）与「缓冲区」（上下各 3 屏）；
+2. **分带**：两个 `IntersectionObserver`（root 为 **shadow root 内** App 的
+   `.bewly-scroll-container`）分别标记「活跃带」（视口上下各 1.5 屏）与「缓冲区」（上下各 3 屏）；
+   > Bewly 的页面（含列表页卡片）都渲染在 `#bewly` 的 **shadow root** 里，
+   > 所以本模块的 `querySelector` 全部走 `document.querySelector('#bewly')?.shadowRoot`，
+   > 不能用 `document` 直接查（见下文「shadow root 查询」）。
 3. **三态**（写到卡片内联样式，不动其它样式）：
    - 活跃带 / 键盘导航当前卡：`content-visibility: visible`；
    - 缓冲区：`content-visibility: auto`；
@@ -164,10 +167,35 @@
 - 浏览器不支持 `content-visibility` 时自动整体降级（不做任何改动）；
 - 卡片高度在优化开启期间是「布局占位高度」，`contain-intrinsic-size` 会让隐藏卡片的
   文本无法被浏览器内查找（Ctrl+F）/ 无障碍树跳过，属于该 CSS 特性本身的语义；
-- 本轮未做浏览器验证（按分工由 Lead 统一构建回归）。
+
+### shadow root 查询（第 11 轮修复）
+
+第 10 轮的实现用 `document.querySelector('.bewly-list-page')` / `document.querySelectorAll('[data-bewly-list-card]')`
+找节点，而列表页整体渲染在 `#bewly` 的 shadow root 里 —— `document` 查不到这些节点，
+于是「扫描结果为空 → 观察器不挂 → 不写任何内联样式」，开启开关后实际是 **no-op**。
+
+修复后（只改 `listShared/useListVirtual.ts`）：
+
+1. 新增 `getBewlyShadowRoot()`：`document.querySelector('#bewly')?.shadowRoot`（与
+   `views/Moments`、`useFocusBrowse`、`useKeyboardCardNavigation` 的取法一致）；
+2. `findListRoot()`：shadow root 内 `.bewly-list-page`；只有在 shadow root 还不存在
+   （极早期 / 单测环境）时才回退 `document`；
+3. `findScrollRoot()`：shadow root 内的 `.bewly-scroll-container`（IntersectionObserver
+   的 root 必须是它，否则分带判断用的是错误的视口）；
+4. 高亮卡查询与 `MutationObserver` 目标同样优先 shadow root：列表根还没挂载时观察
+   shadow root，等列表挂上来后下一拍扫描即可建立全部观察器；
+5. 卡片标记与内联样式仍然只落在 `.bewly-list-card` 根节点上，DOM 结构与事件未动。
+
+**静态核对**（浏览器不可用时的自证路径）：`setItemRef` 由 `ListGroupSection` 的
+`:data-bewly-list-card` 属性驱动 —— 属性经 Vue 单根组件落到 `<article class="bewly-list-card">` 上；
+扫描 → 观察器 → 内联样式三条链路都在同一个 shadow root 节点集合内（`root.querySelectorAll` 与
+`IntersectionObserver(root)` 用的是同一棵子树），因此只要页面在 shadow root 内渲染，
+`content-visibility` / `contain-intrinsic-size` 一定会被写到卡片上。
+e2e 侧可在开启优化后断言卡片（`[data-bewly-list-card]`）带上述内联样式。
 
 ### 本轮自测
 
 - `pnpm exec eslint src/contentScripts/views/listShared src/contentScripts/views/History src/contentScripts/views/WatchLater src/contentScripts/views/Favorites --fix`，
   再裸跑：**0 error 0 warning**；
-- `pnpm run typecheck`：**0 error**。
+- `pnpm run typecheck`：**0 error**；
+- 修复后按上面的「静态核对」路径复核了扫描 / 观察器 / 样式写入三处都在 `#bewly` shadow root 内。

@@ -30,6 +30,21 @@ function showPasteStatus(message: string) {
   }, 2600)
 }
 
+/** 收起「已识别…」提示（Escape 立即清理，不等 2.6s 自动消失） */
+function clearPasteStatus() {
+  if (pasteStatusTimer) {
+    clearTimeout(pasteStatusTimer)
+    pasteStatusTimer = null
+  }
+  pasteStatus.value = ''
+}
+
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Escape' || !pasteStatus.value)
+    return
+  clearPasteStatus()
+}
+
 function handlePaste(event: ClipboardEvent) {
   if (!directPasteEnabled.value)
     return
@@ -47,9 +62,13 @@ function handlePaste(event: ClipboardEvent) {
   }))
 }
 
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
+})
+
 onUnmounted(() => {
-  if (pasteStatusTimer)
-    clearTimeout(pasteStatusTimer)
+  window.removeEventListener('keydown', handleKeydown)
+  clearPasteStatus()
 })
 </script>
 
@@ -123,6 +142,25 @@ onUnmounted(() => {
 
 .search-start-panel {
   margin-top: 28px;
+}
+
+@media (max-width: 640px) {
+  .search-start {
+    margin-top: 8vh;
+    padding-inline: 12px;
+  }
+
+  .search-start-logo {
+    margin-bottom: 28px;
+  }
+
+  .search-start-hint {
+    padding-inline: 8px;
+  }
+
+  .search-start-panel {
+    margin-top: 20px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

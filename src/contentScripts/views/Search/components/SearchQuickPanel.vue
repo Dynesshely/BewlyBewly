@@ -4,6 +4,7 @@ import { ref } from 'vue'
 import { clearAllSearchHistory, getSearchHistory } from '~/components/SearchBar/searchHistoryProvider'
 
 import { useDirectPasteSetting } from '../composables/useDirectPasteSetting'
+import { useHotSearch } from '../composables/useHotSearch'
 import { useSearchI18n } from '../i18n'
 import { labelKeyForKind, parseDirectLink } from '../utils/directLink'
 import { navigateToSearch, openDirectLink } from '../utils/navigation'
@@ -20,7 +21,6 @@ const directPasteEnabled = useDirectPasteSetting()
 const history = ref<HistoryItem[]>([])
 const directInput = ref<string>('')
 const directError = ref<string>('')
-const visibleHotKeywords = ref<string[]>([])
 
 const HISTORY_VISIBLE = 8
 const HOT_VISIBLE = 8
@@ -28,9 +28,31 @@ const HOT_VISIBLE = 8
 const recentKeywords = computed<string[]>(() => history.value.slice(0, HISTORY_VISIBLE).map(item => item.value))
 const directPreview = computed(() => parseDirectLink(directInput.value))
 
+/**
+ * 热门搜索：优先真实热搜（接口一次取 12 条），失败/未登录回落到内置词表。
+ * 显示 8 条，「换一批」把窗口在 12 条里轮换一批（保留真实排名序号）。
+ */
+const {
+  items: hotItems,
+  source: hotSource,
+  loading: hotLoading,
+  settled: hotSettled,
+  load: loadHotSearch,
+} = useHotSearch(() => hotKeywords.value)
+
+const hotWindowStart = ref(0)
+
+const visibleHotItems = computed(() => {
+  const pool = hotItems.value
+  if (!pool.length)
+    return []
+  const count = Math.min(HOT_VISIBLE, pool.length)
+  return Array.from({ length: count }, (_, offset) => pool[(hotWindowStart.value + offset) % pool.length])
+})
+
 onMounted(() => {
   void refreshHistory()
-  shuffleHotKeywords()
+  void loadHotSearch()
 })
 
 async function refreshHistory() {
@@ -61,15 +83,17 @@ async function clearHistory() {
   history.value = []
 }
 
-function shuffleHotKeywords() {
-  const pool = [...hotKeywords.value]
-  for (let index = pool.length - 1; index > 0; index--) {
-    const swap = Math.floor(Math.random() * (index + 1))
-    const current = pool[index]
-    pool[index] = pool[swap]
-    pool[swap] = current
-  }
-  visibleHotKeywords.value = pool.slice(0, HOT_VISIBLE)
+/** 换一批：在 12 条热词池里把展示窗口后移 8 条（并循环），序号仍是真实排名 */
+function rotateHotKeywords() {
+  const poolLength = hotItems.value.length
+  if (poolLength <= HOT_VISIBLE)
+    return
+  hotWindowStart.value = (hotWindowStart.value + HOT_VISIBLE) % poolLength
+}
+
+function retryHotSearch() {
+  hotWindowStart.value = 0
+  void loadHotSearch(true)
 }
 
 async function searchKeyword(keyword: string) {
@@ -119,27 +143,52 @@ function handlePaste(event: ClipboardEvent) {
       </ul>
     </section>
 
-    <!-- 热门推荐词 -->
+    <!-- 热门搜索（真实热搜，失败回落内置词表） -->
     <section class="quick-section" aria-labelledby="bewly-search-hot-title">
       <header class="quick-head">
         <h2 id="bewly-search-hot-title" class="quick-title">
           {{ t('hot_title') }}
         </h2>
-        <button type="button" class="quick-action" @click="shuffleHotKeywords">
+        <button
+          type="button"
+          class="quick-action"
+          :disabled="hotLoading || hotItems.length <= HOT_VISIBLE"
+          :title="t('hot_refresh')"
+          @click="rotateHotKeywords"
+        >
           <span class="i-tabler:refresh" aria-hidden="true" />
           <span>{{ t('hot_refresh') }}</span>
         </button>
       </header>
-      <ul class="chip-list">
-        <li v-for="keyword in visibleHotKeywords" :key="keyword">
-          <button type="button" class="chip chip--hot" @click="searchKeyword(keyword)">
-            <span class="i-tabler:flame" aria-hidden="true" />
-            <span class="chip-text">{{ keyword }}</span>
+      <ul v-if="visibleHotItems.length" class="chip-list">
+        <li v-for="item in visibleHotItems" :key="item.keyword">
+          <button
+            type="button"
+            class="chip chip--hot"
+            :class="{ 'chip--top': item.rank <= 3 }"
+            :title="item.keyword"
+            @click="searchKeyword(item.keyword)"
+          >
+            <span class="chip-rank" aria-hidden="true">{{ item.rank }}</span>
+            <span class="chip-text">{{ item.keyword }}</span>
           </button>
         </li>
       </ul>
       <p class="quick-note">
-        {{ t('hot_hint') }}
+        <template v-if="hotSource === 'remote'">
+          {{ t('hot_source_remote') }}
+        </template>
+        <template v-else>
+          {{ t('hot_source_fallback') }}
+          <button
+            v-if="hotSettled && !hotLoading"
+            type="button"
+            class="quick-inline-link"
+            @click="retryHotSearch"
+          >
+            {{ t('hot_retry') }}
+          </button>
+        </template>
       </p>
     </section>
 
@@ -247,9 +296,14 @@ function handlePaste(event: ClipboardEvent) {
     background var(--quick-duration) var(--quick-ease),
     color var(--quick-duration) var(--quick-ease);
 
-  &:hover {
+  &:hover:not(:disabled) {
     background: var(--bew-fill-1);
     color: var(--bew-text-1);
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.45;
   }
 
   &:focus-visible {
@@ -310,9 +364,60 @@ function handlePaste(event: ClipboardEvent) {
 }
 
 .chip-text {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 热搜序号徽标：前三名用主题色 */
+.chip-rank {
+  display: inline-flex;
+  flex: none;
+  justify-content: center;
+  align-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 6px;
+  background: var(--bew-fill-2);
+  color: var(--bew-text-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.chip--top {
+  border-color: var(--bew-theme-color-40);
+}
+
+.chip--top .chip-rank {
+  background: var(--bew-theme-color-10);
+  color: var(--bew-theme-color);
+  font-weight: 700;
+}
+
+/* 底部提示里的小动作（热搜失败后的「重试」） */
+.quick-inline-link {
+  margin-left: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--bew-theme-color);
+  font-size: inherit;
+  line-height: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+
+  &:hover {
+    opacity: 0.8;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--bew-theme-color);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
 }
 
 .quick-switch {
@@ -442,6 +547,40 @@ function handlePaste(event: ClipboardEvent) {
 
 .quick-error {
   color: var(--bew-error-color);
+}
+
+/* 窄屏：不溢出、表单可换行、正文可截断 */
+@media (max-width: 640px) {
+  .quick-panel {
+    max-width: 100%;
+    padding: 16px;
+  }
+
+  .quick-head {
+    align-items: flex-start;
+  }
+
+  .quick-switch {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+
+  .chip {
+    max-width: 100%;
+  }
+
+  .direct-form {
+    flex-wrap: wrap;
+  }
+
+  .direct-input {
+    flex: 1 1 100%;
+  }
+
+  .direct-submit {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -7,9 +7,9 @@
  */
 
 :host {
-  --blp-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
-  --blp-duration: 180ms;
-  --blp-edge: 24px;
+  --blp-ease: var(--bew-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1));
+  --blp-duration: var(--bew-motion-base, 180ms);
+  --blp-edge: var(--bew-space-24, 24px);
   --blp-fab-height: 34px;
 
   position: fixed;
@@ -64,7 +64,7 @@
   z-index: 2;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--bew-space-8, 8px);
   align-items: flex-end;
   pointer-events: none;
 }
@@ -74,13 +74,13 @@
   gap: 6px;
   align-items: center;
   height: var(--blp-fab-height);
-  padding: 0 12px;
+  padding: 0 var(--bew-space-12, 12px);
   font-size: 12px;
   color: var(--bew-text-2);
   pointer-events: auto;
   background: var(--bew-elevated);
   border: 1px solid var(--bew-border-color);
-  border-radius: 12px;
+  border-radius: var(--bew-radius-md, 12px);
   box-shadow: var(--bew-shadow-2);
   opacity: 0.72;
   transition:
@@ -114,7 +114,7 @@
   width: 6px;
   height: 6px;
   background: var(--bew-theme-color);
-  border-radius: 999px;
+  border-radius: var(--bew-radius-pill, 999px);
   box-shadow: 0 0 0 3px var(--bew-theme-color-20);
 }
 /* #endregion */
@@ -123,14 +123,14 @@
 .blp-panel {
   position: fixed;
   right: var(--blp-edge);
-  bottom: calc(var(--blp-edge) + var(--blp-fab-height) + 12px);
+  bottom: calc(var(--blp-edge) + var(--blp-fab-height) + var(--bew-space-12, 12px));
   z-index: 3;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--bew-space-12, 12px);
   width: min(320px, calc(100vw - var(--blp-edge) * 2));
   max-height: min(70vh, 560px);
-  padding: 16px;
+  padding: var(--bew-space-16, 16px);
   overflow: auto;
   pointer-events: auto;
   background: var(--bew-elevated-solid);
@@ -141,7 +141,7 @@
 
 .blp-panel__header {
   display: flex;
-  gap: 12px;
+  gap: var(--bew-space-12, 12px);
   align-items: center;
   justify-content: space-between;
 }
@@ -159,7 +159,7 @@
   width: 24px;
   height: 24px;
   color: var(--bew-text-3);
-  border-radius: 8px;
+  border-radius: var(--bew-radius-sm, 8px);
   transition:
     color var(--blp-duration) var(--blp-ease),
     background-color var(--blp-duration) var(--blp-ease);
@@ -187,22 +187,22 @@
 .blp-toggle-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--bew-space-4, 4px);
 }
 
 .blp-toggle {
   display: flex;
-  gap: 8px;
+  gap: var(--bew-space-8, 8px);
   align-items: center;
   justify-content: space-between;
   min-height: 28px;
-  padding: 4px 10px;
+  padding: var(--bew-space-4, 4px) 10px;
   font-size: 12px;
   color: var(--bew-text-2);
   text-align: left;
   background: var(--bew-fill-1);
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--bew-radius-sm, 8px);
   transition:
     color var(--blp-duration) var(--blp-ease),
     background-color var(--blp-duration) var(--blp-ease),
@@ -249,13 +249,13 @@
 .blp-shortcuts__list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--bew-space-4, 4px);
   list-style: none;
 }
 
 .blp-shortcuts__row {
   display: flex;
-  gap: 8px;
+  gap: var(--bew-space-8, 8px);
   align-items: center;
   font-size: 12px;
   color: var(--bew-text-2);
@@ -333,6 +333,13 @@
 
 /* #region 动效降级 */
 @media (prefers-reduced-motion: reduce) {
+  :host,
+  :host * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
   .blp-fab,
   .blp-icon-btn,
   .blp-toggle {
@@ -348,6 +355,61 @@
   .blp-panel-leave-to {
     transform: none;
     opacity: 1;
+  }
+}
+/* #endregion */
+
+/* #region 高对比度 / 强制颜色（第 11 轮）
+   浮层在 shadow root 内，系统级 high-contrast 不会自动照顾到我们自定义的边框与底色：
+   - prefers-contrast: more：把按钮 / 面板 / kbd / 胶囊的边框提到 --bew-text-3；
+   - forced-colors: active：用系统颜色（Canvas / CanvasText / Highlight）重画边界与选中态，
+     确保在高对比度主题下按钮、面板、徽标仍有可见轮廓。 */
+@media (prefers-contrast: more) {
+  :host .blp-fab,
+  :host .blp-panel,
+  :host .blp-toast,
+  :host .blp-kbd,
+  :host .blp-seg,
+  :host .blp-seg__btn,
+  :host .blp-chip,
+  :host .blp-jump,
+  :host .blp-toggle,
+  :host .blp-icon-btn,
+  :host .blp-status {
+    border-color: var(--bew-text-3);
+  }
+
+  :host [aria-pressed="true"],
+  :host [aria-expanded="true"] {
+    border-color: var(--bew-text-2);
+  }
+}
+
+@media (forced-colors: active) {
+  :host .blp-fab,
+  :host .blp-panel,
+  :host .blp-toast,
+  :host .blp-kbd,
+  :host .blp-seg,
+  :host .blp-seg__btn,
+  :host .blp-chip,
+  :host .blp-jump,
+  :host .blp-toggle,
+  :host .blp-icon-btn,
+  :host .blp-status {
+    color: CanvasText;
+    background: Canvas;
+    border: 1px solid CanvasText;
+  }
+
+  :host [aria-pressed="true"],
+  :host [aria-expanded="true"] {
+    color: Highlight;
+    border-color: Highlight;
+  }
+
+  :host :focus-visible {
+    outline: 2px solid Highlight;
   }
 }
 /* #endregion */

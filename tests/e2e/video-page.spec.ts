@@ -1,12 +1,8 @@
-import type { Page } from '@playwright/test'
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import type { BrowserContext, Page } from '@playwright/test'
 
-import { chromium, expect, test } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
-const ROOT = fileURLToPath(new URL('../..', import.meta.url))
-const EXTENSION_DIR = join(ROOT, 'extension')
+import { launchExtension, skipIfExtensionMissing } from './utils'
 
 /**
  * 播放页快照：只保留增强层依赖的结构（播放器 / 标题 / UP 主 / 右栏 / 可滚动正文），
@@ -52,17 +48,8 @@ const VIDEO_PAGE_FIXTURE = `<!doctype html>
   </body>
 </html>`
 
-async function openVideoPage(): Promise<{ context: Awaited<ReturnType<typeof chromium.launchPersistentContext>>, page: Page }> {
-  const context = await chromium.launchPersistentContext('', {
-    channel: 'chromium',
-    headless: true,
-    args: [
-      `--disable-extensions-except=${EXTENSION_DIR}`,
-      `--load-extension=${EXTENSION_DIR}`,
-      '--disable-popup-blocking',
-    ],
-    viewport: { width: 1440, height: 900 },
-  })
+async function openVideoPage(): Promise<{ context: BrowserContext, page: Page }> {
+  const context = await launchExtension({ allowPopups: true })
 
   const page = await context.newPage()
   await page.route('**/*', async (route) => {
@@ -99,7 +86,7 @@ async function ensureOverlay(page: Page): Promise<void> {
 }
 
 test.describe('视频播放页增强', () => {
-  test.skip(!existsSync(EXTENSION_DIR), '先运行 pnpm build 生成 extension/ 目录')
+  skipIfExtensionMissing()
 
   test('T / Esc 切换影院模式，并写进 sessionStorage', async () => {
     const { context, page } = await openVideoPage()
@@ -277,17 +264,8 @@ const BANGUMI_PLAYBACK_FIXTURE = `<!doctype html>
   </body>
 </html>`
 
-async function openBangumiPlaybackPage(): Promise<{ context: Awaited<ReturnType<typeof chromium.launchPersistentContext>>, page: Page }> {
-  const context = await chromium.launchPersistentContext('', {
-    channel: 'chromium',
-    headless: true,
-    args: [
-      `--disable-extensions-except=${EXTENSION_DIR}`,
-      `--load-extension=${EXTENSION_DIR}`,
-      '--disable-popup-blocking',
-    ],
-    viewport: { width: 1440, height: 900 },
-  })
+async function openBangumiPlaybackPage(): Promise<{ context: BrowserContext, page: Page }> {
+  const context = await launchExtension({ allowPopups: true })
 
   const page = await context.newPage()
   await page.route('**/*', async (route) => {
@@ -309,7 +287,7 @@ async function openBangumiPlaybackPage(): Promise<{ context: Awaited<ReturnType<
 }
 
 test.describe('番剧 / 电影播放页增强', () => {
-  test.skip(!existsSync(EXTENSION_DIR), '先运行 pnpm build 生成 extension/ 目录')
+  skipIfExtensionMissing()
 
   test('T / Esc 切换影院模式，隐藏信息列并铺满视口', async () => {
     const { context, page } = await openBangumiPlaybackPage()

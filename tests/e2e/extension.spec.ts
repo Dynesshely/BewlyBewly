@@ -1,45 +1,23 @@
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { expect, test } from '@playwright/test'
 
-import { chromium, expect, test } from '@playwright/test'
-
-import { routeBilibiliDocument } from './utils'
-
-const ROOT = fileURLToPath(new URL('../..', import.meta.url))
-const EXTENSION_DIR = join(ROOT, 'extension')
-const HOME_FIXTURE = join(ROOT, 'tests', 'e2e', 'fixtures', 'bilibili-home.html')
+import { launchExtension, openHomeFixture, readExtensionState, skipIfExtensionMissing } from './utils'
 
 test.describe('扩展挂载冒烟测试', () => {
-  test.skip(!existsSync(EXTENSION_DIR), '先运行 pnpm build 生成 extension/ 目录')
+  skipIfExtensionMissing()
 
   test('在 B 站首页 fixture 上挂载 #bewly', async () => {
-    const context = await chromium.launchPersistentContext('', {
-      channel: 'chromium',
-      headless: true,
-      args: [
-        `--disable-extensions-except=${EXTENSION_DIR}`,
-        `--load-extension=${EXTENSION_DIR}`,
-      ],
-      viewport: { width: 1440, height: 900 },
-    })
+    const context = await launchExtension()
 
     try {
       const page = await context.newPage()
 
-      // 用本地快照替代真实 B 站首页，避免依赖线上环境
-      await routeBilibiliDocument(page, HOME_FIXTURE)
+      // 本地快照 + 统一就绪 helper（host 可见 / shadow root 注入样式）
+      await openHomeFixture(page)
 
-      await page.goto('https://www.bilibili.com/', { waitUntil: 'domcontentloaded' })
-
-      // 内容脚本会在页面里创建 #bewly 容器并挂载 Shadow DOM
-      await expect(page.locator('#bewly')).toHaveCount(1, { timeout: 30_000 })
-
-      const shadowMounted = await page.evaluate(() => {
-        const host = document.querySelector('#bewly')
-        return !!host?.shadowRoot?.querySelector('#bewly-wrapper, .bewly-wrapper')
-      })
-      expect(shadowMounted).toBe(true)
+      const state = await readExtensionState(page)
+      expect(state.hostExists).toBe(true)
+      expect(state.hasShadowRoot).toBe(true)
+      expect(state.hasWrapper).toBe(true)
     }
     finally {
       await context.close()

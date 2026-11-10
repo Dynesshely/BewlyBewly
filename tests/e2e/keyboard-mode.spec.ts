@@ -1,39 +1,18 @@
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { expect, test } from '@playwright/test'
 
-import { chromium, expect, test } from '@playwright/test'
-
-import { routeBilibiliDocument } from './utils'
-
-const ROOT = fileURLToPath(new URL('../..', import.meta.url))
-const EXTENSION_DIR = join(ROOT, 'extension')
-const HOME_FIXTURE = join(ROOT, 'tests', 'e2e', 'fixtures', 'bilibili-home.html')
+import { focusPage, launchExtension, openHomeFixture, skipIfExtensionMissing, waitForStableCardCount } from './utils'
 
 test.describe('键盘模式开关', () => {
-  test.skip(!existsSync(EXTENSION_DIR), '先运行 pnpm build 生成 extension/ 目录')
+  skipIfExtensionMissing()
 
   test('命令面板可关闭/恢复键盘卡片导航', async () => {
-    const context = await chromium.launchPersistentContext('', {
-      channel: 'chromium',
-      headless: true,
-      args: [
-        `--disable-extensions-except=${EXTENSION_DIR}`,
-        `--load-extension=${EXTENSION_DIR}`,
-      ],
-      viewport: { width: 1440, height: 900 },
-    })
+    const context = await launchExtension()
 
     try {
       const page = await context.newPage()
-      await routeBilibiliDocument(page, HOME_FIXTURE)
-      await page.goto('https://www.bilibili.com/', { waitUntil: 'domcontentloaded' })
-      await expect(page.locator('#bewly')).toHaveCount(1, { timeout: 30_000 })
-      await page.waitForFunction(
-        () => (document.querySelector('#bewly')?.shadowRoot?.querySelectorAll('[data-video-card]').length ?? 0) > 3,
-        undefined,
-        { timeout: 30_000 },
-      )
+      await focusPage(page)
+      await openHomeFixture(page, { minCards: 1 })
+      await waitForStableCardCount(page, 4)
 
       const read = () => page.evaluate(() => {
         const root = document.querySelector('#bewly')?.shadowRoot

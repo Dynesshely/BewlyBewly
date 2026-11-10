@@ -101,3 +101,19 @@ html.bewly-live-page.bewly-live-hide-aside {
   }
 }
 // #endregion
+
+/* #region 高对比度 / 强制颜色（第 11 轮）
+   影院模式的页面压暗是纯 CSS 遮罩：forced-colors 下浏览器会用自己的系统色渲染它，
+   容易把整页涂成实色块，这里直接关掉遮罩，只保留播放器铺满。 */
+@media (forced-colors: active) {
+  html.bewly-live-page.bewly-live-cinema body::before {
+    content: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  html.bewly-live-page.bewly-live-cinema body::before {
+    background: color-mix(in oklab, var(--bew-bg), black 70%);
+  }
+}
+/* #endregion */

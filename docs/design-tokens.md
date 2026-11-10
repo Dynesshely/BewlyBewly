@@ -153,3 +153,122 @@ reduced-motion 下过渡时长恒为 0ms，**不需要每个文件再写 `transi
 - `pnpm exec eslint`（含 CSS Prettier 格式化）：0 error 0 warning；
 - `pnpm run typecheck`：0 error（本轮没有改 TS）；
 - 未跑 build / playwright；未碰浏览器；未做 git 操作。
+
+## 8. 模块 shadow 样式接入（第 11 轮）
+
+第 9 轮把令牌定义在 `src/styles/tokens/` 并通过 `main.scss` 的 `:root / :host` 暴露。
+本轮把六个原生页增强模块里**写死的动效 / 圆角 / 间距**换成这些令牌，并补高对比度支持。
+
+### 涉及文件
+
+| 模块 | 文件 |
+| --- | --- |
+| 搜索结果页 | `searchPage/searchEnhance.shadow.scss` |
+| 消息页 | `notificationPage/notificationPage.shadow.scss` |
+| 用户空间 | `spacePage/spacePage.shadow.scss` |
+| 分区 / 排行页 | `channelPage/channelPage.shadow.scss`、`channelPage/pageStyles.scss` |
+| 直播页 | `livePage/livePage.shadow.scss`、`livePage/livePage.page.scss` |
+| 专栏阅读模式 | `articlePage/articlePage.shadow.scss`、`articlePage/articlePage.page.scss` |
+
+只改了 SCSS 与样式文本，**没有改任何模块 TS 逻辑**。
+
+### 模块自有变量 → 全站令牌（带兜底值）
+
+每个 shadow 样式在 `:host` 里本来就有 `--bse-*` / `--bnp-*` / `--bsp-*` / `--bcp-*` /
+`--blp-*` / `--bap-*` 这一层变量，本轮把它们的**值**指向全站令牌，保留兜底值以便
+shadow root 单独加载（例如组件测试）时仍然可用：
+
+| 模块变量 | 指向 |
+| --- | --- |
+| `--<p>-duration` | `var(--bew-motion-base, 180ms)` |
+| `--<p>-duration-slow` | `var(--bew-motion-slow, 240ms)` |
+| `--<p>-ease` | `var(--bew-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1))` |
+| `--<p>-edge` | `var(--bew-space-24, 24px)`（文章页窄屏变体指向 `--bew-space-12`） |
+| `--bnp-gap-xs / sm / / lg` | `--bew-space-4 / 8 / 12 / 16` |
+| `--bap-gap` | `--bew-space-8` |
+| 各模块 `border-radius: 8 / 12 / 16 / 999px` | `--bew-radius-sm / md / lg / pill` |
+| 各模块 padding / margin / gap / inset 里的 4 / 8 / 12 / 16 / 24 / 32px | `--bew-space-4…32` |
+| 文章页进度条 `transition: width 140ms linear` | `--bew-motion-fast(,140ms) + --bew-ease-linear` |
+| 频道页高亮描边过渡 `180ms cubic-bezier(...)` | `--bew-motion-base + --bew-ease-out` |
+
+> 尺寸类字面量（浮层按钮高度 34/44px、面板 `min(340px, …)`、toast 距顶 96px 等）
+> **不是**间距令牌的语义，保持原值；圆角里不在 8/12/16/999 标尺上的微值（4 / 5 / 6 / 10px）
+> 也保持原值，避免为凑令牌改变视觉。
+
+### prefers-reduced-motion
+
+- 六个 shadow 样式现在都有统一的**兜底规则**：
+  ```scss
+  @media (prefers-reduced-motion: reduce) {
+    :host,
+    :host * {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+    }
+    /* …各模块原有的面板过场 / Transition 规则 */
+  }
+  ```
+  加上各模块原有的「面板过场 / 淡入淡出 / 滑块过渡关掉、位移与缩放复位」规则；
+- 全站令牌本身也会在 reduced-motion 下被压成 0ms（第 9 轮，`main.scss`），
+  shadow root 会继承 `:root` 上被覆盖后的令牌值，因此**双保险**；
+- 六个模块内**没有任何 `@keyframes` / `animation`**（只有 transition 与 Vue 的
+  Transition 过场），浮层按钮、面板、胶囊、徽标都没有额外动画需要单独关闭。
+
+### prefers-contrast: more
+
+给浮层按钮 / 面板 / 胶囊 / kbd / toast 补可见边界（只加深边框，不改配色）：
+
+```scss
+/* 以搜索结果页的 bse- 前缀为例，其余模块把前缀换掉即可 */
+@media (prefers-contrast: more) {
+  :host .bse-fab,
+  :host .bse-panel,
+  :host .bse-toast,
+  :host .bse-kbd,
+  :host .bse-seg,
+  :host .bse-seg__btn,
+  :host .bse-chip,
+  :host .bse-jump,
+  :host .bse-toggle,
+  :host .bse-icon-btn,
+  :host .bse-status {
+    border-color: var(--bew-text-3);
+  }
+
+  :host [aria-pressed="true"],
+  :host [aria-expanded="true"] {
+    border-color: var(--bew-text-2);
+  }
+}
+```
+
+页面级样式同理：频道页命中卡描边加宽到 3px、排名徽标文字改用 `--bew-text-1`；
+直播页影院遮罩加深到 70% 黑，保证高对比度下内容边界仍清楚。
+
+### forced-colors: active（Windows 高对比度 / 强制颜色）
+
+shadow root 里的自定义边框与背景不会被系统自动接管，因此用**系统颜色**重画：
+
+| 模块 | 处理 |
+| --- | --- |
+| 六个 shadow 浮层 | 按钮 / 面板 / 胶囊 / kbd / toast 用 `Canvas` 底、`CanvasText` 文字与 1px 边框；`aria-pressed=true` / `aria-expanded=true` 用 `Highlight`；`:focus-visible` 用 `Highlight` 描边 |
+| 频道页（页面级） | 排名徽标 `::before` 恢复 `Canvas` 底 + `CanvasText` 边框，前三名用 `Highlight` 边框 |
+| 直播页（页面级） | 影院模式的 `body::before` 压暗遮罩在强制颜色下直接 `content: none`（否则会被系统色涂成实色块，盖住播放器） |
+| 文章阅读模式（页面级） | 阅读模式本身就是「保留原生排版 + 收窄正文」，没有自绘边框，不需要额外处理 |
+
+### 已知限制
+
+- 强制颜色下会使用系统调色板，主题色（`--bew-theme-color`）被 `Highlight` 取代是预期行为；
+- 浮层定位用的尺寸（fab 高度、toast 顶部偏移、面板宽度）仍是像素值，不属于间距令牌语义；
+- 页面级 scss（`channelPage/pageStyles.scss` / `livePage.page.scss` / `articlePage.page.scss`）
+  作用于 B 站原生 DOM，只在有意义的位置补了对比度规则，没有重写整页配色；
+- 未做浏览器验证（高对比度模式建议由 Lead 在 Windows 高对比度主题下人工确认一次）。
+
+## 9. 第 11 轮自测
+
+- 六个模块全部样式的 `sass` 编译通过（9 个文件）；
+- `pnpm exec eslint src/contentScripts/{livePage,channelPage,spacePage,notificationPage,searchPage,articlePage} --fix`
+  后裸跑：**0 error 0 warning**；
+- `pnpm run typecheck`：**0 error**（本轮无 TS 改动）；
+- 未跑 build / playwright；未碰浏览器；未做 git 操作。

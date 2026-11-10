@@ -13,6 +13,15 @@ const API_SEARCH = {
     },
     afterHandle: AHS.J_D,
   },
+  // 搜索热门词 / 热搜（B 站搜索页右侧「搜索发现」）
+  // https://socialsisteryi.github.io/bilibili-API-collect/docs/search/hot.html
+  getHotSearchWords: {
+    url: 'https://s.search.bilibili.com/main/hotword',
+    _fetch: {
+      method: 'get',
+    },
+    afterHandle: AHS.J_D,
+  },
 } satisfies APIMAP
 
 export default API_SEARCH

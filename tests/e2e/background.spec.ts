@@ -1,11 +1,6 @@
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { expect, test } from '@playwright/test'
 
-import { chromium, expect, test } from '@playwright/test'
-
-const ROOT = fileURLToPath(new URL('../..', import.meta.url))
-const EXTENSION_DIR = join(ROOT, 'extension')
+import { launchExtension, skipIfExtensionMissing } from './utils'
 
 /**
  * 后台消息通道冒烟测试（在线）。
@@ -13,21 +8,13 @@ const EXTENSION_DIR = join(ROOT, 'extension')
  * 依赖真实 B 站接口，默认跳过；用 E2E_ONLINE=1 运行。
  */
 test.describe('后台消息通道', () => {
-  test.skip(!existsSync(EXTENSION_DIR), '先运行 pnpm build 生成 extension/ 目录')
+  skipIfExtensionMissing()
   test.skip(!process.env.E2E_ONLINE, '需要在线环境（设置 E2E_ONLINE=1）')
 
   test('getRecommendVideos 返回真实数据', async () => {
     test.setTimeout(180_000)
 
-    const context = await chromium.launchPersistentContext('', {
-      channel: 'chromium',
-      headless: true,
-      args: [
-        `--disable-extensions-except=${EXTENSION_DIR}`,
-        `--load-extension=${EXTENSION_DIR}`,
-      ],
-      viewport: { width: 1440, height: 900 },
-    })
+    const context = await launchExtension()
 
     try {
       const page = await context.newPage()

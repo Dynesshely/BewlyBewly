@@ -1,47 +1,28 @@
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { expect, test } from '@playwright/test'
 
-import { chromium, expect, test } from '@playwright/test'
-
-import { routeBilibiliDocument } from './utils'
-
-const ROOT = fileURLToPath(new URL('../..', import.meta.url))
-const EXTENSION_DIR = join(ROOT, 'extension')
-const HOME_FIXTURE = join(ROOT, 'tests', 'e2e', 'fixtures', 'bilibili-home.html')
+import { HOME_FIXTURE, launchExtension, routeBilibiliDocument, skipIfExtensionMissing, waitForExtensionReady, waitForStableCardCount } from './utils'
 
 /**
  * 首屏性能基线：记录 #bewly 挂载与首屏卡片出现耗时，作为回归对照。
  */
 test.describe('首屏性能基线', () => {
-  test.skip(!existsSync(EXTENSION_DIR), '先运行 pnpm build 生成 extension/ 目录')
+  skipIfExtensionMissing()
 
   test('记录 #bewly 挂载与首屏卡片耗时', async () => {
-    const context = await chromium.launchPersistentContext('', {
-      channel: 'chromium',
-      headless: true,
-      args: [
-        `--disable-extensions-except=${EXTENSION_DIR}`,
-        `--load-extension=${EXTENSION_DIR}`,
-      ],
-      viewport: { width: 1440, height: 900 },
-    })
+    const context = await launchExtension()
 
     try {
       const page = await context.newPage()
       await routeBilibiliDocument(page, HOME_FIXTURE)
 
+      await routeBilibiliDocument(page, HOME_FIXTURE)
+
       const start = Date.now()
       await page.goto('https://www.bilibili.com/', { waitUntil: 'domcontentloaded' })
-
-      await expect(page.locator('#bewly')).toHaveCount(1, { timeout: 30_000 })
+      await waitForExtensionReady(page)
       const mountMs = Date.now() - start
 
-      await page.waitForFunction(
-        () => (document.querySelector('#bewly')?.shadowRoot?.querySelectorAll('[data-video-card]').length ?? 0) > 0,
-        undefined,
-        { timeout: 30_000 },
-      )
+      await waitForStableCardCount(page, 1)
       const cardsMs = Date.now() - start
 
       test.info().annotations.push(

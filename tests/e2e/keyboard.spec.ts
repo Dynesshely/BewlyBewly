@@ -1,87 +1,71 @@
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { expect, test } from '@playwright/test'
 
-import { chromium, expect, test } from '@playwright/test'
+import {
+  expectActiveCardUrl,
+  focusPage,
+  injectTestCards,
+  launchExtension,
+  openHomeFixture,
+  readActiveCardUrl,
+  waitForKeyboardHighlight,
+  waitForStableCardCount,
+} from './utils'
 
-import { routeBilibiliDocument } from './utils'
-
-const ROOT = fileURLToPath(new URL('../..', import.meta.url))
-const EXTENSION_DIR = join(ROOT, 'extension')
-const HOME_FIXTURE = join(ROOT, 'tests', 'e2e', 'fixtures', 'bilibili-home.html')
-
+/**
+ * 键盘卡片导航回归。
+ *
+ * 稳定性要点（修掉历史上的 flaky）：
+ * - 统一用 openHomeFixture 等「扩展就绪 + 卡片数量稳定」，不再按固定数量 / 固定 timeout 判断；
+ * - 断言用「高亮卡片的 data-video-url」而不是卡片索引：卡片分批渲染时索引会漂移；
+ * - End / Enter 之前先把状态归一化（Home → 等待高亮出现），并把注入的测试卡片放在最后；
+ * - 新标签页用 context.waitForEvent('page') 等待，不再轮询 context.pages().length。
+ */
 test.describe('键盘卡片导航', () => {
-  test.skip(!existsSync(EXTENSION_DIR), '先运行 pnpm build 生成 extension/ 目录')
-
   test('方向键切换高亮、回车新标签、空格当前标签', async () => {
-    const context = await chromium.launchPersistentContext('', {
-      channel: 'chromium',
-      headless: true,
-      args: [
-        `--disable-extensions-except=${EXTENSION_DIR}`,
-        `--load-extension=${EXTENSION_DIR}`,
-        '--disable-popup-blocking',
-      ],
-      viewport: { width: 1440, height: 900 },
-    })
+    const context = await launchExtension({ allowPopups: true })
 
     try {
       const page = await context.newPage()
+      await openHomeFixture(page, { minCards: 1 })
 
-      // 用本地快照替代真实 B 站首页
-      await routeBilibiliDocument(page, HOME_FIXTURE)
+      // 卡片数量稳定后再注入测试卡片，避免渲染中的数量变化影响 End 的落点
+      await waitForStableCardCount(page, 4)
+      const injected = await injectTestCards(page, 4, 'BVE2EKEY')
+      await waitForStableCardCount(page, 4 + injected.length)
 
-      await page.goto('https://www.bilibili.com/', { waitUntil: 'domcontentloaded' })
-      await expect(page.locator('#bewly')).toHaveCount(1, { timeout: 30_000 })
-      await page.waitForFunction(
-        () => (document.querySelector('#bewly')?.shadowRoot?.querySelectorAll('[data-video-card]').length ?? 0) > 3,
-        undefined,
-        { timeout: 30_000 },
-      )
+      await focusPage(page)
 
-      // 注入不受 Vue 管理的测试卡片（带视频链接），避免依赖骨架卡片数据
-      await page.evaluate(() => {
-        const root = document.querySelector('#bewly')!.shadowRoot!
-        const container = root.querySelector('.bewly-scroll-container') || root.querySelector('#bewly-wrapper') || root
-        for (let i = 0; i < 4; i++) {
-          const el = document.createElement('div')
-          el.setAttribute('data-video-card', '')
-          el.setAttribute('data-video-url', `https://www.bilibili.com/video/BVTEST${i}`)
-          el.style.cssText = 'height: 120px; display: block'
-          container.appendChild(el)
-        }
-      })
+      // 状态归一化：先跳到第一张
+      await page.keyboard.press('Home')
+      const firstUrl = await waitForKeyboardHighlight(page)
 
-      const getActiveIndex = () => page.evaluate(() => {
-        const root = document.querySelector('#bewly')!.shadowRoot!
-        return Array.from(root.querySelectorAll('[data-video-card]')).findIndex(card => card.hasAttribute('data-keyboard-active'))
-      })
-
-      // 初始高亮
-      await expect.poll(getActiveIndex, { timeout: 10_000 }).toBeGreaterThanOrEqual(0)
-      const initial = await getActiveIndex()
-
-      // 方向键切换
+      // 方向键：高亮必须离开第一张（用 URL 判断，避免索引漂移）
       await page.keyboard.press('ArrowRight')
-      await expect.poll(getActiveIndex, { timeout: 5_000 }).not.toBe(initial)
+      await expect.poll(async () => {
+        const url = await readActiveCardUrl(page)
+        return url !== '' && url !== firstUrl
+      }, { timeout: 10_000, message: '方向键后高亮应移动到另一张卡片' }).toBe(true)
 
-      // 跳到最后一个卡片（注入的测试卡片带视频链接）
+      // End：落到最后一张（注入的测试卡片，带 video URL）
       await page.keyboard.press('End')
-      const lastIndex = await page.evaluate(() => {
-        const root = document.querySelector('#bewly')!.shadowRoot!
-        return root.querySelectorAll('[data-video-card]').length - 1
-      })
-      await expect.poll(getActiveIndex, { timeout: 5_000 }).toBe(lastIndex)
+      await expectActiveCardUrl(page, injected[injected.length - 1])
 
       // 回车：新标签打开
-      const tabsBefore = context.pages().length
-      await page.keyboard.press('Enter')
-      await expect.poll(() => context.pages().length, { timeout: 10_000 }).toBeGreaterThan(tabsBefore)
+      const [popup] = await Promise.all([
+        context.waitForEvent('page', { timeout: 15_000 }),
+        page.keyboard.press('Enter'),
+      ])
+      expect(popup.url()).toContain('/video/')
+      await popup.close().catch(() => {})
 
-      // 空格：默认在页面内预览抽屉里打开（可在设置 → 键盘里改成当前页跳转 / 新标签页）
+      // 空格：在当前页打开内嵌预览抽屉（不整页跳转）
+      await page.bringToFront()
+      await focusPage(page)
       await page.keyboard.press('Space')
-      const drawerVisible = () => page.evaluate(() => !!document.querySelector('#bewly')?.shadowRoot?.querySelector('.bewly-iframe-drawer'))
-      await expect.poll(drawerVisible, { timeout: 10_000 }).toBe(true)
+      await expect.poll(
+        () => page.evaluate(() => Boolean(document.querySelector('#bewly')?.shadowRoot?.querySelector('.bewly-iframe-drawer'))),
+        { timeout: 15_000, message: '空格应打开内嵌预览抽屉' },
+      ).toBe(true)
     }
     finally {
       await context.close()
@@ -89,33 +73,20 @@ test.describe('键盘卡片导航', () => {
   })
 
   test('? 打开/关闭快捷键帮助面板', async () => {
-    const context = await chromium.launchPersistentContext('', {
-      channel: 'chromium',
-      headless: true,
-      args: [
-        `--disable-extensions-except=${EXTENSION_DIR}`,
-        `--load-extension=${EXTENSION_DIR}`,
-      ],
-      viewport: { width: 1440, height: 900 },
-    })
+    const context = await launchExtension()
 
     try {
       const page = await context.newPage()
-      await routeBilibiliDocument(page, HOME_FIXTURE)
-      await page.goto('https://www.bilibili.com/', { waitUntil: 'domcontentloaded' })
-      await expect(page.locator('#bewly')).toHaveCount(1, { timeout: 30_000 })
-      await page.waitForFunction(
-        () => (document.querySelector('#bewly')?.shadowRoot?.querySelectorAll('[data-video-card]').length ?? 0) > 0,
-        undefined,
-        { timeout: 30_000 },
-      )
+      await openHomeFixture(page, { minCards: 1 })
+      await focusPage(page)
 
-      const helpVisible = () => page.evaluate(() => !!document.querySelector('#bewly')?.shadowRoot?.querySelector('.keyboard-help-panel'))
+      const helpVisible = () => page.evaluate(() => Boolean(document.querySelector('#bewly')?.shadowRoot?.querySelector('.keyboard-help-panel')))
 
       await page.keyboard.press('?')
-      await expect.poll(helpVisible, { timeout: 5_000 }).toBe(true)
+      await expect.poll(helpVisible, { timeout: 10_000 }).toBe(true)
+
       await page.keyboard.press('?')
-      await expect.poll(helpVisible, { timeout: 5_000 }).toBe(false)
+      await expect.poll(helpVisible, { timeout: 10_000 }).toBe(false)
     }
     finally {
       await context.close()

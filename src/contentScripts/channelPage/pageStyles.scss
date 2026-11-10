@@ -21,18 +21,18 @@ html.bewly-channel-page {
   [data-bewly-channel-active] {
     position: relative;
     z-index: 1;
-    border-radius: var(--bew-radius);
+    border-radius: var(--bew-radius-md, var(--bew-radius));
     outline: 2px solid var(--bew-theme-color);
     outline-offset: 3px;
     box-shadow: 0 0 0 6px var(--bew-theme-color-20);
     transition:
-      outline-color 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
-      box-shadow 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+      outline-color var(--bew-motion-base, 180ms) var(--bew-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1)),
+      box-shadow var(--bew-motion-base, 180ms) var(--bew-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1));
   }
 
   // scrollIntoView 居中滚动时不要被顶部导航盖住
   [data-bewly-channel-card] {
-    scroll-margin-block: calc(var(--bew-top-bar-height) + 24px) 32px;
+    scroll-margin-block: calc(var(--bew-top-bar-height) + var(--bew-space-24, 24px)) var(--bew-space-32, 32px);
   }
 }
 // #endregion
@@ -111,7 +111,7 @@ html.bewly-channel-page[data-bewly-channel-kind="rank"] {
       pointer-events: none;
       background: var(--bew-elevated-solid);
       border: 1px solid var(--bew-border-color);
-      border-radius: 8px;
+      border-radius: var(--bew-radius-sm, 8px);
       box-shadow: var(--bew-shadow-1);
     }
 
@@ -136,3 +136,30 @@ html.bewly-channel-page[data-bewly-channel-kind="rank"] {
   }
 }
 // #endregion
+
+@media (prefers-contrast: more) {
+  html.bewly-channel-page [data-bewly-channel-active] {
+    outline-width: 3px;
+  }
+
+  html.bewly-channel-page[data-bewly-channel-kind="rank"] [data-bewly-channel-rank]::before {
+    color: var(--bew-text-1);
+    border-color: var(--bew-text-2);
+  }
+}
+
+/* #region 高对比度 / 强制颜色（第 11 轮）
+   页面级样式作用在 B 站原生 DOM 上：排名徽标是纯 CSS 生成的背景元素，
+   在 forced-colors 下背景会被系统色抹掉，这里补回可见轮廓与文字色。 */
+@media (forced-colors: active) {
+  html.bewly-channel-page[data-bewly-channel-kind="rank"] [data-bewly-channel-rank]::before {
+    color: CanvasText;
+    background: Canvas;
+    border: 1px solid CanvasText;
+  }
+
+  html.bewly-channel-page[data-bewly-channel-rank-tier="top3"]::before {
+    border-color: Highlight;
+  }
+}
+/* #endregion */

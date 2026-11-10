@@ -6,10 +6,10 @@
  */
 
 :host {
-  --bap-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
-  --bap-duration: 180ms;
-  --bap-gap: 8px;
-  --bap-edge: 24px;
+  --bap-ease: var(--bew-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1));
+  --bap-duration: var(--bew-motion-base, 180ms);
+  --bap-gap: var(--bew-space-8, 8px);
+  --bap-edge: var(--bew-space-24, 24px);
 
   position: fixed;
   inset: 0;
@@ -70,7 +70,7 @@
 .bap-progress__fill {
   height: 100%;
   background: var(--bew-theme-color);
-  transition: width 140ms linear;
+  transition: width var(--bew-motion-fast, 140ms) var(--bew-ease-linear, linear);
 }
 /* #endregion */
 
@@ -112,13 +112,13 @@
   gap: 6px;
   align-items: center;
   height: 34px;
-  padding: 0 12px;
+  padding: 0 var(--bew-space-12, 12px);
   font-size: 12px;
   color: var(--bew-text-2);
   pointer-events: auto;
   background: var(--bew-elevated);
   border: 1px solid var(--bew-border-color);
-  border-radius: 12px;
+  border-radius: var(--bew-radius-md, 12px);
   box-shadow: var(--bew-shadow-2);
   backdrop-filter: var(--bew-filter-glass-1);
   transition:
@@ -186,10 +186,10 @@
 
 .bap-toc__header {
   display: flex;
-  gap: 12px;
+  gap: var(--bew-space-12, 12px);
   align-items: flex-start;
   justify-content: space-between;
-  padding: 14px 16px 6px;
+  padding: 14px var(--bew-space-16, 16px) 6px;
 }
 
 .bap-toc__title {
@@ -209,7 +209,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 4px 8px 10px;
+  padding: var(--bew-space-4, 4px) var(--bew-space-8, 8px) 10px;
   overflow-y: auto;
   list-style: none;
   scrollbar-width: thin;
@@ -218,14 +218,14 @@
 .bap-toc__item {
   display: block;
   width: 100%;
-  padding: 6px 8px;
+  padding: 6px var(--bew-space-8, 8px);
   overflow: hidden;
   font-size: 13px;
   color: var(--bew-text-2);
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
-  border-radius: 8px;
+  border-radius: var(--bew-radius-sm, 8px);
   transition:
     color var(--bap-duration) var(--bap-ease),
     background-color var(--bap-duration) var(--bap-ease);
@@ -248,14 +248,14 @@
 }
 
 .bap-toc__empty {
-  padding: 8px 16px 16px;
+  padding: var(--bew-space-8, 8px) var(--bew-space-16, 16px) var(--bew-space-16, 16px);
   font-size: 12px;
   line-height: 1.5;
   color: var(--bew-text-3);
 }
 
 .bap-toc__foot {
-  padding: 8px 16px 12px;
+  padding: var(--bew-space-8, 8px) var(--bew-space-16, 16px) var(--bew-space-12, 12px);
   font-size: 11px;
   line-height: 1.5;
   color: var(--bew-text-4);
@@ -269,7 +269,7 @@
   top: 64px;
   left: 50%;
   z-index: 4;
-  padding: 8px 16px;
+  padding: var(--bew-space-8, 8px) var(--bew-space-16, 16px);
   font-size: 12px;
   color: var(--bew-text-1);
   white-space: nowrap;
@@ -312,7 +312,7 @@
 
 @media (max-width: 720px) {
   :host {
-    --bap-edge: 12px;
+    --bap-edge: var(--bew-space-12, 12px);
   }
 
   .bap-toc {
@@ -340,6 +340,61 @@
 
   .bap-progress__fill {
     transition: none !important;
+  }
+}
+/* #endregion */
+
+/* #region 高对比度 / 强制颜色（第 11 轮）
+   浮层在 shadow root 内，系统级 high-contrast 不会自动照顾到我们自定义的边框与底色：
+   - prefers-contrast: more：把按钮 / 面板 / kbd / 胶囊的边框提到 --bew-text-3；
+   - forced-colors: active：用系统颜色（Canvas / CanvasText / Highlight）重画边界与选中态，
+     确保在高对比度主题下按钮、面板、徽标仍有可见轮廓。 */
+@media (prefers-contrast: more) {
+  :host .bap-fab,
+  :host .bap-panel,
+  :host .bap-toast,
+  :host .bap-kbd,
+  :host .bap-seg,
+  :host .bap-seg__btn,
+  :host .bap-chip,
+  :host .bap-jump,
+  :host .bap-toggle,
+  :host .bap-icon-btn,
+  :host .bap-status {
+    border-color: var(--bew-text-3);
+  }
+
+  :host [aria-pressed="true"],
+  :host [aria-expanded="true"] {
+    border-color: var(--bew-text-2);
+  }
+}
+
+@media (forced-colors: active) {
+  :host .bap-fab,
+  :host .bap-panel,
+  :host .bap-toast,
+  :host .bap-kbd,
+  :host .bap-seg,
+  :host .bap-seg__btn,
+  :host .bap-chip,
+  :host .bap-jump,
+  :host .bap-toggle,
+  :host .bap-icon-btn,
+  :host .bap-status {
+    color: CanvasText;
+    background: Canvas;
+    border: 1px solid CanvasText;
+  }
+
+  :host [aria-pressed="true"],
+  :host [aria-expanded="true"] {
+    color: Highlight;
+    border-color: Highlight;
+  }
+
+  :host :focus-visible {
+    outline: 2px solid Highlight;
   }
 }
 /* #endregion */

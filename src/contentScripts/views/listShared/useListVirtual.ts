@@ -23,6 +23,14 @@ import { settings } from '~/logic'
  * 关闭优化（`enabled() === false` 或浏览器不支持 content-visibility）时移除全部内联样式，
  * 完全退回改动前的渲染方式。不碰 hover 快捷操作、键盘导航、无限滚动、分组与骨架屏：
  * 它只对已渲染的卡片根节点做样式级的「渲不渲染」，DOM 结构与事件一律不动。
+ *
+ * ⚠️ 所有查询都必须走 `#bewly` 的 shadow root：
+ * Bewly 的页面（含列表页）渲染在 `#bewly` 的 shadow root 里，`document.querySelector`
+ * 是**看不到** `.bewly-list-page` / `[data-bewly-list-card]` 的（曾经因此整个优化是 no-op）。
+ * `getScrollRoot` 同理必须拿 shadow root 内的 `.bewly-scroll-container`，否则
+ * IntersectionObserver 的 root 是错的。取法与 `views/Moments`、`useFocusBrowse`、
+ * `useKeyboardCardNavigation` 保持一致。只有在 shadow root 还不存在（极早期 / 单测环境）时
+ * 才回退到 `document`。
  */
 
 export type ListCardVisibility = 'visible' | 'auto' | 'hidden'
@@ -36,6 +44,32 @@ const ACTIVE_ATTR = 'data-keyboard-active'
 const STYLE_CONTENT_VISIBILITY = 'content-visibility'
 const STYLE_CONTAIN_INTRINSIC_SIZE = 'contain-intrinsic-size'
 const CARD_SELECTOR = `[${LIST_CARD_ATTR}]`
+
+/** Bewly 主应用的 shadow root；页面内容都在这里面渲染 */
+function getBewlyShadowRoot(): ShadowRoot | null {
+  try {
+    return document.querySelector<HTMLElement>('#bewly')?.shadowRoot ?? null
+  }
+  catch {
+    return null
+  }
+}
+
+/** 列表页根节点：shadow root 内优先，取不到才回退 document（单测 / 极早期） */
+function findListRoot(): ParentNode | null {
+  const shadowRoot = getBewlyShadowRoot()
+  if (shadowRoot)
+    return shadowRoot.querySelector<HTMLElement>('.bewly-list-page') ?? null
+  return document.querySelector<HTMLElement>('.bewly-list-page')
+}
+
+/** 滚动容器：必须是 shadow root 内那个，否则 IntersectionObserver 的 root 是错的 */
+function findScrollRoot(): HTMLElement | null {
+  const shadowRoot = getBewlyShadowRoot()
+  if (shadowRoot)
+    return shadowRoot.querySelector<HTMLElement>('.bewly-scroll-container') ?? null
+  return document.querySelector<HTMLElement>('.bewly-scroll-container')
+}
 
 export interface UseListVirtualOptions {
   /** 是否启用：默认读 settings.momentsOptimizeEnabled（第 10 轮复用同一个开关） */
@@ -71,8 +105,8 @@ export function useListVirtual(options: UseListVirtualOptions = {}) {
   const estimatedHeight = options.estimatedHeight ?? 320
 
   const enabled = options.enabled ?? (() => settings.value.momentsOptimizeEnabled !== false)
-  const getRoot = options.getRoot ?? (() => document.querySelector<HTMLElement>('.bewly-list-page'))
-  const getScrollRoot = options.getScrollRoot ?? (() => document.querySelector<HTMLElement>('.bewly-scroll-container'))
+  const getRoot = options.getRoot ?? (() => findListRoot())
+  const getScrollRoot = options.getScrollRoot ?? (() => findScrollRoot())
   const count = options.count ?? (() => 0)
   const layoutKey = options.layoutKey ?? (() => '')
 
@@ -144,7 +178,7 @@ export function useListVirtual(options: UseListVirtualOptions = {}) {
 
   /** 全局键盘导航的高亮卡：把最近的列表卡片找出来，始终强制渲染 */
   function readActiveKey(): string {
-    const root = observedRoot ?? getRoot()
+    const root = observedRoot ?? getRoot() ?? getBewlyShadowRoot()
     const active = (root ?? document).querySelector<HTMLElement>(`[${ACTIVE_ATTR}]`)
     if (!active)
       return ''
@@ -376,7 +410,8 @@ export function useListVirtual(options: UseListVirtualOptions = {}) {
     scan()
     // 无限滚动 / 排序 / 过滤 / 切视图都会重建列表 DOM：监听根节点变化后重扫
     if (typeof MutationObserver !== 'undefined') {
-      const root = getRoot() ?? document.body
+      // 列表根可能还没渲染：此时观察 shadow root，等列表挂上来后再扫描
+      const root: Node | null = getRoot() ?? getBewlyShadowRoot() ?? document.body
       if (root) {
         mutationObserver = new MutationObserver((records) => {
           if (!isEnabled())

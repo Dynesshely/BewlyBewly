@@ -7,9 +7,9 @@
  */
 
 :host {
-  --bcp-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
-  --bcp-duration: 180ms;
-  --bcp-edge: 24px;
+  --bcp-ease: var(--bew-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1));
+  --bcp-duration: var(--bew-motion-base, 180ms);
+  --bcp-edge: var(--bew-space-24, 24px);
   --bcp-fab-height: 34px;
 
   position: fixed;
@@ -64,7 +64,7 @@
   z-index: 2;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--bew-space-8, 8px);
   align-items: flex-end;
   pointer-events: none;
 }
@@ -74,13 +74,13 @@
   gap: 6px;
   align-items: center;
   height: var(--bcp-fab-height);
-  padding: 0 12px;
+  padding: 0 var(--bew-space-12, 12px);
   font-size: 12px;
   color: var(--bew-text-2);
   pointer-events: auto;
   background: var(--bew-elevated);
   border: 1px solid var(--bew-border-color);
-  border-radius: 12px;
+  border-radius: var(--bew-radius-md, 12px);
   box-shadow: var(--bew-shadow-2);
   opacity: 0.72;
   transition:
@@ -119,7 +119,7 @@
   color: var(--bew-text-3);
   text-align: center;
   background: var(--bew-fill-1);
-  border-radius: 999px;
+  border-radius: var(--bew-radius-pill, 999px);
 }
 /* #endregion */
 
@@ -127,14 +127,14 @@
 .bcp-panel {
   position: fixed;
   right: var(--bcp-edge);
-  bottom: calc(var(--bcp-edge) + var(--bcp-fab-height) + 12px);
+  bottom: calc(var(--bcp-edge) + var(--bcp-fab-height) + var(--bew-space-12, 12px));
   z-index: 3;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--bew-space-12, 12px);
   width: min(320px, calc(100vw - var(--bcp-edge) * 2));
   max-height: min(70vh, 560px);
-  padding: 16px;
+  padding: var(--bew-space-16, 16px);
   overflow: auto;
   pointer-events: auto;
   background: var(--bew-elevated-solid);
@@ -145,7 +145,7 @@
 
 .bcp-panel__header {
   display: flex;
-  gap: 12px;
+  gap: var(--bew-space-12, 12px);
   align-items: center;
   justify-content: space-between;
 }
@@ -163,7 +163,7 @@
   width: 24px;
   height: 24px;
   color: var(--bew-text-3);
-  border-radius: 8px;
+  border-radius: var(--bew-radius-sm, 8px);
   transition:
     color var(--bcp-duration) var(--bcp-ease),
     background-color var(--bcp-duration) var(--bcp-ease);
@@ -203,7 +203,7 @@
   font-size: 12px;
   color: var(--bew-text-2);
   white-space: nowrap;
-  border-radius: 8px;
+  border-radius: var(--bew-radius-sm, 8px);
   transition:
     color var(--bcp-duration) var(--bcp-ease),
     background-color var(--bcp-duration) var(--bcp-ease);
@@ -223,7 +223,7 @@
 .bcp-chip-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: var(--bew-space-4, 4px);
 }
 
 .bcp-chip {
@@ -234,7 +234,7 @@
   white-space: nowrap;
   background: var(--bew-fill-1);
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--bew-radius-pill, 999px);
   transition:
     color var(--bcp-duration) var(--bcp-ease),
     background-color var(--bcp-duration) var(--bcp-ease),
@@ -250,7 +250,7 @@
 .bcp-chip__key {
   display: inline-block;
   min-width: 12px;
-  margin-right: 4px;
+  margin-right: var(--bew-space-4, 4px);
   padding: 0 3px;
   font-family: inherit;
   font-size: 10px;
@@ -268,7 +268,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 8px 10px;
+  padding: var(--bew-space-8, 8px) 10px;
   background: var(--bew-fill-1);
   border-radius: 10px;
 }
@@ -302,13 +302,13 @@
 .bcp-shortcuts__list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--bew-space-4, 4px);
   list-style: none;
 }
 
 .bcp-shortcuts__row {
   display: flex;
-  gap: 8px;
+  gap: var(--bew-space-8, 8px);
   align-items: center;
   font-size: 12px;
   color: var(--bew-text-2);
@@ -380,6 +380,13 @@
 
 /* #region 动效降级 */
 @media (prefers-reduced-motion: reduce) {
+  :host,
+  :host * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
   .bcp-fab,
   .bcp-icon-btn,
   .bcp-seg__btn,
@@ -396,6 +403,61 @@
   .bcp-panel-leave-to {
     transform: none;
     opacity: 1;
+  }
+}
+/* #endregion */
+
+/* #region 高对比度 / 强制颜色（第 11 轮）
+   浮层在 shadow root 内，系统级 high-contrast 不会自动照顾到我们自定义的边框与底色：
+   - prefers-contrast: more：把按钮 / 面板 / kbd / 胶囊的边框提到 --bew-text-3；
+   - forced-colors: active：用系统颜色（Canvas / CanvasText / Highlight）重画边界与选中态，
+     确保在高对比度主题下按钮、面板、徽标仍有可见轮廓。 */
+@media (prefers-contrast: more) {
+  :host .bcp-fab,
+  :host .bcp-panel,
+  :host .bcp-toast,
+  :host .bcp-kbd,
+  :host .bcp-seg,
+  :host .bcp-seg__btn,
+  :host .bcp-chip,
+  :host .bcp-jump,
+  :host .bcp-toggle,
+  :host .bcp-icon-btn,
+  :host .bcp-status {
+    border-color: var(--bew-text-3);
+  }
+
+  :host [aria-pressed="true"],
+  :host [aria-expanded="true"] {
+    border-color: var(--bew-text-2);
+  }
+}
+
+@media (forced-colors: active) {
+  :host .bcp-fab,
+  :host .bcp-panel,
+  :host .bcp-toast,
+  :host .bcp-kbd,
+  :host .bcp-seg,
+  :host .bcp-seg__btn,
+  :host .bcp-chip,
+  :host .bcp-jump,
+  :host .bcp-toggle,
+  :host .bcp-icon-btn,
+  :host .bcp-status {
+    color: CanvasText;
+    background: Canvas;
+    border: 1px solid CanvasText;
+  }
+
+  :host [aria-pressed="true"],
+  :host [aria-expanded="true"] {
+    color: Highlight;
+    border-color: Highlight;
+  }
+
+  :host :focus-visible {
+    outline: 2px solid Highlight;
   }
 }
 /* #endregion */

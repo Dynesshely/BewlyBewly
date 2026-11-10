@@ -1,54 +1,22 @@
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { expect, test } from '@playwright/test'
 
-import { chromium, expect, test } from '@playwright/test'
-
-import { routeBilibiliDocument } from './utils'
-
-const ROOT = fileURLToPath(new URL('../..', import.meta.url))
-const EXTENSION_DIR = join(ROOT, 'extension')
-const HOME_FIXTURE = join(ROOT, 'tests', 'e2e', 'fixtures', 'bilibili-home.html')
+import { focusPage, injectTestCards, launchExtension, openHomeFixture, skipIfExtensionMissing, waitForStableCardCount } from './utils'
 
 test.describe('聚焦浏览（Cover Flow）', () => {
-  test.skip(!existsSync(EXTENSION_DIR), '先运行 pnpm build 生成 extension/ 目录')
+  skipIfExtensionMissing()
 
   test('聚焦模式下快捷键：Ctrl+K 命令面板、回车新标签、空格页面内预览', async () => {
-    const context = await chromium.launchPersistentContext('', {
-      channel: 'chromium',
-      headless: true,
-      args: [
-        `--disable-extensions-except=${EXTENSION_DIR}`,
-        `--load-extension=${EXTENSION_DIR}`,
-        '--disable-popup-blocking',
-      ],
-      viewport: { width: 1440, height: 900 },
-    })
+    const context = await launchExtension({ allowPopups: true })
 
     try {
       const page = await context.newPage()
-      await routeBilibiliDocument(page, HOME_FIXTURE)
-      await page.goto('https://www.bilibili.com/', { waitUntil: 'domcontentloaded' })
-      await expect(page.locator('#bewly')).toHaveCount(1, { timeout: 30_000 })
-      await page.waitForFunction(
-        () => (document.querySelector('#bewly')?.shadowRoot?.querySelectorAll('[data-video-card]').length ?? 0) > 0,
-        undefined,
-        { timeout: 30_000 },
-      )
+      await focusPage(page)
+      await openHomeFixture(page, { minCards: 1 })
+      await waitForStableCardCount(page, 2)
 
       // 注入带视频链接的测试卡片，保证聚焦浏览有可用的轨道
-      await page.evaluate(() => {
-        const root = document.querySelector('#bewly')!.shadowRoot!
-        const container = root.querySelector('.bewly-scroll-container') || root.querySelector('#bewly-wrapper') || root
-        for (let i = 0; i < 4; i++) {
-          const el = document.createElement('div')
-          el.setAttribute('data-video-card', '')
-          el.setAttribute('data-video-url', `https://www.bilibili.com/video/BVTESTFOCUS${i}`)
-          el.setAttribute('data-video-title', `测试卡片 ${i}`)
-          el.style.cssText = 'height: 320px; width: 480px'
-          container.appendChild(el)
-        }
-      })
+      const injected = await injectTestCards(page, 4, 'BVTESTFOCUS', 'height: 320px; width: 480px')
+      await waitForStableCardCount(page, 2 + injected.length)
 
       const paletteOpen = () => page.evaluate(() => !!document.querySelector('#bewly')?.shadowRoot?.querySelector('.command-palette-mask'))
       // 面板文案跟随界面语言，用命令的按键提示 `F` 定位，避免依赖具体语言

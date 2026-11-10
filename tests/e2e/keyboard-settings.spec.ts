@@ -1,34 +1,17 @@
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { expect, test } from '@playwright/test'
 
-import { chromium, expect, test } from '@playwright/test'
-
-import { routeBilibiliDocument } from './utils'
-
-const ROOT = fileURLToPath(new URL('../..', import.meta.url))
-const EXTENSION_DIR = join(ROOT, 'extension')
-const HOME_FIXTURE = join(ROOT, 'tests', 'e2e', 'fixtures', 'bilibili-home.html')
+import { focusPage, launchExtension, openHomeFixture, skipIfExtensionMissing } from './utils'
 
 test.describe('键盘与快捷键设置', () => {
-  test.skip(!existsSync(EXTENSION_DIR), '先运行 pnpm build 生成 extension/ 目录')
+  skipIfExtensionMissing()
 
   test('设置页可打开、能改键、能恢复默认', async () => {
-    const context = await chromium.launchPersistentContext('', {
-      channel: 'chromium',
-      headless: true,
-      args: [
-        `--disable-extensions-except=${EXTENSION_DIR}`,
-        `--load-extension=${EXTENSION_DIR}`,
-      ],
-      viewport: { width: 1440, height: 900 },
-    })
+    const context = await launchExtension()
 
     try {
       const page = await context.newPage()
-      await routeBilibiliDocument(page, HOME_FIXTURE)
-      await page.goto('https://www.bilibili.com/', { waitUntil: 'domcontentloaded' })
-      await expect(page.locator('#bewly')).toHaveCount(1, { timeout: 30_000 })
+      await openHomeFixture(page)
+      await focusPage(page)
 
       const paletteOpen = () => page.evaluate(() => !!document.querySelector('#bewly')?.shadowRoot?.querySelector('.command-palette-mask'))
       const settingsOpen = () => page.evaluate(() => !!document.querySelector('#bewly')?.shadowRoot?.querySelector('#settings-window'))

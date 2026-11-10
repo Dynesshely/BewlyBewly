@@ -73,7 +73,7 @@ function handleLinkKeydown(event: KeyboardEvent) {
           {{ card.video.title }}
         </p>
         <p class="moment-media__video-meta">
-          <span v-if="card.video.badge" class="moment-media__badge">{{ card.video.badge }}</span>
+          <span v-if="card.video.badge || card.type === 'pgc'" class="moment-media__badge">{{ card.video.badge || t('type_pgc') }}</span>
           <span v-if="card.video.play">{{ t('play_count', { n: card.video.play }) }}</span>
           <span v-if="card.video.danmaku">{{ t('danmaku_count', { n: card.video.danmaku }) }}</span>
         </p>

@@ -3,13 +3,13 @@ import type { ShortcutLabelKey } from './i18n'
 import { settings } from '~/logic'
 
 import {
-  closePlaylistPanel,
+  closeSelectionPanel,
   restorePlayer,
   seekBy,
   seekToPercent,
   setCinema,
   stepEpisode,
-  stepPlaylistItem,
+  stepSelectionItem,
   toggleCinema,
   toggleDanmaku,
   toggleFullscreen,
@@ -28,8 +28,8 @@ const BIG_SEEK_STEP = 10
 export interface ShortcutDefinition {
   keys: string[]
   labelKey: ShortcutLabelKey
-  /** 只在特定条件下才存在/可用（页面上没有集数列表 / 播放列表时不列出、不拦截） */
-  requires?: 'episodeNav' | 'playlist'
+  /** 只在特定条件下才存在/可用（页面上没有集数 / 选集结构时不列出、不拦截） */
+  requires?: 'episodeNav' | 'selection' | 'autoplay'
 }
 
 /** 快捷键帮助面板的数据源（同时也是行为清单，改这里就是改帮助） */
@@ -91,17 +91,17 @@ export const VIDEO_PAGE_SHORTCUTS: ShortcutDefinition[] = [
   {
     keys: ['['],
     labelKey: 'prevItem',
-    requires: 'playlist',
+    requires: 'selection',
   },
   {
     keys: [']'],
     labelKey: 'nextItem',
-    requires: 'playlist',
+    requires: 'selection',
   },
   {
     keys: ['A'],
     labelKey: 'autoplay',
-    requires: 'playlist',
+    requires: 'autoplay',
   },
   {
     keys: ['0', '–', '9'],
@@ -164,17 +164,17 @@ const SHORTCUT_ACTIONS: ShortcutAction[] = [
     run: () => restorePlayer(),
   },
   {
-    // `[`：番剧页切上一集，播放列表页切上一个播放项（两者互斥，按页面能力判定）
+    // `[`：番剧页切上一集，播放列表 / 分P 页切上一个选集项（三类页面互斥）
     match: key => key === '[',
     run: () => stepAdjacent(-1),
   },
   {
-    // `]`：番剧页切下一集，播放列表页切下一个播放项
+    // `]`：番剧页切下一集，播放列表 / 分P 页切下一个选集项
     match: key => key === ']',
     run: () => stepAdjacent(1),
   },
   {
-    // 播放列表页：自动连播开关
+    // 仅播放列表页：自动连播开关（分P 由 B 站自己连播）
     match: (_, lower) => lower === 'a',
     run: () => togglePlaylistAutoplay(),
   },
@@ -184,14 +184,14 @@ const SHORTCUT_ACTIONS: ShortcutAction[] = [
   },
 ]
 
-/** `[` `]` 的共享入口：先看番剧集数列表，再看播放列表（两种页面不会同时出现） */
+/** `[` `]` 的共享入口：先看番剧集数列表，再看选集（播放列表 / 分P，三类页面不会同时出现） */
 function stepAdjacent(direction: -1 | 1): void {
   if (ui.episodeNav) {
     stepEpisode(direction)
     return
   }
-  if (ui.playlistNav)
-    stepPlaylistItem(direction)
+  if (ui.selectionNav)
+    stepSelectionItem(direction)
 }
 
 function consume(event: KeyboardEvent): void {
@@ -228,9 +228,9 @@ function handleKeyDown(event: KeyboardEvent): void {
       toggleShortcutsHelp(false)
       return
     }
-    if (ui.playlistPanelOpen) {
+    if (ui.selectionPanelOpen) {
       consume(event)
-      closePlaylistPanel()
+      closeSelectionPanel()
       return
     }
     if (ui.cinema) {
@@ -254,7 +254,7 @@ function handleKeyDown(event: KeyboardEvent): void {
       return
     }
     // 切集别名：部分键盘 `[` `]` 需要 AltGr，这里同时支持 Shift+, / Shift+. 产生的 `<` `>`
-    if ((ui.episodeNav || ui.playlistNav) && (key === '<' || key === '>')) {
+    if ((ui.episodeNav || ui.selectionNav) && (key === '<' || key === '>')) {
       consume(event)
       stepAdjacent(key === '<'
         ? -1
@@ -275,12 +275,12 @@ function handleKeyDown(event: KeyboardEvent): void {
   if (lower === 'p' && !settings.value.videoPageMiniPlayer) {
     return
   }
-  // 页面上既没有集数列表也没有播放列表时不抢 [ ]，交还给 B 站原生
-  if ((key === '[' || key === ']') && !ui.episodeNav && !ui.playlistNav) {
+  // 页面上既没有集数列表也没有选集结构时不抢 [ ]，交还给 B 站原生
+  if ((key === '[' || key === ']') && !ui.episodeNav && !ui.selectionNav) {
     return
   }
-  // 播放列表面板相关按键只在页面上真的有播放列表时生效
-  if (lower === 'a' && !ui.playlistNav) {
+  // 自动连播只服务播放列表页，分P / 番剧页交还给 B 站
+  if (lower === 'a' && ui.selectionKind !== 'playlist') {
     return
   }
 
@@ -308,8 +308,10 @@ export function getShortcutDefinitions(): ShortcutDefinition[] {
       return settings.value.videoPageMiniPlayer
     if (item.requires === 'episodeNav')
       return ui.episodeNav
-    if (item.requires === 'playlist')
-      return ui.playlistNav
+    if (item.requires === 'selection')
+      return ui.selectionNav
+    if (item.requires === 'autoplay')
+      return ui.selectionKind === 'playlist'
     return true
   })
 }

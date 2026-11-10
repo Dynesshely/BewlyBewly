@@ -12,7 +12,6 @@ import { useMomentsFeed } from './composables/useMomentsFeed'
 import { useMomentsOpen } from './composables/useMomentsOpen'
 import { useMomentsShortcuts } from './composables/useMomentsShortcuts'
 import { useVirtualList } from './composables/useVirtualList'
-import { useVirtualListI18n } from './composables/useVirtualListI18n'
 import { NATIVE_MOMENTS_URL, useMomentsI18n } from './i18n'
 
 /**
@@ -22,7 +21,7 @@ import { NATIVE_MOMENTS_URL, useMomentsI18n } from './i18n'
  * 支持无限加载、九宫格图片、大图预览、正文折叠与 j/k 键盘浏览。
  */
 const { t } = useMomentsI18n()
-const { t: vt } = useVirtualListI18n()
+
 const { openVideo, openInNewTab } = useMomentsOpen()
 const { handlePageRefresh, handleReachBottom, scrollbarRef } = useBewlyApp()
 
@@ -347,11 +346,11 @@ onUnmounted(() => {
           class="moments-chip"
           :class="{ 'is-active': optimizeEnabled }"
           :aria-pressed="optimizeEnabled"
-          :title="optimizeEnabled ? vt('optimizeHintOn') : vt('optimizeHintOff')"
+          :title="optimizeEnabled ? t('optimize_on') : t('optimize_off')"
           @click="setOptimizeEnabled(!optimizeEnabled)"
         >
           <span class="i-tabler:bolt" aria-hidden="true" />
-          <span>{{ vt('optimize') }}</span>
+          <span>{{ t('optimize') }}</span>
         </button>
       </div>
     </div>

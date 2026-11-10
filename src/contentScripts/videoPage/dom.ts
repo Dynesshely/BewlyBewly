@@ -333,7 +333,8 @@ export function getPlaylistItems(): HTMLElement[] {
   return []
 }
 
-export function getPlaylistItemTitle(item: HTMLElement): string {
+/** 选集条目的显示标题：播放列表与分P 共用 */
+export function getSelectionItemTitle(item: HTMLElement): string {
   return item.querySelector<HTMLElement>('.title-txt')?.textContent?.trim()
     ?? item.querySelector<HTMLElement>('[class*="title"]')?.textContent?.trim()
     ?? item.getAttribute('title')?.trim()
@@ -388,10 +389,6 @@ export function getPlaylistCurrentIndex(items: HTMLElement[] = getPlaylistItems(
     .some(anchor => (anchor.getAttribute('href') ?? '').includes(bvid)))
 }
 
-export function hasPlaylistNavigation(): boolean {
-  return isPlaylistPage() && getPlaylistItems().length > 0
-}
-
 /** 点击列表里的第 index 项：点原生条目的链接，交给 B 站自己路由 */
 export function clickPlaylistItem(index: number): boolean {
   const item = getPlaylistItems()[index]
@@ -437,6 +434,195 @@ export function canAdvanceToNextItem(): boolean {
   const items = getPlaylistItems()
   const current = getPlaylistCurrentIndex(items)
   return current >= 0 && current + 1 < items.length
+}
+
+// #endregion
+// #region 选集（播放列表 / 分P）
+
+/** 选集来源：播放列表（/list/*）或普通视频页的分P list，二者互斥 */
+export type SelectionKind = 'none' | 'playlist' | 'parts'
+
+export interface SelectionContext {
+  kind: 'playlist' | 'parts'
+  items: HTMLElement[]
+  /** 当前项下标，-1 表示判定失败 */
+  index: number
+}
+
+/**
+ * 分P 列表候选（按优先级）。
+ *
+ * 类名证据来自仓库内的 `videoPage.scss`：
+ * `.multi-page-v1 .cur-list .list-box li.on` 是当前 P；`#multi_page` / `.list-box` 是旧版分P 列表。
+ * 新版播放页也可能把分P 渲染进 `.video-pod`（`bilibiliEnhanceVideoList.scss` 里 `.simple-base-item`）。
+ */
+const PART_ITEM_SELECTORS = [
+  '#multi_page .list-box li',
+  '.multi-page-v1 .cur-list .list-box li',
+  '.multi-page-v1 .list-box li',
+  '[class*="multi-page"] .list-box li',
+  '#multi_page li',
+  '[class*="multi-page"] li',
+  '.video-pod__list .simple-base-item',
+  '.video-pod__item',
+]
+
+const ACTIVE_SELECTION_TOKEN_RE = /(?:^|[-_])(?:active|current|selected)(?:[-_]|$)/i
+
+function hasActiveToken(el: HTMLElement): boolean {
+  if (el.getAttribute('aria-current'))
+    return true
+
+  return el.className
+    .split(/\s+/)
+    .some(token => token.toLowerCase() === 'on'
+      || token.toLowerCase() === 'cursor'
+      || ACTIVE_SELECTION_TOKEN_RE.test(token))
+}
+
+function isActivePartItem(item: HTMLElement): boolean {
+  if (hasActiveToken(item))
+    return true
+
+  // 条目本身是 <a> 时，高亮通常挂在父级 <li> 上
+  const parent = item.closest<HTMLElement>('li')
+  return Boolean(parent && parent !== item && hasActiveToken(parent))
+}
+
+function getCurrentPartNumber(): number {
+  try {
+    const param = new URL(location.href).searchParams.get('p')
+    const parsed = param
+      ? Number(param)
+      : 1
+    return Number.isFinite(parsed) && parsed > 0
+      ? parsed
+      : 1
+  }
+  catch {
+    return 1
+  }
+}
+
+function getItemPartNumber(item: HTMLElement): number | null {
+  const candidates: Element[] = [
+    item,
+    ...Array.from(item.querySelectorAll('a')),
+  ]
+  for (const candidate of candidates) {
+    const href = candidate.getAttribute('href')
+    if (!href)
+      continue
+
+    try {
+      const param = new URL(href, location.href).searchParams.get('p')
+      const parsed = param
+        ? Number(param)
+        : Number.NaN
+      if (Number.isFinite(parsed))
+        return parsed
+    }
+    catch {
+      // 忽略非法 href
+    }
+  }
+  return null
+}
+
+function getPartCurrentIndex(items: HTMLElement[]): number {
+  const activeIndex = items.findIndex(isActivePartItem)
+  if (activeIndex >= 0)
+    return activeIndex
+
+  // 兜底：按 URL 里的 p= 匹配条目链接
+  const current = getCurrentPartNumber()
+  return items.findIndex(item => getItemPartNumber(item) === current)
+}
+
+function findPartItems(): HTMLElement[] {
+  for (const selector of PART_ITEM_SELECTORS) {
+    const items = Array.from(document.querySelectorAll<HTMLElement>(selector))
+    if (items.length > 1)
+      return items
+  }
+
+  // 兜底启发式：同一路径下存在 2 个以上带 p= 的视频链接
+  const pathname = location.pathname
+  const anchors = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href*="p="]'))
+    .filter((anchor) => {
+      try {
+        const url = new URL(anchor.getAttribute('href') ?? '', location.href)
+        return url.pathname === pathname && url.searchParams.has('p')
+      }
+      catch {
+        return false
+      }
+    })
+
+  return anchors.length > 1
+    ? anchors
+    : []
+}
+
+/**
+ * 当前页面的「选集」上下文：`/list/*` 优先取播放列表，其余页面取分P。
+ *
+ * 三类页面按能力互斥：番剧页走集数列表（不进入本函数），播放列表页走 playlist，
+ * 普通多P 视频走 parts；都探测不到时返回 null，面板整体不渲染。
+ */
+export function getSelectionContext(): SelectionContext | null {
+  if (isPlaylistPage()) {
+    const playlistItems = getPlaylistItems()
+    if (playlistItems.length) {
+      return {
+        kind: 'playlist',
+        items: playlistItems,
+        index: getPlaylistCurrentIndex(playlistItems),
+      }
+    }
+  }
+
+  const partItems = findPartItems()
+  if (partItems.length > 1) {
+    return {
+      kind: 'parts',
+      items: partItems,
+      index: getPartCurrentIndex(partItems),
+    }
+  }
+
+  return null
+}
+
+export function hasSelectionNavigation(): boolean {
+  return getSelectionContext() !== null
+}
+
+/** 点击选集里的第 index 项：点原生条目的链接，交给 B 站自己路由 */
+export function clickSelectionItem(index: number): boolean {
+  const item = getSelectionContext()?.items[index]
+  if (!item)
+    return false
+
+  const clickable = item.querySelector<HTMLElement>('a') ?? item
+  clickable.click()
+  return true
+}
+
+export function goToAdjacentSelectionItem(direction: -1 | 1): boolean {
+  const context = getSelectionContext()
+  if (!context)
+    return false
+
+  const targetIndex = context.index >= 0
+    ? context.index + direction
+    : (direction > 0
+        ? 0
+        : context.items.length - 1)
+  if (targetIndex < 0 || targetIndex >= context.items.length)
+    return false
+
+  return clickSelectionItem(targetIndex)
 }
 
 // #endregion

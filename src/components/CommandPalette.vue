@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ShortcutScope } from '~/constants/shortcutRegistry'
 import { useI18n } from 'vue-i18n'
 import { isFocusBrowseActive } from '~/composables/useFocusBrowse'
 import {
@@ -10,6 +11,7 @@ import {
   scopeLabelKey,
 } from '~/constants/shortcutRegistry'
 import { settings } from '~/logic'
+import { isHomePage } from '~/utils/main'
 import emitter from '~/utils/mitt'
 
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -26,6 +28,18 @@ interface Command {
   scopeLabel?: string
   /** 该命令对应的 App 层全局事件名（注册表可执行条目与面板内置命令去重时用） */
   event?: string
+  /** 注册表条目的页面 scope（按当前页过滤其他页面动作时用） */
+  scope?: ShortcutScope
+  /** 分组标题行：不可执行、不可选中，只用于分隔「当前页 / 其他页面」 */
+  header?: boolean
+  /** 「其他页面」折叠行：可执行，但执行后保持面板打开 */
+  toggle?: boolean
+  /** 执行后不关闭面板（折叠行用） */
+  keepOpen?: boolean
+  /** 是否显示「当前页不可用」提示（仅无法判断页面时的旧行为使用） */
+  note?: boolean
+  /** 分组标题高亮（「当前页」分组用主题色） */
+  accent?: boolean
 }
 
 /** 按键片段 → 单行提示（组合键用 +，或关系用空格） */
@@ -143,7 +157,17 @@ const commands = computed<Command[]>(() => [
   },
 ])
 
-const activeScopes = getActiveShortcutScopes()
+const activeScopes = computed(() => getActiveShortcutScopes())
+
+/**
+ * 是否处于「能判断当前页面」的上下文。
+ *
+ * getActiveShortcutScopes() 至少会返回 global：只剩 global 说明 URL 不在注册表能
+ * 识别的页面里；首页本身也没有独立 scope，用 isHomePage() 兜底。
+ * 两者都判断不出时退回第 9 轮的旧行为（可执行 + 灰显混排），
+ * 避免在未知页面把命令全藏进折叠区。
+ */
+const pageContextKnown = computed(() => activeScopes.value.size > 1 || isHomePage())
 
 /**
  * 注册表里带 `emitEvent` 的动作：App 层已有全局事件，命令面板可直接执行。
@@ -166,62 +190,57 @@ const registryCommands = computed<Command[]>(() => {
         label: t(entry.i18nKey),
         hint: formatKeyTokens(tokens, chord),
         event: eventName,
+        scope: entry.scope,
         run: () => emitter.emit(eventName),
       } satisfies Command
     })
 })
 
-/** 可执行命令 = 面板内置命令 + 注册表可执行动作（参考条目由 buildShortcutReferences 补在后面） */
-const executableCommands = computed<Command[]>(() => [
-  ...commands.value,
-  ...registryCommands.value,
-])
+/** 当前页可执行的注册表动作 */
+const currentRegistryCommands = computed<Command[]>(() =>
+  registryCommands.value.filter(cmd => !cmd.scope || activeScopes.value.has(cmd.scope)),
+)
 
-/** 注册表里「不能安全触发」的快捷键条目：只展示，标灰 */
-function buildShortcutReferences(onlyCurrentScope: boolean): Command[] {
+/** 其他页面的注册表动作：收进折叠区，灰显且不可执行 */
+const otherRegistryCommands = computed<Command[]>(() =>
+  registryCommands.value
+    .filter(cmd => Boolean(cmd.scope) && !activeScopes.value.has(cmd.scope as ShortcutScope))
+    .map(cmd => ({
+      ...cmd,
+      id: `other-${cmd.id}`,
+      run: undefined,
+      reference: true,
+    }) satisfies Command),
+)
+
+/** 「其他页面」折叠区是否展开 */
+const showOtherPages = ref(false)
+
+/**
+ * 注册表里「不能安全触发」的快捷键条目：只展示，标灰。
+ *
+ * @param mode current=当前页 other=其他页面 all=不做页面过滤（旧行为）
+ * @param q 搜索关键词；空串表示不过滤
+ */
+function buildReferenceCommands(mode: 'current' | 'other' | 'all', q = ''): Command[] {
   const entries = getPaletteShortcutEntries(
     settings.value.keyboardShortcuts,
-    onlyCurrentScope
-      ? { scopes: activeScopes }
-      : {},
+    mode === 'all'
+      ? {}
+      : { scopes: activeScopes.value, excludeScopes: mode === 'other' },
   )
 
-  return entries.map((entry) => {
-    const scopeLabel = t(scopeLabelKey(entry.scope))
-    const { tokens, chord } = getEntryKeyTokens(entry, settings.value.keyboardShortcuts)
-    return {
-      id: `shortcut-${entry.id}`,
-      label: t(entry.i18nKey),
-      hint: formatKeyTokens(tokens, chord),
-      reference: true,
-      scopeLabel,
-    }
-  })
-}
-
-const filtered = computed(() => {
-  const q = query.value.trim().toLowerCase()
-  if (!q) {
-    // 未输入时不把整张注册表铺开，避免把命令挤下去；只补当前页相关的快捷键
-    return [
-      ...executableCommands.value,
-      ...buildShortcutReferences(true),
-    ]
-  }
-
-  // 命令名 / 按键提示 / id 都参与匹配：可执行动作也能用快捷键片段搜到（例如输入 shift+z）
-  const commandHits = executableCommands.value.filter(cmd =>
-    cmd.label.toLowerCase().includes(q)
-    || (cmd.hint ?? '').toLowerCase().includes(q)
-    || cmd.id.toLowerCase().includes(q))
-  const referenceHits = getPaletteShortcutEntries(settings.value.keyboardShortcuts, {})
+  return entries
     .filter((entry) => {
-      const scopeLabel = t(scopeLabelKey(entry.scope))
-      const label = t(entry.i18nKey)
+      if (!q)
+        return true
       return matchesShortcutQuery(
         entry,
         q,
-        [label, scopeLabel],
+        [
+          t(entry.i18nKey),
+          t(scopeLabelKey(entry.scope)),
+        ],
         settings.value.keyboardShortcuts,
       )
     })
@@ -232,14 +251,103 @@ const filtered = computed(() => {
         label: t(entry.i18nKey),
         hint: formatKeyTokens(tokens, chord),
         reference: true,
+        // 只有「页面不确定」的回退模式需要逐条提示，分组 / 折叠标题已经说明了原因
+        note: mode === 'all',
         scopeLabel: t(scopeLabelKey(entry.scope)),
       } satisfies Command
     })
+}
 
-  return [
-    ...commandHits,
-    ...referenceHits,
+function buildSectionHeader(id: string, label: string, accent = false): Command {
+  return {
+    id: `header-${id}`,
+    label,
+    header: true,
+    accent,
+  }
+}
+
+/** 命令名 / 按键提示 / id 任一命中即算匹配 */
+function matchesCommand(cmd: Command, q: string): boolean {
+  return cmd.label.toLowerCase().includes(q)
+    || (cmd.hint ?? '').toLowerCase().includes(q)
+    || cmd.id.toLowerCase().includes(q)
+}
+
+/** 「其他页面（N）」折叠行 */
+function buildToggleRow(count: number): Command {
+  return {
+    id: 'toggle-other-pages',
+    label: `${t('command_palette.shortcut_unavailable')} · ${count}`,
+    toggle: true,
+    keepOpen: true,
+    run: () => {
+      showOtherPages.value = !showOtherPages.value
+    },
+  }
+}
+
+const filtered = computed<Command[]>(() => {
+  const q = query.value.trim().toLowerCase()
+
+  // 页面不确定：退回第 9 轮行为（可执行 + 灰显混排，不做分组 / 折叠）
+  if (!pageContextKnown.value) {
+    const executable = [
+      ...commands.value,
+      ...registryCommands.value,
+    ]
+    if (!q) {
+      return [
+        ...executable,
+        ...buildReferenceCommands('all'),
+      ]
+    }
+    return [
+      ...executable.filter(cmd => matchesCommand(cmd, q)),
+      ...buildReferenceCommands('all', q),
+    ]
+  }
+
+  // 页面确定且没有输入：内置命令 → 当前页可执行动作 / 当前页快捷键 → 折叠的其他页面
+  if (!q) {
+    const currentItems = [
+      ...currentRegistryCommands.value,
+      ...buildReferenceCommands('current'),
+    ]
+    const otherItems = [
+      ...otherRegistryCommands.value,
+      ...buildReferenceCommands('other'),
+    ]
+    const list: Command[] = [...commands.value]
+
+    if (currentItems.length)
+      list.push(buildSectionHeader('current', t('keyboard_registry.current_scope'), true), ...currentItems)
+
+    if (otherItems.length) {
+      list.push(buildToggleRow(otherItems.length))
+      if (showOtherPages.value)
+        list.push(...otherItems)
+    }
+
+    return list
+  }
+
+  // 有关键词：可执行的排前面并分组，其他页面 / 不可执行的排后面
+  const currentItems = [
+    ...currentRegistryCommands.value.filter(cmd => matchesCommand(cmd, q)),
+    ...buildReferenceCommands('current', q),
   ]
+  const otherItems = [
+    ...otherRegistryCommands.value.filter(cmd => matchesCommand(cmd, q)),
+    ...buildReferenceCommands('other', q),
+  ]
+
+  const list: Command[] = commands.value.filter(cmd => matchesCommand(cmd, q))
+  if (currentItems.length)
+    list.push(buildSectionHeader('current', t('keyboard_registry.current_scope'), true), ...currentItems)
+  if (otherItems.length)
+    list.push(buildSectionHeader('other', `${t('command_palette.shortcut_unavailable')} · ${otherItems.length}`), ...otherItems)
+  return list
 })
 
 watch(filtered, () => {
@@ -280,10 +388,19 @@ function runCommand(command?: Command) {
   const target = command ?? filtered.value[selected.value]
   if (!target)
     return
-  // 参考条目只是告诉用户「这个页面上有这些键」，不能执行
-  if (target.reference || !target.run)
+  // 分组标题没有动作；参考条目只是告诉用户「这个页面上有这些键」，都不能执行
+  if (target.header || target.reference || !target.run)
     return
   target.run()
+  // 折叠行只展开 / 收起「其他页面」，执行后保持面板打开并停在原处
+  if (target.keepOpen) {
+    nextTick(() => {
+      const index = filtered.value.findIndex(item => item.id === target.id)
+      if (index >= 0)
+        selected.value = index
+    })
+    return
+  }
   emit('close')
 }
 
@@ -325,24 +442,38 @@ function onKeydown(event: KeyboardEvent) {
         :placeholder="t('command_palette.placeholder')"
       >
       <div class="command-palette-list">
-        <div
-          v-for="(cmd, index) in filtered"
-          :key="cmd.id"
-          class="command-palette-item"
-          :class="{ active: index === selected, reference: cmd.reference }"
-          :aria-disabled="cmd.reference ? 'true' : undefined"
-          @mouseenter="!cmd.reference && (selected = index)"
-          @click="runCommand(cmd)"
-        >
-          <span class="command-palette-label">
-            <span class="command-palette-name">{{ cmd.label }}</span>
-            <span v-if="cmd.scopeLabel" class="command-palette-scope">{{ cmd.scopeLabel }}</span>
-            <span v-if="cmd.reference" class="command-palette-note">
-              {{ t('command_palette.shortcut_unavailable') }}
+        <template v-for="(cmd, index) in filtered" :key="cmd.id">
+          <div
+            v-if="cmd.header"
+            class="command-palette-section"
+            :class="{ 'is-current': cmd.accent }"
+          >
+            {{ cmd.label }}
+          </div>
+          <div
+            v-else
+            class="command-palette-item"
+            :class="{ 'active': index === selected, 'reference': cmd.reference, 'is-toggle': cmd.toggle }"
+            :aria-disabled="cmd.reference ? 'true' : undefined"
+            :aria-expanded="cmd.toggle ? showOtherPages : undefined"
+            @mouseenter="isRunnable(cmd) && (selected = index)"
+            @click="runCommand(cmd)"
+          >
+            <span class="command-palette-label">
+              <span class="command-palette-name">{{ cmd.label }}</span>
+              <span v-if="cmd.scopeLabel" class="command-palette-scope">{{ cmd.scopeLabel }}</span>
+              <span v-if="cmd.reference && cmd.note" class="command-palette-note">
+                {{ t('command_palette.shortcut_unavailable') }}
+              </span>
             </span>
-          </span>
-          <kbd v-if="cmd.hint">{{ cmd.hint }}</kbd>
-        </div>
+            <template v-if="cmd.toggle">
+              <span class="command-palette-chevron" aria-hidden="true">
+                {{ showOtherPages ? '▴' : '▾' }}
+              </span>
+            </template>
+            <kbd v-else-if="cmd.hint">{{ cmd.hint }}</kbd>
+          </div>
+        </template>
         <div v-if="!filtered.length" class="command-palette-empty">
           {{ t('command_palette.empty') }}
         </div>
@@ -404,6 +535,28 @@ function onKeydown(event: KeyboardEvent) {
 .command-palette-item.reference {
   color: var(--bew-text-3);
   cursor: default;
+}
+.command-palette-item.is-toggle {
+  margin-top: 4px;
+  color: var(--bew-text-3);
+  border-top: 1px solid var(--bew-border-color);
+  border-radius: 0 0 8px 8px;
+}
+.command-palette-section {
+  padding: 10px 12px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--bew-text-3);
+}
+.command-palette-section.is-current {
+  color: var(--bew-theme-color);
+}
+.command-palette-chevron {
+  flex: none;
+  padding: 0 4px;
+  font-size: 10px;
+  color: var(--bew-text-3);
 }
 .command-palette-item.reference:hover {
   background: transparent;

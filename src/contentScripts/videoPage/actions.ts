@@ -2,7 +2,7 @@ import { settings } from '~/logic'
 
 import {
   canAdvanceToNextItem,
-  clickPlaylistItem,
+  clickSelectionItem,
   findNativeNextButton,
   getDanmakuSwitchEl,
   getPlayerEl,
@@ -10,6 +10,7 @@ import {
   getVideoEl,
   goToAdjacentEpisode,
   goToAdjacentPlaylistItem,
+  goToAdjacentSelectionItem,
   isDanmakuEnabled,
   notifyPlayerResize,
   prefersReducedMotion,
@@ -89,7 +90,7 @@ export function setCinema(on: boolean, options: { silent?: boolean } = {}): void
   if (on) {
     // 进入影院时先复位迷你播放器 / 收起播放列表面板，避免它们挡住铺满视口的播放器
     setMini(false)
-    closePlaylistPanel()
+    closeSelectionPanel()
     window.scrollTo({
       top: 0,
       behavior: prefersReducedMotion()
@@ -343,9 +344,9 @@ export async function togglePictureInPicture(): Promise<void> {
     showToast(t.pipFailed)
   }
 }
-// #region 播放列表（/list/*）
+// #region 选集（播放列表 / 分P）
 
-/** 自动连播状态存 sessionStorage：默认关，同一标签页刷新后保持 */
+/** 自动连播状态存 sessionStorage：默认关，同一标签页刷新后保持（仅播放列表页可用） */
 const AUTOPLAY_STORAGE_KEY = 'bewly-playlist-autoplay'
 
 export function readStoredAutoplay(): boolean {
@@ -366,25 +367,25 @@ function storeAutoplay(on: boolean): void {
   }
 }
 
-export function setPlaylistPanelOpen(open: boolean): void {
-  if (ui.playlistPanelOpen === open)
+export function setSelectionPanelOpen(open: boolean): void {
+  if (ui.selectionPanelOpen === open)
     return
-  ui.playlistPanelOpen = open && ui.playlistNav
+  ui.selectionPanelOpen = open && ui.selectionNav
 }
 
-export function togglePlaylistPanel(): void {
-  if (!ui.playlistNav)
+export function toggleSelectionPanel(): void {
+  if (!ui.selectionNav)
     return
-  setPlaylistPanelOpen(!ui.playlistPanelOpen)
+  setSelectionPanelOpen(!ui.selectionPanelOpen)
 }
 
-export function closePlaylistPanel(): void {
-  setPlaylistPanelOpen(false)
+export function closeSelectionPanel(): void {
+  setSelectionPanelOpen(false)
 }
 
-/** 自动连播开关：默认关；页面上没有任何「下一个」入口时不允许开启 */
+/** 自动连播开关：默认关；只服务 /list/* 播放列表（分P 由 B 站自己连播） */
 export function setPlaylistAutoplay(on: boolean): void {
-  if (on && !ui.playlistNav)
+  if (on && ui.selectionKind !== 'playlist')
     return
 
   ui.playlistAutoplay = on
@@ -394,7 +395,7 @@ export function setPlaylistAutoplay(on: boolean): void {
 }
 
 export function togglePlaylistAutoplay(): void {
-  if (!ui.playlistNav)
+  if (ui.selectionKind !== 'playlist')
     return
 
   if (!ui.playlistAutoplay && !canAdvanceToNextItem()) {
@@ -404,28 +405,28 @@ export function togglePlaylistAutoplay(): void {
   setPlaylistAutoplay(!ui.playlistAutoplay)
 }
 
-/** 点击面板里的一项：直接点原生条目，路由交给 B 站 */
-export function selectPlaylistItem(index: number): void {
-  if (!ui.playlistNav)
+/** 点击面板里的一项：直接点原生条目（播放列表链接 / 分P 链接），路由交给 B 站 */
+export function selectSelectionItem(index: number): void {
+  if (!ui.selectionNav)
     return
-  clickPlaylistItem(index)
+  clickSelectionItem(index)
 }
 
-/** 快捷键 [ / ]：切上一个 / 下一个播放项 */
-export function stepPlaylistItem(direction: -1 | 1): void {
-  if (!ui.playlistNav)
+/** 快捷键 [ / ]：切上一个 / 下一个选集项（播放列表条目或分P） */
+export function stepSelectionItem(direction: -1 | 1): void {
+  if (!ui.selectionNav)
     return
-  goToAdjacentPlaylistItem(direction)
+  goToAdjacentSelectionItem(direction)
 }
 
 /**
- * 自动连播的一步：视频 ended 时触发。
+ * 自动连播的一步：视频 ended 时触发（仅播放列表页）。
  *
- * 优先点播放器原生的「下一个」按钮（保留 B 站自己的分P / 合集行为）；
+ * 优先点播放器原生的「下一个」按钮（保留 B 站自己的行为）；
  * 找不到原生按钮时退化为点播放列表里的下一项；两者都没有就关闭自动连播并说明。
  */
 export function advanceToNextItem(): boolean {
-  if (!ui.playlistNav)
+  if (ui.selectionKind !== 'playlist')
     return false
 
   const nativeNext = findNativeNextButton()

@@ -1,23 +1,31 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 
-import { closePlaylistPanel, selectPlaylistItem, togglePlaylistAutoplay } from '../actions'
+import { closeSelectionPanel, selectSelectionItem, togglePlaylistAutoplay } from '../actions'
 import { formatPlaylistPosition, useMessages } from '../i18n'
 import { ui } from '../state'
 
 const t = useMessages()
 const listEl = ref<HTMLElement | null>(null)
 
+/** 面板名跟随选集来源：播放列表 / 分P 选集 */
+const panelTitle = computed(() => ui.selectionKind === 'parts'
+  ? t.value.partsPanel
+  : t.value.playlistPanel)
+const panelHint = computed(() => ui.selectionKind === 'parts'
+  ? t.value.partsHint
+  : t.value.playlistHint)
+
 const positionText = computed(() => {
-  const total = ui.playlistItems.length
-  const current = ui.playlistCurrentIndex >= 0
-    ? ui.playlistCurrentIndex + 1
+  const total = ui.selectionItems.length
+  const current = ui.selectionCurrentIndex >= 0
+    ? ui.selectionCurrentIndex + 1
     : 0
   return formatPlaylistPosition(t.value.playlistPosition, current, total)
 })
 
 /** 打开面板时把当前项滚到可视区中间（只滚面板自身，不动页面） */
-watch(() => ui.playlistPanelOpen, async (open) => {
+watch(() => ui.selectionPanelOpen, async (open) => {
   if (!open)
     return
   await nextTick()
@@ -34,16 +42,17 @@ watch(() => ui.playlistPanelOpen, async (open) => {
 <template>
   <Transition name="bvp-fade">
     <section
-      v-if="ui.playlistNav && ui.playlistPanelOpen"
+      v-if="ui.selectionNav && ui.selectionPanelOpen"
       class="bvp-playlist"
-      :aria-label="t.playlistPanel"
+      :aria-label="panelTitle"
     >
       <header class="bvp-playlist__header">
         <h2 class="bvp-playlist__title">
-          {{ t.playlistPanel }}
+          {{ panelTitle }}
         </h2>
         <span class="bvp-playlist__position">{{ positionText }}</span>
         <button
+          v-if="ui.selectionKind === 'playlist'"
           class="bvp-playlist__btn bvp-playlist__autoplay"
           type="button"
           data-bvp-action="autoplay"
@@ -66,10 +75,10 @@ watch(() => ui.playlistPanelOpen, async (open) => {
         <button
           class="bvp-playlist__btn"
           type="button"
-          data-bvp-action="close-playlist"
+          data-bvp-action="close-selection"
           :aria-label="t.close"
           :title="t.close"
-          @click="closePlaylistPanel()"
+          @click="closeSelectionPanel()"
         >
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
@@ -78,13 +87,13 @@ watch(() => ui.playlistPanelOpen, async (open) => {
       </header>
 
       <ol ref="listEl" class="bvp-playlist__list">
-        <li v-for="item in ui.playlistItems" :key="item.index">
+        <li v-for="item in ui.selectionItems" :key="item.index">
           <button
             class="bvp-playlist__item"
             type="button"
             :aria-current="item.active ? 'true' : undefined"
             :title="item.title"
-            @click="selectPlaylistItem(item.index)"
+            @click="selectSelectionItem(item.index)"
           >
             <span class="bvp-playlist__index">{{ item.index + 1 }}</span>
             <span class="bvp-playlist__label">{{ item.title }}</span>
@@ -93,7 +102,7 @@ watch(() => ui.playlistPanelOpen, async (open) => {
       </ol>
 
       <p class="bvp-playlist__hint">
-        {{ t.playlistHint }}
+        {{ panelHint }}
       </p>
     </section>
   </Transition>

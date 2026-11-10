@@ -12,7 +12,9 @@
  *   引用，展示时取用户改键后的真实组合键；
  * - `emitEvent` 表示该动作在 App 层已有对应的全局事件：命令面板据此把它渲染成
  *   **可执行**条目（执行后关闭面板）；没有 emitEvent 的条目在命令面板里只作参考
- *   （标灰 + 「当前页不可用」）。
+ *   （标灰 + 「当前页不可用」）；
+ * - 命令面板会按 `getActiveShortcutScopes()` 过滤：只有当前页 scope 的动作直接展示，
+ *   其他页面的动作收进底部折叠区（灰显、不可执行）。
  */
 
 import type { ShortcutActionId } from './shortcuts'
@@ -516,15 +518,27 @@ export function groupShortcutsByScope(): ShortcutGroup[] {
     .filter(group => group.entries.length > 0)
 }
 
-/** 命令面板用：带有 App 层全局事件、可以直接执行的动作（可按 scope 过滤） */
+/**
+ * 命令面板用：没有全局事件、只能作参考的快捷键条目。
+ *
+ * - 不传 `scopes`：返回全表；
+ * - 传 `scopes`：默认只返回当前页 scope 的条目；
+ * - `excludeScopes: true`：反过来，只返回**不在**当前页 scope 的条目（其他页面）。
+ */
 export function getPaletteShortcutEntries(
   overrides?: Partial<Record<ShortcutActionId, string>> | null,
-  options: { scopes?: Set<ShortcutScope> | null } = {},
+  options: { scopes?: Set<ShortcutScope> | null, excludeScopes?: boolean } = {},
 ): ShortcutRegistryEntry[] {
   const scopes = options.scopes ?? null
-  return SHORTCUT_REGISTRY.filter(entry =>
-    !entry.emitEvent && (!scopes || scopes.has(entry.scope)),
-  )
+  return SHORTCUT_REGISTRY.filter((entry) => {
+    if (entry.emitEvent)
+      return false
+    if (!scopes)
+      return true
+    return options.excludeScopes
+      ? !scopes.has(entry.scope)
+      : scopes.has(entry.scope)
+  })
 }
 
 /**

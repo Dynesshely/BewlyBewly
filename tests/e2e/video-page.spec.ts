@@ -502,7 +502,7 @@ test.describe('播放列表页增强', () => {
     try {
       await ensureOverlay(page)
 
-      const playlistFab = page.locator('[data-bvp-action="playlist"]')
+      const playlistFab = page.locator('[data-bvp-action="selection"]')
       await expect(playlistFab).toHaveCount(1)
       await playlistFab.click()
 
@@ -527,7 +527,7 @@ test.describe('播放列表页增强', () => {
     try {
       await ensureOverlay(page)
 
-      await page.locator('[data-bvp-action="playlist"]').click()
+      await page.locator('[data-bvp-action="selection"]').click()
       await expect(page.locator('.bvp-playlist')).toBeVisible()
 
       await page.keyboard.press('Escape')
@@ -603,8 +603,187 @@ test.describe('播放列表页增强', () => {
 
     try {
       await ensureOverlay(page)
-      await expect(page.locator('[data-bvp-action="playlist"]')).toHaveCount(0)
-      await expect(page.locator('#bewly-video-playlist')).toHaveCount(0)
+      await expect(page.locator('[data-bvp-action="selection"]')).toHaveCount(0)
+      await expect(page.locator('#bewly-video-selection')).toHaveCount(0)
+      await expect(page.locator('.bvp-playlist')).toHaveCount(0)
+    }
+    finally {
+      await context.close()
+    }
+  })
+})
+/**
+ * 分P 视频快照：普通视频页 + `#multi_page` 分P 列表（`.list-box li`，当前项 `.on`）。
+ * 点条目时不真正路由，只记录点击并搬移 `.on` 类。
+ */
+const PARTS_PAGE_FIXTURE = `<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>多P 测试视频_哔哩哔哩_bilibili</title>
+    <style>
+      body { margin: 0; font-family: system-ui, sans-serif; }
+      #mirror-vdcon { display: flex; gap: 16px; padding: 16px; margin: 0 auto; max-width: 1600px; }
+      .left-container { flex: 1 1 70%; min-width: 0; }
+      #playerWrap { background: #000; }
+      #bilibili-player { position: relative; height: 420px; overflow: hidden; }
+      .bpx-player-container { width: 100%; height: 100%; }
+      video { display: block; width: 100%; height: 100%; object-fit: contain; }
+      .right-container { flex: 0 0 28%; }
+      .video-title { margin: 16px 0; font-size: 20px; }
+      .video-desc { min-height: 1600px; }
+      #multi_page .list-box { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+      #multi_page .list-box li { padding: 6px; }
+      #multi_page .list-box li.on { background: #ddd; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="video-container-v1" id="mirror-vdcon">
+        <div class="left-container scroll-sticky">
+          <div id="playerWrap">
+            <div id="bilibili-player">
+              <div class="bpx-player-container"><video preload="metadata"></video></div>
+            </div>
+          </div>
+          <h1 class="video-title">多P 测试视频</h1>
+          <div class="video-desc">正文</div>
+        </div>
+        <div class="right-container">
+          <div id="multi_page">
+            <div class="cur-list">
+              <ul class="list-box">
+                <li class="on"><a href="/video/BV1xx411c7mD?p=1">P1 第一集</a></li>
+                <li><a href="/video/BV1xx411c7mD?p=2">P2 第二集</a></li>
+                <li><a href="/video/BV1xx411c7mD?p=3">P3 第三集</a></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      document.querySelectorAll('#multi_page .list-box > li > a').forEach((anchor) => {
+        anchor.addEventListener('click', (event) => {
+          event.preventDefault()
+          const item = anchor.parentElement
+          document.querySelectorAll('#multi_page .list-box > li').forEach((el) => el.classList.remove('on'))
+          item.classList.add('on')
+          document.body.dataset.clickedPart = new URL(anchor.href).searchParams.get('p')
+        })
+      })
+    </script>
+  </body>
+</html>`
+
+async function openPartsPage(): Promise<{ context: BrowserContext, page: Page }> {
+  const context = await launchExtension({ allowPopups: true })
+
+  const page = await context.newPage()
+  await page.route('**/*', async (route) => {
+    const request = route.request()
+    const url = new URL(request.url())
+    if (url.hostname === 'www.bilibili.com' && request.resourceType() === 'document') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/html; charset=utf-8',
+        body: PARTS_PAGE_FIXTURE,
+      })
+      return
+    }
+    await route.continue()
+  })
+
+  await page.goto('https://www.bilibili.com/video/BV1xx411c7mD?p=1', { waitUntil: 'domcontentloaded' })
+  return { context, page }
+}
+
+test.describe('分P 选集面板', () => {
+  skipIfExtensionMissing()
+
+  const clickedPart = (page: Page) => page.evaluate(() => document.body.dataset.clickedPart ?? '')
+
+  test('多P 视频出现「选集」入口：面板标题区分、当前 P 高亮、点条目切 P', async () => {
+    const { context, page } = await openPartsPage()
+
+    try {
+      await ensureOverlay(page)
+
+      const selectionFab = page.locator('[data-bvp-action="selection"]')
+      await expect(selectionFab).toHaveCount(1)
+      await selectionFab.click()
+
+      const panel = page.locator('.bvp-playlist')
+      await expect(panel).toBeVisible()
+      // 普通多P 视频的面板标题是「选集 / Parts」，不是播放列表
+      const panelTitle = (await panel.locator('.bvp-playlist__title').textContent())?.trim() ?? ''
+      expect(panelTitle).toMatch(/选集|parts/i)
+      await expect(panel.locator('.bvp-playlist__item')).toHaveCount(3)
+      // 当前 P = 第 1 P（fixture 里 li.on 在第一项）
+      await expect(panel.locator('[aria-current="true"]')).toHaveCount(1)
+      await expect(panel.locator('[aria-current="true"]')).toContainText('第一集')
+
+      await panel.locator('.bvp-playlist__item').nth(2).click()
+      await expect.poll(() => clickedPart(page), { timeout: 5_000 }).toBe('3')
+    }
+    finally {
+      await context.close()
+    }
+  })
+
+  test('] / [ 切下一 P / 上一 P', async () => {
+    const { context, page } = await openPartsPage()
+
+    try {
+      await ensureOverlay(page)
+
+      await page.keyboard.press(']')
+      await expect.poll(() => clickedPart(page), { timeout: 5_000 }).toBe('2')
+
+      await page.keyboard.press(']')
+      await expect.poll(() => clickedPart(page), { timeout: 5_000 }).toBe('3')
+
+      await page.keyboard.press('[')
+      await expect.poll(() => clickedPart(page), { timeout: 5_000 }).toBe('2')
+    }
+    finally {
+      await context.close()
+    }
+  })
+
+  test('帮助面板列出切 P，但不列播放列表专属的自动连播', async () => {
+    const { context, page } = await openPartsPage()
+
+    try {
+      await ensureOverlay(page)
+
+      await page.evaluate(() => {
+        document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '?', bubbles: true, cancelable: true }))
+      })
+      await expect(page.locator('.bvp-help__dialog')).toBeVisible()
+
+      const labels = await page.evaluate(() => Array.from(
+        document
+          .querySelector('#bewly-video-page')
+          ?.shadowRoot
+          ?.querySelectorAll('.bvp-help__label') ?? [],
+      ).map(el => el.textContent?.trim() ?? ''))
+
+      expect(labels.some(label => /上一个播放项|previous playlist item|previous item/i.test(label))).toBe(true)
+      expect(labels.some(label => /自动连播|autoplay/i.test(label))).toBe(false)
+    }
+    finally {
+      await context.close()
+    }
+  })
+
+  test('没有任何选集结构时，入口与面板都不渲染', async () => {
+    const { context, page } = await openVideoPage()
+
+    try {
+      await ensureOverlay(page)
+      await expect(page.locator('[data-bvp-action="selection"]')).toHaveCount(0)
+      await expect(page.locator('#bewly-video-selection')).toHaveCount(0)
       await expect(page.locator('.bvp-playlist')).toHaveCount(0)
     }
     finally {

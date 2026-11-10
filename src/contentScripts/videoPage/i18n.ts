@@ -54,8 +54,10 @@ export interface VideoPageMessages {
   shortcutsTitle: string
   shortcutsHint: string
   close: string
-  /** 播放列表面板标题 */
+  /** 播放列表面板标题（/list/*） */
   playlistPanel: string
+  /** 分P 选集的标题（普通多P 视频） */
+  partsPanel: string
   /** 形如「3 / 12」，用 formatPlaylistPosition 替换占位符 */
   playlistPosition: string
   autoplay: string
@@ -63,6 +65,7 @@ export interface VideoPageMessages {
   autoplayOff: string
   autoplayUnavailable: string
   playlistHint: string
+  partsHint: string
   /** 形如「已跳到 {percent}%」，用 formatPercent 替换占位符 */
   percent: string
   shortcut: ShortcutLabels
@@ -94,12 +97,14 @@ const CMN_CN: VideoPageMessages = {
   shortcutsHint: '按 ? 打开或关闭帮助，Esc 关闭',
   close: '关闭',
   playlistPanel: '播放列表',
+  partsPanel: '选集',
   playlistPosition: '{current} / {total}',
   autoplay: '自动连播',
   autoplayOn: '已开启自动连播：播完自动切下一个',
   autoplayOff: '已关闭自动连播',
   autoplayUnavailable: '当前页面没有可用的「下一个」，无法自动连播',
   playlistHint: '点条目切换视频；A 切自动连播；Esc 关闭面板',
+  partsHint: '点条目切换分P；Esc 关闭面板',
   percent: '已跳到 {percent}%',
   shortcut: {
     seekBack: '后退 10 秒',
@@ -150,12 +155,14 @@ const EN: VideoPageMessages = {
   shortcutsHint: 'Press ? to toggle this help, Esc to close',
   close: 'Close',
   playlistPanel: 'Playlist',
+  partsPanel: 'Parts',
   playlistPosition: '{current} / {total}',
   autoplay: 'Autoplay',
   autoplayOn: 'Autoplay on — play the next item automatically',
   autoplayOff: 'Autoplay off',
   autoplayUnavailable: 'No next item is available on this page, so autoplay cannot be enabled',
   playlistHint: 'Click an item to switch, A toggles autoplay, Esc closes',
+  partsHint: 'Click an item to switch part, Esc closes',
   percent: 'Jumped to {percent}%',
   shortcut: {
     seekBack: 'Back 10 seconds',
@@ -206,8 +213,10 @@ const CMN_TW: VideoPageMessages = {
   shortcutsHint: '按 ? 開啟或關閉說明，Esc 關閉',
   close: '關閉',
   playlistPanel: '播放清單',
+  partsPanel: '選集',
   playlistPosition: '{current} / {total}',
   playlistHint: '點項目切換影片；A 切換自動連播；Esc 關閉面板',
+  partsHint: '點項目切換分P；Esc 關閉面板',
   autoplay: '自動連播',
   autoplayOn: '已開啟自動連播：播完自動切下一個',
   autoplayOff: '已關閉自動連播',
@@ -239,6 +248,7 @@ const CMN_TW: VideoPageMessages = {
 const JYUT: VideoPageMessages = {
   ...CMN_TW,
   playlistHint: '撳項目切換影片；A 切換自動連播；Esc 收埋面板',
+  partsHint: '撳項目切換分P；Esc 收埋面板',
   cinemaOn: '入咗影院模式，撳 Esc 退出',
   cinemaOff: '已經退出影院模式',
   restored: '還原咗播放器',

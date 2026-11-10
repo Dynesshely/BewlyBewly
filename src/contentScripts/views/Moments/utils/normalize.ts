@@ -98,7 +98,8 @@ function pickVideo(major: RawMajor): MomentVideo | undefined {
       duration: '',
       play: pgc.stat?.play ?? '',
       danmaku: pgc.stat?.danmaku ?? '',
-      badge: pgc.badge?.text ?? '番剧',
+      // 接口没给角标时留空，由卡片按当前语言补「番剧 / 番劇 / Bangumi」文案
+      badge: pgc.badge?.text ?? '',
     }
   }
 

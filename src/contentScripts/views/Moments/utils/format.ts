@@ -9,9 +9,16 @@ import type { MomentCardType } from '../types'
 
 type Translate = (key: MomentsMessageKey, params?: Record<string, string | number>) => string
 
-const ZH_UNITS = [
+/** 简中单位 */
+const ZH_CN_UNITS = [
   { value: 1e8, symbol: '亿' },
   { value: 1e4, symbol: '万' },
+]
+
+/** 繁体（cmn-TW / jyut）单位：万/亿 在繁体里必须写成 萬/億 */
+const ZH_TW_UNITS = [
+  { value: 1e8, symbol: '億' },
+  { value: 1e4, symbol: '萬' },
 ]
 
 const EN_UNITS = [
@@ -24,7 +31,16 @@ function trimTrailingZero(text: string): string {
   return text.replace(/\.0+$/, '').replace(/(\.\d*[1-9])0+$/, '$1')
 }
 
-/** 播放量 / 互动数的紧凑写法：12345 → 1.2万（简中） / 12.3K（英文） */
+/** 按语言选计数单位：简中 万/亿、繁体与粤语 萬/億、英文 K/M/B */
+function countUnitsFor(locale: MomentsLocale) {
+  if (locale === 'en')
+    return EN_UNITS
+  if (locale === 'cmn-TW' || locale === 'jyut')
+    return ZH_TW_UNITS
+  return ZH_CN_UNITS
+}
+
+/** 播放量 / 互动数的紧凑写法：12345 → 1.2万（简中）/ 1.2萬（繁体/粤语）/ 12.3K（英文） */
 export function formatCount(value: number | string | undefined, locale: MomentsLocale): string {
   const number = typeof value === 'number'
     ? value
@@ -32,9 +48,7 @@ export function formatCount(value: number | string | undefined, locale: MomentsL
   if (!Number.isFinite(number) || number <= 0)
     return '0'
 
-  const units = locale === 'en'
-    ? EN_UNITS
-    : ZH_UNITS
+  const units = countUnitsFor(locale)
   for (const unit of units) {
     if (number >= unit.value)
       return `${trimTrailingZero((number / unit.value).toFixed(1))}${unit.symbol}`

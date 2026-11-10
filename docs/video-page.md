@@ -143,3 +143,39 @@ B 站原生播放页（`www.bilibili.com/video/*`、`/list/*`）不是 Bewly 接
 - 真实播放列表页 DOM 未实测：面板条目选择器按仓库内已有样式证据选择，命中不了就完全不渲染（可降级）；
   自动连播的原生「下一个」按钮选择器（`.bpx-player-ctrl-next` 等）同样带兜底，兜底到点列表下一项
 - 点击条目是否成功切换取决于 B 站对该条目的原生点击处理；本模块只 `click()`，不模拟路由
+## 选集面板：分P / 播放列表（第 13 轮扩展）
+
+第 12 轮的「播放列表面板」在本轮升级为**通用选集面板**：同一个浮动入口 / 面板组件，按页面能力显示
+「播放列表」或「选集（分P）」。三类页面的能力**互斥**：
+
+| 页面 | 选集来源 | 面板标题 | `[` / `]` | `A` 自动连播 |
+|---|---|---|---|---|
+| 番剧 / 电影 `/bangumi/play/*` | 集数列表（原有能力，不进面板） | — | 上一集 / 下一集 | 不可用（交给 B 站） |
+| 播放列表 `/list/*` | `.video-pod` 等播放列表条目 | 播放列表 | 上一个 / 下一个播放项 | 可用 |
+| 普通多P 视频 `/video/*` | `#multi_page` / `.multi-page-v1` 分P 列表 | 选集 | 上一 P / 下一 P | 不可用（交给 B 站） |
+
+**探测规则**（`src/contentScripts/videoPage/dom.ts` 的 `getSelectionContext()`）
+
+- 播放列表：`#playlist-container` / `.video-pod` / `[class*="video-pod"]` 内的 `.video-pod__item`、
+  `.video-pod__list .simple-base-item`
+- 分P（按优先级）：`#multi_page .list-box li` → `.multi-page-v1 .cur-list .list-box li` →
+  `.multi-page-v1 .list-box li` → `[class*="multi-page"] .list-box li` → `#multi_page li` →
+  `.video-pod__list .simple-base-item` → `.video-pod__item`
+- 兜底启发式：同一路径下存在 **2 个以上带 `p=` 的视频链接**（`a[href*="p="]`）时，直接把这些链接当分P 条目
+- 当前项：先看原生高亮类（`on` / `active` / `current` / `selected` / `cursor` 或 `aria-current`，
+  分P 支持高亮挂在父级 `li` 上），再看 URL 的 `p=` / `bvid` 与条目链接匹配；判定失败时下标为 -1，面板仍可用
+- **任何一类都探测不到时，浮动入口、面板 host、快捷键、帮助项全部不渲染**，不留空浮层
+
+**交互**
+
+- 点条目：直接点原生条目里的 `<a>`（分P 链接 / 播放列表链接），路由交给 B 站，不模拟跳转
+- 当前项主题色高亮 + `aria-current="true"`；条目是原生 `<button>`（Tab 可达、Enter/Space 触发）
+- 面板打开时把当前项滚到可视区中间；`Esc` 关闭面板（顺序：帮助 → 面板 → 影院）
+- 自动连播（`A`）只在播放列表页提供：分P / 番剧的连播由 B 站自己处理，避免两边同时跳
+
+**降级与已知限制**
+
+- 分P 的容器/条目选择器全部按优先级尝试，命中不了就走「2 个以上 `p=` 链接」兜底；
+  两者都失败时入口不出现（不会出现「面板空着」的状态）
+- 面板标题跟随来源：`/list/*` 为「播放列表」，普通多P 视频为「选集」；文案来自模块内 i18n（四种语言）
+- 分P 页不提供自动连播，帮助面板也不会列出 `A`（避免与 B 站自己的分P 自动切换冲突）

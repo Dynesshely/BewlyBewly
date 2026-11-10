@@ -1,7 +1,9 @@
+import type { SelectionKind } from './dom'
+
 import { reactive } from 'vue'
 
-/** 播放列表面板里的一行 */
-export interface PlaylistItemView {
+/** 选集面板（播放列表 / 分P）里的一行 */
+export interface SelectionItemView {
   index: number
   title: string
   active: boolean
@@ -15,16 +17,18 @@ export interface VideoPageUiState {
   isBangumi: boolean
   /** 页面上存在可用的集数列表（番剧 / 电影才可能为 true） */
   episodeNav: boolean
-  /** 页面上存在可用的播放列表（仅 /list/* 页面才可能为 true） */
-  playlistNav: boolean
-  /** 播放列表面板是否展开 */
-  playlistPanelOpen: boolean
-  /** 自动连播：默认关，状态存 sessionStorage */
+  /** 页面上存在可用的选集结构（播放列表或分P），面板据此渲染 */
+  selectionNav: boolean
+  /** 选集来源：播放列表 / 分P / 无（与番剧集数互斥） */
+  selectionKind: SelectionKind
+  /** 选集面板是否展开 */
+  selectionPanelOpen: boolean
+  /** 自动连播（仅播放列表页可用）：默认关，状态存 sessionStorage */
   playlistAutoplay: boolean
-  /** 播放列表条目（同步自原生 DOM，只在内容变化时写入） */
-  playlistItems: PlaylistItemView[]
-  /** 当前播放项下标，-1 表示判定失败 */
-  playlistCurrentIndex: number
+  /** 选集条目（同步自原生 DOM，只在内容变化时写入） */
+  selectionItems: SelectionItemView[]
+  /** 当前选集项下标，-1 表示判定失败 */
+  selectionCurrentIndex: number
   cinema: boolean
   mini: boolean
   compact: boolean
@@ -44,11 +48,12 @@ function createInitialState(): VideoPageUiState {
     ready: false,
     isBangumi: false,
     episodeNav: false,
-    playlistNav: false,
-    playlistPanelOpen: false,
+    selectionNav: false,
+    selectionKind: 'none',
+    selectionPanelOpen: false,
     playlistAutoplay: false,
-    playlistItems: [],
-    playlistCurrentIndex: -1,
+    selectionItems: [],
+    selectionCurrentIndex: -1,
     cinema: false,
     mini: false,
     compact: false,

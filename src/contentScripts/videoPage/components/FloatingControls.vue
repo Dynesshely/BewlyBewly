@@ -1,16 +1,23 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+
 import { settings } from '~/logic'
 
-import { restorePlayer, toggleCinema, togglePlaylistPanel, toggleShortcutsHelp } from '../actions'
+import { restorePlayer, toggleCinema, toggleSelectionPanel, toggleShortcutsHelp } from '../actions'
 import { useMessages } from '../i18n'
 import { ui } from '../state'
 
 const t = useMessages()
+
+/** 面板名跟随页面能力：/list/* 是「播放列表」，普通多P 视频是「选集」 */
+const selectionLabel = computed(() => ui.selectionKind === 'parts'
+  ? t.value.partsPanel
+  : t.value.playlistPanel)
 </script>
 
 <template>
   <div
-    v-if="ui.mini || settings.videoPageCinemaMode || settings.videoPageShortcuts || ui.playlistNav"
+    v-if="ui.mini || settings.videoPageCinemaMode || settings.videoPageShortcuts || ui.selectionNav"
     class="bvp-fab-group"
     role="toolbar"
     :aria-label="t.controls"
@@ -57,13 +64,13 @@ const t = useMessages()
     </button>
 
     <button
-      v-if="ui.playlistNav"
+      v-if="ui.selectionNav"
       class="bvp-fab"
       type="button"
-      data-bvp-action="playlist"
-      :aria-pressed="ui.playlistPanelOpen"
-      :title="`${t.playlistPanel}（Esc 关闭）`"
-      @click="togglePlaylistPanel()"
+      data-bvp-action="selection"
+      :aria-pressed="ui.selectionPanelOpen"
+      :title="`${selectionLabel}（Esc 关闭）`"
+      @click="toggleSelectionPanel()"
     >
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
         <path
@@ -73,7 +80,7 @@ const t = useMessages()
           stroke-linecap="round"
         />
       </svg>
-      <span class="bvp-fab__label">{{ t.playlistPanel }}</span>
+      <span class="bvp-fab__label">{{ selectionLabel }}</span>
     </button>
 
     <button

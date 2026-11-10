@@ -6,6 +6,7 @@ import { useBewlyApp } from '~/composables/useAppProvider'
 import MomentCardView from './components/MomentCard.vue'
 import MomentLightbox from './components/MomentLightbox.vue'
 import MomentSkeleton from './components/MomentSkeleton.vue'
+import { MOMENTS_DENSITIES, useMomentsDensity } from './composables/useMomentsDensity'
 import { useMomentsFeed } from './composables/useMomentsFeed'
 import { useMomentsOpen } from './composables/useMomentsOpen'
 import { useMomentsShortcuts } from './composables/useMomentsShortcuts'
@@ -36,10 +37,40 @@ const {
   LOGIN_REQUIRED_CODE,
 } = useMomentsFeed()
 
+const { density, setDensity } = useMomentsDensity()
+
 const activeIndex = ref<number>(-1)
+/** 高亮卡片的 id：筛选切换后用它把高亮停在原来那张卡上 */
+const activeCardId = ref<string>('')
+const videoOnly = ref(false)
 const lightbox = ref<{ images: MomentImage[], index: number } | null>(null)
 const feedEndRef = ref<HTMLElement | null>(null)
 let loadMoreObserver: IntersectionObserver | null = null
+
+function isVideoCard(card: MomentCardModel) {
+  return card.type === 'video' || card.type === 'pgc'
+}
+
+/** 「只看视频」筛选后的列表：键盘高亮与渲染都以它为准 */
+const visibleCards = computed(() => videoOnly.value
+  ? cards.value.filter(isVideoCard)
+  : cards.value)
+
+/** 有动态但当前筛选下一条视频都没有 */
+const videoFilterEmpty = computed(() => videoOnly.value && !visibleCards.value.length && cards.value.length > 0)
+
+/** 「只看视频」时自动补页的次数上限（见 setupLoadMoreObserver） */
+let denseAutoLoadBudget = 3
+
+const densityOptions = computed(() => MOMENTS_DENSITIES.map(value => ({
+  value,
+  label: value === 'compact'
+    ? t('density_compact')
+    : t('density_comfortable'),
+  icon: value === 'compact'
+    ? 'i-tabler:list-details'
+    : 'i-tabler:layout-grid',
+})))
 
 // 首屏（含下拉刷新导致的空列表）才铺骨架；已有内容时刷新保留旧列表
 const showSkeleton = computed(() => status.value === 'idle' || (status.value === 'loading' && !cards.value.length))
@@ -89,8 +120,22 @@ function setupLoadMoreObserver() {
 
   const root = target.closest('.bewly-scroll-container') as HTMLElement | null
   loadMoreObserver = new IntersectionObserver((entries) => {
-    if (entries.some(entry => entry.isIntersecting))
-      void loadMore()
+    const intersecting = entries.some(entry => entry.isIntersecting)
+    // 哨兵离开视口后恢复补页预算，方便下次滚动到末尾时再自动加载
+    if (!intersecting) {
+      denseAutoLoadBudget = 3
+      return
+    }
+
+    // 只看视频时，若整页都没有视频卡，列表不会变长、哨兵会一直可见；
+    // 限制自动补页次数，避免连续请求几十页。剩下的交给「加载更多」按钮与滚动。
+    if (videoOnly.value) {
+      if (denseAutoLoadBudget <= 0 || visibleCards.value.length >= 6)
+        return
+      denseAutoLoadBudget--
+    }
+
+    void loadMore()
   }, {
     root: root ?? null,
     rootMargin: '0px 0px 320px 0px',
@@ -110,27 +155,44 @@ function initPageAction() {
 }
 
 useMomentsShortcuts({
-  cards,
+  cards: visibleCards,
   activeIndex,
   isOverlayOpen: () => lightbox.value !== null,
   onOpen: openCard,
 })
 
-watch(() => cards.value.length, (length) => {
-  if (activeIndex.value >= length)
-    activeIndex.value = length - 1
+// 选中 / 移动高亮时记住卡片 id，供筛选切换后恢复定位
+watch(activeIndex, (index) => {
+  activeCardId.value = visibleCards.value[index]?.id ?? ''
+
+  // 键盘浏览接近末尾时预取下一页
+  if (index >= 0 && index >= visibleCards.value.length - 2)
+    void loadMore()
+})
+
+// 列表或筛选变化后：把高亮重新定位到原来那张卡（找不到就清空），并重新挂观察器
+watch(visibleCards, (list) => {
+  if (activeCardId.value) {
+    const nextIndex = list.findIndex(card => card.id === activeCardId.value)
+    activeIndex.value = nextIndex
+    if (nextIndex < 0)
+      activeCardId.value = ''
+  }
+  else if (activeIndex.value >= list.length) {
+    activeIndex.value = list.length - 1
+  }
+
   // 列表变长后重新 observe：observe 会立即回报当前相交状态，
   // 首屏撑不满视口时能继续把下一屏拉进来
   nextTick(setupLoadMoreObserver)
 })
 
-// 键盘浏览接近末尾时预取下一页
-watch(activeIndex, (index) => {
-  if (index >= 0 && index >= cards.value.length - 2)
-    void loadMore()
-})
-
 watch(feedEndRef, () => nextTick(setupLoadMoreObserver))
+
+// 切换筛选时重置「自动补页」预算
+watch(videoOnly, () => {
+  denseAutoLoadBudget = 3
+})
 
 onMounted(() => {
   initPageAction()
@@ -183,13 +245,46 @@ onUnmounted(() => {
       </div>
     </header>
 
+    <div class="moments-toolbar">
+      <div class="moments-toolbar__group" role="group" :aria-label="t('density_title')">
+        <span class="moments-toolbar__label">{{ t('density_title') }}</span>
+        <div class="moments-segmented">
+          <button
+            v-for="option in densityOptions"
+            :key="option.value"
+            type="button"
+            class="moments-segmented__btn"
+            :class="{ 'is-active': density === option.value }"
+            :aria-pressed="density === option.value"
+            @click="setDensity(option.value)"
+          >
+            <span :class="option.icon" aria-hidden="true" />
+            <span>{{ option.label }}</span>
+          </button>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        class="moments-chip"
+        :class="{ 'is-active': videoOnly }"
+        :aria-pressed="videoOnly"
+        :title="t('filter_video_hint')"
+        @click="videoOnly = !videoOnly"
+      >
+        <span class="i-tabler:movie" aria-hidden="true" />
+        <span>{{ t('filter_video_only') }}</span>
+        <span v-if="videoOnly" class="moments-chip__count">{{ visibleCards.length }}</span>
+      </button>
+    </div>
+
     <div class="moments-keys" role="note" :aria-label="t('keyboard_title')">
       <span class="i-tabler:keyboard" aria-hidden="true" />
       <span>{{ t('keyboard_hint_bar') }}</span>
     </div>
 
     <div v-if="showSkeleton" class="moments-feed">
-      <MomentSkeleton v-for="index in 3" :key="index" />
+      <MomentSkeleton v-for="index in 3" :key="index" :density="density" />
     </div>
 
     <div v-else-if="status === 'error'" class="moments-state">
@@ -218,11 +313,25 @@ onUnmounted(() => {
     </div>
 
     <div v-else class="moments-feed" role="feed" :aria-busy="loadingMore">
+      <div v-if="videoFilterEmpty" class="moments-filter-empty">
+        <span class="i-tabler:movie moments-filter-empty__icon" aria-hidden="true" />
+        <h3 class="moments-filter-empty__title">
+          {{ t('filter_empty_title') }}
+        </h3>
+        <p class="moments-filter-empty__desc">
+          {{ t('filter_empty_desc') }}
+        </p>
+        <button type="button" class="moments-button is-ghost" @click="videoOnly = false">
+          {{ t('filter_clear') }}
+        </button>
+      </div>
+
       <MomentCardView
-        v-for="(card, index) in cards"
+        v-for="(card, index) in visibleCards"
         :key="card.id"
         :card="card"
         :active="index === activeIndex"
+        :density="density"
         @activate="activeIndex = index"
         @open="openCard"
         @open-images="openImages"
@@ -378,6 +487,148 @@ onUnmounted(() => {
   }
 }
 
+/* #region 工具条（密度 / 只看视频） */
+.moments-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.moments-toolbar__group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.moments-toolbar__label {
+  color: var(--bew-text-3);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.moments-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--bew-border-color);
+  border-radius: 999px;
+  background: var(--bew-fill-1);
+}
+
+.moments-segmented__btn {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--bew-text-2);
+  font-size: 12px;
+  line-height: 1.5;
+  cursor: pointer;
+  transition:
+    background-color 180ms var(--moment-ease),
+    color 180ms var(--moment-ease);
+
+  &:hover {
+    background: var(--bew-fill-2);
+    color: var(--bew-text-1);
+  }
+
+  &.is-active {
+    background: var(--bew-elevated-solid);
+    color: var(--bew-text-1);
+    box-shadow: var(--bew-shadow-1);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--bew-theme-color);
+    outline-offset: 2px;
+  }
+}
+
+.moments-chip {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 12px;
+  border: 1px solid var(--bew-border-color);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--bew-text-2);
+  font-size: 12px;
+  line-height: 1.5;
+  cursor: pointer;
+  transition:
+    background-color 180ms var(--moment-ease),
+    border-color 180ms var(--moment-ease),
+    color 180ms var(--moment-ease);
+
+  &:hover {
+    border-color: var(--bew-theme-color-40);
+    background: var(--bew-fill-1);
+    color: var(--bew-text-1);
+  }
+
+  &.is-active {
+    border-color: var(--bew-theme-color-40);
+    background: var(--bew-theme-color-10);
+    color: var(--bew-theme-color);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--bew-theme-color);
+    outline-offset: 2px;
+  }
+}
+
+.moments-chip__count {
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--bew-theme-color);
+  color: #fff;
+  font-size: 11px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+}
+/* #endregion */
+
+.moments-filter-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  padding: 48px 20px;
+  border: 1px dashed var(--bew-border-color);
+  border-radius: var(--bew-radius);
+  background: var(--bew-elevated-alt);
+  text-align: center;
+}
+
+.moments-filter-empty__icon {
+  color: var(--bew-text-3);
+  font-size: 32px;
+}
+
+.moments-filter-empty__title {
+  margin: 0;
+  color: var(--bew-text-1);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.moments-filter-empty__desc {
+  margin: 0;
+  max-width: 460px;
+  color: var(--bew-text-3);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .moments-keys {
   display: flex;
   gap: 8px;
@@ -468,7 +719,9 @@ onUnmounted(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .moments-button {
+  .moments-button,
+  .moments-segmented__btn,
+  .moments-chip {
     transition: none;
   }
 

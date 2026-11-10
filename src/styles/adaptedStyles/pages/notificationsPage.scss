@@ -662,3 +662,73 @@ html.bewly-design.notificationsPage {
   }
 }
 // #endregion
+// #region 第 3 轮：消息页交互增强（只新增，不改动上方既有规则）
+//
+// 这里只放「作用于原生 DOM」的两组状态规则，状态类由
+// src/contentScripts/notificationPage/** 挂在 <html> 上：
+//   - html.bewly-notif-only-unread —— 隐藏已读条目
+//   - html.bewly-notif-compact    —— 紧凑密度
+// 条目的 data-bewly-notif-read 属性由 actions.ts 同步写入（0 = 未读，1 = 已读）；
+// 页面结构变化导致识别不到时该属性不会写入，规则自然不命中，页面保持原样。
+//
+// 选择器仍然只使用上方既有规则里出现过的类名（.reply-card / .at-card / .love-card /
+// .msg-notify / .msg-time / .line-1 / .line-2 / .message-list）。
+
+html.notificationsPage.bewly-notif-only-unread {
+  // 只隐藏被识别为「已读」的条目；未识别（没有 data-bewly-notif-read）的保持可见，
+  // 避免筛选失效时整屏空白。
+  [data-bewly-notif-read="1"] {
+    display: none !important;
+  }
+}
+
+html.bewly-design.notificationsPage.bewly-notif-compact {
+  .message-list {
+    scrollbar-width: thin;
+  }
+
+  // 四类消息条目收紧成两行式的紧凑行：上下内边距减半、行高收紧。
+  // 圆角用 calc(var(--bew-radius) / 1.5) 而不是 --bew-native-radius-sm，
+  // 这样即使页面没开「适配原生页面样式」（tokens 不在场）也不会掉成直角。
+  .reply-card,
+  .at-card,
+  .love-card,
+  .msg-notify {
+    margin-block: 0;
+    padding-block: 6px;
+    border-radius: calc(var(--bew-radius) / 1.5);
+  }
+
+  .line-1,
+  .line-2,
+  .line-3 {
+    line-height: 1.32;
+  }
+
+  .line-1 {
+    font-size: 13px;
+  }
+
+  .line-2 {
+    font-size: 12px;
+  }
+
+  .msg-time .time {
+    font-size: 11px;
+  }
+
+  .space-left .side-bar .item {
+    margin-block: 0;
+    padding-block: 2px;
+  }
+
+  @include native.reduced-motion {
+    .reply-card,
+    .at-card,
+    .love-card,
+    .msg-notify {
+      transition: none;
+    }
+  }
+}
+// #endregion

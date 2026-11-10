@@ -29,8 +29,18 @@ const MESSAGES = {
     keyboard_hint_bar: 'j / k 或 ↑ / ↓ 切换卡片 · o 打开原动态 · Esc 取消高亮',
     // #endregion
 
+    // #region 工具条（第 3 轮：密度 / 只看视频）
+    density_title: '卡片密度',
+    density_comfortable: '舒适',
+    density_compact: '紧凑',
+    filter_video_only: '只看视频',
+    filter_video_hint: '仅显示视频 / 番剧卡片，j / k 仍可切换',
+    filter_empty_title: '当前筛选下还没有视频动态',
+    filter_empty_desc: '这一屏还没有视频或番剧卡片，关闭筛选可以看全部动态',
+    filter_clear: '关闭「只看视频」',
+    // #endregion
+
     // #region 状态
-    loading: '正在加载动态…',
     loading_more: '正在加载更多…',
     load_failed: '动态加载失败',
     load_more_failed: '加载更多失败',
@@ -67,6 +77,9 @@ const MESSAGES = {
     image_alt: '第 {n} 张图片',
     avatar_alt: '{name} 的头像',
     media_open_hint: '打开视频',
+    copy_text: '复制正文',
+    copied: '已复制',
+    copy_failed: '复制失败',
     // #endregion
 
     // #region 大图
@@ -75,6 +88,9 @@ const MESSAGES = {
     lightbox_next: '下一张',
     lightbox_counter: '{current} / {total}',
     lightbox_hint: 'Esc 关闭 · ← / → 切换',
+    lightbox_download: '下载图片',
+    lightbox_downloading: '下载中…',
+    lightbox_download_failed: '下载失败，已在新标签页打开原图',
     // #endregion
 
     // #region 时间
@@ -97,7 +113,15 @@ const MESSAGES = {
     keyboard_title: 'Keyboard',
     keyboard_hint_bar: 'j / k or ↑ / ↓ to move · o to open the original post · Esc to clear',
 
-    loading: 'Loading moments…',
+    density_title: 'Card density',
+    density_comfortable: 'Comfortable',
+    density_compact: 'Compact',
+    filter_video_only: 'Videos only',
+    filter_video_hint: 'Only video / bangumi cards; j / k still works',
+    filter_empty_title: 'No videos under this filter',
+    filter_empty_desc: 'This batch has no video or bangumi cards yet. Turn the filter off to see every moment.',
+    filter_clear: 'Turn off "Videos only"',
+
     loading_more: 'Loading more…',
     load_failed: 'Failed to load moments',
     load_more_failed: 'Failed to load more moments',
@@ -132,12 +156,18 @@ const MESSAGES = {
     image_alt: 'Image {n}',
     avatar_alt: 'Avatar of {name}',
     media_open_hint: 'Open video',
+    copy_text: 'Copy text',
+    copied: 'Copied',
+    copy_failed: 'Copy failed',
 
     lightbox_close: 'Close',
     lightbox_prev: 'Previous',
     lightbox_next: 'Next',
     lightbox_counter: '{current} / {total}',
     lightbox_hint: 'Esc to close · ← / → to switch',
+    lightbox_download: 'Download image',
+    lightbox_downloading: 'Downloading…',
+    lightbox_download_failed: 'Download failed, opened the original image instead',
 
     just_now: 'just now',
     minutes_ago: '{n} min ago',

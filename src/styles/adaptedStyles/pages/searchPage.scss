@@ -345,3 +345,107 @@ html.bewly-design.searchPage {
   }
 }
 // #endregion
+
+// #region 第 3 轮：搜索结果页交互增强（只追加，不改动上方任何规则）
+//
+// 这段样式由 src/contentScripts/searchPage 模块驱动，状态类加在 <html> 上：
+//   .bewly-search-compact       紧凑密度
+//   .bewly-search-filter-video  仅看视频结果
+//   .bewly-search-filter-user   仅看用户结果
+// 模块扫描结果卡时还会在卡片根节点上写这几个标记（卸载时全部移除）：
+//   [data-bewly-search-card]    结果卡（值 = 序号）
+//   [data-bewly-search-kind]    video / user
+//   [data-bewly-search-active]  j/k 当前高亮卡
+// 卡片类名 .bili-video-card / .b-user-video-card 来自第 2 轮已确认的真实搜索页 DOM，
+// 筛选不是按卡片类名硬藏，而是按模块打上的类型标记隐藏 —— 因为 UP 主卡内部还有
+// 一层 .bili-video-card 小网格，直接按类名隐藏会把 UP 主卡一起掏空。
+
+// #region 键盘高亮
+//
+// j/k 当前卡，以及 Bewly 既有 ↑/↓ 键盘导航的当前卡（data-keyboard-active），
+// 在原生搜索页上统一补一条主题色描边：main.scss 里的键盘高亮规则要求卡片带
+// [data-video-card]，而搜索页原生卡没有这个属性，所以原生的 ↑/↓ 高亮本来是看不见的。
+html.searchPage {
+  [data-bewly-search-active],
+  [data-keyboard-active] {
+    position: relative;
+    z-index: 1;
+    border-radius: var(--bew-native-radius, var(--bew-radius));
+    outline: 2px solid var(--bew-theme-color);
+    outline-offset: 3px;
+    box-shadow: 0 0 0 6px var(--bew-theme-color-20);
+    transition:
+      outline-color var(--bew-native-dur, 180ms) var(--bew-native-ease, ease),
+      box-shadow var(--bew-native-dur, 180ms) var(--bew-native-ease, ease);
+  }
+
+  // 结果卡吸顶偏移：scrollIntoView 居中滚动时不要被顶部搜索区 / 筛选栏盖住
+  [data-bewly-search-card] {
+    scroll-margin-block: calc(var(--bew-native-sticky-top, 72px) + 24px) 32px;
+  }
+}
+// #endregion
+
+// #region 快速筛选
+html.searchPage {
+  &.bewly-search-filter-video [data-bewly-search-kind="user"],
+  &.bewly-search-filter-user [data-bewly-search-kind="video"] {
+    display: none !important;
+  }
+}
+// #endregion
+
+// #region 紧凑密度
+html.searchPage.bewly-search-compact {
+  .search-layout {
+    // 结果网格行距收紧一档
+    .video-list.row {
+      row-gap: var(--bew-native-gap-sm, 8px);
+    }
+
+    .bili-video-card {
+      .bili-video-card__wrap {
+        border-radius: var(--bew-native-radius-sm, 8px);
+      }
+
+      // 紧凑档标题只保留一行，作者 / 日期降一档，卡片信息区更贴封面
+      .bili-video-card__info {
+        padding-top: 6px;
+      }
+
+      .bili-video-card__info--tit {
+        font-size: 14px;
+        @include native.clamp(1);
+      }
+
+      .bili-video-card__info--author {
+        font-size: 12px;
+      }
+
+      .bili-video-card__info--date {
+        font-size: 11px;
+      }
+    }
+
+    // UP 主卡在紧凑档收紧内边距
+    .b-user-video-card {
+      padding: var(--bew-native-gap, 16px) var(--bew-native-gap-sm, 8px);
+    }
+
+    // 视频 / 用户 / 专栏等结果块之间从 32px 收到 16px
+    .search-all-list + .search-all-list {
+      margin-top: var(--bew-native-gap, 16px);
+    }
+  }
+}
+// #endregion
+
+// #region 动效降级
+@media (prefers-reduced-motion: reduce) {
+  html.searchPage [data-bewly-search-active],
+  html.searchPage [data-keyboard-active] {
+    transition: none;
+  }
+}
+// #endregion
+// #endregion

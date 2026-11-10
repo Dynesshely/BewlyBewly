@@ -1,12 +1,16 @@
 <script setup lang="ts">
+import type { MomentsDensity } from '../composables/useMomentsDensity'
 import type { MomentCard } from '../types'
 import { useMomentsI18n } from '../i18n'
 
 const props = withDefaults(defineProps<{
   card: MomentCard
   compact?: boolean
+  /** 卡片密度：紧凑档缩小封面与九宫格尺寸 */
+  density?: MomentsDensity
 }>(), {
   compact: false,
+  density: 'comfortable',
 })
 
 const emit = defineEmits<{
@@ -15,6 +19,8 @@ const emit = defineEmits<{
 }>()
 
 const { t, count } = useMomentsI18n()
+
+const isDense = computed(() => props.density === 'compact')
 
 const imageCount = computed(() => props.card.images.length)
 
@@ -44,7 +50,7 @@ function handleLinkKeydown(event: KeyboardEvent) {
 </script>
 
 <template>
-  <div v-if="card.type === 'video' || card.type === 'pgc'" class="moment-media">
+  <div v-if="card.type === 'video' || card.type === 'pgc'" class="moment-media" :class="{ 'is-density-compact': isDense }">
     <div
       v-if="card.video"
       class="moment-media__video"
@@ -75,7 +81,7 @@ function handleLinkKeydown(event: KeyboardEvent) {
     </div>
   </div>
 
-  <div v-else-if="card.type === 'article' && card.article" class="moment-media">
+  <div v-else-if="card.type === 'article' && card.article" class="moment-media" :class="{ 'is-density-compact': isDense }">
     <div
       class="moment-media__article"
       :class="{ 'is-compact': compact }"
@@ -104,7 +110,7 @@ function handleLinkKeydown(event: KeyboardEvent) {
     </div>
   </div>
 
-  <div v-else-if="card.type === 'live' && card.live" class="moment-media">
+  <div v-else-if="card.type === 'live' && card.live" class="moment-media" :class="{ 'is-density-compact': isDense }">
     <div
       class="moment-media__live"
       :class="{ 'is-compact': compact }"
@@ -134,7 +140,7 @@ function handleLinkKeydown(event: KeyboardEvent) {
     </div>
   </div>
 
-  <div v-else-if="card.images.length" class="moment-media">
+  <div v-else-if="card.images.length" class="moment-media" :class="{ 'is-density-compact': isDense }">
     <div class="moment-media__grid" :class="[imageGridClass, { 'is-compact': compact }]">
       <button
         v-for="(image, index) in card.images"
@@ -456,6 +462,47 @@ function handleLinkKeydown(event: KeyboardEvent) {
 
 .moment-media__grid.is-compact.is-single .moment-media__cell {
   max-height: 200px;
+}
+/* #endregion */
+
+/* #region 紧凑密度 */
+.moment-media.is-density-compact {
+  gap: 6px;
+
+  .moment-media__video,
+  .moment-media__live,
+  .moment-media__article {
+    gap: 10px;
+    padding: 8px;
+  }
+
+  .moment-media__video-cover,
+  .moment-media__live-cover {
+    width: 150px;
+  }
+
+  .moment-media__article-cover {
+    width: 72px;
+    height: 72px;
+  }
+
+  .moment-media__video-title,
+  .moment-media__article-title {
+    font-size: 13px;
+  }
+
+  .moment-media__grid.is-single {
+    width: min(100%, 320px);
+  }
+
+  .moment-media__grid.is-two,
+  .moment-media__grid.is-three {
+    max-width: 400px;
+  }
+
+  .moment-media__grid.is-single .moment-media__cell {
+    max-height: 300px;
+  }
 }
 /* #endregion */
 

@@ -1,14 +1,23 @@
 <script setup lang="ts">
+import type { MomentsDensity } from '../composables/useMomentsDensity'
+
 withDefaults(defineProps<{
   /** 转发卡片里的骨架更紧凑 */
   compact?: boolean
+  /** 卡片密度：紧凑档骨架同步收窄 */
+  density?: MomentsDensity
 }>(), {
   compact: false,
+  density: 'comfortable',
 })
 </script>
 
 <template>
-  <div class="moment-skeleton" :class="{ 'is-compact': compact }" aria-hidden="true">
+  <div
+    class="moment-skeleton"
+    :class="{ 'is-compact': compact, 'is-density-compact': density === 'compact' && !compact }"
+    aria-hidden="true"
+  >
     <div class="moment-skeleton__avatar" />
     <div class="moment-skeleton__body">
       <div class="moment-skeleton__head">
@@ -42,6 +51,24 @@ withDefaults(defineProps<{
   padding: 0;
   border: 0;
   background: transparent;
+}
+
+.moment-skeleton.is-density-compact {
+  gap: 10px;
+  padding: 12px 16px;
+}
+
+.moment-skeleton.is-density-compact .moment-skeleton__avatar {
+  width: 36px;
+  height: 36px;
+}
+
+.moment-skeleton.is-density-compact .moment-skeleton__body {
+  gap: 8px;
+}
+
+.moment-skeleton.is-density-compact .moment-skeleton__media {
+  height: 96px;
 }
 
 .moment-skeleton__avatar {

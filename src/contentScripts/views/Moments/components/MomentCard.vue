@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import type { MomentsDensity } from '../composables/useMomentsDensity'
 import type { MomentCard, MomentImage } from '../types'
 import { useMomentsOpen } from '../composables/useMomentsOpen'
 import { useMomentsI18n } from '../i18n'
+import { copyTextToClipboard } from '../utils/clipboard'
 
 import MomentMedia from './MomentMedia.vue'
 
@@ -10,9 +12,12 @@ const props = withDefaults(defineProps<{
   active?: boolean
   /** 转发卡片里嵌套的原动态，缩小一档展示 */
   compact?: boolean
+  /** 卡片密度（第 3 轮）：紧凑档正文只显示 2 行 */
+  density?: MomentsDensity
 }>(), {
   active: false,
   compact: false,
+  density: 'comfortable',
 })
 
 const emit = defineEmits<{
@@ -25,7 +30,19 @@ const { t, count, time, typeLabel } = useMomentsI18n()
 const { openInNewTab } = useMomentsOpen()
 
 const TEXT_LINES = 4
+const DENSE_TEXT_LINES = 2
 const COMPACT_TEXT_LINES = 3
+
+/** 正文折叠行数：普通 4 行、紧凑密度 2 行、转发里的原动态 3 行 */
+const textLines = computed(() => {
+  if (props.compact)
+    return COMPACT_TEXT_LINES
+  return props.density === 'compact'
+    ? DENSE_TEXT_LINES
+    : TEXT_LINES
+})
+
+const isDense = computed(() => props.density === 'compact')
 
 const expanded = ref(false)
 const overflowing = ref(false)
@@ -54,6 +71,22 @@ function forwardImages(index: number) {
   emit('openImages', props.card.images, index)
 }
 
+const copyState = ref<'idle' | 'done' | 'failed'>('idle')
+let copyResetTimer: ReturnType<typeof setTimeout> | null = null
+
+/** 复制正文：只读操作，优先 clipboard API，失败回退 execCommand */
+async function handleCopyText() {
+  const succeeded = await copyTextToClipboard(props.card.text)
+  copyState.value = succeeded
+    ? 'done'
+    : 'failed'
+  if (copyResetTimer)
+    clearTimeout(copyResetTimer)
+  copyResetTimer = setTimeout(() => {
+    copyState.value = 'idle'
+  }, 1600)
+}
+
 onMounted(() => {
   nextTick(measureOverflow)
   if (textRef.value && typeof ResizeObserver !== 'undefined') {
@@ -65,9 +98,18 @@ onMounted(() => {
 onUnmounted(() => {
   resizeObserver?.disconnect()
   resizeObserver = null
+  if (copyResetTimer)
+    clearTimeout(copyResetTimer)
 })
 
 watch(() => props.card.text, async () => {
+  expanded.value = false
+  await nextTick()
+  measureOverflow()
+})
+
+// 密度切换会改变行数上限，需要重新判断是否溢出
+watch(() => [props.density, props.compact], async () => {
   expanded.value = false
   await nextTick()
   measureOverflow()
@@ -77,7 +119,11 @@ watch(() => props.card.text, async () => {
 <template>
   <article
     class="moment-card"
-    :class="{ 'is-active': active && !compact, 'is-compact': compact }"
+    :class="{
+      'is-active': active && !compact,
+      'is-compact': compact,
+      'is-density-compact': isDense && !compact,
+    }"
     :data-moment-id="compact ? undefined : card.id"
     :tabindex="compact ? undefined : -1"
     @click="emit('activate')"
@@ -111,9 +157,7 @@ watch(() => props.card.text, async () => {
         ref="textRef"
         class="moment-card__text"
         :class="{ 'is-expanded': expanded, 'is-compact': compact }"
-        :style="{
-          '--moment-text-lines': compact ? COMPACT_TEXT_LINES : TEXT_LINES,
-        }"
+        :style="{ '--moment-text-lines': textLines }"
       >
         {{ card.text }}
       </p>
@@ -129,6 +173,7 @@ watch(() => props.card.text, async () => {
       <MomentMedia
         :card="card"
         :compact="compact"
+        :density="density"
         @open-link="emit('open', card)"
         @open-images="forwardImages"
       />
@@ -159,10 +204,30 @@ watch(() => props.card.text, async () => {
           <span class="i-tabler:heart" aria-hidden="true" />
           {{ count(card.stats.like) }}
         </span>
-        <button type="button" class="moment-card__open" @click.stop="emit('open', card)">
-          {{ t('open_original') }}
-          <span class="i-tabler:arrow-up-right" aria-hidden="true" />
-        </button>
+        <div class="moment-card__actions">
+          <button
+            v-if="card.text"
+            type="button"
+            class="moment-card__action-btn"
+            :class="{ 'is-done': copyState === 'done', 'is-failed': copyState === 'failed' }"
+            :title="t('copy_text')"
+            @click.stop="handleCopyText"
+          >
+            <span
+              :class="copyState === 'done' ? 'i-tabler:check' : 'i-tabler:copy'"
+              aria-hidden="true"
+            />
+            <span>{{ copyState === 'done'
+              ? t('copied')
+              : copyState === 'failed'
+                ? t('copy_failed')
+                : t('copy_text') }}</span>
+          </button>
+          <button type="button" class="moment-card__open" @click.stop="emit('open', card)">
+            {{ t('open_original') }}
+            <span class="i-tabler:arrow-up-right" aria-hidden="true" />
+          </button>
+        </div>
       </footer>
     </div>
   </article>
@@ -204,6 +269,31 @@ watch(() => props.card.text, async () => {
     background: transparent;
     box-shadow: none;
     transform: none;
+  }
+
+  /* 紧凑密度：缩小留白与头像，正文行数由 textLines 控制 */
+  &.is-density-compact {
+    gap: 10px;
+    padding: 12px 16px;
+
+    .moment-card__avatar {
+      width: 36px;
+      height: 36px;
+    }
+
+    .moment-card__main {
+      gap: 8px;
+    }
+
+    .moment-card__text {
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .moment-card__stats {
+      gap: 14px;
+      padding-top: 8px;
+    }
   }
 }
 
@@ -407,7 +497,8 @@ watch(() => props.card.text, async () => {
 
 .moment-card__stats {
   display: flex;
-  gap: 18px;
+  flex-wrap: wrap;
+  gap: 8px 18px;
   align-items: center;
   margin-top: 2px;
   padding-top: 10px;
@@ -424,11 +515,53 @@ watch(() => props.card.text, async () => {
   line-height: 1.5;
 }
 
+.moment-card__actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.moment-card__action-btn {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--bew-text-3);
+  font-size: 12px;
+  line-height: 1.5;
+  cursor: pointer;
+  transition:
+    color var(--moment-duration) var(--moment-ease),
+    background-color var(--moment-duration) var(--moment-ease);
+
+  &:hover {
+    background: var(--bew-fill-1);
+    color: var(--bew-text-1);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--bew-theme-color);
+    outline-offset: 2px;
+  }
+
+  &.is-done {
+    color: var(--bew-theme-color);
+  }
+
+  &.is-failed {
+    color: var(--bew-error-color);
+  }
+}
+
 .moment-card__open {
   display: inline-flex;
   gap: 4px;
   align-items: center;
-  margin-left: auto;
   padding: 4px 10px;
   border: 1px solid var(--bew-border-color);
   border-radius: 8px;
@@ -458,7 +591,8 @@ watch(() => props.card.text, async () => {
   .moment-card,
   .moment-card__avatar,
   .moment-card__name,
-  .moment-card__open {
+  .moment-card__open,
+  .moment-card__action-btn {
     transition: none;
   }
 

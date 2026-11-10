@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { MomentImage } from '../types'
+import { openLinkToNewTab } from '~/utils/main'
 import { useMomentsI18n } from '../i18n'
+import { downloadImage, imageFileExtension } from '../utils/download'
 import { momentImageUrl } from '../utils/normalize'
 
 const props = defineProps<{
@@ -19,8 +21,10 @@ const closeButtonRef = ref<HTMLButtonElement | null>(null)
 const dialogRef = ref<HTMLElement | null>(null)
 
 const currentImage = computed(() => props.images[props.index] ?? props.images[0])
-/** 大图用原图、不裁切，只限制宽度避免拉超大图 */
+/** 展示用：去掉 @ 尺寸后加宽度限制，避免拉超大图 */
 const currentUrl = computed(() => momentImageUrl(currentImage.value?.url, '1600w'))
+/** 下载用：完全原始尺寸（不带任何 @ 后缀） */
+const originalUrl = computed(() => momentImageUrl(currentImage.value?.url))
 const counter = computed(() => t('lightbox_counter', {
   current: Math.min(props.index + 1, props.images.length),
   total: props.images.length,
@@ -35,6 +39,37 @@ function step(delta: number) {
   if (total <= 1)
     return
   emit('update:index', (props.index + delta + total) % total)
+}
+
+const downloading = ref(false)
+const downloadFailed = ref(false)
+let downloadMessageTimer: ReturnType<typeof setTimeout> | null = null
+
+/**
+ * 下载当前图：fetch 成 blob 再触发浏览器下载（图床跨域，`<a download>` 会被忽略）。
+ * 失败时回退到新标签页打开原图，并提示一句失败原因。
+ */
+async function handleDownload() {
+  const url = originalUrl.value
+  if (!url || downloading.value)
+    return
+
+  downloading.value = true
+  downloadFailed.value = false
+  const filename = `bilibili-moments-${Date.now()}-${props.index + 1}.${imageFileExtension(url)}`
+  const succeeded = await downloadImage(url, filename)
+  downloading.value = false
+
+  if (succeeded)
+    return
+
+  downloadFailed.value = true
+  openLinkToNewTab(url)
+  if (downloadMessageTimer)
+    clearTimeout(downloadMessageTimer)
+  downloadMessageTimer = setTimeout(() => {
+    downloadFailed.value = false
+  }, 3000)
 }
 
 function handleKeydown(event: KeyboardEvent) {
@@ -84,6 +119,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
+  if (downloadMessageTimer)
+    clearTimeout(downloadMessageTimer)
   unlockScroll()
   previousActiveElement?.focus?.()
 })
@@ -123,6 +160,21 @@ onUnmounted(() => {
       <figcaption class="moment-lightbox__caption">
         <span class="moment-lightbox__counter">{{ counter }}</span>
         <span class="moment-lightbox__hint">{{ t('lightbox_hint') }}</span>
+        <button
+          type="button"
+          class="moment-lightbox__download"
+          :disabled="downloading"
+          @click.stop="handleDownload"
+        >
+          <span
+            :class="downloading ? 'i-tabler:loader-2 is-spinning' : 'i-tabler:download'"
+            aria-hidden="true"
+          />
+          <span>{{ downloading ? t('lightbox_downloading') : t('lightbox_download') }}</span>
+        </button>
+        <span v-if="downloadFailed" class="moment-lightbox__message">
+          {{ t('lightbox_download_failed') }}
+        </span>
       </figcaption>
     </figure>
 
@@ -173,8 +225,10 @@ onUnmounted(() => {
 
 .moment-lightbox__caption {
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 8px 12px;
   align-items: center;
+  justify-content: center;
   color: rgb(255 255 255 / 78%);
   font-size: 12px;
   line-height: 1.5;
@@ -186,6 +240,51 @@ onUnmounted(() => {
 
 .moment-lightbox__hint {
   color: rgb(255 255 255 / 50%);
+}
+
+.moment-lightbox__download {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  padding: 3px 10px;
+  border: 1px solid rgb(255 255 255 / 26%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 10%);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.5;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    opacity 160ms ease;
+
+  &:hover {
+    background: rgb(255 255 255 / 20%);
+  }
+
+  &:disabled {
+    cursor: progress;
+    opacity: 0.7;
+  }
+
+  &:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+  }
+}
+
+.moment-lightbox__message {
+  color: rgb(255 255 255 / 72%);
+}
+
+.is-spinning {
+  animation: moment-lightbox-spin 720ms linear infinite;
+}
+
+@keyframes moment-lightbox-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .moment-lightbox__close,
@@ -259,8 +358,13 @@ onUnmounted(() => {
   }
 
   .moment-lightbox__close,
-  .moment-lightbox__nav {
+  .moment-lightbox__nav,
+  .moment-lightbox__download {
     transition: none;
+  }
+
+  .is-spinning {
+    animation: none;
   }
 }
 </style>

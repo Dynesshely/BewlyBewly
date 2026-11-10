@@ -1,9 +1,9 @@
 import type { ArticleFontStep } from './state'
 
+import type { ModuleLocale } from '~/utils/moduleI18n'
 import { computed } from 'vue'
-import { LanguageType } from '~/enums/appEnums'
-
 import { settings } from '~/logic'
+import { getModuleMessages, resolveModuleLocale } from '~/utils/moduleI18n'
 
 export type { ArticleFontStep }
 
@@ -92,23 +92,61 @@ const EN: ArticlePageMessages = {
   progressLabel: 'Reading progress {percent}%',
 }
 
-/** 模块自建 i18n：只覆盖简中与英文，其余语言回退简中 */
-export const MESSAGES: Record<string, ArticlePageMessages> = {
-  'cmn-CN': CMN_CN,
-  'en': EN,
+const CMN_TW: ArticlePageMessages = {
+  dock: '閱讀輔助',
+  reading: '沉浸閱讀',
+  exitReading: '退出閱讀',
+  readingOn: '已進入沉浸閱讀，Esc 退出',
+  readingOff: '已退出沉浸閱讀',
+  readingHint: '正文 720px、隱藏側欄與推薦',
+  fontSmaller: '字號減小',
+  fontLarger: '字號增大',
+  fontLabel: '字號',
+  fontStepS: '小',
+  fontStepM: '標準',
+  fontStepL: '大',
+  fontChanged: '字號：{step}',
+  toc: '目錄',
+  tocTitle: '文章目錄',
+  tocEmpty: '正文裡找不到可跳轉的標題',
+  tocCount: '共 {count} 條',
+  tocHint: '點擊標題平滑跳轉，目前章節會高亮',
+  backToTop: '回到頂部',
+  backToTopDone: '已回到頂部',
+  progress: '閱讀進度',
+  shortcutsHint: 'R 閱讀 · [ ] 字號 · T 頂部 · Esc 退出',
+  close: '關閉',
+  noContent: '暫時找不到正文容器，閱讀增強已降級',
+  progressLabel: '閱讀進度 {percent}%',
 }
 
-const FALLBACK_LANGUAGE = 'cmn-CN'
+const JYUT: ArticlePageMessages = {
+  ...CMN_TW,
+  readingOn: '入咗沉浸閱讀，撳 Esc 退出',
+  readingOff: '已經退出沉浸閱讀',
+  readingHint: '正文 720px、收埋側欄同推薦',
+  tocEmpty: '正文入面搵唔到可以跳轉嘅標題',
+  tocHint: '撳標題平滑跳過去，而家嘅章節會高亮',
+  backToTopDone: '返到頂部喇',
+  shortcutsHint: 'R 閱讀 · [ ] 字號 · T 頂部 · Esc 退出',
+  noContent: '暫時搵唔到正文容器，閱讀增強降咗級',
+  progressLabel: '閱讀進度 {percent}%',
+}
 
-export function normalizeLanguage(language?: string): string {
-  return language === LanguageType.English
-    ? 'en'
-    : FALLBACK_LANGUAGE
+/** 模块自建 i18n：四种语言键集合完全一致（缺键回退简中 / 英文，不会出现空串） */
+export const MESSAGES: Record<ModuleLocale, ArticlePageMessages> = {
+  'cmn-CN': CMN_CN,
+  'cmn-TW': CMN_TW,
+  jyut: JYUT,
+  en: EN,
+}
+
+export function normalizeLanguage(language?: string): ModuleLocale {
+  return resolveModuleLocale(language)
 }
 
 export function getMessages(language?: string): ArticlePageMessages {
-  const key = normalizeLanguage(language ?? settings.value.language)
-  return MESSAGES[key] ?? CMN_CN
+  return getModuleMessages<ArticlePageMessages>(MESSAGES, resolveModuleLocale(language ?? settings.value.language), CMN_CN)
 }
 
 /** 响应 settings.language 的文案（切语言后无需重建 UI） */

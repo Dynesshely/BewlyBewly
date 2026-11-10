@@ -6,38 +6,52 @@
  * 一个独立 shadow root 的增强层（影院模式 / 迷你播放器 / 快捷键 / 紧凑信息栏）。
  */
 import type { App } from 'vue'
+import type { PlaylistItemView } from './state'
+
 import { createApp, watch } from 'vue'
 
 import { settings } from '~/logic'
 
+import { hasNativeOverlay, mountNativeOverlay, unmountNativeOverlay } from '../nativeOverlay'
 import {
+  advanceToNextItem,
   clearStagePlaceholder,
   clearToastTimer,
   isMiniRestoreSuppressed,
+  readStoredAutoplay,
   readStoredCinema,
   setCinema,
   setCompact,
   setMini,
 } from './actions'
+import PlaylistPanel from './components/PlaylistPanel.vue'
 import VideoPageOverlay from './components/VideoPageOverlay.vue'
 import {
   clearPlayerStage,
   getNativePlaybackKind,
   getPlayerWrapEl,
+  getPlaylistCurrentIndex,
+  getPlaylistItems,
+  getPlaylistItemTitle,
   getUploaderName,
   getVideoEl,
   getVideoTitle,
   hasEpisodeNavigation,
+  hasPlaylistNavigation,
   isDanmakuEnabled,
   isNativeMiniPlayerActive,
   isNativeVideoPage,
   markPlayerStage,
 } from './dom'
+import playlistPanelCss from './playlistPanel.shadow.scss?inline'
 import { setupShortcuts } from './shortcuts'
 import { resetUiState, ui } from './state'
 import shadowCss from './videoPage.shadow.scss?inline'
 
 const HOST_ID = 'bewly-video-page'
+
+/** 播放列表面板：独立浮层 host，探测不到播放列表时整个 host 不存在 */
+const PLAYLIST_HOST_ID = 'bewly-video-playlist'
 
 /** 页面滚动超过这个距离后出现紧凑信息栏 */
 const COMPACT_THRESHOLD = 160
@@ -63,6 +77,13 @@ let scrollFrame = 0
 let miniEnteredAt = 0
 /** 上一次标记的播放器舞台元素（避免每拍都写 DOM 属性） */
 let stageEl: HTMLElement | null = null
+/** 已绑定 ended 事件的 video 元素（播放器会换，需要重绑） */
+let boundVideoEl: HTMLVideoElement | null = null
+let boundEndedHandler: (() => void) | null = null
+/** ended 后的延时（让 B 站自己的 ended 处理先跑完） */
+let endedTimer: number | null = null
+/** 自动连播偏好是否已经从 sessionStorage 还原过 */
+let autoplayPreferenceLoaded = false
 
 export function setupVideoPage(): void {
   if (hostEl)
@@ -131,6 +152,10 @@ function mount(): void {
   if (settings.value.videoPageCinemaMode && readStoredCinema())
     setCinema(true, { silent: true })
 
+  // 自动连播默认关，只在同一标签页里记忆用户的开启状态
+  if (ui.playlistNav)
+    restoreAutoplayPreference()
+
   syncTimer = window.setInterval(sync, SYNC_INTERVAL)
   updateScrollState()
 }
@@ -159,11 +184,18 @@ function unmount(): void {
   window.removeEventListener('scroll', handleScroll)
   window.removeEventListener('resize', handleScroll)
 
+  unbindVideoEnded()
+  if (endedTimer !== null) {
+    window.clearTimeout(endedTimer)
+    endedTimer = null
+  }
+
   document.documentElement.classList.remove('bewly-video-cinema', 'bewly-video-mini')
   document.documentElement.style.removeProperty('--bvp-mini-placeholder')
   clearStagePlaceholder()
   clearPlayerStage()
   stageEl = null
+  unmountPlaylistOverlay()
   clearToastTimer()
 
   if (vueApp) {
@@ -205,6 +237,13 @@ function sync(): void {
 
   // 番剧 / 电影才有集数列表；没有时切集快捷键与帮助项都隐藏
   ui.episodeNav = kind === 'bangumi' && hasEpisodeNavigation()
+
+  // 播放列表（/list/*）：没有列表结构时面板、快捷键、自动连播全部不出现
+  // （普通视频页 / 番剧页即使有分P列表也不算，避免和 B 站自己的分P UI 抢位置）
+  syncPlaylistState(hasPlaylistNavigation())
+
+  // 播放器可能被分 P / 换集替换，ended 监听需要跟着重绑
+  bindVideoEnded()
 
   if (video) {
     ui.currentTime = Number.isFinite(video.currentTime)
@@ -280,3 +319,121 @@ function updateScrollState(): void {
     setMini(true)
   }
 }
+// #region 播放列表（/list/*）
+
+function restoreAutoplayPreference(): void {
+  if (autoplayPreferenceLoaded)
+    return
+  autoplayPreferenceLoaded = true
+  ui.playlistAutoplay = readStoredAutoplay()
+}
+
+function samePlaylistItems(a: PlaylistItemView[], b: PlaylistItemView[]): boolean {
+  if (a.length !== b.length)
+    return false
+  return a.every((item, index) => item.index === b[index].index
+    && item.title === b[index].title
+    && item.active === b[index].active)
+}
+
+/**
+ * 同步播放列表到 UI 状态。
+ *
+ * 每 500ms 只读一次 DOM；内容（长度 / 标题 / 当前项）完全一致时不写 reactive 状态，
+ * 避免面板每拍重渲染。
+ */
+function syncPlaylistState(navAvailable: boolean): void {
+  if (!navAvailable) {
+    unmountPlaylistOverlay()
+    if (ui.playlistNav)
+      ui.playlistNav = false
+    if (ui.playlistPanelOpen)
+      ui.playlistPanelOpen = false
+    if (ui.playlistItems.length)
+      ui.playlistItems = []
+    if (ui.playlistCurrentIndex !== -1)
+      ui.playlistCurrentIndex = -1
+    return
+  }
+
+  if (!ui.playlistNav)
+    ui.playlistNav = true
+
+  mountPlaylistOverlay()
+  restoreAutoplayPreference()
+
+  const items = getPlaylistItems()
+  const currentIndex = getPlaylistCurrentIndex(items)
+  const next = items.map<PlaylistItemView>((el, index) => ({
+    index,
+    title: getPlaylistItemTitle(el),
+    active: index === currentIndex,
+  }))
+
+  if (ui.playlistCurrentIndex !== currentIndex)
+    ui.playlistCurrentIndex = currentIndex
+
+  if (!samePlaylistItems(ui.playlistItems, next))
+    ui.playlistItems = next
+}
+
+function mountPlaylistOverlay(): void {
+  if (hasNativeOverlay(PLAYLIST_HOST_ID))
+    return
+  mountNativeOverlay({
+    hostId: PLAYLIST_HOST_ID,
+    component: PlaylistPanel,
+    css: playlistPanelCss,
+    hostAttributes: { 'data-bewly-video-playlist': '' },
+  })
+}
+
+function unmountPlaylistOverlay(): void {
+  if (!hasNativeOverlay(PLAYLIST_HOST_ID))
+    return
+  unmountNativeOverlay(PLAYLIST_HOST_ID)
+}
+
+function bindVideoEnded(): void {
+  const video = getVideoEl()
+  if (video === boundVideoEl)
+    return
+
+  unbindVideoEnded()
+
+  boundVideoEl = video
+  if (!video)
+    return
+
+  boundEndedHandler = () => handleVideoEnded()
+  video.addEventListener('ended', boundEndedHandler)
+}
+
+function unbindVideoEnded(): void {
+  if (boundVideoEl && boundEndedHandler)
+    boundVideoEl.removeEventListener('ended', boundEndedHandler)
+  boundVideoEl = null
+  boundEndedHandler = null
+}
+
+/**
+ * 自动连播：视频播完后切下一个。
+ *
+ * B 站自己也可能在 ended 后弹「自动连播」提示，这里延后一拍再动作，
+ * 让原生逻辑先跑；节点里没有下一个可用项时 advanceToNextItem 会关闭自动连播并提示。
+ */
+function handleVideoEnded(): void {
+  if (!ui.playlistAutoplay || !ui.playlistNav)
+    return
+
+  if (endedTimer !== null)
+    window.clearTimeout(endedTimer)
+  endedTimer = window.setTimeout(() => {
+    endedTimer = null
+    if (!ui.playlistAutoplay || !ui.playlistNav)
+      return
+    advanceToNextItem()
+  }, 400)
+}
+
+// #endregion

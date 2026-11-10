@@ -1,7 +1,8 @@
-import { computed } from 'vue'
+import type { ModuleLocale } from '~/utils/moduleI18n'
 
-import { LanguageType } from '~/enums/appEnums'
+import { computed } from 'vue'
 import { settings } from '~/logic'
+import { getModuleMessages, resolveModuleLocale } from '~/utils/moduleI18n'
 
 /** 快捷键说明（与 keyboard.ts 的行为一一对应） */
 export interface ShortcutLabels {
@@ -159,23 +160,88 @@ const EN: SpacePageMessages = {
   },
 }
 
-/** 模块自建 i18n：只覆盖简中与英文，其余语言回退简中 */
-export const MESSAGES: Record<string, SpacePageMessages> = {
-  'cmn-CN': CMN_CN,
-  'en': EN,
+const CMN_TW: SpacePageMessages = {
+  controls: '使用者空間增強',
+  openPanel: '開啟使用者空間增強面板',
+  panelTitle: '使用者空間增強',
+  close: '關閉',
+
+  filter: '內容篩選',
+  filterAll: '全部',
+  filterVideo: '影片',
+  filterArticle: '專欄',
+  filterDynamic: '動態',
+  filterCollection: '合集',
+  filterUnavailable: '目前頁面沒有這類內容',
+  filterNoMatch: '目前頁面沒有這類內容，已切回「全部」',
+
+  density: '密度',
+  densityComfortable: '舒適',
+  densityCompact: '緊湊',
+  densityOn: '已切換為緊湊密度',
+  densityOff: '已切換為舒適密度',
+
+  jumpTitle: '快速跳轉',
+  jumpHome: '主頁',
+  jumpVideo: '投稿',
+  jumpCollection: '合集',
+  jumpFavorites: '收藏夾',
+  jumpFailed: '頁面上找不到這個入口',
+
+  status: '瀏覽狀態',
+  statusIdle: '按 J / K 開始瀏覽內容',
+  statusActive: '第 {current} / {total} 條',
+  statusCount: '共 {total} 條可瀏覽',
+
+  shortcutsTitle: '快速鍵',
+  hint: '面板與快速鍵只作用於本頁，狀態在本分頁內保持',
+
+  opened: '已在新分頁開啟',
+  openFailed: '無法開啟該連結（可能被瀏覽器攔截）',
+  noUrl: '這條內容沒有可開啟的連結',
+  noCards: '頁面上還沒有可瀏覽的內容',
+
+  shortcut: {
+    next: '下一條內容',
+    prev: '上一條內容',
+    open: '在新分頁開啟',
+    cancel: '取消高亮 / 關閉面板',
+  },
 }
 
-const FALLBACK_LANGUAGE = 'cmn-CN'
+const JYUT: SpacePageMessages = {
+  ...CMN_TW,
+  filterUnavailable: '呢頁冇呢類內容',
+  filterNoMatch: '呢頁冇呢類內容，轉返「全部」喇',
+  jumpFailed: '頁面搵唔到呢個入口',
+  statusIdle: '撳 J / K 開始睇內容',
+  hint: '面板同快速鍵淨係影響呢一頁，狀態喺呢個分頁入面保持',
+  opened: '喺新分頁開咗',
+  openFailed: '開唔到條連結（可能畀瀏覽器攔咗）',
+  noUrl: '呢條內容冇連結可以開',
+  noCards: '頁面仲未有內容可以睇',
+  shortcut: {
+    next: '下一條內容',
+    prev: '上一條內容',
+    open: '喺新分頁開',
+    cancel: '取消高亮 / 收埋面板',
+  },
+}
 
-export function normalizeLanguage(language?: string): string {
-  return language === LanguageType.English
-    ? 'en'
-    : FALLBACK_LANGUAGE
+/** 模块自建 i18n：四种语言键集合完全一致（缺键回退简中 / 英文，不会出现空串） */
+export const MESSAGES: Record<ModuleLocale, SpacePageMessages> = {
+  'cmn-CN': CMN_CN,
+  'cmn-TW': CMN_TW,
+  jyut: JYUT,
+  en: EN,
+}
+
+export function normalizeLanguage(language?: string): ModuleLocale {
+  return resolveModuleLocale(language)
 }
 
 export function getMessages(language?: string): SpacePageMessages {
-  const key = normalizeLanguage(language ?? settings.value.language)
-  return MESSAGES[key] ?? CMN_CN
+  return getModuleMessages<SpacePageMessages>(MESSAGES, resolveModuleLocale(language ?? settings.value.language), CMN_CN)
 }
 
 /** 响应 settings.language 的文案（切换语言后立即生效，不需要重建 UI） */

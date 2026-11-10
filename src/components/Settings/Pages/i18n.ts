@@ -1,13 +1,15 @@
-import { computed } from 'vue'
+import type { ModuleLocale } from '~/utils/moduleI18n'
 
-import { LanguageType } from '~/enums/appEnums'
+import { computed } from 'vue'
 import { settings } from '~/logic'
+import { getModuleMessages, resolveModuleLocale } from '~/utils/moduleI18n'
 
 /**
  * 「页面增强」设置页的模块内文案。
  *
- * 按简报约定，本页文案不进入全局 src/_locales 目录，而是由设置模块自行维护：
- * settings.value.language === 'en' 时使用英文，其余语言（含空值）一律回落简体中文。
+ * 按简报约定，本页文案不进入全局 src/_locales 目录，而是由设置模块自行维护。
+ * 四种模块语言：cmn-CN 简中 / cmn-TW 繁体 / jyut 繁体（粤语词）/ en 英文，
+ * 语言解析统一走 `~/utils/moduleI18n`（见 docs/i18n-modules.md）。
  */
 export interface PagesSettingsMessages {
   menuTitle: string
@@ -217,23 +219,114 @@ const EN: PagesSettingsMessages = {
   channelDensityDesc: 'Compact tightens card gaps and the title size so more content fits on one screen.',
 }
 
-/** 模块自建 i18n：只覆盖简中与英文，其余语言回退简中 */
-export const MESSAGES: Record<string, PagesSettingsMessages> = {
-  'cmn-CN': CMN_CN,
-  'en': EN,
+const CMN_TW: PagesSettingsMessages = {
+  menuTitle: '頁面增強',
+  groupVideoPage: '影片播放頁',
+  groupVideoPageDesc: '針對 B 站原生播放頁的增強功能，關閉後對應功能不再接管頁面',
+  videoPageCinemaMode: '影院模式',
+  videoPageCinemaModeDesc: '播放器鋪滿視口、隱藏右欄與推薦。按 T 或點擊播放器右下角的浮動按鈕切換',
+  videoPageMiniPlayer: '捲動迷你播放器',
+  videoPageMiniPlayerDesc: '播放器滾出視口後收縮到右下角浮窗，按 P 或點擊按鈕還原',
+  videoPageShortcuts: '增強快速鍵',
+  videoPageShortcutsDesc: 'J/K/L、←/→、C/M/F/T 等快速鍵；關閉後按鍵完全交還給 B 站原生快速鍵',
+  groupVideoCard: '影片卡片',
+  groupVideoCardDesc: '影片卡片本身的互動增強（首頁、搜尋、清單頁等所有出現卡片的位置）',
+  cardPreview: '懸停預覽',
+  cardPreviewDesc: '懸停卡片 0.9 秒後靜音播放最多 6 秒的小片段；觸控、減少動態效果偏好，或卡片資料裡沒有 cid 時不生效',
+  cardQuickActions: '懸停操作列',
+  cardQuickActionsDesc: '懸停卡片時在右下角顯示按讚 / 收藏 / 稍後再看；收藏可多選收藏夾，已收藏再點即取消。未登入時只提示不請求，失敗會自動回滾',
+  groupListPage: '清單頁',
+  groupListPageDesc: '觀看歷史 / 稍後再看 / 收藏頁的預設檢視與排序',
+  historyViewMode: '觀看歷史檢視',
+  watchLaterViewMode: '稍後再看檢視',
+  favoritesViewMode: '收藏夾檢視',
+  defaultSort: '預設排序',
+  defaultSortDesc: '三個清單頁共用的初始排序；在頁面內切換排序會同步更新這裡',
+  viewModeComfortable: '舒適網格',
+  viewModeCompact: '緊湊網格',
+  viewModeList: '清單',
+  sortTime: '時間',
+  sortDuration: '時長',
+  sortTitle: '標題',
+  groupSearchPage: '搜尋頁',
+  groupSearchPageDesc: 'BewlyBewly 的搜尋起始頁（B 站搜尋框獲得焦點時出現的頁面）',
+  directPaste: '貼上直達',
+  directPasteDesc: '在搜尋頁貼上 BV 號或 B 站連結時直接開啟目標，而不是填入搜尋框',
+  groupMoments: '動態頁',
+  momentsDensity: '卡片密度',
+  momentsDensityDesc: '動態頁卡片流的資訊密度，頁面頂部工具列也能直接切換',
+  momentsOptimize: '離屏最佳化',
+  momentsOptimizeDesc: '只渲染視口附近的卡片，捲動到附近時才渲染其餘卡片；關閉後所有卡片全部渲染（長清單更吃效能）',
+  groupNotification: '訊息頁',
+  groupNotificationDesc: 'B 站原生訊息頁（message.bilibili.com）的增強浮層',
+  notificationOnlyUnread: '預設只看未讀',
+  notificationOnlyUnreadDesc: '進入訊息頁時自動隱藏已讀項目；頁面暫時辨識不到未讀狀態時不會生效',
+  notificationDensity: '清單密度',
+  groupSearchResult: '搜尋結果頁',
+  groupSearchResultDesc: 'B 站原生搜尋結果頁（search.bilibili.com）的增強浮層',
+  searchDensity: '結果密度',
+  groupSpace: '使用者空間',
+  groupSpaceDesc: 'B 站原生使用者空間（space.bilibili.com）的增強浮層',
+  spaceDensity: '內容密度',
+  groupArticle: '文章頁',
+  groupArticleDesc: 'B 站專欄 / 動態文章頁的沉浸閱讀模式',
+  articleReadingMode: '預設進入閱讀模式',
+  articleReadingModeDesc: '正文確認載入後自動進入沉浸閱讀（隱藏側欄 / 推薦 / 評論）',
+  articleFontSize: '正文字級',
+  densityComfortable: '舒適',
+  densityCompact: '緊湊',
+  fontSizeS: '小',
+  fontSizeM: '中',
+  fontSizeL: '大',
+  groupHome: '首頁',
+  groupHomeDesc: '首頁各子頁籤（推薦 / 關注 / 訂閱劇集 / 熱門 / 排行 / 直播）的卡片密度',
+  homeCardDensity: '卡片密度',
+  homeCardDensityDesc: '緊湊檔每行多一張卡片、間距更小、標題字級小一檔；首頁頂部工具列也能直接切換',
+  groupChannel: '分區 / 排行頁',
+  groupChannelDesc: 'B 站原生分區頁（bilibili.com/v/*、/channel/*）與排行榜頁的增強浮層',
+  channelDensity: '清單密度',
+  channelDensityDesc: '緊湊檔縮小卡片間距與標題字級，一屏能看到更多內容',
 }
 
-const FALLBACK_LANGUAGE = 'cmn-CN'
+const JYUT: PagesSettingsMessages = {
+  ...CMN_TW,
+  groupVideoPageDesc: '針對 B 站原生播放頁嘅增強功能，閂咗之後對應功能唔會再接管頁面',
+  videoPageCinemaModeDesc: '播放器鋪滿成個視口、收埋右欄同推薦。撳 T 或者播放器右下角嘅浮動掣切換',
+  videoPageMiniPlayerDesc: '播放器滾出視口之後縮到右下角浮窗，撳 P 或者撳掣還原',
+  cardPreviewDesc: '懸停卡片 0.9 秒後靜音播最多 6 秒嘅小片段；觸控、減少動態效果，或者卡片資料冇 cid 就唔會生效',
+  cardQuickActionsDesc: '懸停卡片嗰陣喺右下角顯示讚好 / 收藏 / 稍後再看；收藏可以揀多個收藏夾，已收藏再撳就取消。未登入淨係提示唔發請求，失敗會自動回滾',
+  groupListPageDesc: '觀看歷史 / 稍後再看 / 收藏頁嘅預設檢視同排序',
+  defaultSortDesc: '三個清單頁共用嘅初始排序；喺頁面入面切換排序會同步更新呢度',
+  groupSearchPageDesc: 'BewlyBewly 嘅搵嘢起始頁（B 站搜尋框聚焦嗰陣出現嘅頁面）',
+  directPasteDesc: '喺搵嘢頁貼上 BV 號或者 B 站連結就直接開目標，唔會填入搜尋框',
+  momentsDensityDesc: '動態頁卡片流嘅資訊密度，頁面頂部工具列都可以直接切換',
+  momentsOptimizeDesc: '淨係渲染視口附近嘅卡片，捲到附近先渲染其餘卡片；閂咗之後所有卡片全部渲染（長清單食效能啲）',
+  groupNotificationDesc: 'B 站原生訊息頁（message.bilibili.com）嘅增強浮層',
+  notificationOnlyUnreadDesc: '入訊息頁嗰陣自動收埋已讀項目；頁面暫時認唔到未讀狀態就唔會生效',
+  groupSearchResultDesc: 'B 站原生搵嘢結果頁（search.bilibili.com）嘅增強浮層',
+  groupSpaceDesc: 'B 站原生使用者空間（space.bilibili.com）嘅增強浮層',
+  groupArticleDesc: 'B 站專欄 / 動態文章頁嘅沉浸閱讀模式',
+  articleReadingModeDesc: '正文確認載入之後自動入沉浸閱讀（收埋側欄 / 推薦 / 評論）',
+  groupHomeDesc: '首頁各子頁籤（推薦 / 關注 / 訂閱劇集 / 熱門 / 排行 / 直播）嘅卡片密度',
+  homeCardDensityDesc: '緊湊檔每行多一張卡片、間距細啲、標題字細一檔；首頁頂部工具列都可以直接切換',
+  groupChannelDesc: 'B 站原生分區頁（bilibili.com/v/*、/channel/*）同排行榜頁嘅增強浮層',
+  channelDensityDesc: '緊湊檔縮細卡片間距同標題字級，一屏睇到多啲內容',
+}
 
-export function normalizeLanguage(language?: string): string {
-  return language === LanguageType.English
-    ? 'en'
-    : FALLBACK_LANGUAGE
+/** 模块自建 i18n：四种语言键集合完全一致（缺键回退简中 / 英文，不会出现空串） */
+export const MESSAGES: Record<ModuleLocale, PagesSettingsMessages> = {
+  'cmn-CN': CMN_CN,
+  'cmn-TW': CMN_TW,
+  jyut: JYUT,
+  en: EN,
+}
+
+export function normalizeLanguage(language?: string): ModuleLocale {
+  return resolveModuleLocale(language)
 }
 
 export function getPagesSettingsMessages(language?: string): PagesSettingsMessages {
-  const key = normalizeLanguage(language ?? settings.value.language)
-  return MESSAGES[key] ?? CMN_CN
+  return getModuleMessages<PagesSettingsMessages>(MESSAGES, resolveModuleLocale(language ?? settings.value.language), CMN_CN)
 }
 
 /** 响应 settings.language 的文案（切换语言后立即生效） */

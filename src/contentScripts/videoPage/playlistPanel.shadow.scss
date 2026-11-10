@@ -1,0 +1,206 @@
+/**
+ * 播放列表面板样式（独立 shadow root 内，由 nativeOverlay 挂载）。
+ *
+ * 面板与主增强层分开成一个 host，是为了让「有没有播放列表」直接对应
+ * 「面板 host 存不存在」：探测不到列表结构时整个浮层不渲染，不留空 div。
+ * 颜色 / 圆角 / 阴影 / 字体全部走 --bew-* 变量，暗色模式自动跟随。
+ */
+
+:host {
+  --bvp-edge: var(--bew-space-24, 24px);
+  --bvp-gap: var(--bew-space-8, 8px);
+  --bvp-duration: var(--bew-motion-base, 200ms);
+  --bvp-ease: var(--bew-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1));
+
+  position: fixed;
+  inset: 0;
+  z-index: 2147483150;
+  display: block;
+  font-family: inherit;
+  font-size: var(--bew-base-font-size, 14px);
+  line-height: 1.5;
+  color: var(--bew-text-1);
+  pointer-events: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+:host *,
+:host *::before,
+:host *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:host button {
+  font: inherit;
+  color: inherit;
+  appearance: none;
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+:host :focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+
+:host svg {
+  display: block;
+  flex: none;
+}
+
+.bvp-playlist {
+  position: fixed;
+  top: calc(var(--bvp-edge) + 40px);
+  right: var(--bvp-edge);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  width: min(320px, calc(100vw - var(--bvp-edge) * 2));
+  max-height: min(64vh, 560px);
+  pointer-events: auto;
+  background: var(--bew-elevated);
+  border: 1px solid var(--bew-border-color);
+  border-radius: var(--bew-radius);
+  box-shadow: var(--bew-shadow-3);
+  backdrop-filter: var(--bew-filter-glass-1);
+  overflow: hidden;
+}
+
+.bvp-playlist__header {
+  display: flex;
+  flex: none;
+  gap: var(--bvp-gap);
+  align-items: center;
+  padding: 12px 12px 8px 16px;
+}
+
+.bvp-playlist__title {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+.bvp-playlist__position {
+  flex: none;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--bew-text-3);
+}
+
+.bvp-playlist__btn {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--bew-text-2);
+  border-radius: 8px;
+  transition:
+    color var(--bvp-duration) var(--bvp-ease),
+    background-color var(--bvp-duration) var(--bvp-ease);
+}
+
+.bvp-playlist__btn:hover {
+  color: var(--bew-text-1);
+  background: var(--bew-fill-1);
+}
+
+.bvp-playlist__btn[aria-pressed="true"] {
+  color: var(--bew-theme-color);
+  background: color-mix(in oklab, var(--bew-theme-color), transparent 90%);
+}
+
+.bvp-playlist__list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 8px 8px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.bvp-playlist__item {
+  display: flex;
+  gap: var(--bvp-gap);
+  align-items: flex-start;
+  width: 100%;
+  padding: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--bew-text-2);
+  text-align: left;
+  border-radius: 8px;
+  transition:
+    color var(--bvp-duration) var(--bvp-ease),
+    background-color var(--bvp-duration) var(--bvp-ease);
+}
+
+.bvp-playlist__item:hover {
+  color: var(--bew-text-1);
+  background: var(--bew-fill-1);
+}
+
+.bvp-playlist__item[aria-current="true"] {
+  color: var(--bew-theme-color);
+  background: color-mix(in oklab, var(--bew-theme-color), transparent 90%);
+}
+
+.bvp-playlist__index {
+  flex: none;
+  min-width: 18px;
+  font-variant-numeric: tabular-nums;
+  color: var(--bew-text-3);
+  text-align: right;
+}
+
+.bvp-playlist__item[aria-current="true"] .bvp-playlist__index {
+  color: var(--bew-theme-color);
+}
+
+.bvp-playlist__label {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.bvp-playlist__hint {
+  flex: none;
+  padding: 6px 16px 12px;
+  font-size: 12px;
+  color: var(--bew-text-3);
+}
+
+/* #region 过场 */
+.bvp-fade-enter-active,
+.bvp-fade-leave-active {
+  transition: opacity var(--bvp-duration) var(--bvp-ease);
+}
+
+.bvp-fade-enter-from,
+.bvp-fade-leave-to {
+  opacity: 0;
+}
+/* #endregion */
+
+/* #region 动效降级 */
+@media (prefers-reduced-motion: reduce) {
+  .bvp-playlist,
+  .bvp-playlist__btn,
+  .bvp-playlist__item {
+    transition: none !important;
+  }
+
+  .bvp-fade-enter-from,
+  .bvp-fade-leave-to {
+    opacity: 1;
+  }
+}
+/* #endregion */

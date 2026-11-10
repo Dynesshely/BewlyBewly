@@ -92,5 +92,60 @@ unicode-range 拉取实际用到的切片（通常 2–5 片，而非整份 1.81
 
 ## 图片与 CLS
 
-- 封面：`loading="lazy"`、`aspect-video object-cover`（已具备）。
+- 封面：`loading="lazy"`、`aspect-video object-cover`（已具备，第 12 轮又补了
+  `decoding="async"` / `fetchpriority` 与容器 `aspect-ratio`，见下一节）。
 - 骨架卡片与真实卡片共用卡片容器尺寸，避免数据到达后的布局跳动。
+
+## 图片加载与 CLS 加固（第 12 轮）
+
+### 改动
+
+| 文件 | 改动 |
+| --- | --- |
+| `src/components/Picture.vue` | 新增 `decoding` / `fetchpriority` 两个可选 props（默认 `async` / `low`），透传到 `<img>`；`loading` 默认值改为 `lazy` |
+| `src/components/VideoCard/VideoCard.vue` | 封面 `<Picture>` 补 `decoding="async"` + `:fetchpriority`；卡片根节点加 `ref`，挂载时按「是否在首屏（视口内 + 上方一行）」决定 `high` / `low`；横向 / 纵向封面容器补 `aspect-ratio: 16 / 9` |
+| `VideoCardAuthorAvatar.vue` | 头像 `decoding="async"` + `fetchpriority="low"`（头像容器本来就有固定 34/28px 尺寸，无 CLS） |
+| `views/Moments/components/MomentCard.vue` | 头像 `decoding="async"` + `fetchpriority="low"`；头像容器与内部 img 补 `aspect-ratio: 1 / 1` |
+| `views/Moments/components/MomentLightbox.vue` | 大图 `decoding="async"` + `fetchpriority="high"`（用户点击后才加载） |
+| `views/Moments/components/MomentMedia.vue` | 已有 `loading="lazy"` + `decoding="async"`，本轮未改（视频 / 专栏 / 直播封面自带 `aspect-ratio`） |
+| `views/listShared/components/ListPageHeader.vue` | 列表页头图 `loading="lazy"` + `decoding="async"` + `fetchpriority="low"`（背景层已由容器 `inset: 0` 占位） |
+| `views/Anime/components/AnimeTimeTable.vue` | 当日主推大图 `decoding="async"` + `fetchpriority="high"`；其余更新缩略图 `decoding="async"` + `fetchpriority="low"`（两者的容器已有 `aspect-ratio: 16 / 9` / 固定 28px） |
+
+原则：**只加属性 / 占位，不改布局、不降分辨率**。封面 URL 仍是原有的 `@672w_378h_1c` 变体，
+头像仍是 `@50w_50h_1c`。
+
+### 基线数字（`tests/e2e/perf.spec.ts` + `visibility.spec.ts`）
+
+测量口径（fixture 首页 `tests/e2e/fixtures/bilibili-home.html`，1440×900，headless Chromium）：
+
+- `mountMs`：导航开始 → `#bewly` 挂载就绪（宿主可见 + shadow root 样式表注入）；
+- `cardsMs`：导航开始 → 首屏卡片数量稳定；
+- `CLS`：扩展就绪后再观察 1s，`layout-shift`（排除用户输入）累计值；
+- 图片覆盖：`#bewly` shadow root 内 `<img>` 的 `loading` / `decoding` / `fetchpriority` 属性数量。
+
+| 轮次 | mountMs | 首屏卡片 ms | 卡片数 | img 数 | lazy | decoding=async | fetchpriority high / low | CLS |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 改动前（现有构建产物） | 3066 | 3588 | 30 | 62 | 60 | 0 | 0 / 0 | 0 |
+| 改动后 · 第 1 次（同一构建） | 2528 | 3053 | 30 | 62 | 60 | 0 | 0 / 0 | 0 |
+| 改动后 · 第 2 次（同一构建） | 2507 | 3034 | 30 | 62 | 60 | 0 | 0 / 0 | 0 |
+
+**关于属性列恒为 0**：e2e 加载的是 `extension/` 里**上一次构建**的产物，本轮只改了源码；
+按分工本轮不允许 `pnpm build`，所以运行时覆盖率要在 Lead 统一重建后才会变化。
+源码侧已经用静态编译核对过属性确实进入了渲染函数（`vue/compiler-sfc` 编译 `Picture.vue` /
+`VideoCard.vue`，产物中出现 `decoding`、`fetchpriority`、`coverFetchPriority`），
+并且 typecheck + eslint 通过。重建后预期：`decodingAsync` = 页面全部卡片头像 + 封面（fixture 首屏 62 张里
+约 60 张），`fetchHigh` ≥ 首屏卡片数（约 8–12），其余为 `low`。
+
+**关于 CLS 恒为 0**：首页封面本来就有 `aspect-video`，骨架与真实卡片同尺寸，所以基线就是 0；
+本轮补的容器 `aspect-ratio` 是针对**横向列表模式**与动态页头像的防御性占位（这些位置此前依赖子元素
+撑高），不会改变现有首屏测量值，也不会引入新的跳动。
+
+### 结论与限制
+
+- 首屏挂载 / 卡片耗时的波动（2500–3100ms / 3000–3600ms）属于本机噪声范围，
+  本轮是**纯属性级改动**，没有改 JS 执行路径，耗时不构成回归；
+- CLS 代理值两轮均为 0，未发现新的布局抖动；
+- e2e 的图片覆盖列只有在 Lead 重新构建 `extension/` 之后才有意义，建议重建后把
+  `optimized` 风格断言升级为 `expect(metrics.decodingAsync).toBeGreaterThan(0)`；
+- 本轮**未做网络限速 / 冷缓存**场景测量（fixture 不走真实网络），真实网络下的
+  `fetchpriority` 收益需要 Lead 用真实页面或 CDP 限速再验一次。

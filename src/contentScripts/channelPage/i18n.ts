@@ -1,7 +1,8 @@
-import { computed } from 'vue'
+import type { ModuleLocale } from '~/utils/moduleI18n'
 
-import { LanguageType } from '~/enums/appEnums'
+import { computed } from 'vue'
 import { settings } from '~/logic'
+import { getModuleMessages, resolveModuleLocale } from '~/utils/moduleI18n'
 
 /** 快捷键说明（与 keyboard.ts 的行为一一对应） */
 export interface ShortcutLabels {
@@ -160,23 +161,89 @@ const EN: ChannelPageMessages = {
   },
 }
 
-/** 模块自建 i18n：只覆盖简中与英文，其余语言回退简中 */
-export const MESSAGES: Record<string, ChannelPageMessages> = {
-  'cmn-CN': CMN_CN,
-  'en': EN,
+const CMN_TW: ChannelPageMessages = {
+  controls: '分區頁增強',
+  openPanel: '開啟分區頁增強面板',
+  panelTitle: '分區頁增強',
+  panelTitlePopular: '熱門頁增強',
+  panelTitleRank: '排行榜增強',
+  close: '關閉',
+
+  density: '密度',
+  densityComfortable: '舒適',
+  densityCompact: '緊湊',
+  densityOn: '已切換為緊湊密度',
+  densityOff: '已切換為舒適密度',
+
+  sortTitle: '排序快捷',
+  sortDefault: '綜合',
+  sortViews: '播放多',
+  sortNewest: '最新',
+  sortUnavailable: '目前頁面沒有排序頁籤',
+  sortFailed: '找不到這個排序頁籤',
+
+  rankTitle: '榜單切換',
+  rankDay: '日榜',
+  rankWeek: '週榜',
+  rankMonth: '月榜',
+  rankFailed: '找不到這個榜單頁籤',
+
+  status: '瀏覽狀態',
+  statusIdle: '按 J / K 開始瀏覽影片',
+  statusActive: '第 {current} / {total} 條',
+  statusCount: '共 {total} 條',
+  shortcutRank: '切換日榜 / 週榜 / 月榜',
+
+  shortcutsTitle: '快速鍵',
+  hint: '面板與快速鍵只作用於本頁，狀態在本分頁內保持',
+
+  opened: '已在新分頁開啟',
+  openFailed: '無法開啟該連結（可能被瀏覽器攔截）',
+  noUrl: '這支影片沒有可開啟的連結',
+  noCards: '頁面上還沒有可瀏覽的影片',
+
+  shortcut: {
+    next: '下一支影片',
+    prev: '上一支影片',
+    open: '在新分頁開啟',
+    cancel: '取消高亮 / 關閉面板',
+  },
 }
 
-const FALLBACK_LANGUAGE = 'cmn-CN'
+const JYUT: ChannelPageMessages = {
+  ...CMN_TW,
+  panelTitlePopular: '熱門頁增強',
+  sortUnavailable: '呢頁冇排序頁籤',
+  sortFailed: '搵唔到呢個排序頁籤',
+  rankFailed: '搵唔到呢個榜單頁籤',
+  statusIdle: '撳 J / K 開始睇影片',
+  hint: '面板同快速鍵淨係影響呢一頁，狀態喺呢個分頁入面保持',
+  opened: '喺新分頁開咗',
+  openFailed: '開唔到條連結（可能畀瀏覽器攔咗）',
+  noUrl: '呢支影片冇連結可以開',
+  noCards: '頁面仲未有影片可以睇',
+  shortcut: {
+    next: '下一支影片',
+    prev: '上一支影片',
+    open: '喺新分頁開',
+    cancel: '取消高亮 / 收埋面板',
+  },
+}
 
-export function normalizeLanguage(language?: string): string {
-  return language === LanguageType.English
-    ? 'en'
-    : FALLBACK_LANGUAGE
+/** 模块自建 i18n：四种语言键集合完全一致（缺键回退简中 / 英文，不会出现空串） */
+export const MESSAGES: Record<ModuleLocale, ChannelPageMessages> = {
+  'cmn-CN': CMN_CN,
+  'cmn-TW': CMN_TW,
+  jyut: JYUT,
+  en: EN,
+}
+
+export function normalizeLanguage(language?: string): ModuleLocale {
+  return resolveModuleLocale(language)
 }
 
 export function getMessages(language?: string): ChannelPageMessages {
-  const key = normalizeLanguage(language ?? settings.value.language)
-  return MESSAGES[key] ?? CMN_CN
+  return getModuleMessages<ChannelPageMessages>(MESSAGES, resolveModuleLocale(language ?? settings.value.language), CMN_CN)
 }
 
 /** 响应 settings.language 的文案（切换语言后立即生效，不需要重建 UI） */

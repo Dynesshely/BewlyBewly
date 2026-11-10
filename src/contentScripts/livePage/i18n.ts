@@ -1,7 +1,8 @@
-import { computed } from 'vue'
+import type { ModuleLocale } from '~/utils/moduleI18n'
 
-import { LanguageType } from '~/enums/appEnums'
+import { computed } from 'vue'
 import { settings } from '~/logic'
+import { getModuleMessages, resolveModuleLocale } from '~/utils/moduleI18n'
 
 /** 快捷键说明（与 keyboard.ts 的行为一一对应） */
 export interface ShortcutLabels {
@@ -123,23 +124,80 @@ const EN: LivePageMessages = {
   },
 }
 
-/** 模块自建 i18n：只覆盖简中与英文，其余语言回退简中 */
-export const MESSAGES: Record<string, LivePageMessages> = {
-  'cmn-CN': CMN_CN,
-  'en': EN,
+const CMN_TW: LivePageMessages = {
+  controls: '直播增強',
+  openPanel: '開啟直播增強面板',
+  panelTitle: '直播頁增強',
+  close: '關閉',
+
+  cinema: '影院模式',
+  cinemaOn: '已進入影院模式',
+  cinemaOff: '已退出影院模式',
+  cinemaUnavailable: '找不到直播播放器',
+
+  hideAside: '隱藏側欄',
+  asideOn: '已隱藏右側欄',
+  asideOff: '已顯示右側欄',
+  asideUnavailable: '目前頁面沒有可隱藏的側欄',
+
+  danmaku: '彈幕開關',
+  danmakuOn: '彈幕已開啟',
+  danmakuOff: '彈幕已關閉',
+  danmakuUnavailable: '找不到原生彈幕開關',
+
+  fullscreen: '全螢幕',
+  fullscreenFailed: '無法進入全螢幕',
+  fullscreenUnavailable: '找不到播放器',
+
+  shortcutsTitle: '快速鍵',
+  hint: '面板與快速鍵只作用於本頁，狀態在本分頁內保持',
+  playerNotFound: '找不到直播播放器，稍後自動重試',
+
+  shortcut: {
+    cinema: '影院模式',
+    aside: '隱藏右側欄',
+    danmaku: '彈幕開關',
+    fullscreen: '全螢幕',
+    help: '開啟 / 關閉面板',
+    exitCinema: '退出影院模式 / 關閉面板',
+  },
 }
 
-const FALLBACK_LANGUAGE = 'cmn-CN'
+const JYUT: LivePageMessages = {
+  ...CMN_TW,
+  openPanel: '打開直播增強面板',
+  cinemaUnavailable: '搵唔到直播播放器',
+  asideOn: '收埋咗右邊欄',
+  asideOff: '顯示返右邊欄',
+  asideUnavailable: '呢頁冇嘢可以收埋',
+  danmakuUnavailable: '搵唔到原生彈幕開關',
+  fullscreenFailed: '入唔到全螢幕',
+  hint: '面板同快速鍵淨係影響呢一頁，狀態喺呢個分頁入面保持',
+  playerNotFound: '搵唔到直播播放器，轉頭自動再試',
+  shortcut: {
+    cinema: '影院模式',
+    aside: '收埋右邊欄',
+    danmaku: '彈幕開關',
+    fullscreen: '全螢幕',
+    help: '打開 / 關閉面板',
+    exitCinema: '退出影院模式 / 關閉面板',
+  },
+}
 
-export function normalizeLanguage(language?: string): string {
-  return language === LanguageType.English
-    ? 'en'
-    : FALLBACK_LANGUAGE
+/** 模块自建 i18n：四种语言键集合完全一致（缺键回退简中 / 英文，不会出现空串） */
+export const MESSAGES: Record<ModuleLocale, LivePageMessages> = {
+  'cmn-CN': CMN_CN,
+  'cmn-TW': CMN_TW,
+  jyut: JYUT,
+  en: EN,
+}
+
+export function normalizeLanguage(language?: string): ModuleLocale {
+  return resolveModuleLocale(language)
 }
 
 export function getMessages(language?: string): LivePageMessages {
-  const key = normalizeLanguage(language ?? settings.value.language)
-  return MESSAGES[key] ?? CMN_CN
+  return getModuleMessages<LivePageMessages>(MESSAGES, resolveModuleLocale(language ?? settings.value.language), CMN_CN)
 }
 
 /** 响应 settings.language 的文案（切换语言后立即生效，不需要重建 UI） */

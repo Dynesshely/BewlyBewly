@@ -137,7 +137,10 @@ watch(() => [props.density, props.compact], async () => {
   >
     <div class="moment-card__rail">
       <button type="button" class="moment-card__avatar" @click.stop="handleAuthorClick">
-        <img v-if="card.author.face" :src="card.author.face" :alt="t('avatar_alt', { name: card.author.name })" loading="lazy">
+        <img
+          v-if="card.author.face" :src="card.author.face" :alt="t('avatar_alt', { name: card.author.name })" loading="lazy" decoding="async"
+          fetchpriority="low"
+        >
         <span v-else class="moment-card__avatar-fallback">{{ card.author.name.slice(0, 1) }}</span>
       </button>
     </div>
@@ -326,6 +329,7 @@ watch(() => [props.density, props.compact], async () => {
   place-items: center;
   width: 44px;
   height: 44px;
+  aspect-ratio: 1 / 1;
   padding: 0;
   overflow: hidden;
   border: 0;
@@ -337,6 +341,7 @@ watch(() => [props.density, props.compact], async () => {
   img {
     width: 100%;
     height: 100%;
+    aspect-ratio: 1 / 1;
     object-fit: cover;
   }
 

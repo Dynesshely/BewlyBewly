@@ -224,6 +224,25 @@ function handleUndo() {
   }
 }
 
+/** 卡片根节点：用来判断它是否在首屏，从而决定封面图的加载优先级 */
+const cardRootRef = ref<HTMLElement | null>(null)
+/** 首屏（视口内及紧邻视口上方一行）的封面用 high，其余 low */
+const coverFetchPriority = ref<'high' | 'low'>('low')
+
+onMounted(() => {
+  const el = cardRootRef.value
+  if (!el)
+    return
+  try {
+    const rect = el.getBoundingClientRect()
+    const inFirstScreen = rect.top < window.innerHeight * 1.2 && rect.bottom > -window.innerHeight * 0.4
+    coverFetchPriority.value = inFirstScreen ? 'high' : 'low'
+  }
+  catch {
+    // 拿不到布局信息时保持 low，不影响渲染
+  }
+})
+
 function handleRemoved(selectedOpt?: { dislikeReasonId: number }) {
   selectedDislikeOpt.value = selectedOpt
   removed.value = true
@@ -234,6 +253,7 @@ provide('getVideoType', () => props.type!)
 
 <template>
   <div
+    ref="cardRootRef"
     :style="{ contentVisibility }"
     data-video-card
     :data-video-url="videoUrl || ''"
@@ -280,6 +300,8 @@ provide('getVideoType', () => props.type!)
             <Picture
               :src="`${removeHttpFromUrl(video.cover)}@672w_378h_1c_!web-home-common-cover`"
               loading="lazy"
+              decoding="async"
+              :fetchpriority="coverFetchPriority"
               w="full" max-w-full align-middle aspect-video object-cover
               rounded="$bew-radius"
             />
@@ -559,10 +581,12 @@ provide('getVideoType', () => props.type!)
 <style lang="scss" scoped>
 .horizontal-card-cover {
   --uno: "xl:w-280px lg:w-250px md:w-200px w-200px";
+  aspect-ratio: 16 / 9;
 }
 
 .vertical-card-cover {
   --uno: "w-full";
+  aspect-ratio: 16 / 9;
 }
 
 .more-active {

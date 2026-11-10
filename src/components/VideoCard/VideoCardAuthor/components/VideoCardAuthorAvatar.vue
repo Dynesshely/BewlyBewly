@@ -51,6 +51,8 @@ const displayedAvatars = computed(() => {
       <Picture
         :src="`${removeHttpFromUrl(item.authorFace)}@50w_50h_1c`"
         loading="lazy"
+        decoding="async"
+        fetchpriority="low"
         w-inherit h-inherit
         rounded="1/2"
       />

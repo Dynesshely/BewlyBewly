@@ -1,15 +1,18 @@
+import type { ModuleLocale } from '~/utils/moduleI18n'
+
 import { computed } from 'vue'
-
 import { settings } from '~/logic'
+import { resolveModuleLocale } from '~/utils/moduleI18n'
 
-export type ListLocale = 'cmn-CN' | 'en'
+export type ListLocale = ModuleLocale
 
 /**
  * 列表页模块内文案。
- * 不改动 src/_locales/**，由本模块自行维护；settings.value.language 为 en 时使用英文，
- * 其余语言（含空值）一律回落简体中文。
+ * 不改动 src/_locales/**，由本模块自行维护。
+ * 四种模块语言：cmn-CN 简中 / cmn-TW 繁体 / jyut 繁体（粤语词）/ en 英文，
+ * 语言解析统一走 `~/utils/moduleI18n`（见 docs/i18n-modules.md）。
  */
-export const MESSAGES: Record<ListLocale, Record<string, string>> = {
+export const MESSAGES: Record<ModuleLocale, Record<string, string>> = {
   'cmn-CN': {
     'view.comfortable': '舒适',
     'view.compact': '紧凑',
@@ -116,6 +119,113 @@ export const MESSAGES: Record<ListLocale, Record<string, string>> = {
     'shortcut.close': 'Close',
     'shortcut.note': 'Shortcuts are ignored while typing in a field.',
   },
+  'cmn-TW': {
+    'view.comfortable': '舒適',
+    'view.compact': '緊湊',
+    'view.list': '清單',
+    'view.group_label': '檢視模式',
+    'sort.label': '排序',
+    'sort.time': '時間',
+    'sort.duration': '時長',
+    'sort.title': '標題',
+    'sort.note': '已按「{dim}」排序，順序只作用於目前已載入的 {count} 筆內容',
+    'filter.placeholder': '過濾標題 / UP 主',
+    'filter.clear': '清除過濾',
+    'filter.empty_title': '沒有符合的內容',
+    'filter.empty_desc': '目前過濾詞「{word}」沒有符合任何項目，換個關鍵字試試。',
+    'search.placeholder': '輸入過濾詞，按 Enter 搜尋全部歷史',
+    'group.today': '今天',
+    'group.yesterday': '昨天',
+    'group.thisWeek': '本週',
+    'group.earlier': '更早',
+    'count.loaded': '已載入 {count} 筆',
+    'count.items': '{count} 筆',
+    'action.watchLater': '稍後再看',
+    'action.copy': '複製連結',
+    'action.remove': '移除',
+    'action.unfavorite': '取消收藏',
+    'action.copied': '連結已複製',
+    'action.copy_failed': '複製失敗，請手動複製',
+    'action.watchLater_ok': '已加入稍後再看',
+    'action.watchLater_failed': '加入稍後再看失敗',
+    'a11y.quick_actions': '快捷操作',
+    'history.subtitle': '按時間倒序記錄你最近看過的影片',
+    'history.paused_subtitle': '觀看歷史記錄已暫停',
+    'history.empty_title': '還沒有觀看記錄',
+    'history.empty_desc': '看過的影片會自動出現在這裡，方便隨時接著看。',
+    'watch_later.subtitle': '共 {count} 支影片，隨時接著看',
+    'watch_later.empty_title': '稍後再看是空的',
+    'watch_later.empty_desc': '在影片頁按「稍後再看」，或懸停卡片時按第一個快捷按鈕，就能把影片累積到這裡。',
+    'favorites.subtitle': '「{name}」共 {count} 筆收藏',
+    'favorites.empty_title': '這個收藏夾還是空的',
+    'favorites.empty_desc': '換個收藏夾看看，或者先去 B 站收藏一些影片。',
+    'favorites.categories': '收藏夾分類',
+    'progress.watched': '已看 {watched} / {total}',
+    'progress.finished': '已看完 · {total}',
+    'shortcut.button': '本頁快速鍵',
+    'shortcut.title': '本頁快速鍵',
+    'shortcut.cycle_view': '循環切換檢視模式（舒適 → 緊湊 → 清單）',
+    'shortcut.cycle_sort': '循環切換排序方式（時間 → 時長 → 標題）',
+    'shortcut.focus_filter': '聚焦關鍵字過濾框',
+    'shortcut.toggle_help': '開啟 / 關閉本頁快速鍵說明',
+    'shortcut.global_help': '顯示全域快速鍵說明',
+    'shortcut.close': '關閉',
+    'shortcut.note': '在輸入框內不會觸發，字母鍵不分大小寫。',
+  },
+  jyut: {
+    'view.comfortable': '舒適',
+    'view.compact': '緊湊',
+    'view.list': '清單',
+    'view.group_label': '檢視模式',
+    'sort.label': '排序',
+    'sort.time': '時間',
+    'sort.duration': '時長',
+    'sort.title': '標題',
+    'sort.note': '已按「{dim}」排序，順序淨係影響而家載入咗嘅 {count} 筆內容',
+    'filter.placeholder': '過濾標題 / UP 主',
+    'filter.clear': '清除過濾',
+    'filter.empty_title': '冇符合嘅內容',
+    'filter.empty_desc': '而家嘅過濾詞「{word}」搵唔到任何項目，換個關鍵字試下。',
+    'search.placeholder': '輸入過濾詞，撳 Enter 搵晒全部歷史',
+    'group.today': '今日',
+    'group.yesterday': '尋日',
+    'group.thisWeek': '今個星期',
+    'group.earlier': '更早',
+    'count.loaded': '已載入 {count} 筆',
+    'count.items': '{count} 筆',
+    'action.watchLater': '稍後再看',
+    'action.copy': '複製連結',
+    'action.remove': '移除',
+    'action.unfavorite': '取消收藏',
+    'action.copied': '複製咗連結',
+    'action.copy_failed': '複製唔到，請自己手動複製',
+    'action.watchLater_ok': '加咗入稍後再看',
+    'action.watchLater_failed': '加唔到入稍後再看',
+    'a11y.quick_actions': '快捷操作',
+    'history.subtitle': '按時間倒序記低你最近睇過嘅影片',
+    'history.paused_subtitle': '觀看歷史記錄暫停咗',
+    'history.empty_title': '仲未有觀看記錄',
+    'history.empty_desc': '睇過嘅影片會自動出現喺呢度，隨時可以接住睇。',
+    'watch_later.subtitle': '總共 {count} 支影片，隨時接住睇',
+    'watch_later.empty_title': '稍後再看係空嘅',
+    'watch_later.empty_desc': '喺影片頁撳「稍後再看」，或者懸停卡片嗰陣撳第一個快捷掣，就可以儲影片入嚟。',
+    'favorites.subtitle': '「{name}」總共 {count} 筆收藏',
+    'favorites.empty_title': '呢個收藏夾仲係空嘅',
+    'favorites.empty_desc': '換個收藏夾睇下，或者去 B 站收藏啲影片先。',
+    'favorites.categories': '收藏夾分類',
+    'progress.watched': '睇咗 {watched} / {total}',
+    'progress.finished': '睇晒 · {total}',
+    'shortcut.button': '呢頁快速鍵',
+    'shortcut.title': '呢頁快速鍵',
+    'shortcut.cycle_view': '循環切換檢視模式（舒適 → 緊湊 → 清單）',
+    'shortcut.cycle_sort': '循環切換排序方式（時間 → 時長 → 標題）',
+    'shortcut.focus_filter': '聚焦關鍵字過濾框',
+    'shortcut.toggle_help': '開 / 收埋呢頁快速鍵說明',
+    'shortcut.global_help': '顯示全域快速鍵說明',
+    'shortcut.close': '收埋',
+    'shortcut.note': '喺輸入框入面唔會觸發，字母鍵唔分大細楷。',
+  },
+
 }
 
 /**
@@ -123,9 +233,7 @@ export const MESSAGES: Record<ListLocale, Record<string, string>> = {
  * tl(key, params) 支持 {name} 形式的占位符替换。
  */
 export function useListI18n() {
-  const locale = computed<ListLocale>(() => (settings.value.language === 'en'
-    ? 'en'
-    : 'cmn-CN'))
+  const locale = computed<ListLocale>(() => resolveModuleLocale(settings.value.language))
 
   function tl(key: string, params?: Record<string, string | number>): string {
     const dict = MESSAGES[locale.value] ?? MESSAGES['cmn-CN']

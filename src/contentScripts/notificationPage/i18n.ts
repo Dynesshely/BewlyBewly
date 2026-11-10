@@ -1,9 +1,9 @@
 import type { NotificationCategoryId } from './state'
 
+import type { ModuleLocale } from '~/utils/moduleI18n'
 import { computed } from 'vue'
-import { LanguageType } from '~/enums/appEnums'
-
 import { settings } from '~/logic'
+import { getModuleMessages, resolveModuleLocale } from '~/utils/moduleI18n'
 
 export interface NotificationMessages {
   panel: string
@@ -116,23 +116,83 @@ const EN: NotificationMessages = {
   switchOff: 'Off',
 }
 
-/** 模块自建 i18n：只覆盖简中与英文，其余语言回退简中 */
-export const MESSAGES: Record<string, NotificationMessages> = {
-  'cmn-CN': CMN_CN,
-  'en': EN,
+const CMN_TW: NotificationMessages = {
+  panel: '訊息頁增強',
+  fabWithUnread: '訊息頁增強，{count} 條未讀',
+  close: '關閉',
+  unreadLabel: '未讀',
+  unreadUnknown: '未偵測到未讀計數',
+  unreadBadgeLabel: '訊息頁增強',
+  unreadOnly: '只看未讀',
+  unreadOnlyHint: '隱藏已讀訊息',
+  unreadFilterUnavailable: '目前頁面沒有可辨識的已讀 / 未讀標記，篩選不可用',
+  noUnreadItems: '目前分類沒有未讀訊息',
+  categories: '分類跳轉',
+  category: {
+    reply: '回覆',
+    at: '@我',
+    love: '按讚',
+    system: '系統',
+  },
+  categoryUnavailable: '目前頁面找不到該分類',
+  categoryNotFound: '找不到「{name}」入口',
+  switchedTo: '已切到「{name}」',
+  markAllRead: '全部已讀',
+  markedAllRead: '已點擊原生「全部已讀」',
+  markAllReadUnavailable: '目前頁面沒有原生「全部已讀」按鈕',
+  density: '清單密度',
+  densityComfortable: '舒適',
+  densityCompact: '緊湊',
+  shortcuts: '快速鍵',
+  shortcutUnread: '切換「只看未讀」',
+  shortcutCategories: '跳到分類 1–4',
+  shortcutDensity: '切換清單密度',
+  shortcutClose: '關閉面板',
+  unreadOnlyOn: '已開啟只看未讀',
+  unreadOnlyOff: '已關閉只看未讀',
+  switchOn: '已開啟',
+  switchOff: '已關閉',
 }
 
-const FALLBACK_LANGUAGE = 'cmn-CN'
+const JYUT: NotificationMessages = {
+  ...CMN_TW,
+  panel: '訊息頁增強',
+  fabWithUnread: '訊息頁增強，{count} 條未讀',
+  unreadUnknown: '未見到未讀計數',
+  unreadOnlyHint: '收埋睇咗嘅訊息',
+  unreadFilterUnavailable: '呢頁冇已讀 / 未讀標記，篩選唔到',
+  noUnreadItems: '呢個分類冇未讀訊息',
+  category: {
+    reply: '回覆',
+    at: '@我',
+    love: '讚好',
+    system: '系統',
+  },
+  categoryUnavailable: '呢頁搵唔到呢個分類',
+  switchedTo: '轉咗去「{name}」',
+  markedAllRead: '撳咗原生「全部已讀」',
+  shortcutUnread: '切換「淨係睇未讀」',
+  shortcutDensity: '切換清單密度',
+  unreadOnlyOn: '開咗淨係睇未讀',
+  unreadOnlyOff: '熄咗淨係睇未讀',
+  switchOn: '開咗',
+  switchOff: '熄咗',
+}
 
-export function normalizeLanguage(language?: string): string {
-  return language === LanguageType.English
-    ? 'en'
-    : FALLBACK_LANGUAGE
+/** 模块自建 i18n：四种语言键集合完全一致（缺键回退简中 / 英文，不会出现空串） */
+export const MESSAGES: Record<ModuleLocale, NotificationMessages> = {
+  'cmn-CN': CMN_CN,
+  'cmn-TW': CMN_TW,
+  jyut: JYUT,
+  en: EN,
+}
+
+export function normalizeLanguage(language?: string): ModuleLocale {
+  return resolveModuleLocale(language)
 }
 
 export function getMessages(language?: string): NotificationMessages {
-  const key = normalizeLanguage(language ?? settings.value.language)
-  return MESSAGES[key] ?? CMN_CN
+  return getModuleMessages<NotificationMessages>(MESSAGES, resolveModuleLocale(language ?? settings.value.language), CMN_CN)
 }
 
 /** 响应 settings.language 的文案（切换语言后立即生效，不需要重建 UI） */

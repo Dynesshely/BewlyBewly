@@ -1,12 +1,14 @@
-import { computed } from 'vue'
+import type { ModuleLocale } from '~/utils/moduleI18n'
 
-import { LanguageType } from '~/enums/appEnums'
+import { computed } from 'vue'
 import { settings } from '~/logic'
+import { getModuleMessages, resolveModuleLocale } from '~/utils/moduleI18n'
 
 /**
  * 首页模块内文案（卡片密度 / 回到顶部，不进入全局 _locales）。
  *
- * 与其它模块一致：`settings.language === 'en'` 用英文，其余语言（含空值）回退简中。
+ * 四种模块语言：cmn-CN 简中 / cmn-TW 繁体 / jyut 繁体（粤语词）/ en 英文；
+ * 语言解析统一走 `~/utils/moduleI18n`（见 docs/i18n-modules.md）。
  */
 export interface HomeMessages {
   densityGroup: string
@@ -28,6 +30,23 @@ const CMN_CN: HomeMessages = {
   backToTopHint: '滚过两屏后出现，点击平滑回到顶部',
 }
 
+const CMN_TW: HomeMessages = {
+  densityGroup: '卡片密度',
+  densityComfortable: '舒適',
+  densityCompact: '緊湊',
+  densityComfortableHint: '舒適密度：更大的封面、更寬的間距',
+  densityCompactHint: '緊湊密度：每行多一張、間距更小、標題字號小一檔',
+  backToTop: '回到頂部',
+  backToTopHint: '滾過兩屏後出現，點擊平滑回到頂部',
+}
+
+const JYUT: HomeMessages = {
+  ...CMN_TW,
+  densityComfortableHint: '舒適密度：封面大啲、間距闊啲',
+  densityCompactHint: '緊湊密度：每行多一張、間距細啲、標題字細一檔',
+  backToTopHint: '滾過兩屏先會出現，撳一下平滑返到頂部',
+}
+
 const EN: HomeMessages = {
   densityGroup: 'Card density',
   densityComfortable: 'Comfortable',
@@ -38,23 +57,20 @@ const EN: HomeMessages = {
   backToTopHint: 'Appears after scrolling two screens; click to glide back to the top',
 }
 
-/** 模块自建 i18n：只覆盖简中与英文，其余语言回退简中 */
-export const MESSAGES: Record<string, HomeMessages> = {
+/** 模块自建 i18n：四种语言键集合完全一致（缺键回退简中 / 英文，不会出现空串） */
+export const MESSAGES: Record<ModuleLocale, HomeMessages> = {
   'cmn-CN': CMN_CN,
-  'en': EN,
+  'cmn-TW': CMN_TW,
+  jyut: JYUT,
+  en: EN,
 }
 
-const FALLBACK_LANGUAGE = 'cmn-CN'
-
-export function normalizeLanguage(language?: string): string {
-  return language === LanguageType.English
-    ? 'en'
-    : FALLBACK_LANGUAGE
+export function normalizeLanguage(language?: string): ModuleLocale {
+  return resolveModuleLocale(language)
 }
 
 export function getHomeMessages(language?: string): HomeMessages {
-  const key = normalizeLanguage(language ?? settings.value.language)
-  return MESSAGES[key] ?? CMN_CN
+  return getModuleMessages<HomeMessages>(MESSAGES, resolveModuleLocale(language ?? settings.value.language), CMN_CN)
 }
 
 /** 响应 settings.language 的文案 */

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { settings } from '~/logic'
 
-import { restorePlayer, toggleCinema, toggleShortcutsHelp } from '../actions'
+import { restorePlayer, toggleCinema, togglePlaylistPanel, toggleShortcutsHelp } from '../actions'
 import { useMessages } from '../i18n'
 import { ui } from '../state'
 
@@ -10,7 +10,7 @@ const t = useMessages()
 
 <template>
   <div
-    v-if="ui.mini || settings.videoPageCinemaMode || settings.videoPageShortcuts"
+    v-if="ui.mini || settings.videoPageCinemaMode || settings.videoPageShortcuts || ui.playlistNav"
     class="bvp-fab-group"
     role="toolbar"
     :aria-label="t.controls"
@@ -54,6 +54,26 @@ const t = useMessages()
         />
       </svg>
       <span class="bvp-fab__label">{{ t.cinema }}</span>
+    </button>
+
+    <button
+      v-if="ui.playlistNav"
+      class="bvp-fab"
+      type="button"
+      data-bvp-action="playlist"
+      :aria-pressed="ui.playlistPanelOpen"
+      :title="`${t.playlistPanel}（Esc 关闭）`"
+      @click="togglePlaylistPanel()"
+    >
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path
+          d="M5.5 4h8M5.5 8h8M5.5 12h8M2.5 4h.01M2.5 8h.01M2.5 12h.01"
+          stroke="currentColor"
+          stroke-width="1.4"
+          stroke-linecap="round"
+        />
+      </svg>
+      <span class="bvp-fab__label">{{ t.playlistPanel }}</span>
     </button>
 
     <button

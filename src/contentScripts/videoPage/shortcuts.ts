@@ -3,17 +3,20 @@ import type { ShortcutLabelKey } from './i18n'
 import { settings } from '~/logic'
 
 import {
+  closePlaylistPanel,
   restorePlayer,
   seekBy,
   seekToPercent,
   setCinema,
   stepEpisode,
+  stepPlaylistItem,
   toggleCinema,
   toggleDanmaku,
   toggleFullscreen,
   toggleMute,
   togglePictureInPicture,
   togglePlay,
+  togglePlaylistAutoplay,
   toggleShortcutsHelp,
 } from './actions'
 import { isEditableTarget, isFromBewlyUi } from './dom'
@@ -25,8 +28,8 @@ const BIG_SEEK_STEP = 10
 export interface ShortcutDefinition {
   keys: string[]
   labelKey: ShortcutLabelKey
-  /** 只在特定条件下才存在/可用（用于「页面上没有集数列表就不列切集」这类场景） */
-  requires?: 'episodeNav'
+  /** 只在特定条件下才存在/可用（页面上没有集数列表 / 播放列表时不列出、不拦截） */
+  requires?: 'episodeNav' | 'playlist'
 }
 
 /** 快捷键帮助面板的数据源（同时也是行为清单，改这里就是改帮助） */
@@ -84,6 +87,21 @@ export const VIDEO_PAGE_SHORTCUTS: ShortcutDefinition[] = [
     keys: [']'],
     labelKey: 'nextEpisode',
     requires: 'episodeNav',
+  },
+  {
+    keys: ['['],
+    labelKey: 'prevItem',
+    requires: 'playlist',
+  },
+  {
+    keys: [']'],
+    labelKey: 'nextItem',
+    requires: 'playlist',
+  },
+  {
+    keys: ['A'],
+    labelKey: 'autoplay',
+    requires: 'playlist',
   },
   {
     keys: ['0', '–', '9'],
@@ -146,20 +164,35 @@ const SHORTCUT_ACTIONS: ShortcutAction[] = [
     run: () => restorePlayer(),
   },
   {
-    // 番剧 / 电影：切上一集
+    // `[`：番剧页切上一集，播放列表页切上一个播放项（两者互斥，按页面能力判定）
     match: key => key === '[',
-    run: () => stepEpisode(-1),
+    run: () => stepAdjacent(-1),
   },
   {
-    // 番剧 / 电影：切下一集
+    // `]`：番剧页切下一集，播放列表页切下一个播放项
     match: key => key === ']',
-    run: () => stepEpisode(1),
+    run: () => stepAdjacent(1),
+  },
+  {
+    // 播放列表页：自动连播开关
+    match: (_, lower) => lower === 'a',
+    run: () => togglePlaylistAutoplay(),
   },
   {
     match: key => /^\d$/.test(key),
     run: key => seekToPercent(Number(key) * 10),
   },
 ]
+
+/** `[` `]` 的共享入口：先看番剧集数列表，再看播放列表（两种页面不会同时出现） */
+function stepAdjacent(direction: -1 | 1): void {
+  if (ui.episodeNav) {
+    stepEpisode(direction)
+    return
+  }
+  if (ui.playlistNav)
+    stepPlaylistItem(direction)
+}
 
 function consume(event: KeyboardEvent): void {
   event.preventDefault()
@@ -195,6 +228,11 @@ function handleKeyDown(event: KeyboardEvent): void {
       toggleShortcutsHelp(false)
       return
     }
+    if (ui.playlistPanelOpen) {
+      consume(event)
+      closePlaylistPanel()
+      return
+    }
     if (ui.cinema) {
       consume(event)
       setCinema(false)
@@ -216,9 +254,9 @@ function handleKeyDown(event: KeyboardEvent): void {
       return
     }
     // 切集别名：部分键盘 `[` `]` 需要 AltGr，这里同时支持 Shift+, / Shift+. 产生的 `<` `>`
-    if (ui.episodeNav && (key === '<' || key === '>')) {
+    if ((ui.episodeNav || ui.playlistNav) && (key === '<' || key === '>')) {
       consume(event)
-      stepEpisode(key === '<'
+      stepAdjacent(key === '<'
         ? -1
         : 1)
     }
@@ -237,8 +275,12 @@ function handleKeyDown(event: KeyboardEvent): void {
   if (lower === 'p' && !settings.value.videoPageMiniPlayer) {
     return
   }
-  // 页面上没有集数列表（电影单集 / 结构改版）时不抢 [ ]，交还给 B 站原生
-  if ((key === '[' || key === ']') && !ui.episodeNav) {
+  // 页面上既没有集数列表也没有播放列表时不抢 [ ]，交还给 B 站原生
+  if ((key === '[' || key === ']') && !ui.episodeNav && !ui.playlistNav) {
+    return
+  }
+  // 播放列表面板相关按键只在页面上真的有播放列表时生效
+  if (lower === 'a' && !ui.playlistNav) {
     return
   }
 
@@ -266,6 +308,8 @@ export function getShortcutDefinitions(): ShortcutDefinition[] {
       return settings.value.videoPageMiniPlayer
     if (item.requires === 'episodeNav')
       return ui.episodeNav
+    if (item.requires === 'playlist')
+      return ui.playlistNav
     return true
   })
 }

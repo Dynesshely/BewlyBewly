@@ -12,7 +12,7 @@ withDefaults(defineProps<{
 <template>
   <header class="bewly-list-hero" :class="{ 'bewly-list-hero--with-cover': Boolean(cover) }">
     <div v-if="cover" class="bewly-list-hero__bg" aria-hidden="true">
-      <img :src="cover" alt="">
+      <img :src="cover" alt="" loading="lazy" decoding="async" fetchpriority="low">
     </div>
     <div class="bewly-list-hero__body">
       <div class="bewly-list-hero__text">

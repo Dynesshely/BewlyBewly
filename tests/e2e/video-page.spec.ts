@@ -395,3 +395,220 @@ test.describe('番剧 / 电影播放页增强', () => {
     }
   })
 })
+/**
+ * 播放列表页快照：URL 走 `/list/watchlater`，右侧是 `.video-pod` 列表。
+ * 点条目时不真正路由，只记录点击并搬移 active 类，模拟 B 站的 SPA 切换。
+ */
+const PLAYLIST_PAGE_FIXTURE = `<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>列表视频 2_哔哩哔哩_bilibili</title>
+    <style>
+      body { margin: 0; font-family: system-ui, sans-serif; }
+      #mirror-vdcon { display: flex; gap: 16px; padding: 16px; margin: 0 auto; max-width: 1600px; }
+      .left-container { flex: 1 1 70%; min-width: 0; }
+      #playerWrap { background: #000; }
+      #bilibili-player { position: relative; height: 420px; overflow: hidden; }
+      .bpx-player-container { width: 100%; height: 100%; }
+      video { display: block; width: 100%; height: 100%; object-fit: contain; }
+      .right-container { flex: 0 0 28%; }
+      .video-title { margin: 16px 0; font-size: 20px; }
+      .video-desc { min-height: 1600px; }
+      .video-pod__list { display: flex; flex-direction: column; gap: 4px; }
+      .video-pod__item { padding: 6px; }
+      .video-pod__item.active { background: #ddd; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="video-container-v1" id="mirror-vdcon">
+        <div class="left-container scroll-sticky">
+          <div id="playerWrap">
+            <div id="bilibili-player">
+              <div class="bpx-player-container">
+                <video preload="metadata"></video>
+                <button class="bpx-player-ctrl-next" type="button">下一个</button>
+              </div>
+            </div>
+          </div>
+          <h1 class="video-title">列表视频 2</h1>
+          <div class="video-desc">正文</div>
+        </div>
+        <div class="right-container">
+          <div class="video-pod">
+            <div class="video-pod__list">
+              <div class="video-pod__item">
+                <a href="/video/BV1111111111">列表视频 1</a><span class="title-txt">列表视频 1</span>
+              </div>
+              <div class="video-pod__item active">
+                <a href="/video/BV2222222222">列表视频 2</a><span class="title-txt">列表视频 2</span>
+              </div>
+              <div class="video-pod__item">
+                <a href="/video/BV3333333333">列表视频 3</a><span class="title-txt">列表视频 3</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      document.querySelectorAll('.video-pod__item > a').forEach((anchor) => {
+        anchor.addEventListener('click', (event) => {
+          event.preventDefault()
+          const item = anchor.parentElement
+          document.querySelectorAll('.video-pod__item').forEach((el) => el.classList.remove('active'))
+          item.classList.add('active')
+          document.body.dataset.clickedItem = anchor.getAttribute('href')
+        })
+      })
+      document.querySelector('.bpx-player-ctrl-next')?.addEventListener('click', () => {
+        document.body.dataset.nativeNext = String(Number(document.body.dataset.nativeNext || 0) + 1)
+      })
+    </script>
+  </body>
+</html>`
+
+async function openPlaylistPage(): Promise<{ context: BrowserContext, page: Page }> {
+  const context = await launchExtension({ allowPopups: true })
+
+  const page = await context.newPage()
+  await page.route('**/*', async (route) => {
+    const request = route.request()
+    const url = new URL(request.url())
+    if (url.hostname === 'www.bilibili.com' && request.resourceType() === 'document') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/html; charset=utf-8',
+        body: PLAYLIST_PAGE_FIXTURE,
+      })
+      return
+    }
+    await route.continue()
+  })
+
+  await page.goto('https://www.bilibili.com/list/watchlater?bvid=BV2222222222', { waitUntil: 'domcontentloaded' })
+  return { context, page }
+}
+
+test.describe('播放列表页增强', () => {
+  skipIfExtensionMissing()
+
+  const clickedItem = (page: Page) => page.evaluate(() => document.body.dataset.clickedItem ?? '')
+
+  test('浮动按钮打开面板：当前项高亮，点条目切换', async () => {
+    const { context, page } = await openPlaylistPage()
+
+    try {
+      await ensureOverlay(page)
+
+      const playlistFab = page.locator('[data-bvp-action="playlist"]')
+      await expect(playlistFab).toHaveCount(1)
+      await playlistFab.click()
+
+      const panel = page.locator('.bvp-playlist')
+      await expect(panel).toBeVisible()
+      await expect(panel.locator('.bvp-playlist__item')).toHaveCount(3)
+      // 当前项 = 第 2 项（fixture 里 active 在第二项）
+      await expect(panel.locator('[aria-current="true"]')).toHaveCount(1)
+      await expect(panel.locator('[aria-current="true"]')).toContainText('列表视频 2')
+
+      await panel.locator('.bvp-playlist__item').nth(2).click()
+      await expect.poll(() => clickedItem(page), { timeout: 5_000 }).toBe('/video/BV3333333333')
+    }
+    finally {
+      await context.close()
+    }
+  })
+
+  test('Esc 关面板，[ / ] 切上 / 下一个播放项', async () => {
+    const { context, page } = await openPlaylistPage()
+
+    try {
+      await ensureOverlay(page)
+
+      await page.locator('[data-bvp-action="playlist"]').click()
+      await expect(page.locator('.bvp-playlist')).toBeVisible()
+
+      await page.keyboard.press('Escape')
+      await expect(page.locator('.bvp-playlist')).toBeHidden()
+
+      await page.keyboard.press(']')
+      await expect.poll(() => clickedItem(page), { timeout: 5_000 }).toBe('/video/BV3333333333')
+
+      await page.keyboard.press('[')
+      await expect.poll(() => clickedItem(page), { timeout: 5_000 }).toBe('/video/BV2222222222')
+    }
+    finally {
+      await context.close()
+    }
+  })
+
+  test('A 开启自动连播后，视频 ended 会点原生「下一个」按钮', async () => {
+    const { context, page } = await openPlaylistPage()
+
+    try {
+      await ensureOverlay(page)
+
+      // 默认关闭
+      expect(await page.evaluate(() => document.body.dataset.nativeNext ?? '')).toBe('')
+
+      await page.keyboard.press('a')
+      expect(await page.evaluate(() => sessionStorage.getItem('bewly-playlist-autoplay'))).toBe('1')
+
+      await page.evaluate(() => {
+        document.querySelector('video')?.dispatchEvent(new Event('ended'))
+      })
+      await expect.poll(
+        () => page.evaluate(() => document.body.dataset.nativeNext ?? ''),
+        { timeout: 5_000 },
+      ).toBe('1')
+    }
+    finally {
+      await context.close()
+    }
+  })
+
+  test('没有原生下一个按钮时，自动连播兜底点列表下一项', async () => {
+    const { context, page } = await openPlaylistPage()
+
+    try {
+      await ensureOverlay(page)
+      await page.evaluate(() => document.querySelector('.bpx-player-ctrl-next')?.remove())
+
+      await page.keyboard.press('a')
+      await page.evaluate(() => {
+        document.querySelector('video')?.dispatchEvent(new Event('ended'))
+      })
+      await expect.poll(() => clickedItem(page), { timeout: 5_000 }).toBe('/video/BV3333333333')
+
+      // 已是最后一项：再 ended 时自动连播关闭并提示
+      await page.waitForTimeout(600)
+      await page.evaluate(() => {
+        document.querySelector('video')?.dispatchEvent(new Event('ended'))
+      })
+      await expect.poll(
+        () => page.evaluate(() => sessionStorage.getItem('bewly-playlist-autoplay')),
+        { timeout: 5_000 },
+      ).toBe('0')
+    }
+    finally {
+      await context.close()
+    }
+  })
+
+  test('没有播放列表结构时，入口与面板都不渲染', async () => {
+    // 复用视频页 fixture（没有 .video-pod）
+    const { context, page } = await openVideoPage()
+
+    try {
+      await ensureOverlay(page)
+      await expect(page.locator('[data-bvp-action="playlist"]')).toHaveCount(0)
+      await expect(page.locator('#bewly-video-playlist')).toHaveCount(0)
+      await expect(page.locator('.bvp-playlist')).toHaveCount(0)
+    }
+    finally {
+      await context.close()
+    }
+  })
+})

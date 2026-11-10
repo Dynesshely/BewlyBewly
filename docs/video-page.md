@@ -113,3 +113,33 @@ B 站原生播放页（`www.bilibili.com/video/*`、`/list/*`）不是 Bewly 接
   页面改版后若某块内容没被隐藏，仍会被影院遮罩压暗，不影响观看
 - 切集快捷键依赖集数列表的 DOM 顺序；若 B 站改成虚拟列表（只渲染可视项），相邻集判定可能失效，
   届时需要按真实结构补充选择器
+## 播放列表页（/list/*，第 12 轮扩展）
+
+`/list/watchlater?bvid=…`、`/list/ml…`、`/list/…` 这类**播放列表播放页**除了原有的影院 / 迷你 / 快捷键，
+本轮补了「播放列表」本身的交互：浮动按钮在既有的 `bilibili-video-page` 浮层里，
+**面板用 `src/contentScripts/nativeOverlay` 挂成独立的 `#bewly-video-playlist` host**
+（与消息页 / 搜索页同一套挂载方式与 `--bew-*` 令牌），探测不到列表结构时整个 host 不渲染。
+
+- 结构探测：容器 `#playlist-container` / `.video-pod` / `[class*="video-pod"]`，
+  条目 `.video-pod__item` → `.video-pod__list .simple-base-item` → `.video-pod__list [class*="item"]`
+  （类名证据来自 `src/styles/adaptedStyles/thirdParties/bilibiliEnhanceVideoList.scss`）；
+  **探测不到播放列表时，浮动按钮、面板、快捷键、自动连播全部不渲染**，不留空浮层
+- 右下角「播放列表」按钮 → 打开面板：条目按顺序列出，当前项高亮 + `aria-current="true"`，
+  顶部显示「当前 / 总数」与自动连播开关；点条目**直接点原生条目链接**，路由由 B 站自己处理
+- 面板条目是原生 `<button>`：Tab 可达、Enter/Space 触发、`:focus-visible` 主题色描边；
+  打开面板时会把当前项滚动到面板可视区中间
+- 自动连播：默认关，状态存 `sessionStorage`（key `bewly-playlist-autoplay`）；
+  开启后视频触发 `ended` 时延时 400ms 再动作（让 B 站自己的 ended 处理先跑）：
+  优先点播放器原生的「下一个」按钮，找不到就点列表里的下一项；
+  两者都没有（最后一项 / 页面没有下一个入口）时自动关闭自动连播并提示
+- 快捷键（沿用同一份数据源，帮助面板按页面能力过滤）：
+  - `[` / `]` 上一个 / 下一个播放项（`<` `>` 亦可；番剧页这两个键走「上一集 / 下一集」，两者按页面能力互斥）
+  - `A` 自动连播开关
+  - `Esc` 依次关闭：快捷键帮助 → 播放列表面板 → 影院模式
+- 进入影院模式会自动收起播放列表面板；离开播放页 / 列表结构消失时状态与监听一并清理
+
+已知限制：
+
+- 真实播放列表页 DOM 未实测：面板条目选择器按仓库内已有样式证据选择，命中不了就完全不渲染（可降级）；
+  自动连播的原生「下一个」按钮选择器（`.bpx-player-ctrl-next` 等）同样带兜底，兜底到点列表下一项
+- 点击条目是否成功切换取决于 B 站对该条目的原生点击处理；本模块只 `click()`，不模拟路由

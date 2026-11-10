@@ -283,3 +283,160 @@ export function isDanmakuEnabled(): boolean {
     return true
   return !el.classList.contains('bpx-state-off') && !el.classList.contains('bui-danmaku-switch-off')
 }
+// #region 播放列表页（/list/*）
+
+/** 播放列表页 URL：/list/watchlater、/list/ml…、/list/… 合集播放页 */
+const PLAYLIST_PAGE_URL_RE = /^https?:\/\/(?:www\.)?bilibili\.com\/list\//i
+
+/**
+ * 播放列表条目选择器（按优先级）。
+ *
+ * 真实类名证据来自 src/styles/adaptedStyles/thirdParties/bilibiliEnhanceVideoList.scss：
+ * 分P / 合集列表都渲染在 `.video-pod__list` 里，普通条目是 `.video-pod__item`，
+ * 分P 的是 `.simple-base-item`。两个都收，先命中先用。
+ */
+const PLAYLIST_ITEM_SELECTORS = [
+  '.video-pod__item',
+  '.video-pod__list .simple-base-item',
+  '.video-pod__list [class*="item"]',
+]
+
+/** 播放器上的原生「下一个」按钮（自动连播优先点它，保留 B 站自己的行为） */
+const NATIVE_NEXT_SELECTORS = [
+  '#bilibili-player .bpx-player-ctrl-next',
+  '.bpx-player-ctrl-next',
+  '#bilibili-player .bilibili-player-video-btn-next',
+  '#bilibili-player [class*="ctrl-next"]',
+]
+
+export function isPlaylistPage(url: string = location.href): boolean {
+  return PLAYLIST_PAGE_URL_RE.test(url)
+}
+
+/** 当前播放列表容器（找不到就返回 null，面板据此不渲染） */
+export function getPlaylistContainerEl(): HTMLElement | null {
+  return document.querySelector<HTMLElement>('#playlist-container')
+    ?? document.querySelector<HTMLElement>('.video-pod')
+    ?? document.querySelector<HTMLElement>('[class*="video-pod"]')
+}
+
+export function getPlaylistItems(): HTMLElement[] {
+  const container = getPlaylistContainerEl()
+  if (!container)
+    return []
+
+  for (const selector of PLAYLIST_ITEM_SELECTORS) {
+    const items = Array.from(container.querySelectorAll<HTMLElement>(selector))
+    if (items.length)
+      return items
+  }
+  return []
+}
+
+export function getPlaylistItemTitle(item: HTMLElement): string {
+  return item.querySelector<HTMLElement>('.title-txt')?.textContent?.trim()
+    ?? item.querySelector<HTMLElement>('[class*="title"]')?.textContent?.trim()
+    ?? item.getAttribute('title')?.trim()
+    ?? item.textContent?.trim()
+    ?? ''
+}
+
+const ACTIVE_PLAYLIST_TOKEN_RE = /(?:^|[-_])(?:active|current|selected)(?:[-_]|$)/i
+
+function isActivePlaylistItem(item: HTMLElement): boolean {
+  if (item.getAttribute('aria-current'))
+    return true
+
+  return item.className
+    .split(/\s+/)
+    .some(token => token.toLowerCase() === 'on'
+      || token.toLowerCase() === 'cursor'
+      || ACTIVE_PLAYLIST_TOKEN_RE.test(token))
+}
+
+/** 当前视频的 BV 号：从查询串 bvid=… 或路径 /video/BV… 里取 */
+export function getCurrentBvid(): string {
+  try {
+    const fromQuery = new URL(location.href).searchParams.get('bvid')
+    if (fromQuery)
+      return fromQuery
+  }
+  catch {
+    // URL 解析失败时走路径兜底
+  }
+
+  const match = location.pathname.match(/(BV[0-9A-Z]+)/i)
+  return match?.[1] ?? ''
+}
+
+/** 当前项在列表中的下标；判定失败返回 -1 */
+export function getPlaylistCurrentIndex(items: HTMLElement[] = getPlaylistItems()): number {
+  if (!items.length)
+    return -1
+
+  // 优先信原生高亮（切集后 B 站会实时改 active 类）
+  const activeIndex = items.findIndex(isActivePlaylistItem)
+  if (activeIndex >= 0)
+    return activeIndex
+
+  // 兜底：按当前 BV 号匹配条目里的链接
+  const bvid = getCurrentBvid()
+  if (!bvid)
+    return -1
+
+  return items.findIndex(item => Array.from(item.querySelectorAll('a'))
+    .some(anchor => (anchor.getAttribute('href') ?? '').includes(bvid)))
+}
+
+export function hasPlaylistNavigation(): boolean {
+  return isPlaylistPage() && getPlaylistItems().length > 0
+}
+
+/** 点击列表里的第 index 项：点原生条目的链接，交给 B 站自己路由 */
+export function clickPlaylistItem(index: number): boolean {
+  const item = getPlaylistItems()[index]
+  if (!item)
+    return false
+
+  const clickable = item.querySelector<HTMLElement>('a') ?? item
+  clickable.click()
+  return true
+}
+
+export function goToAdjacentPlaylistItem(direction: -1 | 1): boolean {
+  const items = getPlaylistItems()
+  if (!items.length)
+    return false
+
+  const current = getPlaylistCurrentIndex(items)
+  const targetIndex = current >= 0
+    ? current + direction
+    : (direction > 0
+        ? 0
+        : items.length - 1)
+  if (targetIndex < 0 || targetIndex >= items.length)
+    return false
+
+  return clickPlaylistItem(targetIndex)
+}
+
+/** 播放器自带的「下一个」按钮（有就优先点它，保留 B 站自动连播的完整行为） */
+export function findNativeNextButton(): HTMLElement | null {
+  for (const selector of NATIVE_NEXT_SELECTORS) {
+    const el = document.querySelector<HTMLElement>(selector)
+    if (el && !el.hasAttribute('disabled'))
+      return el
+  }
+  return null
+}
+
+/** 当前页面能不能真的「连播到下一个」：原生按钮或列表下一项至少有一个 */
+export function canAdvanceToNextItem(): boolean {
+  if (findNativeNextButton())
+    return true
+  const items = getPlaylistItems()
+  const current = getPlaylistCurrentIndex(items)
+  return current >= 0 && current + 1 < items.length
+}
+
+// #endregion

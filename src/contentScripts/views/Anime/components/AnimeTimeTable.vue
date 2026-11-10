@@ -343,6 +343,8 @@ function episodeThumb(episode: Episode) {
             :src="`${episodeCover(heroEpisode)}@672w_378h_1c.webp`"
             :alt="heroEpisode.title"
             loading="lazy"
+            decoding="async"
+            fetchpriority="high"
           >
           <span class="hero-badge">
             {{ activeIsToday ? t('today_pick') : t('day_pick') }}
@@ -396,6 +398,8 @@ function episodeThumb(episode: Episode) {
                     :src="`${episodeThumb(episode)}@96w_96h_1c.webp`"
                     :alt="episode.title"
                     loading="lazy"
+                    decoding="async"
+                    fetchpriority="low"
                   >
                   <span class="hero-more-title">{{ episode.title }}</span>
                 </a>

@@ -156,7 +156,7 @@ onUnmounted(() => {
     </button>
 
     <figure class="moment-lightbox__figure" @click.stop>
-      <img :src="currentUrl" :alt="t('image_alt', { n: index + 1 })">
+      <img :src="currentUrl" :alt="t('image_alt', { n: index + 1 })" decoding="async" fetchpriority="high">
       <figcaption class="moment-lightbox__caption">
         <span class="moment-lightbox__counter">{{ counter }}</span>
         <span class="moment-lightbox__hint">{{ t('lightbox_hint') }}</span>

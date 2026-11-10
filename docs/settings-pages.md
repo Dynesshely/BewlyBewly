@@ -108,3 +108,38 @@
 - 各模块的旧值迁移在模块挂载时同步执行，与 settings 的异步读取存在极小的冷启动竞态（若读取晚于迁移完成，可能短暂按默认值显示；settings 读完后由 watch 纠正）。原生页模块在 DOM 就绪后才挂载，实际几乎不会命中；
 - 消息页「默认只看未读」是页面级偏好：页面识别不到未读标记时不会强行开启筛选，避免出现空白列表；
 - 动态页密度只影响卡片内部排版，不改变卡片流的分栏数量（分栏仍由页面宽度决定）。
+## 六、第 7 轮：视频卡片悬停预览开关
+
+> 把第 6 轮悬停预览的开关从 `localStorage` 迁到 settings（字段由 Lead 在 `src/logic/storage.ts` 新增，
+> 模块只读使用），并在「页面增强」页新增「视频卡片」分组。
+
+### 新增分组（仍在「页面增强」页）
+
+| 分组 | 项 | settings 字段 | 控件 |
+|---|---|---|---|
+| 视频卡片 | 悬停预览 | `enableVideoCardPreview` | Radio（默认开） |
+
+文案仍走模块内 i18n（`src/components/Settings/Pages/i18n.ts`，cmn-CN + en）。
+分组插在「视频播放页」与「列表页」之间；分组说明为「视频卡片本身的交互增强」。
+
+### 模块改动（`src/components/VideoCardPreview/previewSettings.ts`）
+
+- `isCardPreviewEnabled()` 改为读 `settings.enableVideoCardPreview`；
+- 旧 localStorage key `bewly-card-preview`（第 6 轮，`'1'` / `'0'`）一次性迁移：
+  只有旧值为 `'0'` 且设置仍是默认（开启）时才写入关闭，读完立即删除旧 key，之后不再读 localStorage；
+- 旧的全局「启用视频预览」（`enableVideoPreview`，通用设置里的视频卡片分组）仍作为总闸参与判断，
+  避免留下一个不起作用的死开关；其联动项 `enableVideoCtrlBarOnVideoCard`（预览控件条）与
+  `hoverVideoCardDelayed`（延迟 900ms → 1200ms）继续复用；
+- 设置页改动通过响应式依赖立即生效（下一次悬停按新值执行），无需刷新页面。
+
+### 第 7 轮 Lead 接线
+
+无。设置页分组、开关与迁移均已完成；悬停预览依赖卡片数据里的 `cid`，
+相关页面透传见 `docs/video-card-preview.md` 的「生效范围」。
+
+### 第 7 轮已知限制
+
+- 旧开关 `enableVideoPreview` 与新开关 `enableVideoCardPreview` 目前是「与」关系，两个都能关；
+  若后续只想保留一个开关，需要同时调整通用设置页与 `previewSettings`（本模块已按「新字段为主、旧字段兜底」实现）；
+- 开关变化不会打断正在播放的那一段预览（最多再播 6 秒），下一次悬停生效；
+- 迁移与 settings 的异步读取存在极小的冷启动竞态（与第 5 轮各模块相同）：设置读完后由响应式依赖纠正。

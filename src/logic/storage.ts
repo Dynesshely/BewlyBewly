@@ -156,6 +156,10 @@ export interface Settings {
   articleReadingMode: boolean
   /** 文章页字号档位 */
   articleFontSize: ArticleFontSize
+  /** 视频卡悬停静音预览 */
+  enableVideoCardPreview: boolean
+  /** 首页卡片密度 */
+  homeCardDensity: PageDensity
   /** 接管页拦截原版 B 站脚本（提升性能） */
   nativeGuardEnabled: boolean
   /** 在原生页面（搜索页等）应用屏蔽词过滤 */
@@ -294,6 +298,8 @@ export const originalSettings: Settings = {
   spaceDensity: 'comfortable',
   articleReadingMode: false,
   articleFontSize: 'm',
+  enableVideoCardPreview: true,
+  homeCardDensity: 'comfortable',
   nativeGuardEnabled: true,
   nativeFilterEnabled: false,
 

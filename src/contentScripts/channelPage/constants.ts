@@ -17,6 +17,15 @@ export const ROOT_CLASS_PAGE = 'bewly-channel-page'
 /** 挂在 <html> 上的紧凑密度状态类 */
 export const ROOT_CLASS_COMPACT = 'bewly-channel-compact'
 
+/** 挂在 <html> 上的页面种类：channel / popular / rank（页面级样式与面板标题按它区分） */
+export const PAGE_KIND_ATTR = 'data-bewly-channel-kind'
+/** 排行榜卡片上的名次徽标（值 = 名次数字，CSS 用 content: attr(...) 渲染） */
+export const RANK_ATTR = 'data-bewly-channel-rank'
+/** 名次档位：top3 / top10；空字符串表示普通名次（只影响徽标配色） */
+export const RANK_TIER_ATTR = 'data-bewly-channel-rank-tier'
+/** 原生名次元素：徽标接管后隐藏它，避免同一个名次显示两次 */
+export const RANK_NATIVE_ATTR = 'data-bewly-channel-rank-native'
+
 /** 页面级 <style> 的 id（模块在 /v/*、/channel/* 上自行注入，见 docs） */
 export const PAGE_STYLE_ID = 'bewly-channel-page-style'
 

@@ -1,4 +1,4 @@
-# 分区 / 频道页增强浮层（第 5 轮）
+# 分区 / 频道页 / 热门 / 排行榜增强浮层（第 5、7 轮）
 
 第 5 轮 C 工作流，负责人 `native-style`。分区 / 频道页（`bilibili.com/v/*`、`bilibili.com/channel/*`）
 是 **B 站原生页面**：Bewly 不能替换它的 DOM，只能在上面叠加一个独立 shadow root 的浮层，
@@ -156,3 +156,67 @@ setupChannelPage()
   `adaptedStyles/pages/channelPage.scss`（3.9KB，含 `@use` 引入的页面级规则）均通过；
 - 未修改 `App.vue` / `contentScripts/index.ts` / `storage.ts` / `_locales` / `nativeOverlay`；
   未跑 build / playwright；未碰浏览器；未做 git 操作。
+
+## 8. 第 7 轮追加：热门页 / 排行榜页
+
+同一个 `channelPage` 模块继续覆盖两个 URL（它们本来就被 `isChannelPage()` 的 `/v/*` 分支接住）：
+
+| URL | 页面种类 | 面板标题 | 可用功能 |
+| --- | --- | --- | --- |
+| `/v/*`、`/channel/*`、`/c/*`（其他） | `channel`（分区页） | 分区页增强 | 密度、排序快捷、j/k |
+| `/v/popular*`（含 `/v/popular/all`） | `popular`（热门页） | 热门页增强 | 密度、j/k |
+| `/v/popular/rank/*` | `rank`（排行榜） | 排行榜增强 | 密度、榜单快捷（1/2/3）、排名徽标、j/k |
+
+页面种类由 `dom.ts` 的 `getChannelPageKind()` 判断（`rank` 优先于 `popular`），
+同时写到 `<html data-bewly-channel-kind="channel|popular|rank">`，页面级样式与面板标题都按它区分。
+
+### 榜单切换（1 / 2 / 3）
+
+- 排行榜页的日榜 / 周榜 / 月榜没有仓库确认的类名，按「标签文本」发现：
+  `日榜|每日|day|daily`、`周榜|每周|week|weekly`、`月榜|每月|month|monthly`；
+  排除内容卡、头部导航与弹层，只接受短文本 + 子元素不超过 2 个的节点；
+- 快捷键 `1` / `2` / `3` 分别点对应原生 tab（面板里也有「榜单切换」按钮，按钮上标了序号）；
+- 页面上找不到某个 tab 时：面板里不渲染该项、对应快捷键静默忽略（不抢按键、不弹错）。
+
+### 排名徽标
+
+- 名次优先读卡片里已有的原生名次元素（`.num` / `.rank` / `[class*="rank-num"]` 等，
+  只认 1–4 位纯数字，避免把播放量 / 日期当名次）；
+- 读不到时退回卡片在列表里的 **DOM 顺序**（排行榜的排列顺序本身就是名次）；
+- 名次写到 `[data-bewly-channel-rank]`，徽标用 CSS `content: attr(data-bewly-channel-rank)`
+  渲染在卡片左上角：前三名主题色实心，4–10 名主题色淡底，其余中性底；
+- 原生名次元素在徽标接管后隐藏（`[data-bewly-channel-rank-native]`），避免同一个名次显示两次；
+- **非排行榜页不写任何名次标记**，样式也就不会渲染徽标；名次读不到（既无原生元素、
+  列表为空）时同样不显示。
+
+### 卡片选择器（排行榜页）
+
+排行榜页的卡片根优先用 `.rank-item`（nativeFilter 的排行 / 分区页规则里已确认），
+因为名次徽标要挂在整条目上；其余页面仍用 `.bili-video-card` 优先的既有顺序。
+热门页的卡 `.bili-video-card` / `.video-card` 同样来自 nativeFilter 的
+`.popular-video-container` 规则，无需新选择器。
+
+### 样式落在哪
+
+页面级样式（名次徽标、密度、高亮）唯一来源仍是模块内的 `pageStyles.scss`，
+而 `src/styles/adaptedStyles/pages/channelPage.scss` 顶部 `@use` 了它 —— 所以
+`/tv|movie|...` 子频道与模块自行注入的 `/v/*` 页面共用同一份规则。
+本轮新增的徽标规则追加在 `pageStyles.scss`（在 `channelPage.scss` 的生效链路内），
+`channelPage.scss` 本身不需要再加规则，避免两处漂移。
+
+### 本轮自测
+
+- `pnpm exec eslint src/contentScripts/channelPage --fix`，再裸跑：**0 error 0 warning**；
+- `pnpm run typecheck`：**0 error**；
+- sass 编译 `pageStyles.scss`（2.9KB）、`channelPage.shadow.scss`（6.0KB）、
+  `adaptedStyles/pages/channelPage.scss`（5.2KB，含 `@use` 的页面级规则）均通过。
+
+### 本轮已知限制
+
+- 榜单 tab 与上一轮的排序 tab 一样是**文本启发式**：B 站改文案或换容器后对应项会消失
+  （面板隐藏、快捷键静默），不影响密度与 j/k；
+- 名次退回 DOM 顺序时，若列表混入了非视频条目（广告 / 推荐块），名次可能整体偏移一格；
+  能读到原生名次元素时不会出现这个问题；
+- 热门页（`/v/popular/all`）上的 `useKeyboardCardNavigation` 也接管方向键 / Enter，
+  与本模块的 j/k 高亮各自独立（同一轮第 5 节已有说明）；
+- 未做浏览器验证（按分工由 Lead 统一构建回归）。

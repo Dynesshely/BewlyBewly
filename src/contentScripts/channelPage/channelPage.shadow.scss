@@ -245,6 +245,22 @@
   color: var(--bew-theme-color);
   border-color: color-mix(in oklab, var(--bew-theme-color), transparent 60%);
 }
+
+/* 榜单按钮里的快捷键序号（1 / 2 / 3） */
+.bcp-chip__key {
+  display: inline-block;
+  min-width: 12px;
+  margin-right: 4px;
+  padding: 0 3px;
+  font-family: inherit;
+  font-size: 10px;
+  line-height: 1.5;
+  color: inherit;
+  text-align: center;
+  background: var(--bew-fill-1);
+  border-radius: 4px;
+  opacity: 0.75;
+}
 /* #endregion */
 
 /* #region 状态与快捷键 */

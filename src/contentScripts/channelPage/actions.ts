@@ -6,7 +6,7 @@
  * 排序是「点原生排序 tab」（交给 B 站自己的逻辑），本模块零网络请求。
  */
 import type { ChannelCard } from './dom'
-import type { ChannelDensity, ChannelSortId } from './state'
+import type { ChannelDensity, ChannelPageKind, ChannelRankPeriod, ChannelSortId } from './state'
 
 import { settings } from '~/logic'
 import { injectCSS } from '~/utils/main'
@@ -14,17 +14,29 @@ import { injectCSS } from '~/utils/main'
 import {
   ACTIVE_ATTR,
   CARD_ATTR,
+  PAGE_KIND_ATTR,
   PAGE_STYLE_ID,
+  RANK_ATTR,
+  RANK_NATIVE_ATTR,
+  RANK_TIER_ATTR,
   ROOT_CLASS_COMPACT,
   ROOT_CLASS_PAGE,
   TOAST_DURATION,
 } from './constants'
-import { collectCards, findSortTab, prefersReducedMotion } from './dom'
+import {
+  collectCards,
+  findRankTab,
+  findSortTab,
+  getChannelPageKind,
+  prefersReducedMotion,
+  readNativeRank,
+} from './dom'
 import { getMessages } from './i18n'
 import { readStoredDensity, readStoredPanelOpen, storeDensity, storePanelOpen } from './preferences'
 import { ui } from './state'
 
 const SORT_IDS: ChannelSortId[] = ['default', 'views', 'newest']
+const RANK_PERIODS: ChannelRankPeriod[] = ['day', 'week', 'month']
 
 let cards: ChannelCard[] = []
 let toastTimer: number | null = null
@@ -154,7 +166,10 @@ function activateCard(card: ChannelCard): void {
 /** 重新识别视频卡（首屏渲染、切排序 / 翻页、滚动加载都会调用） */
 export function scanCards(): void {
   const previousActive = document.querySelector<HTMLElement>(`[${ACTIVE_ATTR}]`)
-  cards = collectCards()
+  const kind = getChannelPageKind()
+  ui.pageKind = kind
+  document.documentElement.setAttribute(PAGE_KIND_ATTR, kind)
+  cards = collectCards(kind)
   const alive = new Set(cards.map(card => card.el))
 
   // 站点会复用 / 移除节点：清掉已经不存在的卡片的标记
@@ -167,12 +182,18 @@ export function scanCards(): void {
   cards.forEach(card => card.el.setAttribute(CARD_ATTR, ''))
 
   syncPageStyles()
+  applyRankBadges(kind)
 
   ui.cardCount = cards.length
   ui.activeTotal = cards.length
+  // 排序快捷只属于分区页；榜单快捷只属于排行榜页，找不到的原生 tab 一律隐藏
   ui.sortTabs = SORT_IDS.map(id => ({
     id,
-    available: findSortTab(id) !== null,
+    available: kind === 'channel' && findSortTab(id) !== null,
+  }))
+  ui.rankTabs = RANK_PERIODS.map(period => ({
+    period,
+    available: kind === 'rank' && findRankTab(period) !== null,
   }))
 
   if (previousActive && alive.has(previousActive)) {
@@ -236,6 +257,44 @@ export function openActiveCard(): void {
 }
 // #endregion
 
+// #region 排名徽标
+/**
+ * 排行榜页的名次徽标。
+ *
+ * 名次优先读原生名次元素（`.num` / `.rank` 等，见 dom.ts 的 NATIVE_RANK_SELECTORS），
+ * 读不到就退回卡片在当前列表里的 DOM 顺序 —— 排行榜的排列顺序本身就是名次。
+ * 非排行榜页不写任何标记（样式也就不会出现徽标）。
+ */
+function applyRankBadges(kind: ChannelPageKind): void {
+  document.querySelectorAll<HTMLElement>(`[${RANK_ATTR}]`).forEach((el) => {
+    el.removeAttribute(RANK_ATTR)
+    el.removeAttribute(RANK_TIER_ATTR)
+  })
+  document.querySelectorAll<HTMLElement>(`[${RANK_NATIVE_ATTR}]`).forEach((el) => {
+    el.removeAttribute(RANK_NATIVE_ATTR)
+  })
+
+  if (kind !== 'rank')
+    return
+
+  cards.forEach((card, index) => {
+    const native = readNativeRank(card.el)
+    const rank = native?.rank ?? index + 1
+    if (rank < 1 || rank > 9999)
+      return
+    card.el.setAttribute(RANK_ATTR, String(rank))
+    card.el.setAttribute(RANK_TIER_ATTR, rank <= 3
+      ? 'top3'
+      : rank <= 10
+        ? 'top10'
+        : '')
+    // 同一个名次不要显示两次：徽标接管后隐藏原生数字
+    if (native)
+      native.el.setAttribute(RANK_NATIVE_ATTR, '')
+  })
+}
+// #endregion
+
 // #region 排序快捷
 /** 排序 tab 映射到 i18n 文案 */
 export function sortLabel(id: ChannelSortId): string {
@@ -260,6 +319,27 @@ export function applySort(id: ChannelSortId): boolean {
   togglePanel(false)
   showToast(sortLabel(id))
   return true
+}
+/** 点原生榜单 tab（日 / 周 / 月榜），找不到时返回 false 并提示 */
+export function applyRank(period: ChannelRankPeriod): boolean {
+  const tab = findRankTab(period)
+  if (!tab) {
+    showToast(t().rankFailed)
+    return false
+  }
+  tab.click()
+  togglePanel(false)
+  showToast(rankLabel(period))
+  return true
+}
+
+/** 榜单周期映射到 i18n 文案 */
+export function rankLabel(period: ChannelRankPeriod): string {
+  if (period === 'week')
+    return t().rankWeek
+  if (period === 'month')
+    return t().rankMonth
+  return t().rankDay
 }
 // #endregion
 
@@ -304,8 +384,16 @@ export function cleanupDom(): void {
     el.removeAttribute(ACTIVE_ATTR)
     el.removeAttribute('aria-current')
   })
+  document.querySelectorAll<HTMLElement>(`[${RANK_ATTR}]`).forEach((el) => {
+    el.removeAttribute(RANK_ATTR)
+    el.removeAttribute(RANK_TIER_ATTR)
+  })
+  document.querySelectorAll<HTMLElement>(`[${RANK_NATIVE_ATTR}]`).forEach((el) => {
+    el.removeAttribute(RANK_NATIVE_ATTR)
+  })
   cards = []
   const html = document.documentElement
+  html.removeAttribute(PAGE_KIND_ATTR)
   html.classList.remove(ROOT_CLASS_COMPACT, ROOT_CLASS_PAGE)
   removePageStyles()
 }

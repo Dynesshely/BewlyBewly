@@ -5,11 +5,14 @@
  *   j / k      下一张 / 上一张视频卡（高亮 + 滚动到视口中央）
  *   Enter      在新标签页打开当前卡
  *   Esc        关闭面板 / 取消高亮
+ *   1 / 2 / 3  排行榜页：切日榜 / 周榜 / 月榜（点原生 tab；找不到时忽略）
  *
  * 让行规则与前几轮增强层一致：`defaultPrevented`、`isComposing`、输入框 /
  * contenteditable、Ctrl / Cmd / Alt、Shift + 字母全部让行。
  */
-import { clearActive, moveActive, openActiveCard, togglePanel } from './actions'
+import type { ChannelRankPeriod } from './state'
+
+import { applyRank, clearActive, moveActive, openActiveCard, togglePanel } from './actions'
 import { ACTIVE_ATTR } from './constants'
 import { isEditableTarget, isFocusOnInteractive, isFromBewlyUi, isFromOverlay } from './dom'
 import { ui } from './state'
@@ -60,6 +63,21 @@ function handleKeyDown(event: KeyboardEvent): void {
   if (lower === 'k') {
     consume(event)
     moveActive(-1)
+    return
+  }
+
+  // 排行榜页：1 / 2 / 3 切日榜 / 周榜 / 月榜（找不到对应原生 tab 时静默忽略）
+  if (ui.pageKind === 'rank' && (key === '1' || key === '2' || key === '3')) {
+    const period: ChannelRankPeriod = key === '1'
+      ? 'day'
+      : key === '2'
+        ? 'week'
+        : 'month'
+    const available = ui.rankTabs.find(item => item.period === period)?.available
+    if (available) {
+      consume(event)
+      applyRank(period)
+    }
     return
   }
 

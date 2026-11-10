@@ -1,7 +1,10 @@
 import { settings } from '~/logic'
 
-/** localStorage 开关 key：'1' 开启 / '0' 关闭，缺省视为开启 */
-export const CARD_PREVIEW_STORAGE_KEY = 'bewly-card-preview'
+/**
+ * 第 6 轮的 localStorage 开关 key（`'1'` 开 / `'0'` 关）。
+ * 第 7 轮起正式开关是 `settings.enableVideoCardPreview`，这个 key 只在首次调用时迁移一次后删除。
+ */
+export const LEGACY_CARD_PREVIEW_STORAGE_KEY = 'bewly-card-preview'
 
 /** 悬停多久后开始请求预览（毫秒）；用户开启「延迟」时放慢到 1200ms */
 export const CARD_PREVIEW_DELAY = 900
@@ -13,24 +16,48 @@ export const CARD_PREVIEW_MAX_DURATION = 6000
 const HOVER_NONE_QUERY = '(hover: none)'
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)'
 
-function readStoredFlag(): boolean | null {
+let migrated = false
+
+/**
+ * 把第 6 轮写在 localStorage 的 `bewly-card-preview` 一次性迁移到
+ * `settings.enableVideoCardPreview`。
+ *
+ * 仅在旧值为 `'0'`（当时关掉过）且当前 settings 仍为默认（开启）时写入关闭，
+ * 用户已经在设置里改过就以设置为准；无论是否覆盖，读完立即删掉旧 key。
+ */
+export function migrateLegacyCardPreviewSetting(): void {
+  if (migrated)
+    return
+  migrated = true
+
   try {
-    const raw = window.localStorage.getItem(CARD_PREVIEW_STORAGE_KEY)
+    const raw = window.localStorage.getItem(LEGACY_CARD_PREVIEW_STORAGE_KEY)
     if (raw === null)
-      return null
-    return raw !== '0'
+      return
+    window.localStorage.removeItem(LEGACY_CARD_PREVIEW_STORAGE_KEY)
+
+    if (raw !== '0')
+      return
+    if (settings.value.enableVideoCardPreview === false)
+      return
+    settings.value.enableVideoCardPreview = false
   }
   catch {
-    return null
+    // 隐私模式 / 存储被禁用时忽略，沿用 settings 默认值（开启）
   }
 }
 
 /**
- * 卡片预览开关：localStorage 的 `bewly-card-preview`（默认开启）与既有设置
- * `settings.enableVideoPreview` 同时为真时才启用。
+ * 卡片悬停预览开关。
+ *
+ * 第 7 轮起由 `settings.enableVideoCardPreview`（设置页「页面增强 → 视频卡片」）控制，
+ * 同时保留旧「视频预览」总闸：关闭 `settings.enableVideoPreview` 依旧会一并关掉预览，
+ * 避免旧开关变成一个不起作用的死开关。
  */
 export function isCardPreviewEnabled(): boolean {
-  if (readStoredFlag() === false)
+  migrateLegacyCardPreviewSetting()
+
+  if (settings.value.enableVideoCardPreview === false)
     return false
   return settings.value.enableVideoPreview !== false
 }

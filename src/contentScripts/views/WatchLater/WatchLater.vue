@@ -256,6 +256,9 @@ function toCard(item: VideoItem): ListCardItem {
         ? item.stat.danmaku
         : undefined,
       publishedTimestamp: item.pubdate || undefined,
+      // 接口已带 bvid/cid 的直接透传，供卡片悬停预览使用（不会为此新增请求）
+      bvid: item.bvid || undefined,
+      cid: item.cid || item.page?.cid || undefined,
       threePointV2: [],
     },
     copyUrl: url,

@@ -19,6 +19,10 @@ export interface PagesSettingsMessages {
   videoPageMiniPlayerDesc: string
   videoPageShortcuts: string
   videoPageShortcutsDesc: string
+  groupVideoCard: string
+  groupVideoCardDesc: string
+  cardPreview: string
+  cardPreviewDesc: string
   groupListPage: string
   groupListPageDesc: string
   historyViewMode: string
@@ -61,6 +65,10 @@ export interface PagesSettingsMessages {
   fontSizeS: string
   fontSizeM: string
   fontSizeL: string
+  groupHome: string
+  groupHomeDesc: string
+  homeCardDensity: string
+  homeCardDensityDesc: string
 }
 
 const CMN_CN: PagesSettingsMessages = {
@@ -73,6 +81,10 @@ const CMN_CN: PagesSettingsMessages = {
   videoPageMiniPlayerDesc: '播放器滚出视口后收缩到右下角浮窗，按 P 或点击按钮还原',
   videoPageShortcuts: '增强快捷键',
   videoPageShortcutsDesc: 'J/K/L、←/→、C/M/F/T 等快捷键；关闭后按键完全交还给 B 站原生快捷键',
+  groupVideoCard: '视频卡片',
+  groupVideoCardDesc: '视频卡片本身的交互增强（首页、搜索、列表页等所有出现卡片的位置）',
+  cardPreview: '悬停预览',
+  cardPreviewDesc: '悬停卡片 0.9 秒后静音播放最多 6 秒的小片段；触屏、减少动态效果偏好，或卡片数据里没有 cid 时不生效',
   groupListPage: '列表页',
   groupListPageDesc: '观看历史 / 稍后再看 / 收藏页的默认视图与排序',
   historyViewMode: '观看历史视图',
@@ -114,6 +126,10 @@ const CMN_CN: PagesSettingsMessages = {
   fontSizeS: '小',
   fontSizeM: '中',
   fontSizeL: '大',
+  groupHome: '首页',
+  groupHomeDesc: '首页各子标签（推荐 / 关注 / 订阅剧集 / 热门 / 排行 / 直播）的卡片密度',
+  homeCardDensity: '卡片密度',
+  homeCardDensityDesc: '紧凑档每行多一张卡片、间距更小、标题字号小一档；首页顶部工具条也能直接切换',
 }
 
 const EN: PagesSettingsMessages = {
@@ -126,6 +142,10 @@ const EN: PagesSettingsMessages = {
   videoPageMiniPlayerDesc: 'Shrink the player into a floating window once it scrolls out of view. Restore with P or the button.',
   videoPageShortcuts: 'Enhanced shortcuts',
   videoPageShortcutsDesc: 'J/K/L, ←/→, C/M/F/T and more. When off, every key is handed back to the native Bilibili shortcuts.',
+  groupVideoCard: 'Video cards',
+  groupVideoCardDesc: 'Interaction enhancements that apply to every video card (home, search, list pages and so on)',
+  cardPreview: 'Hover preview',
+  cardPreviewDesc: 'Hover a card for 0.9s to play a muted clip of up to 6 seconds. Disabled on touch devices, with reduced motion, or when the card data has no cid.',
   groupListPage: 'List pages',
   groupListPageDesc: 'Default view mode and sorting for history, watch later and favorites',
   historyViewMode: 'History view',
@@ -167,6 +187,10 @@ const EN: PagesSettingsMessages = {
   fontSizeS: 'Small',
   fontSizeM: 'Medium',
   fontSizeL: 'Large',
+  groupHome: 'Home',
+  groupHomeDesc: 'Card density for every home tab (For You / Following / Series / Trending / Ranking / Live)',
+  homeCardDensity: 'Card density',
+  homeCardDensityDesc: 'Compact shows one more card per row, with tighter gaps and a smaller title. The toolbar on the home page can switch it too.',
 }
 
 /** 模块自建 i18n：只覆盖简中与英文，其余语言回退简中 */

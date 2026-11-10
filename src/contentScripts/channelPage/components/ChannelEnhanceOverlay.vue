@@ -1,20 +1,44 @@
 <script setup lang="ts">
-import type { ChannelSortId } from '../state'
+import type { ChannelRankPeriod, ChannelSortId } from '../state'
 import { computed } from 'vue'
 
-import { applySort, clearActive, setDensity, sortLabel, togglePanel } from '../actions'
+import {
+  applyRank,
+  applySort,
+  clearActive,
+  rankLabel,
+  setDensity,
+  sortLabel,
+  togglePanel,
+} from '../actions'
 import { formatStatus, useMessages } from '../i18n'
 import { ui } from '../state'
 
 const t = useMessages()
 
+/** 面板标题按页面种类区分：分区页 / 热门页 / 排行榜 */
+const panelTitle = computed(() => {
+  if (ui.pageKind === 'rank')
+    return t.value.panelTitleRank
+  if (ui.pageKind === 'popular')
+    return t.value.panelTitlePopular
+  return t.value.panelTitle
+})
+
+const rankTabsAvailable = computed(() => ui.rankTabs.filter(item => item.available))
+
 /** 面板里的快捷键说明（行为见 keyboard.ts） */
-const shortcutRows = computed(() => [
-  { keys: 'J', label: t.value.shortcut.next },
-  { keys: 'K', label: t.value.shortcut.prev },
-  { keys: 'Enter', label: t.value.shortcut.open },
-  { keys: 'Esc', label: t.value.shortcut.cancel },
-])
+const shortcutRows = computed(() => {
+  const rows = [
+    { keys: 'J', label: t.value.shortcut.next },
+    { keys: 'K', label: t.value.shortcut.prev },
+    { keys: 'Enter', label: t.value.shortcut.open },
+    { keys: 'Esc', label: t.value.shortcut.cancel },
+  ]
+  if (rankTabsAvailable.value.length)
+    rows.push({ keys: '1 / 2 / 3', label: t.value.shortcutRank })
+  return rows
+})
 
 const statusText = computed(() => {
   if (ui.activeIndex < 0 || ui.activeTotal === 0)
@@ -33,6 +57,16 @@ const visibleSortTabs = computed(() => ui.sortTabs.filter(item => item.available
 function onSort(id: ChannelSortId): void {
   applySort(id)
   clearActive()
+}
+
+function onRank(period: ChannelRankPeriod): void {
+  applyRank(period)
+  clearActive()
+}
+
+/** 榜单按钮上顺带标出快捷键序号（1 / 2 / 3） */
+function rankKey(period: ChannelRankPeriod): string {
+  return String(ui.rankTabs.findIndex(item => item.period === period) + 1)
 }
 </script>
 
@@ -71,11 +105,11 @@ function onSort(id: ChannelSortId): void {
         v-if="ui.panelOpen"
         class="bcp-panel"
         role="dialog"
-        :aria-label="t.panelTitle"
+        :aria-label="panelTitle"
       >
         <header class="bcp-panel__header">
           <h2 class="bcp-panel__title">
-            {{ t.panelTitle }}
+            {{ panelTitle }}
           </h2>
           <button
             class="bcp-icon-btn"
@@ -127,6 +161,23 @@ function onSort(id: ChannelSortId): void {
               @click="onSort(item.id)"
             >
               {{ sortLabel(item.id) }}
+            </button>
+          </div>
+        </div>
+
+        <div v-if="rankTabsAvailable.length" class="bcp-group">
+          <span class="bcp-group__label">{{ t.rankTitle }}</span>
+          <div class="bcp-chip-row" role="group" :aria-label="t.rankTitle">
+            <button
+              v-for="item in rankTabsAvailable"
+              :key="item.period"
+              class="bcp-chip"
+              type="button"
+              :data-bcp-action="`rank-${item.period}`"
+              @click="onRank(item.period)"
+            >
+              <kbd class="bcp-chip__key">{{ rankKey(item.period) }}</kbd>
+              {{ rankLabel(item.period) }}
             </button>
           </div>
         </div>

@@ -15,6 +15,10 @@ export interface ChannelPageMessages {
   controls: string
   openPanel: string
   panelTitle: string
+  /** 热门页（/v/popular*）的面板标题 */
+  panelTitlePopular: string
+  /** 排行榜页（/v/popular/rank/*）的面板标题 */
+  panelTitleRank: string
   close: string
 
   density: string
@@ -31,12 +35,21 @@ export interface ChannelPageMessages {
   sortUnavailable: string
   sortFailed: string
 
+  rankTitle: string
+  rankDay: string
+  rankWeek: string
+  rankMonth: string
+  /** 页面上找不到榜单 tab 时 */
+  rankFailed: string
+
   status: string
   statusIdle: string
   /** 形如「第 {current} / {total} 条」 */
   statusActive: string
   /** 形如「共 {total} 条」 */
   statusCount: string
+  /** 榜单快捷键说明（排行榜页才显示） */
+  shortcutRank: string
 
   shortcutsTitle: string
   hint: string
@@ -53,6 +66,8 @@ const CMN_CN: ChannelPageMessages = {
   controls: '分区页增强',
   openPanel: '打开分区页增强面板',
   panelTitle: '分区页增强',
+  panelTitlePopular: '热门页增强',
+  panelTitleRank: '排行榜增强',
   close: '关闭',
 
   density: '密度',
@@ -68,10 +83,17 @@ const CMN_CN: ChannelPageMessages = {
   sortUnavailable: '当前页没有排序 tab',
   sortFailed: '找不到这个排序 tab',
 
+  rankTitle: '榜单切换',
+  rankDay: '日榜',
+  rankWeek: '周榜',
+  rankMonth: '月榜',
+  rankFailed: '找不到这个榜单 tab',
+
   status: '浏览状态',
   statusIdle: '按 J / K 开始浏览视频',
   statusActive: '第 {current} / {total} 条',
   statusCount: '共 {total} 条',
+  shortcutRank: '切换日榜 / 周榜 / 月榜',
 
   shortcutsTitle: '快捷键',
   hint: '面板与快捷键只作用于本页，状态在本标签页内保持',
@@ -93,6 +115,8 @@ const EN: ChannelPageMessages = {
   controls: 'Channel enhancements',
   openPanel: 'Open channel enhancements',
   panelTitle: 'Channel enhancements',
+  panelTitlePopular: 'Popular page enhancements',
+  panelTitleRank: 'Ranking page enhancements',
   close: 'Close',
 
   density: 'Density',
@@ -108,10 +132,17 @@ const EN: ChannelPageMessages = {
   sortUnavailable: 'No sort tabs on this page',
   sortFailed: 'This sort tab is not available',
 
+  rankTitle: 'Ranking period',
+  rankDay: 'Daily',
+  rankWeek: 'Weekly',
+  rankMonth: 'Monthly',
+  rankFailed: 'This ranking tab is not available',
+
   status: 'Browsing',
   statusIdle: 'Press J / K to start browsing',
   statusActive: 'Item {current} / {total}',
   statusCount: '{total} items',
+  shortcutRank: 'Switch daily / weekly / monthly ranking',
 
   shortcutsTitle: 'Shortcuts',
   hint: 'The panel and shortcuts only affect this page; state is kept for this tab',

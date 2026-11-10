@@ -1,20 +1,82 @@
 <script setup lang="ts">
 import type { GridLayoutIcon } from './types'
 
-import type { GridLayoutType } from '~/logic'
+import type { GridLayoutType, PageDensity } from '~/logic'
 import type { HomeTab } from '~/stores/mainStore'
 import { useThrottleFn } from '@vueuse/core'
 import { useBewlyApp } from '~/composables/useAppProvider'
+import { isFocusBrowseActive } from '~/composables/useFocusBrowse'
 import { TOP_BAR_VISIBILITY_CHANGE } from '~/constants/globalEvents'
 import { gridLayout, settings } from '~/logic'
 import { useMainStore } from '~/stores/mainStore'
 
 import emitter from '~/utils/mitt'
+import { useHomeMessages } from './i18n'
 import { HomeSubPage } from './types'
 
 const mainStore = useMainStore()
 const { handleBackToTop, scrollbarRef } = useBewlyApp()
 const handleThrottledBackToTop = useThrottleFn((targetScrollTop: number = 0) => handleBackToTop(targetScrollTop), 1000)
+const t = useHomeMessages()
+
+// #region 首页卡片密度（舒适 / 紧凑）
+/** 卡片密度读写 settings.homeCardDensity；紧凑档完全靠容器 class + CSS 生效，不碰数据结构 */
+const cardDensity = computed<PageDensity>(() => settings.value.homeCardDensity === 'compact'
+  ? 'compact'
+  : 'comfortable')
+/** 聚焦浏览（Cover Flow）会接管卡片尺寸，此时暂停密度样式，避免影响它的布局 */
+const focusBrowseActive = ref<boolean>(isFocusBrowseActive())
+/** 只给根节点加一个 class，所有网格 / 字号规则都挂在这个 class 下 */
+const densityClass = computed<Record<string, boolean>>(() => ({
+  'home-density-compact': cardDensity.value === 'compact' && !focusBrowseActive.value,
+}))
+
+const CARD_SELECTOR = '[data-video-card]'
+const CARD_URL_ATTR = 'data-video-url'
+
+function getHomeShadowRoot(): ShadowRoot | null {
+  return document.querySelector('#bewly')?.shadowRoot ?? null
+}
+
+/** 当前可见区域第一张卡片：切换密度后用它做滚动锚点，尽量保持阅读位置 */
+function findDensityAnchor(): { url: string, top: number } | null {
+  const card = Array.from(getHomeShadowRoot()?.querySelectorAll<HTMLElement>(CARD_SELECTOR) ?? [])
+    .find(el => el.getBoundingClientRect().bottom > (scrollbarRef.value?.getBoundingClientRect().top ?? 0) + 8)
+  if (!card)
+    return null
+  return {
+    url: card.getAttribute(CARD_URL_ATTR) ?? '',
+    top: card.getBoundingClientRect().top,
+  }
+}
+
+function setDensity(density: PageDensity) {
+  if (settings.value.homeCardDensity === density)
+    return
+
+  // 切换会改变列数 → 先记下当前第一张卡片的位置，重排后再把滚动位置校正回来
+  const anchor = focusBrowseActive.value
+    ? null
+    : findDensityAnchor()
+
+  settings.value.homeCardDensity = density
+
+  if (!anchor)
+    return
+
+  nextTick(() => {
+    requestAnimationFrame(() => {
+      const target = Array.from(getHomeShadowRoot()?.querySelectorAll<HTMLElement>(CARD_SELECTOR) ?? [])
+        .find(el => (el.getAttribute(CARD_URL_ATTR) ?? '') === anchor.url)
+      if (!target)
+        return
+      const delta = target.getBoundingClientRect().top - anchor.top
+      if (Math.abs(delta) > 1 && scrollbarRef.value)
+        scrollbarRef.value.scrollTop += delta
+    })
+  })
+}
+// #endregion
 
 const activatedPage = ref<HomeSubPage>(HomeSubPage.ForYou)
 const pages = {
@@ -48,6 +110,24 @@ const gridLayoutIcons = computed((): GridLayoutIcon[] => {
     { icon: 'i-mingcute:list-check-3-line', iconActivated: 'i-mingcute:list-check-3-fill', value: 'oneColumn' },
   ]
 })
+
+/** 密度分段控件：两档，图标沿用首页已有的 mingcute 图标集 */
+const densityOptions = computed(() => [
+  {
+    value: 'comfortable' as PageDensity,
+    label: t.value.densityComfortable,
+    hint: t.value.densityComfortableHint,
+    icon: 'i-mingcute:layout-grid-line',
+    iconActivated: 'i-mingcute:layout-grid-fill',
+  },
+  {
+    value: 'compact' as PageDensity,
+    label: t.value.densityCompact,
+    hint: t.value.densityCompactHint,
+    icon: 'i-mingcute:table-3-line',
+    iconActivated: 'i-mingcute:table-3-fill',
+  },
+])
 
 // use Json stringify to watch the changes of the array item properties
 watch(() => JSON.stringify(settings.value.homePageTabVisibilityList), () => {
@@ -111,11 +191,17 @@ onMounted(() => {
     if (tab)
       handleChangeTab(tab)
   })
+
+  // 聚焦浏览进入 / 退出时暂停再恢复密度（Cover Flow 自己接管卡片尺寸）
+  emitter.on('focus-browse-change', (payload: { active: boolean }) => {
+    focusBrowseActive.value = payload.active
+  })
 })
 
 onUnmounted(() => {
   emitter.off(TOP_BAR_VISIBILITY_CHANGE)
   emitter.off('switch-home-tab')
+  emitter.off('focus-browse-change')
 })
 
 function handleChangeTab(tab: HomeTab) {
@@ -148,7 +234,7 @@ function toggleTabContentLoading(loading: boolean) {
 </script>
 
 <template>
-  <div>
+  <div :class="densityClass">
     <!-- Home search page mode background -->
     <Transition name="bg">
       <div
@@ -255,24 +341,53 @@ function toggleTabContentLoading(loading: boolean) {
           </OverlayScrollbarsComponent>
         </section>
 
-        <div
-          v-if="settings.enableGridLayoutSwitcher"
-          style="backdrop-filter: var(--bew-filter-glass-1)"
-          flex="~ gap-1 shrink-0" p-1 h-38px bg="$bew-elevated" transform-gpu
-          ml-auto rounded-full
-          shadow="[var(--bew-shadow-1),var(--bew-shadow-edge-glow-1)]"
-          box-border border="1 $bew-border-color"
-        >
+        <div ml-auto flex="~ gap-1 shrink-0 items-center">
+          <!-- 卡片密度：舒适 / 紧凑（写 settings.homeCardDensity，设置页同源） -->
           <div
-            v-for="icon in gridLayoutIcons" :key="icon.value"
-            :class="{ 'grid-layout-item-activated': currentLayout === icon.value }"
-            flex="~ justify-center items-center"
-            h-full aspect-square text="$bew-text-2 hover:$bew-text-1"
-            rounded-full bg="hover:$bew-fill-2" duration-300
-            cursor-pointer
-            @click="setCurrentLayout(icon.value)"
+            style="backdrop-filter: var(--bew-filter-glass-1)"
+            flex="~ gap-1 shrink-0" p-1 h-38px bg="$bew-elevated" transform-gpu
+            rounded-full
+            shadow="[var(--bew-shadow-1),var(--bew-shadow-edge-glow-1)]"
+            box-border border="1 $bew-border-color"
+            role="group"
+            :aria-label="t.densityGroup"
           >
-            <div :class="currentLayout === icon.value ? icon.iconActivated : icon.icon" text-base />
+            <button
+              v-for="option in densityOptions" :key="option.value"
+              type="button"
+              :class="{ 'grid-layout-item-activated': cardDensity === option.value }"
+              :aria-pressed="cardDensity === option.value"
+              :aria-label="option.label"
+              :title="option.hint"
+              flex="~ justify-center items-center"
+              h-full aspect-square text="$bew-text-2 hover:$bew-text-1"
+              rounded-full bg="hover:$bew-fill-2" duration-300
+              cursor-pointer
+              @click="setDensity(option.value)"
+            >
+              <div :class="cardDensity === option.value ? option.iconActivated : option.icon" text-base />
+            </button>
+          </div>
+
+          <div
+            v-if="settings.enableGridLayoutSwitcher"
+            style="backdrop-filter: var(--bew-filter-glass-1)"
+            flex="~ gap-1 shrink-0" p-1 h-38px bg="$bew-elevated" transform-gpu
+            rounded-full
+            shadow="[var(--bew-shadow-1),var(--bew-shadow-edge-glow-1)]"
+            box-border border="1 $bew-border-color"
+          >
+            <div
+              v-for="icon in gridLayoutIcons" :key="icon.value"
+              :class="{ 'grid-layout-item-activated': currentLayout === icon.value }"
+              flex="~ justify-center items-center"
+              h-full aspect-square text="$bew-text-2 hover:$bew-text-1"
+              rounded-full bg="hover:$bew-fill-2" duration-300
+              cursor-pointer
+              @click="setCurrentLayout(icon.value)"
+            >
+              <div :class="currentLayout === icon.value ? icon.iconActivated : icon.icon" text-base />
+            </div>
           </div>
         </div>
       </header>
@@ -338,4 +453,38 @@ function toggleTabContentLoading(loading: boolean) {
 .grid-layout-item-activated {
   --uno: "bg-$bew-theme-color-auto text-$bew-text-auto";
 }
+
+/* #region 首页卡片密度（紧凑档） */
+/*
+ * 密度完全靠容器 class（.home-density-compact）+ CSS 生效，不改数据结构、不重新请求接口。
+ * 网格类来自各子组件的 scoped 样式，这里用 :deep() + !important 覆盖：
+ * 子组件里还有 UnoCSS 的响应式列数，同级选择器压不住，只有 !important 能保证覆盖。
+ *
+ * 列数：舒适档沿用原自适应断点（2xl 5 列 …）；紧凑档改成按容器宽度自动填充、最小卡片宽 240px，
+ * 宽屏下自然比舒适档多 1 列（见 docs/home-density.md 的实测公式）。
+ * 其它两种布局（单列 / 双列）是用户显式选择的，只缩间距与字号，不再叠加列数。
+ */
+.home-density-compact {
+  :deep(.grid-adaptive),
+  :deep(.grid-adaptive-video) {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important;
+    gap: 12px !important;
+  }
+
+  :deep(.grid-adaptive-bangumi) {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important;
+    gap: 12px !important;
+  }
+
+  :deep(.grid-two-columns),
+  :deep(.grid-one-column) {
+    gap: 12px !important;
+  }
+
+  /* 标题字号降一档：VideoCard 的标题统一带 .keep-two-lines，不改卡片组件本身 */
+  :deep(.keep-two-lines) {
+    font-size: calc(var(--bew-base-font-size) * 0.93) !important;
+  }
+}
+/* #endregion */
 </style>

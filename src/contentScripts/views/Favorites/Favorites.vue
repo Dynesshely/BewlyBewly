@@ -308,6 +308,10 @@ function toCard(item: FavoriteItem): ListCardItem {
       danmaku: item.cnt_info?.danmaku,
       publishedTimestamp: item.pubtime || undefined,
       bvid: music ? undefined : item.bvid,
+      // 收藏接口只在 ugc.first_cid 里给出 cid，音频没有，直接透传（不会为此新增请求）
+      cid: music
+        ? undefined
+        : (item.ugc?.first_cid || undefined),
       threePointV2: [],
     },
     copyUrl: url,

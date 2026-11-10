@@ -9,7 +9,7 @@ import { usePagesSettingsMessages } from './i18n'
  * 「页面增强」设置页。
  *
  * 集中管理各轮新增功能的默认偏好：视频播放页（影院模式 / 迷你播放器 / 增强快捷键）、
- * 列表页（三个页面各自的默认视图 + 共用默认排序）、搜索页（粘贴直达），
+ * 视频卡片（悬停预览）、列表页（三个页面各自的默认视图 + 共用默认排序）、搜索页（粘贴直达），
  * 以及第 5 轮并入的模块偏好：动态页密度、消息页（只看未读 + 密度）、
  * 搜索结果页密度、用户空间密度、文章页（默认阅读模式 + 字号）。
  * 文案走模块内 i18n（cmn-CN + en），不进入全局 _locales。
@@ -55,6 +55,12 @@ const fontSizeOptions = computed(() => [
 
       <SettingsItem :title="t.videoPageShortcuts" :desc="t.videoPageShortcutsDesc">
         <Radio v-model="settings.videoPageShortcuts" />
+      </SettingsItem>
+    </SettingsItemGroup>
+
+    <SettingsItemGroup :title="t.groupVideoCard" :desc="t.groupVideoCardDesc">
+      <SettingsItem :title="t.cardPreview" :desc="t.cardPreviewDesc">
+        <Radio v-model="settings.enableVideoCardPreview" />
       </SettingsItem>
     </SettingsItemGroup>
 
@@ -117,6 +123,12 @@ const fontSizeOptions = computed(() => [
 
       <SettingsItem :title="t.articleFontSize">
         <Select v-model="settings.articleFontSize" :options="fontSizeOptions" w="full" />
+      </SettingsItem>
+    </SettingsItemGroup>
+
+    <SettingsItemGroup :title="t.groupHome" :desc="t.groupHomeDesc">
+      <SettingsItem :title="t.homeCardDensity" :desc="t.homeCardDensityDesc">
+        <Select v-model="settings.homeCardDensity" :options="densityOptions" w="full" />
       </SettingsItem>
     </SettingsItemGroup>
   </div>

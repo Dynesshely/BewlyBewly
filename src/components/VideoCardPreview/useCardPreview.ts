@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, ref } from 'vue'
 
 import api from '~/utils/api'
 
-import { CARD_PREVIEW_MAX_DURATION, getCardPreviewDelay, isCardPreviewEnabled, isCardPreviewSupported } from './previewSettings'
+import { CARD_PREVIEW_MAX_DURATION, getCardPreviewDelay, isCardPreviewEnabled, isCardPreviewSupported, migrateLegacyCardPreviewSetting } from './previewSettings'
 
 interface PreviewSession {
   cardId: string
@@ -214,6 +214,9 @@ function handlePlaying(cardId: string) {
  * 卡片需要提供 cid 才可能预览（cid 由接口数据带入，缺失时不发请求）。
  */
 export function useCardPreview(cardId: string) {
+  // 旧 localStorage 开关在首次挂载时一次性迁移到 settings（内部有幂等守卫）
+  migrateLegacyCardPreviewSetting()
+
   const isActive = computed(() => activeCardId.value === cardId)
   const src = computed(() => (isActive.value ? previewUrl.value : ''))
 

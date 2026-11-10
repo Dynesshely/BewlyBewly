@@ -366,6 +366,14 @@ function toCard(item: HistoryItem): ListCardItem {
       capsuleText: timestamp
         ? formatTimeLabel(timestamp)
         : undefined,
+      // 普通投稿的 bvid/cid 直接透传，供卡片悬停预览使用（不会为此新增请求）；
+      // 番剧 / 直播 / 专栏的 playurl 语义不同，不下发，保持无预览。
+      bvid: isArchive
+        ? (item.history?.bvid || undefined)
+        : undefined,
+      cid: isArchive
+        ? (item.history?.cid || undefined)
+        : undefined,
       threePointV2: [],
     },
     copyUrl: url,

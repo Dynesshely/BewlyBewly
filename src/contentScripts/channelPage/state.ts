@@ -6,6 +6,18 @@ export type ChannelDensity = 'comfortable' | 'compact'
 /** 排序快捷目标 */
 export type ChannelSortId = 'default' | 'views' | 'newest'
 
+/** 页面种类：分区 / 频道页、热门页（/v/popular/all）、排行榜页（/v/popular/rank/*） */
+export type ChannelPageKind = 'channel' | 'popular' | 'rank'
+
+/** 排行榜周期：日榜 / 周榜 / 月榜（快捷键 1 / 2 / 3） */
+export type ChannelRankPeriod = 'day' | 'week' | 'month'
+
+/** 面板里的一个榜单入口；页面上找不到对应 tab 时 available=false（按钮隐藏） */
+export interface ChannelRankTabView {
+  period: ChannelRankPeriod
+  available: boolean
+}
+
 /** 面板里的一个排序入口；页面上找不到对应 tab 时 available=false（按钮隐藏） */
 export interface ChannelSortView {
   id: ChannelSortId
@@ -21,11 +33,15 @@ export interface ChannelSortView {
 export interface ChannelUiState {
   /** 面板是否展开 */
   panelOpen: boolean
+  /** 当前页种类（决定面板标题与可用功能） */
+  pageKind: ChannelPageKind
   density: ChannelDensity
   /** 当前页识别到的视频卡总数 */
   cardCount: number
-  /** 排序快捷入口及可用性 */
+  /** 排序快捷入口及可用性（分区页） */
   sortTabs: ChannelSortView[]
+  /** 榜单快捷入口及可用性（排行榜页） */
+  rankTabs: ChannelRankTabView[]
   /** 当前高亮卡序号（从 0 开始，-1 表示未选中） */
   activeIndex: number
   activeTotal: number
@@ -37,12 +53,18 @@ export interface ChannelUiState {
 function createInitialState(): ChannelUiState {
   return {
     panelOpen: false,
+    pageKind: 'channel',
     density: 'comfortable',
     cardCount: 0,
     sortTabs: [
       { id: 'default', available: false },
       { id: 'views', available: false },
       { id: 'newest', available: false },
+    ],
+    rankTabs: [
+      { period: 'day', available: false },
+      { period: 'week', available: false },
+      { period: 'month', available: false },
     ],
     activeIndex: -1,
     activeTotal: 0,

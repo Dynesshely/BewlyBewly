@@ -82,3 +82,57 @@ html.bewly-channel-page.bewly-channel-compact {
   }
 }
 // #endregion
+// #region 排行榜页：名次徽标
+//
+// 名次由 JS（actions.ts 的 applyRankBadges）写在卡片的 data-bewly-channel-rank 上：
+// 优先读原生名次元素，读不到就退回卡片在列表里的 DOM 顺序（排行榜的排列顺序就是名次）。
+// 原生名次元素在徽标接管后被隐藏，避免同一个名次显示两次。
+html.bewly-channel-page[data-bewly-channel-kind="rank"] {
+  [data-bewly-channel-rank] {
+    position: relative;
+
+    &::before {
+      content: attr(data-bewly-channel-rank);
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 22px;
+      height: 22px;
+      padding: 0 6px;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      color: var(--bew-text-2);
+      pointer-events: none;
+      background: var(--bew-elevated-solid);
+      border: 1px solid var(--bew-border-color);
+      border-radius: 8px;
+      box-shadow: var(--bew-shadow-1);
+    }
+
+    // 前三名用主题色实心徽标
+    &[data-bewly-channel-rank-tier="top3"]::before {
+      color: var(--bew-text-auto);
+      background: var(--bew-theme-color);
+      border-color: transparent;
+      box-shadow: var(--bew-shadow-2);
+    }
+
+    // 4–10 名用主题色淡底
+    &[data-bewly-channel-rank-tier="top10"]::before {
+      color: var(--bew-theme-color);
+      background: color-mix(in oklab, var(--bew-theme-color), transparent 88%);
+      border-color: color-mix(in oklab, var(--bew-theme-color), transparent 65%);
+    }
+  }
+
+  [data-bewly-channel-rank-native] {
+    display: none !important;
+  }
+}
+// #endregion

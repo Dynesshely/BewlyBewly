@@ -13,7 +13,7 @@
  * 排序 tab 在仓库 scss 里没有确认的类名，只能按「容器内 + 标签文本」发现（见
  * `SORT_LABELS`）；找不到时面板里隐藏该排序项，不做任何猜测性样式。
  */
-import type { ChannelSortId } from './state'
+import type { ChannelPageKind, ChannelRankPeriod, ChannelSortId } from './state'
 
 import { HOST_ID } from './constants'
 
@@ -36,6 +36,28 @@ const CARD_SELECTORS = [
   '.video-card',
   '.video-list-item',
   '.rank-item',
+]
+
+/**
+ * 排行榜页的卡片根优先用 `.rank-item`：名次徽标要挂在整条目上，
+ * 而不是里面的 `.bili-video-card`（否则卡片与排名数字会错位）。
+ * `.rank-item` 同样来自 nativeFilter 的分区 / 排行页规则，仓库已确认。
+ */
+const RANK_CARD_SELECTORS = [
+  '.rank-item',
+  '.bili-video-card',
+  '.video-card',
+  '.video-list-item',
+]
+
+/** 排行榜页上原生名次元素的候选（读到就沿用，读不到退回 DOM 顺序） */
+const NATIVE_RANK_SELECTORS = [
+  '.num',
+  '.rank',
+  '.rank-num',
+  '[class*="rank-num"]',
+  '[class*="rankNum"]',
+  '[class*="rank_num"]',
 ]
 
 /** 页面容器（确认存在）；排序 tab 只在这个容器里找 */
@@ -105,6 +127,26 @@ export function isChannelPage(url: string = location.href): boolean {
   }
 }
 
+/**
+ * 页面种类：
+ *   rank    —— `/v/popular/rank/*`（排行榜：日榜 / 周榜 / 月榜）
+ *   popular —— `/v/popular*`（热门，含 /v/popular/all）
+ *   channel —— 其余 `/v/*`、`/channel/*`、`/c/*`（分区 / 频道页）
+ */
+export function getChannelPageKind(url: string = location.href): ChannelPageKind {
+  try {
+    const pathname = new URL(url).pathname
+    if (/^\/v\/popular\/rank(?:\/|$)/.test(pathname))
+      return 'rank'
+    if (/^\/v\/popular(?:\/|$)/.test(pathname))
+      return 'popular'
+    return 'channel'
+  }
+  catch {
+    return 'channel'
+  }
+}
+
 function pickText(el: Element, selectors: string[]): string {
   for (const selector of selectors) {
     const text = el.querySelector<HTMLElement>(selector)?.textContent?.replace(/\s+/g, ' ').trim()
@@ -137,7 +179,7 @@ function compareDocumentOrder(a: HTMLElement, b: HTMLElement): number {
  *
  * 同一张卡可能同时命中 `.bili-video-card` 与历史兜底类名，用「互相包含即跳过」去重。
  */
-export function collectCards(): ChannelCard[] {
+export function collectCards(kind: ChannelPageKind = 'channel'): ChannelCard[] {
   const cards: ChannelCard[] = []
   const seen = new Set<HTMLElement>()
 
@@ -157,7 +199,10 @@ export function collectCards(): ChannelCard[] {
     })
   }
 
-  for (const selector of CARD_SELECTORS)
+  const selectors = kind === 'rank'
+    ? RANK_CARD_SELECTORS
+    : CARD_SELECTORS
+  for (const selector of selectors)
     document.querySelectorAll<HTMLElement>(selector).forEach(el => add(el))
 
   return cards.sort((a, b) => compareDocumentOrder(a.el, b.el))
@@ -196,6 +241,73 @@ export function findSortTab(id: ChannelSortId): HTMLElement | null {
 /** 当前页是否存在排序区（三项里任意一项找得到就算有） */
 export function hasSortTabs(): boolean {
   return (['default', 'views', 'newest'] as ChannelSortId[]).some(id => findSortTab(id) !== null)
+}
+
+/**
+ * 在页面里按标签文本找一个可点击的 tab（榜单切换用）。
+ *
+ * 排行榜页的日 / 周 / 月 tab 在仓库 scss 里没有确认的类名，只能按文本找；
+ * 这里排除内容卡、头部与弹层，并且只接受「短文本 + 子元素不超过 2 个」的节点。
+ */
+function findLabelTab(labels: RegExp[]): HTMLElement | null {
+  const candidates = Array.from(document.querySelectorAll<HTMLElement>('a, button, li, span, div'))
+  for (const el of candidates) {
+    if (el.closest(CARD_SELECTORS.join(', ')))
+      continue
+    if (el.closest(EXCLUDE_ZONE_SELECTOR))
+      continue
+    if (el.children.length > 2)
+      continue
+    const text = (el.textContent ?? '').replace(/\s+/g, ' ').trim()
+    if (!text || text.length > 8)
+      continue
+    if (!labels.some(re => re.test(text)))
+      continue
+    const clickable = el.closest<HTMLElement>(CLICKABLE_SELECTOR) ?? el
+    // 别把我们的浮层 / 原生弹窗里的按钮当成榜单 tab
+    if (clickable.closest('#bewly, [data-bewly-native-overlay]'))
+      continue
+    return clickable
+  }
+  return null
+}
+
+/** 榜单 tab 的文本（日榜 / 周榜 / 月榜，含英文兜底） */
+const RANK_PERIOD_LABELS: Record<ChannelRankPeriod, RegExp[]> = {
+  day: [/^日榜$/, /^每日$/, /^day$/, /^daily$/i],
+  week: [/^周榜$/, /^每周$/, /^week$/, /^weekly$/i],
+  month: [
+    /^月榜$/,
+    /^每月$/,
+    /^month$/,
+    /^monthly$/i,
+  ],
+}
+
+/** 找到某个榜单周期对应的原生 tab；找不到返回 null（面板里隐藏该项） */
+export function findRankTab(period: ChannelRankPeriod): HTMLElement | null {
+  return findLabelTab(RANK_PERIOD_LABELS[period])
+}
+
+/**
+ * 读取卡片上的原生名次（排行榜页）。
+ *
+ * 只认 1–4 位纯数字文本，避免把播放量 / 日期误当名次；读不到返回 null，
+ * 由调用方决定是否退回 DOM 顺序。
+ */
+export function readNativeRank(card: HTMLElement): { el: HTMLElement, rank: number } | null {
+  for (const selector of NATIVE_RANK_SELECTORS) {
+    const els = Array.from(card.querySelectorAll<HTMLElement>(selector))
+    for (const el of els) {
+      const text = (el.textContent ?? '').replace(/\s+/g, '').trim()
+      if (!/^\d{1,4}$/.test(text))
+        continue
+      const rank = Number.parseInt(text, 10)
+      if (rank > 0 && rank < 10000)
+        return { el, rank }
+    }
+  }
+  return null
 }
 
 /** 焦点在输入框 / 下拉框 / 可编辑区域里时不劫持快捷键 */

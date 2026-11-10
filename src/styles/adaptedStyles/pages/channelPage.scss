@@ -1,3 +1,5 @@
+@use "../../../contentScripts/channelPage/pageStyles" as *;
+
 .bewly-design.channelPage {
   .banner-wrapper {
     background-color: black;
@@ -76,3 +78,14 @@
   }
   // #endregion
 }
+
+// #region 第 5 轮：分区 / 频道页增强（只追加，不改动上方既有规则）
+//
+// 页面级样式本身放在 src/contentScripts/channelPage/pageStyles.scss，
+// 由本文件顶部 @use 引入 —— 这样两个注入点共用同一份规则：
+//   - tv / movie / variety / mooc / documentary 子频道：adaptedStyles 注入本文件的编译产物；
+//   - /v/*、/channel/*：不在 adaptedStyles 的注入清单里，由 src/contentScripts/channelPage
+//     通过 `?inline` 自行注入 <style id="bewly-channel-page-style">。
+// 因此本文件不需要再写一份密度 / 高亮规则；这里只保留这段说明，避免两处规则漂移。
+// #endregion
+// #endregion

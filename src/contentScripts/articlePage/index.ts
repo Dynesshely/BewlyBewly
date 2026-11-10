@@ -14,6 +14,9 @@
  * 找不到正文容器时整块 UI 降级隐藏（ui.ready = false），不会在非文章页留下空浮层。
  * 非文章页是空操作；重复调用幂等（nativeOverlay 按 hostId 去重）。
  */
+import { watch } from 'vue'
+
+import { settings } from '~/logic'
 import { injectCSS } from '~/utils/main'
 
 import { hasNativeOverlay, mountNativeOverlay, unmountNativeOverlay } from '../nativeOverlay'
@@ -21,6 +24,7 @@ import { hasNativeOverlay, mountNativeOverlay, unmountNativeOverlay } from '../n
 import {
   cleanupPageHooks,
   restorePreferences,
+  setFontStep,
   setReading,
   setTocOpen,
   updateProgress,
@@ -49,6 +53,7 @@ let scrollFrame = 0
 let lastContentEl: HTMLElement | null = null
 let tocRestored = false
 let readingRestored = false
+let stopSettingsWatch: (() => void) | null = null
 
 export function setupArticlePage(): void {
   if (!isArticlePage())
@@ -80,6 +85,16 @@ function mount(): void {
 
   disposeShortcuts = setupShortcuts()
 
+  // 设置页改动实时生效：字号立即换算，阅读模式按需切换（正文没就绪时由 sync 补进）
+  stopSettingsWatch = watch(
+    () => [settings.value.articleFontSize, settings.value.articleReadingMode] as const,
+    ([fontSize, readingMode]) => {
+      setFontStep(fontSize, { silent: true })
+      if (readingMode !== ui.reading)
+        setReading(readingMode, { silent: true })
+    },
+  )
+
   sync()
   intervalTimer = window.setInterval(() => {
     if (document.hidden)
@@ -110,6 +125,10 @@ function unmount(): void {
   if (scrollFrame) {
     window.cancelAnimationFrame(scrollFrame)
     scrollFrame = 0
+  }
+  if (stopSettingsWatch) {
+    stopSettingsWatch()
+    stopSettingsWatch = null
   }
   if (disposeShortcuts) {
     disposeShortcuts()
@@ -200,6 +219,10 @@ function sync(): void {
     readingRestored = true
     if (readStoredReading())
       setReading(true, { silent: true })
+  }
+  // 设置页里打开「默认阅读模式」时，等正文就绪再进入（首次同步之外也覆盖）
+  else if (!ui.reading && settings.value.articleReadingMode) {
+    setReading(true, { silent: true })
   }
 
   // 目录刷新后，恢复上一次会话里展开的目录（只恢复一次）

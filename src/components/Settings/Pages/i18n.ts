@@ -36,6 +36,31 @@ export interface PagesSettingsMessages {
   groupSearchPageDesc: string
   directPaste: string
   directPasteDesc: string
+
+  groupMoments: string
+  momentsDensity: string
+  momentsDensityDesc: string
+  groupNotification: string
+  groupNotificationDesc: string
+  notificationOnlyUnread: string
+  notificationOnlyUnreadDesc: string
+  notificationDensity: string
+  groupSearchResult: string
+  groupSearchResultDesc: string
+  searchDensity: string
+  groupSpace: string
+  groupSpaceDesc: string
+  spaceDensity: string
+  groupArticle: string
+  groupArticleDesc: string
+  articleReadingMode: string
+  articleReadingModeDesc: string
+  articleFontSize: string
+  densityComfortable: string
+  densityCompact: string
+  fontSizeS: string
+  fontSizeM: string
+  fontSizeL: string
 }
 
 const CMN_CN: PagesSettingsMessages = {
@@ -65,6 +90,30 @@ const CMN_CN: PagesSettingsMessages = {
   groupSearchPageDesc: 'BewlyBewly 的搜索起始页（B 站搜索框获得焦点时出现的页面）',
   directPaste: '粘贴直达',
   directPasteDesc: '在搜索页粘贴 BV 号或 B 站链接时直接打开目标，而不是填入搜索框',
+  groupMoments: '动态页',
+  momentsDensity: '卡片密度',
+  momentsDensityDesc: '动态页卡片流的信息密度，页面顶部工具条也能直接切换',
+  groupNotification: '消息页',
+  groupNotificationDesc: 'B 站原生消息页（message.bilibili.com）的增强浮层',
+  notificationOnlyUnread: '默认只看未读',
+  notificationOnlyUnreadDesc: '进入消息页时自动隐藏已读条目；页面暂时识别不到未读状态时不会生效',
+  notificationDensity: '列表密度',
+  groupSearchResult: '搜索结果页',
+  groupSearchResultDesc: 'B 站原生搜索结果页（search.bilibili.com）的增强浮层',
+  searchDensity: '结果密度',
+  groupSpace: '用户空间',
+  groupSpaceDesc: 'B 站原生用户空间（space.bilibili.com）的增强浮层',
+  spaceDensity: '内容密度',
+  groupArticle: '文章页',
+  groupArticleDesc: 'B 站专栏 / 动态文章页的沉浸阅读模式',
+  articleReadingMode: '默认进入阅读模式',
+  articleReadingModeDesc: '正文确认加载后自动进入沉浸阅读（隐藏侧栏 / 推荐 / 评论）',
+  articleFontSize: '正文字号',
+  densityComfortable: '舒适',
+  densityCompact: '紧凑',
+  fontSizeS: '小',
+  fontSizeM: '中',
+  fontSizeL: '大',
 }
 
 const EN: PagesSettingsMessages = {
@@ -94,6 +143,30 @@ const EN: PagesSettingsMessages = {
   groupSearchPageDesc: 'The BewlyBewly search start page (shown when the Bilibili search box gets focus)',
   directPaste: 'Paste to open',
   directPasteDesc: 'Paste a BV id or Bilibili link on the search page to open it directly instead of filling the search box',
+  groupMoments: 'Moments page',
+  momentsDensity: 'Card density',
+  momentsDensityDesc: 'Information density of the moments feed. The toolbar on the page can switch it too.',
+  groupNotification: 'Notifications page',
+  groupNotificationDesc: 'Enhancement overlay on the native Bilibili notifications page (message.bilibili.com)',
+  notificationOnlyUnread: 'Only show unread by default',
+  notificationOnlyUnreadDesc: 'Hide read items when the page opens. Stays inactive while the page cannot detect read state.',
+  notificationDensity: 'List density',
+  groupSearchResult: 'Search results page',
+  groupSearchResultDesc: 'Enhancement overlay on the native Bilibili search results page (search.bilibili.com)',
+  searchDensity: 'Result density',
+  groupSpace: 'User space',
+  groupSpaceDesc: 'Enhancement overlay on the native Bilibili user space (space.bilibili.com)',
+  spaceDensity: 'Content density',
+  groupArticle: 'Article page',
+  groupArticleDesc: 'Immersive reading mode for Bilibili articles and opus pages',
+  articleReadingMode: 'Enter reading mode by default',
+  articleReadingModeDesc: 'Once the article body is ready, hide the sidebar, recommendations and comments automatically.',
+  articleFontSize: 'Body font size',
+  densityComfortable: 'Comfortable',
+  densityCompact: 'Compact',
+  fontSizeS: 'Small',
+  fontSizeM: 'Medium',
+  fontSizeL: 'Large',
 }
 
 /** 模块自建 i18n：只覆盖简中与英文，其余语言回退简中 */

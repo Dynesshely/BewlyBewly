@@ -19,6 +19,7 @@ command_palette:
   keyboard_mode_on: 開啟鍵盤卡片導航
   keyboard_mode_off: 關閉鍵盤卡片導航（恢復滑鼠操作）
   empty: 冇符合嘅指令
+  shortcut_unavailable: 呢頁用唔到
 
 keyboard_help:
   title: 鍵盤快捷鍵
@@ -590,3 +591,50 @@ search_bar:
 keyboard_toast:
   watch_later_ok: 已加入稍後再看
   watch_later_failed: 加入稍後再看失敗
+
+keyboard_registry:
+  close: Close
+  current_scope: This page
+  scopes:
+    global: Global
+    video: Video page
+    list: List pages (history / watch later / favorites)
+    moments: Moments
+    notification: Notifications
+    search: Search results
+    space: User space
+    article: Articles / notes
+  actions:
+    context_menu: Open the card context menu
+    sort_cards: Cycle card sort order
+    filter_cards: Cycle card filter
+    next_card: Next item
+    prev_card: Previous item
+    open_card: Open the current item
+    cancel_active: Clear the current highlight
+    close_panel: Close the floating panel
+    list_cycle_view: Cycle the view mode
+    list_cycle_sort: Cycle the sort mode
+    list_focus_filter: Focus the keyword filter
+    list_toggle_help: Open / close the page shortcut help
+    notify_unread_only: Show unread notifications only
+    notify_density: Switch the list density
+    notify_jump_category: Jump to category 1–4
+    video_seek_back: Seek back 10 seconds
+    video_play_pause: Play / pause
+    video_seek_forward: Seek forward 10 seconds
+    video_back5: Seek back 5 seconds
+    video_forward5: Seek forward 5 seconds
+    video_danmaku: Toggle danmaku
+    video_mute: Toggle mute
+    video_fullscreen: Fullscreen
+    video_cinema: Cinema mode
+    video_pip: Picture-in-picture
+    video_restore: Restore the mini player
+    video_percent: Jump to 0%–90%
+    video_exit: Exit cinema / close this shortcut help
+    article_reading: Focus (immersive) reading mode
+    article_font_smaller: Decrease the article font size
+    article_font_larger: Increase the article font size
+    article_back_to_top: Back to top
+    article_exit: Exit reading mode / close the contents panel

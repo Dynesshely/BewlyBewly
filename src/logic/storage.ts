@@ -10,6 +10,12 @@ export const accessKey = useStorageLocal<string>('accessKey', '')
 /** 键盘打开视频的方式 */
 export type KeyboardOpenAction = 'newTab' | 'currentTab' | 'preview'
 
+/** 页面密度 */
+export type PageDensity = 'comfortable' | 'compact'
+
+/** 文章页字号档位 */
+export type ArticleFontSize = 's' | 'm' | 'l'
+
 /** 列表页视图模式 */
 export type ListViewMode = 'comfortable' | 'compact' | 'list'
 /** 列表页排序模式 */
@@ -134,6 +140,22 @@ export interface Settings {
   listDefaultSort: ListSortMode
   /** 搜索起始页：粘贴 B 站链接时直接打开 */
   searchPageDirectPasteEnabled: boolean
+
+  // 页面偏好（第 4–5 轮模块）
+  /** 动态页卡片密度 */
+  momentsDensity: PageDensity
+  /** 消息页：默认只看未读 */
+  notificationOnlyUnread: boolean
+  /** 消息页密度 */
+  notificationDensity: PageDensity
+  /** 搜索结果页密度 */
+  searchDensity: PageDensity
+  /** 用户空间密度 */
+  spaceDensity: PageDensity
+  /** 文章页：默认进入阅读模式 */
+  articleReadingMode: boolean
+  /** 文章页字号档位 */
+  articleFontSize: ArticleFontSize
   /** 接管页拦截原版 B 站脚本（提升性能） */
   nativeGuardEnabled: boolean
   /** 在原生页面（搜索页等）应用屏蔽词过滤 */
@@ -264,6 +286,14 @@ export const originalSettings: Settings = {
   favoritesViewMode: 'comfortable',
   listDefaultSort: 'time',
   searchPageDirectPasteEnabled: true,
+
+  momentsDensity: 'comfortable',
+  notificationOnlyUnread: false,
+  notificationDensity: 'comfortable',
+  searchDensity: 'comfortable',
+  spaceDensity: 'comfortable',
+  articleReadingMode: false,
+  articleFontSize: 'm',
   nativeGuardEnabled: true,
   nativeFilterEnabled: false,
 

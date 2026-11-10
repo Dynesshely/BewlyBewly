@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { isFocusBrowseActive } from '~/composables/useFocusBrowse'
+import {
+  getActiveShortcutScopes,
+  getEntryKeyTokens,
+  getPaletteShortcutEntries,
+  matchesShortcutQuery,
+  scopeLabelKey,
+} from '~/constants/shortcutRegistry'
 import { settings } from '~/logic'
 import emitter from '~/utils/mitt'
 
@@ -11,7 +18,18 @@ interface Command {
   id: string
   label: string
   hint?: string
-  run: () => void
+  run?: () => void
+  /** 只作参考的快捷键条目：不可执行，标灰并提示「当前页不可用」 */
+  reference?: boolean
+  /** 快捷键条目所属页面的中文名（参考条目用来区分同名动作） */
+  scopeLabel?: string
+}
+
+/** 按键片段 → 单行提示（组合键用 +，或关系用空格） */
+function formatKeyTokens(tokens: string[], chord: boolean): string {
+  return chord
+    ? tokens.join('+')
+    : tokens.join(' ')
 }
 
 const query = ref('')
@@ -114,27 +132,117 @@ const commands = computed<Command[]>(() => [
   },
 ])
 
+const activeScopes = getActiveShortcutScopes()
+
+/** 注册表里「不能安全触发」的快捷键条目：只展示，标灰 */
+function buildShortcutReferences(onlyCurrentScope: boolean): Command[] {
+  const entries = getPaletteShortcutEntries(
+    settings.value.keyboardShortcuts,
+    onlyCurrentScope
+      ? { scopes: activeScopes }
+      : {},
+  )
+
+  return entries.map((entry) => {
+    const scopeLabel = t(scopeLabelKey(entry.scope))
+    const { tokens, chord } = getEntryKeyTokens(entry, settings.value.keyboardShortcuts)
+    return {
+      id: `shortcut-${entry.id}`,
+      label: t(entry.i18nKey),
+      hint: formatKeyTokens(tokens, chord),
+      reference: true,
+      scopeLabel,
+    }
+  })
+}
+
 const filtered = computed(() => {
   const q = query.value.trim().toLowerCase()
-  if (!q)
-    return commands.value
-  return commands.value.filter(cmd => cmd.label.toLowerCase().includes(q))
+  if (!q) {
+    // 未输入时不把整张注册表铺开，避免把命令挤下去；只补当前页相关的快捷键
+    return [
+      ...commands.value,
+      ...buildShortcutReferences(true),
+    ]
+  }
+
+  const commandHits = commands.value.filter(cmd => cmd.label.toLowerCase().includes(q))
+  const referenceHits = getPaletteShortcutEntries(settings.value.keyboardShortcuts, {})
+    .filter((entry) => {
+      const scopeLabel = t(scopeLabelKey(entry.scope))
+      const label = t(entry.i18nKey)
+      return matchesShortcutQuery(
+        entry,
+        q,
+        [label, scopeLabel],
+        settings.value.keyboardShortcuts,
+      )
+    })
+    .map((entry) => {
+      const { tokens, chord } = getEntryKeyTokens(entry, settings.value.keyboardShortcuts)
+      return {
+        id: `shortcut-${entry.id}`,
+        label: t(entry.i18nKey),
+        hint: formatKeyTokens(tokens, chord),
+        reference: true,
+        scopeLabel: t(scopeLabelKey(entry.scope)),
+      } satisfies Command
+    })
+
+  return [
+    ...commandHits,
+    ...referenceHits,
+  ]
 })
 
 watch(filtered, () => {
-  selected.value = 0
+  selected.value = firstRunnableIndex()
 })
 
 onMounted(() => {
   inputRef.value?.focus()
+  selected.value = firstRunnableIndex()
 })
+
+/** 第一个可执行命令的下标（参考条目不可执行，默认选中要跳过它们） */
+function firstRunnableIndex(): number {
+  const index = filtered.value.findIndex(cmd => isRunnable(cmd))
+  return index >= 0
+    ? index
+    : 0
+}
+
+/** 上下移动时跳过参考条目；找不到时停在原地 */
+function moveSelection(delta: number) {
+  const list = filtered.value
+  if (!list.length)
+    return
+  let next = selected.value
+  for (let step = 0; step < list.length; step++) {
+    next += delta
+    if (next < 0 || next >= list.length)
+      return
+    if (isRunnable(list[next])) {
+      selected.value = next
+      return
+    }
+  }
+}
 
 function runCommand(command?: Command) {
   const target = command ?? filtered.value[selected.value]
   if (!target)
     return
+  // 参考条目只是告诉用户「这个页面上有这些键」，不能执行
+  if (target.reference || !target.run)
+    return
   target.run()
   emit('close')
+}
+
+/** 选中项跳过参考条目：上下移动时直接落到可执行命令上 */
+function isRunnable(cmd: Command | undefined): boolean {
+  return Boolean(cmd && cmd.run && !cmd.reference)
 }
 
 function onKeydown(event: KeyboardEvent) {
@@ -145,12 +253,12 @@ function onKeydown(event: KeyboardEvent) {
   }
   if (event.key === 'ArrowDown') {
     event.preventDefault()
-    selected.value = Math.min(filtered.value.length - 1, selected.value + 1)
+    moveSelection(1)
     return
   }
   if (event.key === 'ArrowUp') {
     event.preventDefault()
-    selected.value = Math.max(0, selected.value - 1)
+    moveSelection(-1)
     return
   }
   if (event.key === 'Enter') {
@@ -174,11 +282,18 @@ function onKeydown(event: KeyboardEvent) {
           v-for="(cmd, index) in filtered"
           :key="cmd.id"
           class="command-palette-item"
-          :class="{ active: index === selected }"
-          @mouseenter="selected = index"
+          :class="{ active: index === selected, reference: cmd.reference }"
+          :aria-disabled="cmd.reference ? 'true' : undefined"
+          @mouseenter="!cmd.reference && (selected = index)"
           @click="runCommand(cmd)"
         >
-          <span>{{ cmd.label }}</span>
+          <span class="command-palette-label">
+            <span class="command-palette-name">{{ cmd.label }}</span>
+            <span v-if="cmd.scopeLabel" class="command-palette-scope">{{ cmd.scopeLabel }}</span>
+            <span v-if="cmd.reference" class="command-palette-note">
+              {{ t('command_palette.shortcut_unavailable') }}
+            </span>
+          </span>
           <kbd v-if="cmd.hint">{{ cmd.hint }}</kbd>
         </div>
         <div v-if="!filtered.length" class="command-palette-empty">
@@ -238,6 +353,42 @@ function onKeydown(event: KeyboardEvent) {
 .command-palette-item.active {
   background: var(--bew-fill-2);
   color: var(--bew-text-1);
+}
+.command-palette-item.reference {
+  color: var(--bew-text-3);
+  cursor: default;
+}
+.command-palette-item.reference:hover {
+  background: transparent;
+}
+.command-palette-label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.command-palette-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.command-palette-scope {
+  flex: none;
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 18px;
+  color: var(--bew-text-3);
+  background: var(--bew-fill-1);
+  border-radius: 6px;
+}
+.command-palette-note {
+  flex: none;
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 18px;
+  color: var(--bew-text-4);
+  background: var(--bew-fill-1);
+  border-radius: 6px;
 }
 .command-palette-item kbd {
   padding: 1px 6px;

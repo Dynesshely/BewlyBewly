@@ -105,6 +105,8 @@ async function setupStyles() {
   // channel page e.g. tv shows, movie, variety shows & mooc pages 分区页
   else if (
     /https?:\/\/(?:www\.)?bilibili\.com\/(?:tv|movie|variety|mooc|documentary).*/.test(currentUrl)
+    // 新版分区页
+    || /https?:\/\/(?:www\.)?bilibili\.com\/c\/.*/.test(currentUrl)
   ) {
     await injectPageStyle('channelPage')
     document.documentElement.classList.add('channelPage')

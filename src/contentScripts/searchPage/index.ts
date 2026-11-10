@@ -6,8 +6,12 @@
  * shadow root 的浮层（右下角按钮 + 面板），并通过给原生结果卡打标记 + 页面级
  * CSS 实现 j/k 高亮、密度切换与快速筛选。
  */
+import { watch } from 'vue'
+
+import { settings } from '~/logic'
+
 import { hasNativeOverlay, mountNativeOverlay, unmountNativeOverlay } from '../nativeOverlay'
-import { cleanupDom, restorePreferences, scanResultCards, watchResultCards } from './actions'
+import { cleanupDom, restorePreferences, scanResultCards, syncDensityFromSettings, watchResultCards } from './actions'
 import SearchEnhanceOverlay from './components/SearchEnhanceOverlay.vue'
 import { isSearchPage } from './dom'
 import { setupKeyboard } from './keyboard'
@@ -20,6 +24,7 @@ const RESCAN_DELAY = 800
 
 let disposeKeyboard: (() => void) | null = null
 let stopWatching: (() => void) | null = null
+let stopSettingsWatch: (() => void) | null = null
 let rescanTimer: number | null = null
 
 export function setupSearchEnhance(): void {
@@ -48,6 +53,12 @@ export function setupSearchEnhance(): void {
   stopWatching = watchResultCards()
   disposeKeyboard = setupKeyboard()
 
+  // 设置页改动实时生效
+  stopSettingsWatch = watch(
+    () => settings.value.searchDensity,
+    () => syncDensityFromSettings(),
+  )
+
   rescanTimer = window.setTimeout(() => {
     rescanTimer = null
     scanResultCards()
@@ -58,6 +69,10 @@ export function teardownSearchEnhance(): void {
   if (rescanTimer !== null) {
     window.clearTimeout(rescanTimer)
     rescanTimer = null
+  }
+  if (stopSettingsWatch) {
+    stopSettingsWatch()
+    stopSettingsWatch = null
   }
   if (stopWatching) {
     stopWatching()

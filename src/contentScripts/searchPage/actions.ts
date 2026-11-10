@@ -35,10 +35,14 @@ const HTML_COMPACT_CLASS = 'bewly-search-compact'
 const HTML_FILTER_VIDEO_CLASS = 'bewly-search-filter-video'
 const HTML_FILTER_USER_CLASS = 'bewly-search-filter-user'
 
+/** 旧版本的密度 sessionStorage key（只用于一次性迁移） */
 const DENSITY_KEY = 'bewly-search-density'
 const FILTER_KEY = 'bewly-search-filter'
 const PANEL_KEY = 'bewly-search-panel'
 const TOAST_DURATION = 1600
+const DEFAULT_DENSITY: SearchDensity = 'comfortable'
+
+let densityMigrated = false
 
 let cards: SearchResultCard[] = []
 let toastTimer: number | null = null
@@ -67,10 +71,34 @@ function writeStored(key: string, value: string): void {
   }
 }
 
+/**
+ * 把旧的 sessionStorage 密度偏好一次性迁移到 settings.searchDensity。
+ *
+ * 只在 settings 仍是默认值时才覆盖；无论是否覆盖，读完都删掉旧 key。
+ */
+function migrateLegacyDensity(): void {
+  if (densityMigrated)
+    return
+  densityMigrated = true
+
+  try {
+    const raw = window.sessionStorage.getItem(DENSITY_KEY)
+    if (raw === null)
+      return
+    window.sessionStorage.removeItem(DENSITY_KEY)
+
+    if (settings.value.searchDensity !== DEFAULT_DENSITY)
+      return
+    if (raw === 'compact' || raw === 'comfortable')
+      settings.value.searchDensity = raw
+  }
+  catch {
+    // 隐私模式 / 存储被禁用时忽略
+  }
+}
+
 function readDensity(): SearchDensity {
-  return readStored(DENSITY_KEY) === 'compact'
-    ? 'compact'
-    : 'comfortable'
+  return settings.value.searchDensity
 }
 
 function readFilter(): SearchFilterMode {
@@ -94,8 +122,9 @@ function applyFilterClass(): void {
   html.classList.toggle(HTML_FILTER_USER_CLASS, ui.filter === 'user')
 }
 
-/** 从 sessionStorage 恢复偏好并同步到 `<html>` 上的状态类 */
+/** 从 settings 恢复偏好并同步到 `<html>` 上的状态类 */
 export function restorePreferences(): void {
+  migrateLegacyDensity()
   ui.density = readDensity()
   ui.filter = readFilter()
   ui.panelOpen = readPanelOpen()
@@ -107,13 +136,22 @@ export function setDensity(next: SearchDensity, options: { silent?: boolean } = 
   if (ui.density === next)
     return
   ui.density = next
-  writeStored(DENSITY_KEY, next)
+  settings.value.searchDensity = next
   applyDensityClass()
   if (!options.silent) {
     showToast(next === 'compact'
       ? t().densityOn
       : t().densityOff)
   }
+}
+
+/** 设置页改动密度后同步到当前页面（由入口 watch 调用，不写回 settings） */
+export function syncDensityFromSettings(): void {
+  const density = readDensity()
+  if (ui.density === density && document.documentElement.classList.contains(HTML_COMPACT_CLASS) === (density === 'compact'))
+    return
+  ui.density = density
+  applyDensityClass()
 }
 
 export function setFilter(next: SearchFilterMode): void {

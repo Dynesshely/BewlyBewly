@@ -6,6 +6,7 @@
  */
 
 import type { NotificationCategoryId, NotificationDensity } from './state'
+
 import { ROOT_CLASS_COMPACT, ROOT_CLASS_ONLY_UNREAD } from './constants'
 import {
   CATEGORY_DEFS,
@@ -19,12 +20,13 @@ import {
 } from './dom'
 import { formatName, getMessages } from './i18n'
 import {
-  readStoredDensity,
+  migrateLegacyPreferences,
+  readPreferenceDensity,
+  readPreferenceUnreadOnly,
   readStoredPanelOpen,
-  readStoredUnreadOnly,
-  storeDensity,
   storePanelOpen,
-  storeUnreadOnly,
+  storePreferenceDensity,
+  storePreferenceUnreadOnly,
 } from './preferences'
 import { state } from './state'
 
@@ -77,14 +79,14 @@ export function togglePanel(force?: boolean): void {
  * 把状态同步到 <html>；页面没有可识别标记时强制关闭，避免出现「开了但什么都没变」。
  *
  * persist=false 用于「当前分类暂时没有未读、自动收起筛选」这种临时情况，
- * 不覆盖用户存在 sessionStorage 里的偏好。
+ * 不覆盖 settings 里的用户偏好。
  */
 export function applyUnreadOnly(value: boolean, persist = true): void {
   const effective = value && state.canFilterUnread
   state.unreadOnly = effective
   document.documentElement.classList.toggle(ROOT_CLASS_ONLY_UNREAD, effective)
   if (persist)
-    storeUnreadOnly(effective)
+    storePreferenceUnreadOnly(effective)
 }
 
 export function toggleUnreadOnly(): void {
@@ -108,10 +110,11 @@ export function toggleUnreadOnly(): void {
 // #endregion
 
 // #region 密度
-export function applyDensity(value: NotificationDensity): void {
+export function applyDensity(value: NotificationDensity, options: { persist?: boolean } = {}): void {
   state.density = value
   document.documentElement.classList.toggle(ROOT_CLASS_COMPACT, value === 'compact')
-  storeDensity(value)
+  if (options.persist !== false)
+    storePreferenceDensity(value)
 }
 
 export function toggleDensity(): void {
@@ -195,37 +198,49 @@ export function syncNotificationState(): void {
   if (categoriesChanged)
     state.categories = categories
 
-  // 页面没有可识别标记时，「只看未读」不能保持开启，否则会一直挂着一个空筛选
+  // 页面没有可识别标记时，「只看未读」不能保持开启，否则会一直挂着一个空筛选；
+  // 设置页里的默认偏好保留不动，等页面重新暴露未读状态后再自动应用
   if (!state.canFilterUnread && state.unreadOnly)
     applyUnreadOnly(false, false)
+  else if (readPreferenceUnreadOnly() && state.canFilterUnread && !state.unreadOnly)
+    applyUnreadOnly(true, false)
 }
 // #endregion
 
 // #region 初始化 / 复位
-/** 从 sessionStorage 恢复上次的偏好并写到 DOM 上（幂等，可重复调用） */
+/**
+ * 从 settings 恢复偏好并写到 DOM 上（幂等，可重复调用）。
+ *
+ * 读取前先做一次旧 sessionStorage 偏好迁移；这里只读取、不回写 settings，
+ * 避免「页面暂时识别不到未读状态」把用户的默认偏好改掉。
+ */
 export function restorePreferences(): void {
-  const density = readStoredDensity()
+  migrateLegacyPreferences()
+
+  const density = readPreferenceDensity()
   state.density = density
   document.documentElement.classList.toggle(ROOT_CLASS_COMPACT, density === 'compact')
 
   state.panelOpen = readStoredPanelOpen()
 
   // 未读筛选要等第一次 sync 知道 canFilterUnread 之后再决定是否恢复
-  const storedUnreadOnly = readStoredUnreadOnly()
   syncNotificationState()
-  if (storedUnreadOnly && state.canFilterUnread) {
-    state.unreadOnly = true
-    document.documentElement.classList.add(ROOT_CLASS_ONLY_UNREAD)
-    storeUnreadOnly(true)
-  }
-  else {
-    state.unreadOnly = false
-    document.documentElement.classList.remove(ROOT_CLASS_ONLY_UNREAD)
-    storeUnreadOnly(false)
-  }
+  applyUnreadOnly(readPreferenceUnreadOnly() && state.canFilterUnread, false)
 }
 
-/** 卸载时把挂在页面上的状态全部撤掉；偏好（sessionStorage）保留，下次进页恢复 */
+/**
+ * 设置页改动后把 settings 同步到当前页面（不写回 settings，避免无意义的往返）。
+ * 由入口里的 watch 调用，实现「设置页改了立刻生效」。
+ */
+export function applySettingsPreferences(): void {
+  applyDensity(readPreferenceDensity(), { persist: false })
+
+  const unreadOnly = readPreferenceUnreadOnly()
+  if (unreadOnly !== state.unreadOnly)
+    applyUnreadOnly(unreadOnly, false)
+}
+
+/** 卸载时把挂在页面上的状态全部撤掉；偏好（settings / 会话内面板状态）保留，下次进页恢复 */
 export function resetPageState(): void {
   document.documentElement.classList.remove(ROOT_CLASS_ONLY_UNREAD, ROOT_CLASS_COMPACT)
   clearItemMarks()

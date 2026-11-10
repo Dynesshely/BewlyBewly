@@ -12,6 +12,7 @@ import {
 import { getContentEl, markContentEl, prefersReducedMotion } from './dom'
 import { fontStepLabel, formatTemplate, getMessages } from './i18n'
 import {
+  migrateLegacyPreferences,
   readStoredFontStep,
   storeFontStep,
   storeReading,
@@ -44,12 +45,13 @@ export function clearToast(): void {
 }
 
 /**
- * 从 sessionStorage 恢复字号。
+ * 从 settings 恢复字号。
  *
  * 阅读模式不在这里恢复：必须等正文容器确认存在后再进（见 index.ts 的 sync），
  * 否则正文没渲染出来就先隐藏侧栏 / 评论，会得到一个空白页面。
  */
 export function restorePreferences(): void {
+  migrateLegacyPreferences()
   ui.fontStep = readStoredFontStep()
   applyFontStep(ui.fontStep)
 }

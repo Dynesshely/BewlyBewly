@@ -19,6 +19,7 @@ command_palette:
   keyboard_mode_on: 开启键盘卡片导航
   keyboard_mode_off: 关闭键盘卡片导航（恢复鼠标操作）
   empty: 没有匹配的命令
+  shortcut_unavailable: 当前页不可用
 
 keyboard_help:
   title: 键盘快捷键
@@ -591,3 +592,50 @@ search_bar:
 keyboard_toast:
   watch_later_ok: 已加入稍后再看
   watch_later_failed: 加入稍后再看失败
+
+keyboard_registry:
+  close: 关闭
+  current_scope: 当前页
+  scopes:
+    global: 全局
+    video: 视频播放页
+    list: 列表页（历史 / 稍后再看 / 收藏）
+    moments: 动态页
+    notification: 消息页
+    search: 搜索结果页
+    space: 用户空间
+    article: 专栏 / 文章页
+  actions:
+    context_menu: 打开卡片右键菜单
+    sort_cards: 切换卡片排序
+    filter_cards: 切换卡片筛选
+    next_card: 下一个条目
+    prev_card: 上一个条目
+    open_card: 打开当前条目
+    cancel_active: 取消当前高亮
+    close_panel: 关闭浮层面板
+    list_cycle_view: 循环切换视图模式
+    list_cycle_sort: 循环切换排序方式
+    list_focus_filter: 聚焦关键词过滤框
+    list_toggle_help: 打开 / 关闭本页快捷键说明
+    notify_unread_only: 只看未读消息
+    notify_density: 切换列表密度
+    notify_jump_category: 跳到第 1–4 个分类
+    video_seek_back: 后退 10 秒
+    video_play_pause: 播放 / 暂停
+    video_seek_forward: 前进 10 秒
+    video_back5: 后退 5 秒
+    video_forward5: 前进 5 秒
+    video_danmaku: 开关弹幕
+    video_mute: 静音切换
+    video_fullscreen: 全屏
+    video_cinema: 影院模式
+    video_pip: 画中画
+    video_restore: 还原迷你播放器
+    video_percent: 跳到 0%–90%
+    video_exit: 退出影院 / 关闭快捷键帮助
+    article_reading: 沉浸阅读模式
+    article_font_smaller: 正文字号减小
+    article_font_larger: 正文字号增大
+    article_back_to_top: 回到顶部
+    article_exit: 退出阅读模式 / 关闭目录

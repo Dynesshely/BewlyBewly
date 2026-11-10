@@ -12,6 +12,7 @@ import { markNativeFilteredCards } from '~/utils/nativeFilter'
 import { SVG_ICONS } from '~/utils/svgIcons'
 import { version } from '../../package.json'
 import { setupArticlePage } from './articlePage'
+import { setupChannelPage } from './channelPage'
 import { muteNativeScripts, setNativeGuardEnabled } from './nativeGuard'
 import { setupNotificationPage } from './notificationPage'
 import { setupSearchEnhance } from './searchPage'
@@ -59,6 +60,8 @@ function isSupportedPages(): boolean {
     || isVideoOrBangumiPage()
     // popular page https://www.bilibili.com/v/popular/all
     || /https?:\/\/(?:www\.)?bilibili\.com\/v\/popular\/all.*/.test(currentUrl)
+    // 新版分区页 https://www.bilibili.com/c/*
+    || /https?:\/\/(?:www\.)?bilibili\.com\/c\/.*/.test(currentUrl)
     // search page
     || /https?:\/\/search\.bilibili\.com\.*/.test(currentUrl)
     // moments page
@@ -80,6 +83,8 @@ function isSupportedPages(): boolean {
     || /https?:\/\/message\.bilibili\.com\.*/.test(currentUrl)
     // bilibili channel page b站分区页面
     || /https?:\/\/(?:www\.)?bilibili\.com\/v\/(?!popular).*/.test(currentUrl)
+    // 新版分区页（bilibili.com/c/*，由 /v/* 重定向而来）
+    || /https?:\/\/(?:www\.)?bilibili\.com\/c\/.*/.test(currentUrl)
     // anime page & chinese anime page
     || /https?:\/\/(?:www\.)?bilibili\.com\/(?:anime|guochuang).*/.test(currentUrl)
     // channel page e.g. tv shows, movie, variety shows, mooc page
@@ -251,6 +256,9 @@ async function onDOMLoaded() {
 
   // 专栏 / 文章页阅读模式（沉浸阅读 / 进度 / 目录 / 字号）
   setupArticlePage()
+
+  // 分区 / 频道页增强层（密度、排序快捷、j/k 浏览）
+  setupChannelPage()
 
   // 原生页面（搜索页等）的屏蔽词过滤：标记式隐藏，可逆
   if (settings.value.nativeFilterEnabled && !isFullyTakenOverPage())

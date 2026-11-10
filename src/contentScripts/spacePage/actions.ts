@@ -22,12 +22,13 @@ import {
 import { collectCards, findQuickJumpAnchor, prefersReducedMotion } from './dom'
 import { getMessages } from './i18n'
 import {
-  readStoredDensity,
+  migrateLegacyPreferences,
+  readPreferenceDensity,
   readStoredFilter,
   readStoredPanelOpen,
-  storeDensity,
   storeFilter,
   storePanelOpen,
+  storePreferenceDensity,
 } from './preferences'
 import { ui } from './state'
 
@@ -70,7 +71,8 @@ function applyFilterClass(): void {
 // #region 偏好
 /** 从 sessionStorage 恢复偏好并同步到 <html> 上的状态类 */
 export function restorePreferences(): void {
-  ui.density = readStoredDensity()
+  migrateLegacyPreferences()
+  ui.density = readPreferenceDensity()
   ui.filter = readStoredFilter()
   ui.panelOpen = readStoredPanelOpen()
   applyDensityClass()
@@ -81,13 +83,22 @@ export function setDensity(next: SpaceDensity, options: { silent?: boolean } = {
   if (ui.density === next)
     return
   ui.density = next
-  storeDensity(next)
+  storePreferenceDensity(next)
   applyDensityClass()
   if (!options.silent) {
     showToast(next === 'compact'
       ? t().densityOn
       : t().densityOff)
   }
+}
+
+/** 设置页改动密度后同步到当前页面（由入口 watch 调用，不写回 settings） */
+export function syncDensityFromSettings(): void {
+  const density = readPreferenceDensity()
+  if (ui.density === density && document.documentElement.classList.contains(ROOT_CLASS_COMPACT) === (density === 'compact'))
+    return
+  ui.density = density
+  applyDensityClass()
 }
 
 export function setFilter(next: SpaceFilterMode): void {

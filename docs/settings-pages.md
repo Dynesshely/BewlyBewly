@@ -67,3 +67,44 @@
 - 旧 localStorage 迁移只在 settings 仍为默认值时生效：如果用户先改了设置、再打开旧的本地存储值，以设置为准（这是有意为之）；
 - 三个列表页的排序现在是**共用**一个设置，单独给某一页换排序会同时影响另外两页（按简报「默认排序」语义实现）；
 - 设置页文案只提供简中 / 英文两套，其他语言（cmn-TW、jyut）回落简中，与第 1/2 轮的模块内 i18n 约定一致。
+## 五、第 5 轮：模块偏好并入设置页
+
+> 把第 3–4 轮散落在 localStorage / sessionStorage 的模块偏好收进 settings（字段由 Lead 在 `src/logic/storage.ts` 新增，模块只读使用）。
+
+### 新增分组（仍在「页面增强」页）
+
+| 分组 | 项 | settings 字段 | 控件 |
+|---|---|---|---|
+| 动态页 | 卡片密度 | `momentsDensity` | Select（舒适 / 紧凑） |
+| 消息页 | 默认只看未读 | `notificationOnlyUnread` | Radio |
+| 消息页 | 列表密度 | `notificationDensity` | Select |
+| 搜索结果页 | 结果密度 | `searchDensity` | Select |
+| 用户空间 | 内容密度 | `spaceDensity` | Select |
+| 文章页 | 默认进入阅读模式 | `articleReadingMode` | Radio |
+| 文章页 | 正文字号 | `articleFontSize` | Select（小 / 中 / 大） |
+
+文案仍走模块内 i18n（`src/components/Settings/Pages/i18n.ts`，cmn-CN + en）。
+
+### 各模块改动
+
+- **动态页**（`src/contentScripts/views/Moments/composables/useMomentsDensity.ts`）：密度直接绑定 `settings.momentsDensity` 的可写 computed，页面工具条切换即回写 settings；旧 key `bewly-moments-density`（localStorage）一次性迁移后删除。设置页改动通过响应式依赖实时反映到卡片上。
+- **消息页**（`notificationPage/preferences.ts`、`actions.ts`、`index.ts`）：「只看未读」与「列表密度」改为读写 settings，旧 session key `bewly-notif-only-unread` / `bewly-notif-density` 迁移后删除；面板展开状态继续留在 sessionStorage。入口 `watch` 两个 settings 字段，设置页改动立刻应用（打开未读筛选时若页面暂时识别不到未读状态，会等下一次同步再应用）。
+- **搜索结果页**（`searchPage/actions.ts`、`index.ts`）：密度改为 `settings.searchDensity`，旧 `bewly-search-density` 迁移后删除；快速筛选与面板展开仍在 sessionStorage。入口 `watch(settings.searchDensity)` 实时同步 `<html>` 上的密度类。
+- **用户空间**（`spacePage/preferences.ts`、`actions.ts`、`index.ts`）：密度改为 `settings.spaceDensity`，旧 `bewly-space-density` 迁移后删除；内容筛选与面板状态仍在 sessionStorage。入口 `watch` 实时同步。
+- **文章页**（`articlePage/preferences.ts`、`actions.ts`、`index.ts`）：默认阅读模式与字号改为 `settings.articleReadingMode` / `settings.articleFontSize`，旧 `bewly-article-reading` / `bewly-article-font` 迁移后删除；目录展开仍在 sessionStorage。入口 `watch` 两个字段：字号立即换算，阅读模式按需切换（正文未就绪时等 `sync` 补进，避免把页面藏空）。
+
+### 迁移策略（统一）
+
+1. 首次使用时读取旧 key；**仅当对应 settings 字段仍是默认值**时才覆盖（用户先改过设置则以设置为准）；
+2. 无论是否覆盖，读完立即删除旧 key，保证只迁移一次；
+3. 纯会话内 UI 状态（面板展开、目录展开、快速筛选）不进 settings，保持 sessionStorage。
+
+### 第 5 轮 Lead 接线
+
+无。设置页分组、各模块读写与 watch 均已完成；分区 / 频道页（`channelPage`）按简报 C 节仍用 sessionStorage，本轮不进设置页。
+
+### 第 5 轮已知限制
+
+- 各模块的旧值迁移在模块挂载时同步执行，与 settings 的异步读取存在极小的冷启动竞态（若读取晚于迁移完成，可能短暂按默认值显示；settings 读完后由 watch 纠正）。原生页模块在 DOM 就绪后才挂载，实际几乎不会命中；
+- 消息页「默认只看未读」是页面级偏好：页面识别不到未读标记时不会强行开启筛选，避免出现空白列表；
+- 动态页密度只影响卡片内部排版，不改变卡片流的分栏数量（分栏仍由页面宽度决定）。

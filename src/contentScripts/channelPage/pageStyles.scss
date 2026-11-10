@@ -1,0 +1,84 @@
+/**
+ * 分区 / 频道页增强的页面级样式（作用在 B 站原生 DOM 上，不在 shadow root 内）。
+ *
+ * 注入点有两个（共用这一份规则）：
+ *   1. tv / movie / variety / mooc / documentary 子频道：adaptedStyles 注入
+ *      `channelPage.css`，其中 `@use` 了本文件；
+ *   2. `/v/*`、`/channel/*`：不在 adaptedStyles 的注入清单里，由
+ *      `src/contentScripts/channelPage` 通过 `?inline` 自行注入 <style>。
+ *
+ * 状态类由模块加在 <html> 上：
+ *   .bewly-channel-page     模块接管标记（同时是本文件的作用域）
+ *   .bewly-channel-compact  紧凑密度
+ * 卡片标记：
+ *   [data-bewly-channel-card]    视频卡
+ *   [data-bewly-channel-active]  j/k 当前高亮卡
+ * 颜色只用 --bew-* 变量，暗色自动跟随；不使用 :has()，不做大范围 !important。
+ */
+
+// #region 键盘高亮
+html.bewly-channel-page {
+  [data-bewly-channel-active] {
+    position: relative;
+    z-index: 1;
+    border-radius: var(--bew-radius);
+    outline: 2px solid var(--bew-theme-color);
+    outline-offset: 3px;
+    box-shadow: 0 0 0 6px var(--bew-theme-color-20);
+    transition:
+      outline-color 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
+      box-shadow 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+
+  // scrollIntoView 居中滚动时不要被顶部导航盖住
+  [data-bewly-channel-card] {
+    scroll-margin-block: calc(var(--bew-top-bar-height) + 24px) 32px;
+  }
+}
+// #endregion
+
+// #region 紧凑密度
+html.bewly-channel-page.bewly-channel-compact {
+  [data-bewly-channel-card] {
+    // 标题收到单行、字号降一档
+    .bili-video-card__info--tit,
+    .video-name,
+    h3 {
+      display: -webkit-box;
+      overflow: hidden;
+      font-size: 13px;
+      line-height: 1.35;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 1;
+      line-clamp: 1;
+      text-overflow: ellipsis;
+    }
+
+    // 作者 / 元信息降一档
+    .bili-video-card__info--author,
+    .up-name,
+    .upname {
+      font-size: 12px;
+    }
+
+    // 标题与封面之间更贴一些
+    .bili-video-card__info {
+      padding-top: 6px;
+    }
+
+    // 封面圆角收小一档，视觉更紧凑
+    .bili-video-card__wrap,
+    .bili-video-card__cover {
+      border-radius: var(--bew-radius-half);
+    }
+  }
+}
+// #endregion
+
+// #region 动效降级
+@media (prefers-reduced-motion: reduce) {
+  html.bewly-channel-page [data-bewly-channel-active] {
+    transition: none;
+  }
+}
+// #endregion

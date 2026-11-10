@@ -8,8 +8,13 @@
  *
  * 非消息页是空操作；重复调用是幂等的（nativeOverlay 按 hostId 去重）。
  */
+import { watch } from 'vue'
+
+import { settings } from '~/logic'
+
 import { hasNativeOverlay, mountNativeOverlay, unmountNativeOverlay } from '../nativeOverlay'
 import {
+  applySettingsPreferences,
   resetPageState,
   restorePreferences,
   syncNotificationState,
@@ -29,6 +34,7 @@ const SYNC_INTERVAL = 1500
 const SYNC_AFTER_INTERACTION = 350
 
 let disposeShortcuts: (() => void) | null = null
+let stopSettingsWatch: (() => void) | null = null
 let observer: MutationObserver | null = null
 let intervalTimer: number | null = null
 let debounceTimer: number | null = null
@@ -63,6 +69,12 @@ function mount(): void {
 
   disposeShortcuts = setupShortcuts()
 
+  // 设置页改动实时生效（settings 通过 storage.local 跨上下文同步）
+  stopSettingsWatch = watch(
+    () => [settings.value.notificationOnlyUnread, settings.value.notificationDensity] as const,
+    () => applySettingsPreferences(),
+  )
+
   const observeRoot = getObserveRoot() ?? document.body
   observer = new MutationObserver(() => scheduleSync())
   observer.observe(observeRoot, { childList: true, subtree: true })
@@ -95,6 +107,10 @@ function unmount(): void {
   if (interactionTimer !== null) {
     window.clearTimeout(interactionTimer)
     interactionTimer = null
+  }
+  if (stopSettingsWatch) {
+    stopSettingsWatch()
+    stopSettingsWatch = null
   }
   if (disposeShortcuts) {
     disposeShortcuts()

@@ -1,67 +1,73 @@
 <script setup lang="ts">
-import type { FavoriteCategory, FavoriteResource } from '~/components/TopBar/types'
-
+import type { ListCardItem, ListCategoryChip, ListQuickActionId } from '../listShared/types'
+import type { FavoriteResource } from '~/components/TopBar/types'
 import type { Media as FavoriteItem, FavoritesResult } from '~/models/video/favorite'
 import type { List as CategoryItem, FavoritesCategoryResult } from '~/models/video/favoriteCategory'
 import { useI18n } from 'vue-i18n'
+import { useToast } from 'vue-toastification'
 import { useBewlyApp } from '~/composables/useAppProvider'
 import { useListPageActions } from '~/composables/useListPageActions'
-import { TOP_BAR_VISIBILITY_CHANGE } from '~/constants/globalEvents'
-import { settings } from '~/logic'
 import api from '~/utils/api'
 import { getCSRF, getUserID, openLinkToNewTab, removeHttpFromUrl } from '~/utils/main'
-import emitter from '~/utils/mitt'
+
+import ListCategoryChips from '../listShared/components/ListCategoryChips.vue'
+import ListEmptyState from '../listShared/components/ListEmptyState.vue'
+import ListGroupSection from '../listShared/components/ListGroupSection.vue'
+import ListPageHeader from '../listShared/components/ListPageHeader.vue'
+import ListSkeleton from '../listShared/components/ListSkeleton.vue'
+import ListToolbar from '../listShared/components/ListToolbar.vue'
+import { useListI18n } from '../listShared/i18n'
+import { useListPreferences } from '../listShared/preferences'
+import { formatTimeLabel, groupItemsByTime, sortListItems } from '../listShared/timeline'
+import { useListShortcuts } from '../listShared/useListShortcuts'
+import { copyToClipboard } from '../listShared/utils'
+import '../listShared/styles/listPage.scss'
 
 const { t } = useI18n()
+const { tl } = useListI18n()
+const toast = useToast()
 
 const favoriteCategories = reactive<CategoryItem[]>([])
 const favoriteResources = reactive<FavoriteItem[]>([])
-const categoryOptions = reactive<Array<{ value: any, label: string }>>([])
 
-const selectedCategory = ref<FavoriteCategory>()
+const selectedCategory = ref<CategoryItem>()
 const activatedCategoryCover = ref<string>('')
 
-const shouldMoveCtrlBarUp = ref<boolean>(false)
 const currentPageNum = ref<number>(1)
-const keyword = ref<string>('')
+const filterKeyword = ref<string>('')
+/** 提交给收藏接口的关键词（回车触发），与本地过滤分开 */
+const searchKeyword = ref<string>('')
 const { haveScrollbar } = useBewlyApp()
 const isLoading = ref<boolean>(false)
-const isFullPageLoading = ref<boolean>(false)
 const noMoreContent = ref<boolean>(false)
+const hasLoadedOnce = ref<boolean>(false)
+
+const { viewMode, sortMode, cycleViewMode, cycleSortMode } = useListPreferences('favorites')
+const toolbarRef = ref<{ focusFilter: () => void, toggleHelp: () => void } | null>(null)
+
+const loggedIn = computed(() => Boolean(getCSRF()))
 
 onMounted(() => {
-  emitter.off(TOP_BAR_VISIBILITY_CHANGE)
-  emitter.on(TOP_BAR_VISIBILITY_CHANGE, (val) => {
-    shouldMoveCtrlBarUp.value = false
-
-    // Allow moving tabs up only when the top bar is not hidden & is set to auto-hide
-    // This feature is primarily designed to compatible with the Bilibili Evolved's top bar
-    // Even when the BewlyBewly top bar is hidden, the Bilibili Evolved top bar still exists, so not moving up
-    if (settings.value.autoHideTopBar && settings.value.showTopBar) {
-      if (val)
-        shouldMoveCtrlBarUp.value = false
-
-      else
-        shouldMoveCtrlBarUp.value = true
-    }
-  })
-
   initData()
 })
 
-async function initData() {
-  await getFavoriteCategories()
-  changeCategory(favoriteCategories[0])
-}
-
-onUnmounted(() => {
-  emitter.off(TOP_BAR_VISIBILITY_CHANGE)
+useListShortcuts({
+  viewMode,
+  sortMode,
+  cycleViewMode,
+  cycleSortMode,
+  focusFilter: () => toolbarRef.value?.focusFilter(),
+  toggleHelp: () => toolbarRef.value?.toggleHelp(),
 })
 
 useListPageActions({
   isLoading,
   noMoreContent,
-  reachBottom: () => getFavoriteResources(selectedCategory.value!.id, ++currentPageNum.value, keyword.value),
+  reachBottom: () => {
+    if (!selectedCategory.value)
+      return
+    getFavoriteResources(selectedCategory.value.id, ++currentPageNum.value, searchKeyword.value)
+  },
   refresh: () => {
     favoriteResources.length = 0
     currentPageNum.value = 1
@@ -70,22 +76,19 @@ useListPageActions({
   },
 })
 
+async function initData() {
+  await getFavoriteCategories()
+  if (favoriteCategories[0])
+    changeCategory(favoriteCategories[0])
+}
+
 async function getFavoriteCategories() {
   await api.favorite.getFavoriteCategories({
     up_mid: getUserID(),
   })
     .then((res: FavoritesCategoryResult) => {
-      if (res.code === 0) {
+      if (res.code === 0)
         Object.assign(favoriteCategories, res.data.list)
-
-        categoryOptions.length = 0
-        favoriteCategories.forEach((item) => {
-          categoryOptions.push({
-            label: item.title,
-            value: item,
-          })
-        })
-      }
     })
 }
 
@@ -100,8 +103,6 @@ async function getFavoriteResources(
   pn: number,
   keyword = '' as string,
 ) {
-  // if (pn === 1)
-  //   isFullPageLoading.value = true
   isLoading.value = true
   try {
     const res: FavoritesResult = await api.favorite.getFavoriteResources({
@@ -119,33 +120,45 @@ async function getFavoriteResources(
       if (!res.data.medias)
         noMoreContent.value = true
 
-      if (!await haveScrollbar() && !noMoreContent.value)
-        await getFavoriteResources(selectedCategory.value!.id, ++currentPageNum.value, keyword)
+      if (!await haveScrollbar() && !noMoreContent.value && selectedCategory.value)
+        await getFavoriteResources(selectedCategory.value.id, ++currentPageNum.value, keyword)
     }
   }
   finally {
     isLoading.value = false
-    // isFullPageLoading.value = false
+    hasLoadedOnce.value = true
   }
 }
 
-async function changeCategory(categoryItem: FavoriteCategory) {
-  if (isLoading.value)
+async function changeCategory(categoryItem: CategoryItem | undefined) {
+  if (!categoryItem || isLoading.value)
     return
   currentPageNum.value = 1
   selectedCategory.value = categoryItem
   favoriteResources.length = 0
   noMoreContent.value = false
+  searchKeyword.value = ''
+  hasLoadedOnce.value = false
 
   getFavoriteResources(categoryItem.id, 1)
 }
 
+function handleCategorySelect(id: number) {
+  const category = favoriteCategories.find(item => item.id === id)
+  if (category)
+    changeCategory(category)
+}
+
 function handleSearch() {
+  if (!selectedCategory.value)
+    return
   currentPageNum.value = 1
   favoriteResources.length = 0
   noMoreContent.value = false
+  hasLoadedOnce.value = false
+  searchKeyword.value = filterKeyword.value.trim()
 
-  getFavoriteResources(selectedCategory.value!.id, currentPageNum.value, keyword.value)
+  getFavoriteResources(selectedCategory.value.id, currentPageNum.value, searchKeyword.value)
 }
 
 function handlePlayAll() {
@@ -175,202 +188,251 @@ function handleUnfavorite(favoriteResource: FavoriteResource) {
 function isMusic(item: FavoriteResource) {
   return item.link.includes('bilibili://music')
 }
+
+const categoryChips = computed<Array<ListCategoryChip>>(() => favoriteCategories.map(item => ({
+  id: item.id,
+  title: item.title,
+  count: item.media_count,
+})))
+
+const heroCover = computed(() => {
+  if (!activatedCategoryCover.value)
+    return ''
+  return `${removeHttpFromUrl(activatedCategoryCover.value)}@480w_270h_1c`
+})
+
+const subtitle = computed(() => tl('favorites.subtitle', {
+  name: selectedCategory.value?.title ?? '',
+  count: favoriteResources.length,
+}))
+
+const cards = computed<Array<ListCardItem>>(() => {
+  const keyword = filterKeyword.value.trim().toLowerCase()
+  const items = keyword
+    ? favoriteResources.filter(item => matchesKeyword(item, keyword))
+    : [...favoriteResources]
+  return sortListItems(items.map(toCard), sortMode.value)
+})
+
+const showsTimeGroup = computed(() => sortMode.value === 'time')
+
+const sections = computed<Array<{ key: string, label: string, items: ListCardItem[] }>>(() => {
+  if (!showsTimeGroup.value) {
+    return [
+      { key: 'all', label: '', items: cards.value },
+    ]
+  }
+
+  return groupItemsByTime(cards.value, card => card.timestamp).map(group => ({
+    key: group.key,
+    label: tl(`group.${group.key}`),
+    items: group.items,
+  }))
+})
+
+const sortNote = computed(() => (showsTimeGroup.value
+  ? ''
+  : tl('sort.note', {
+      dim: tl(`sort.${sortMode.value}`),
+      count: cards.value.length,
+    })))
+
+const showSkeleton = computed(() => cards.value.length === 0 && (!hasLoadedOnce.value || isLoading.value))
+const showEmpty = computed(() => cards.value.length === 0 && hasLoadedOnce.value && !isLoading.value)
+
+// 清空过滤词时回到完整收藏内容（若当前处于服务端搜索结果中）
+watch(filterKeyword, (value) => {
+  if (value.trim() || !searchKeyword.value || !selectedCategory.value)
+    return
+  handleSearch()
+})
+
+const emptyState = computed(() => {
+  const word = filterKeyword.value.trim()
+  if (word) {
+    return {
+      icon: 'i-mingcute:search-2-line',
+      title: tl('filter.empty_title'),
+      description: tl('filter.empty_desc', { word }),
+    }
+  }
+  return {
+    icon: 'i-mingcute:star-line',
+    title: tl('favorites.empty_title'),
+    description: tl('favorites.empty_desc'),
+  }
+})
+
+function matchesKeyword(item: FavoriteItem, keyword: string): boolean {
+  const haystack = [item.title, item.upper?.name, item.intro]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+  return haystack.includes(keyword)
+}
+
+function getFavoriteUrl(item: FavoriteItem): string {
+  if (isMusic(item as unknown as FavoriteResource))
+    return `https://www.bilibili.com/audio/au${item.id}`
+  if (item.bvid)
+    return `https://www.bilibili.com/video/${item.bvid}`
+  return item.link || ''
+}
+
+function toCard(item: FavoriteItem): ListCardItem {
+  const music = isMusic(item as unknown as FavoriteResource)
+  const url = getFavoriteUrl(item)
+  const timestamp = item.fav_time
+    ? item.fav_time * 1000
+    : undefined
+
+  const actions: ListQuickActionId[] = []
+  if (!music)
+    actions.push('watchLater')
+  actions.push('copy', 'unfavorite')
+
+  return {
+    key: item.id,
+    video: {
+      id: item.id,
+      title: item.title,
+      cover: item.cover,
+      duration: item.duration,
+      url,
+      author: {
+        name: item.upper?.name,
+        authorFace: item.upper?.face ?? '',
+        mid: item.upper?.mid,
+      },
+      view: item.cnt_info?.play,
+      danmaku: item.cnt_info?.danmaku,
+      publishedTimestamp: item.pubtime || undefined,
+      bvid: music ? undefined : item.bvid,
+      threePointV2: [],
+    },
+    copyUrl: url,
+    timestamp,
+    timeLabel: timestamp
+      ? formatTimeLabel(timestamp)
+      : undefined,
+    actions,
+    raw: item,
+  }
+}
+
+async function copyCardLink(card: ListCardItem) {
+  if (!card.copyUrl)
+    return
+  const succeeded = await copyToClipboard(card.copyUrl)
+  if (succeeded)
+    toast.success(tl('action.copied'))
+  else
+    toast.error(tl('action.copy_failed'))
+}
+
+function saveToWatchLater(card: ListCardItem) {
+  const item = card.raw as FavoriteItem | undefined
+  if (!item || isMusic(item as unknown as FavoriteResource))
+    return
+
+  api.watchlater.saveToWatchLater({
+    aid: item.id,
+    csrf: getCSRF(),
+  })
+    .then((res) => {
+      if (res.code === 0)
+        toast.success(tl('action.watchLater_ok'))
+      else
+        toast.error(res.message || tl('action.watchLater_failed'))
+    })
+    .catch(() => {
+      toast.error(tl('action.watchLater_failed'))
+    })
+}
+
+function handleCardAction(payload: { id: ListQuickActionId, item: ListCardItem }) {
+  if (payload.id === 'copy') {
+    copyCardLink(payload.item)
+  }
+  else if (payload.id === 'unfavorite') {
+    const raw = payload.item.raw as FavoriteItem | undefined
+    if (raw)
+      handleUnfavorite(raw as unknown as FavoriteResource)
+  }
+  else if (payload.id === 'watchLater') {
+    saveToWatchLater(payload.item)
+  }
+}
 </script>
 
 <template>
-  <div v-if="getCSRF()" flex="~ col md:row lg:row" gap-6>
-    <main w="full md:60% lg:70% xl:75%" order="2 md:1 lg:1" relative>
-      <!-- <h3 text="3xl $bew-text-1" font-bold mb-6>
-        {{ selectedCategory?.title }}
-      </h3> -->
-      <div
-        fixed z-10 absolute p-2 flex="~ gap-2"
-        items-center
-        bg="$bew-elevated-solid" rounded="$bew-radius" shadow="$bew-shadow-2" mt--2 transition="all 300 ease-in-out"
-        :class="{ hide: shouldMoveCtrlBarUp }"
-      >
-        <Select v-model="selectedCategory" w-150px :options="categoryOptions" @change="(val: FavoriteCategory) => changeCategory(val)" />
-        <Input v-model="keyword" w-250px @enter="handleSearch" />
-        <Button type="primary" @click="handleSearch">
-          <template #left>
-            <div i-tabler:search />
-          </template>
-        </Button>
-        <!-- <h3
-          text="2xl $bew-text-1" font-bold w-150px
-        >
-          {{ selectedCategory?.title }}
-        </h3> -->
-      </div>
-      <Empty v-if="favoriteResources.length === 0 && !isLoading" m="t-55px b-6" />
+  <div class="bewly-list-page">
+    <template v-if="loggedIn">
+      <ListPageHeader :title="t('dock.favorites')" :subtitle="subtitle" :cover="heroCover">
+        <template #actions>
+          <Button type="primary" size="small" @click="handlePlayAll">
+            <template #left>
+              <div i-tabler:player-play />
+            </template>
+            {{ t('common.play_all') }}
+          </Button>
+        </template>
+      </ListPageHeader>
+
+      <ListCategoryChips
+        :categories="categoryChips"
+        :selected-id="selectedCategory?.id"
+        @select="handleCategorySelect"
+      />
+
+      <ListToolbar
+        ref="toolbarRef"
+        v-model:view-mode="viewMode"
+        v-model:sort-mode="sortMode"
+        v-model:filter-keyword="filterKeyword"
+        :title="selectedCategory?.title"
+        :count="cards.length"
+        @search="handleSearch"
+      />
+
+      <p v-if="sortNote" class="bewly-list-sort-note">
+        {{ sortNote }}
+      </p>
+
+      <ListSkeleton v-if="showSkeleton" :view-mode="viewMode" />
+
+      <ListEmptyState
+        v-else-if="showEmpty"
+        :title="emptyState.title"
+        :description="emptyState.description"
+        :icon="emptyState.icon"
+      />
+
       <template v-else>
-        <Transition name="fade">
-          <Loading v-if="isFullPageLoading" w-full h-full pos="absolute top-0 left-0" mt--50px />
-        </Transition>
-        <!-- favorite list -->
-        <div grid="~ 2xl:cols-4 xl:cols-3 lg:cols-2 md:cols-1 sm:cols-1 cols-1 gap-5" m="t-55px b-6">
-          <TransitionGroup name="list">
-            <VideoCard
-              v-for="item in favoriteResources"
-              :key="item.id"
-              :video="{
-                id: item.id,
-                duration: item.duration,
-                title: item.title,
-                cover: item.cover,
-                author: {
-                  name: item.upper.name,
-                  authorFace: item.upper.face,
-                  mid: item.upper.mid,
-                },
-                view: item.cnt_info.play,
-                danmaku: item.cnt_info.danmaku,
-                publishedTimestamp: item.pubtime,
-                bvid: isMusic(item) ? undefined : item.bvid,
-                url: isMusic(item) ? `https://www.bilibili.com/audio/au${item.id}` : undefined,
-              }"
-              group
-            >
-              <template #coverTopLeft>
-                <button
-                  p="x-2 y-1" m="1"
-                  rounded="$bew-radius"
-                  text="!white xl"
-                  bg="black opacity-60 hover:$bew-error-color-80"
-                  @click.prevent.stop="handleUnfavorite(item)"
-                >
-                  <Tooltip :content="$t('favorites.unfavorite')" placement="bottom" type="dark">
-                    <div i-ic-baseline-clear />
-                  </Tooltip>
-                </button>
-              </template>
-            </VideoCard>
-          </TransitionGroup>
-        </div>
+        <ListGroupSection
+          v-for="section in sections"
+          :key="section.key"
+          :label="section.label"
+          :count="section.items.length"
+          :items="section.items"
+          :view-mode="viewMode"
+          @action="handleCardAction"
+        />
 
         <!-- no more content -->
         <Empty v-if="noMoreContent" class="py-4" :description="$t('common.no_more_content')" />
 
         <!-- loading -->
         <Transition name="fade">
-          <Loading
-            v-if="isLoading && favoriteResources.length !== 0 && !noMoreContent"
-            m="-t-4"
-          />
+          <Loading v-if="isLoading && cards.length !== 0 && !noMoreContent" m="-t-4" />
         </Transition>
       </template>
-    </main>
+    </template>
 
-    <aside relative w="full md:40% lg:30% xl:25%" class="hidden md:block" order="1 md:2 lg:2">
-      <div
-        pos="sticky top-120px"
-        w-full h="auto md:[calc(100vh-160px)]"
-        my-10
-        rounded="$bew-radius"
-        overflow-hidden
-      >
-        <!-- Frosted Glass Cover -->
-        <div
-          pos="absolute top-0 left-0" w-full h-full
-          z--1
-        >
-          <div
-            absolute w-full h-full
-            bg="$bew-fill-4"
-          />
-          <img
-            v-if="activatedCategoryCover"
-            :src="removeHttpFromUrl(`${activatedCategoryCover}@480w_270h_1c`)"
-            w-full h-full object="cover center" blur-40px
-            relative z--1
-          >
-        </div>
-
-        <!-- Content -->
-        <main
-          pos="absolute top-0 left-0"
-          w-full h-full
-          overflow-overlay
-          flex="~ col gap-4 justify-start"
-          p-6
-        >
-          <picture
-            rounded="$bew-radius" style="box-shadow: 0 16px 24px -12px rgba(0, 0, 0, .36)"
-            aspect-video mb-4 bg="$bew-skeleton"
-          >
-            <img
-              v-if="activatedCategoryCover" :src="removeHttpFromUrl(`${activatedCategoryCover}@480w_270h_1c`)"
-              rounded="$bew-radius" aspect-video w-full object-cover
-            >
-            <div v-else aspect-video w-full>
-              <!-- <Empty /> -->
-            </div>
-          </picture>
-
-          <h3 text="3xl white" fw-600 style="text-shadow: 0 0 12px rgba(0,0,0,.3)">
-            {{ selectedCategory?.title }}
-          </h3>
-          <p flex="~ col" gap-4>
-            <Button
-              color="rgba(255,255,255,.35)" block text-color="white" strong flex-1
-              @click="handlePlayAll"
-            >
-              <template #left>
-                <div i-tabler:player-play />
-              </template>
-              {{ t('common.play_all') }}
-            </Button>
-          </p>
-          <ul
-            class="category-list" h-full min-h-200px
-            overflow-overlay
-            border="1 color-[rgba(255,255,255,.2)]"
-            rounded="$bew-radius"
-          >
-            <li
-              v-for="item in favoriteCategories" :key="item.id"
-              border-b="1 color-[rgba(255,255,255,.2)]"
-              lh-30px px-4 cursor-pointer hover:bg="[rgba(255,255,255,.35)]"
-              duration-300 color-white flex justify-between
-              :style="{ background: item.id === selectedCategory?.id ? 'rgba(255,255,255,.35)' : '', pointerEvents: isFullPageLoading ? 'none' : 'auto' }"
-              @click="changeCategory(item)"
-            >
-              <span>{{ item.title }}</span> <span ml-2 color-white color-opacity-60>{{ item.media_count }}</span>
-            </li>
-          </ul>
-        </main>
-      </div>
-    </aside>
+    <Empty v-else mt-6 :description="t('common.please_log_in_first')">
+      <Button type="primary" @click="jumpToLoginPage()">
+        {{ $t('common.login') }}
+      </Button>
+    </Empty>
   </div>
-  <Empty v-else mt-6 :description="t('common.please_log_in_first')">
-    <Button type="primary" @click="jumpToLoginPage()">
-      {{ $t('common.login') }}
-    </Button>
-  </Empty>
 </template>
-
-<style lang="scss" scoped>
-.hide {
-  transform: translateY(-70px);
-}
-
-.category-list {
-  &::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background-color: rgba(255, 255, 255, 0.35);
-    border-radius: 20px;
-  }
-
-  &::-webkit-scrollbar-corner {
-    background: transparent;
-  }
-}
-</style>

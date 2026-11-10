@@ -126,6 +126,11 @@ function getPopularAnimeList() {
 <template>
   <div>
     <div>
+      <!-- 一周番剧时间表：一周时间轴条 + 当日主推大卡 + 其余日卡片流（见 docs/anime-search-pages.md） -->
+      <section class="anime-section">
+        <AnimeTimeTable ref="animeTimeTableRef" />
+      </section>
+
       <!-- Your Watchlist -->
       <section v-if="getUserID()" class="anime-section">
         <div flex justify-between items-center mb-6>
@@ -238,17 +243,6 @@ function getPopularAnimeList() {
             />
           </div>
         </HorizontalScrollView>
-      </section>
-
-      <!-- Anime Timetable -->
-      <section class="anime-section">
-        <div flex justify-between items-end>
-          <h3 text="3xl $bew-text-1" font="bold">
-            {{ $t('anime.anime_timetable.title') }}
-          </h3>
-        </div>
-
-        <AnimeTimeTable ref="animeTimeTableRef" w="[calc(100%+1.5rem)]" />
       </section>
 
       <!-- Recommended for you -->

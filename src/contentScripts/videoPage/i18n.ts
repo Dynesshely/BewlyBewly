@@ -1,0 +1,170 @@
+import { computed } from 'vue'
+
+import { LanguageType } from '~/enums/appEnums'
+import { settings } from '~/logic'
+
+/** 快捷键说明文案（与 shortcuts.ts 的 labelKey 一一对应） */
+export interface ShortcutLabels {
+  seekBack: string
+  seekForward: string
+  playPause: string
+  back5: string
+  forward5: string
+  danmaku: string
+  mute: string
+  fullscreen: string
+  cinema: string
+  pip: string
+  restore: string
+  percent: string
+  help: string
+  escape: string
+}
+
+export type ShortcutLabelKey = keyof ShortcutLabels
+
+export interface VideoPageMessages {
+  controls: string
+  cinema: string
+  exitCinema: string
+  cinemaOn: string
+  cinemaOff: string
+  restorePlayer: string
+  restored: string
+  compactBack: string
+  miniPlayer: string
+  danmaku: string
+  danmakuOn: string
+  danmakuOff: string
+  mute: string
+  muted: string
+  unmuted: string
+  fullscreen: string
+  pip: string
+  pipUnsupported: string
+  pipFailed: string
+  playerNotFound: string
+  shortcuts: string
+  shortcutsTitle: string
+  shortcutsHint: string
+  close: string
+  /** 形如「已跳到 {percent}%」，用 formatPercent 替换占位符 */
+  percent: string
+  shortcut: ShortcutLabels
+}
+
+const CMN_CN: VideoPageMessages = {
+  controls: '播放器增强',
+  cinema: '影院模式',
+  exitCinema: '退出影院',
+  cinemaOn: '已进入影院模式，按 Esc 退出',
+  cinemaOff: '已退出影院模式',
+  restorePlayer: '还原播放器',
+  restored: '已还原播放器',
+  compactBack: '回到播放',
+  miniPlayer: '迷你播放器',
+  danmaku: '弹幕',
+  danmakuOn: '弹幕已开启',
+  danmakuOff: '弹幕已关闭',
+  mute: '静音',
+  muted: '已静音',
+  unmuted: '已取消静音',
+  fullscreen: '全屏',
+  pip: '画中画',
+  pipUnsupported: '当前浏览器不支持画中画',
+  pipFailed: '画中画启动失败',
+  playerNotFound: '未找到播放器',
+  shortcuts: '快捷键',
+  shortcutsTitle: '播放页快捷键',
+  shortcutsHint: '按 ? 打开或关闭帮助，Esc 关闭',
+  close: '关闭',
+  percent: '已跳到 {percent}%',
+  shortcut: {
+    seekBack: '后退 10 秒',
+    seekForward: '前进 10 秒',
+    playPause: '播放 / 暂停',
+    back5: '后退 5 秒',
+    forward5: '前进 5 秒',
+    danmaku: '开关弹幕',
+    mute: '静音切换',
+    fullscreen: '全屏',
+    cinema: '影院模式',
+    pip: '画中画',
+    restore: '还原迷你播放器',
+    percent: '跳到 0%–90%',
+    help: '打开 / 关闭快捷键帮助',
+    escape: '退出影院 / 关闭帮助',
+  },
+}
+
+const EN: VideoPageMessages = {
+  controls: 'Player enhancements',
+  cinema: 'Cinema mode',
+  exitCinema: 'Exit cinema',
+  cinemaOn: 'Cinema mode on — press Esc to exit',
+  cinemaOff: 'Cinema mode off',
+  restorePlayer: 'Restore player',
+  restored: 'Player restored',
+  compactBack: 'Back to video',
+  miniPlayer: 'Mini player',
+  danmaku: 'Danmaku',
+  danmakuOn: 'Danmaku on',
+  danmakuOff: 'Danmaku off',
+  mute: 'Mute',
+  muted: 'Muted',
+  unmuted: 'Unmuted',
+  fullscreen: 'Fullscreen',
+  pip: 'Picture-in-picture',
+  pipUnsupported: 'Picture-in-picture is not supported in this browser',
+  pipFailed: 'Failed to start picture-in-picture',
+  playerNotFound: 'Player not found',
+  shortcuts: 'Shortcuts',
+  shortcutsTitle: 'Video page shortcuts',
+  shortcutsHint: 'Press ? to toggle this help, Esc to close',
+  close: 'Close',
+  percent: 'Jumped to {percent}%',
+  shortcut: {
+    seekBack: 'Back 10 seconds',
+    seekForward: 'Forward 10 seconds',
+    playPause: 'Play / pause',
+    back5: 'Back 5 seconds',
+    forward5: 'Forward 5 seconds',
+    danmaku: 'Toggle danmaku',
+    mute: 'Toggle mute',
+    fullscreen: 'Fullscreen',
+    cinema: 'Cinema mode',
+    pip: 'Picture-in-picture',
+    restore: 'Restore the mini player',
+    percent: 'Jump to 0%–90%',
+    help: 'Toggle this shortcut help',
+    escape: 'Exit cinema / close this help',
+  },
+}
+
+/** 模块自建 i18n：只覆盖简中与英文，其余语言回退简中 */
+export const MESSAGES: Record<string, VideoPageMessages> = {
+  'cmn-CN': CMN_CN,
+  'en': EN,
+}
+
+const FALLBACK_LANGUAGE = 'cmn-CN'
+
+export function normalizeLanguage(language?: string): string {
+  return language === LanguageType.English
+    ? 'en'
+    : FALLBACK_LANGUAGE
+}
+
+export function getMessages(language?: string): VideoPageMessages {
+  const key = normalizeLanguage(language ?? settings.value.language)
+  return MESSAGES[key] ?? CMN_CN
+}
+
+/** 响应 settings.language 的文案（切换语言后立即生效，不需要重建 UI） */
+export function useMessages() {
+  return computed(() => getMessages(settings.value.language))
+}
+
+export function formatPercent(template: string, percent: number): string {
+  return template.replace('{percent}', String(percent))
+}

@@ -1,0 +1,397 @@
+/**
+ * 视频播放页增强层样式（独立 shadow root 内）。
+ *
+ * 颜色 / 圆角 / 阴影 / 字体全部继承 html.bewly-design 上的 CSS 变量，
+ * 因此暗色模式与主题色切换无需额外处理。
+ * 只允许出现变量与透明度混合，不要写死十六进制颜色。
+ */
+
+:host {
+  --bvp-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --bvp-duration: 200ms;
+  --bvp-gap: 8px;
+  --bvp-edge: 24px;
+  /** 与 videoPage.scss 里的迷你浮窗宽度保持一致 */
+  --bvp-mini-width: min(420px, 34vw);
+
+  position: fixed;
+  inset: 0;
+  z-index: 2147483200;
+  display: block;
+  font-family: inherit;
+  font-size: var(--bew-base-font-size, 14px);
+  line-height: 1.5;
+  color: var(--bew-text-1);
+  pointer-events: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+:host *,
+:host *::before,
+:host *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:host button {
+  font: inherit;
+  color: inherit;
+  appearance: none;
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+:host button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+:host :focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+
+:host svg {
+  display: block;
+  flex: none;
+}
+
+/* #region 浮动控件 */
+.bvp-fab-group {
+  position: fixed;
+  right: var(--bvp-edge);
+  bottom: var(--bvp-edge);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--bvp-gap);
+  align-items: flex-end;
+  pointer-events: none;
+}
+
+/* 迷你播放器占据右下角时，把浮动控件上移到浮窗上方（24px 边距 + 浮窗高度 + 12px 间距） */
+.bvp-root[data-mini="true"] .bvp-fab-group {
+  bottom: calc(var(--bvp-edge) + var(--bvp-mini-width) * 9 / 16 + 12px);
+}
+
+.bvp-fab {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  height: 36px;
+  padding: 0 14px;
+  font-size: 12px;
+  color: var(--bew-text-2);
+  pointer-events: auto;
+  background: var(--bew-elevated);
+  border: 1px solid var(--bew-border-color);
+  border-radius: 12px;
+  box-shadow: var(--bew-shadow-2);
+  backdrop-filter: var(--bew-filter-glass-1);
+  transition:
+    color var(--bvp-duration) var(--bvp-ease),
+    background-color var(--bvp-duration) var(--bvp-ease),
+    border-color var(--bvp-duration) var(--bvp-ease),
+    opacity var(--bvp-duration) var(--bvp-ease);
+
+  opacity: 0.72;
+}
+
+.bvp-fab:hover {
+  color: var(--bew-text-1);
+  background: var(--bew-elevated-hover);
+  opacity: 1;
+}
+
+.bvp-fab[aria-pressed="true"],
+.bvp-fab[data-active="true"] {
+  color: var(--bew-theme-color);
+  background: color-mix(in oklab, var(--bew-theme-color), transparent 88%);
+  border-color: color-mix(in oklab, var(--bew-theme-color), transparent 60%);
+  opacity: 1;
+}
+
+.bvp-fab__label {
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.bvp-fab:focus-visible {
+  opacity: 1;
+}
+/* #endregion */
+
+/* #region 紧凑信息栏 */
+.bvp-compact {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 3;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  height: 48px;
+  padding: 0 20px;
+  pointer-events: auto;
+  background: var(--bew-elevated);
+  border-bottom: 1px solid var(--bew-border-color);
+  box-shadow: var(--bew-shadow-2);
+  backdrop-filter: var(--bew-filter-glass-1);
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.bvp-slide-enter-active,
+.bvp-slide-leave-active {
+  transition:
+    transform var(--bvp-duration) var(--bvp-ease),
+    opacity var(--bvp-duration) var(--bvp-ease);
+}
+
+.bvp-slide-enter-from,
+.bvp-slide-leave-to {
+  transform: translateY(-100%);
+  opacity: 0;
+}
+
+.bvp-compact__main {
+  display: flex;
+  flex: 1;
+  gap: 12px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.bvp-compact__title {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-wrap: balance;
+}
+
+.bvp-compact__up {
+  flex: none;
+  max-width: 30%;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--bew-text-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bvp-compact__actions {
+  display: flex;
+  flex: none;
+  gap: 4px;
+  align-items: center;
+}
+
+.bvp-icon-btn {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--bew-text-2);
+  border-radius: 8px;
+  transition:
+    color var(--bvp-duration) var(--bvp-ease),
+    background-color var(--bvp-duration) var(--bvp-ease);
+}
+
+.bvp-icon-btn:hover {
+  color: var(--bew-text-1);
+  background: var(--bew-fill-1);
+}
+
+.bvp-icon-btn[aria-pressed="true"] {
+  color: var(--bew-theme-color);
+  background: color-mix(in oklab, var(--bew-theme-color), transparent 90%);
+}
+
+.bvp-compact__progress {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  overflow: hidden;
+  background: var(--bew-fill-1);
+}
+
+.bvp-compact__progress-fill {
+  height: 100%;
+  background: var(--bew-theme-color);
+  transition: width 240ms linear;
+}
+/* #endregion */
+
+/* #region 吐司 */
+.bvp-toast {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  z-index: 4;
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--bew-text-1);
+  white-space: nowrap;
+  pointer-events: none;
+  background: var(--bew-elevated-solid);
+  border: 1px solid var(--bew-border-color);
+  border-radius: 10px;
+  box-shadow: var(--bew-shadow-3);
+  transform: translateX(-50%);
+}
+/* #endregion */
+
+/* #region 快捷键帮助 */
+.bvp-help {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  pointer-events: auto;
+}
+
+.bvp-help__backdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in oklab, var(--bew-bg), transparent 25%);
+  backdrop-filter: var(--bew-filter-glass-2);
+}
+
+.bvp-help__dialog {
+  position: relative;
+  width: min(440px, 100%);
+  max-height: min(80vh, 640px);
+  padding: 20px;
+  overflow: auto;
+  background: var(--bew-elevated-solid);
+  border: 1px solid var(--bew-border-color);
+  border-radius: var(--bew-radius);
+  box-shadow: var(--bew-shadow-4);
+}
+
+.bvp-help__header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.bvp-help__title {
+  font-size: 16px;
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+.bvp-help__hint {
+  margin-bottom: 16px;
+  font-size: 12px;
+  color: var(--bew-text-3);
+}
+
+.bvp-help__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  list-style: none;
+}
+
+.bvp-help__row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--bew-border-color);
+}
+
+.bvp-help__row:last-child {
+  border-bottom: 0;
+}
+
+.bvp-help__label {
+  font-size: 14px;
+  color: var(--bew-text-2);
+}
+
+.bvp-help__keys {
+  display: flex;
+  flex: none;
+  gap: 4px;
+  align-items: center;
+}
+
+.bvp-kbd {
+  min-width: 24px;
+  padding: 2px 6px;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--bew-text-2);
+  text-align: center;
+  background: var(--bew-fill-1);
+  border: 1px solid var(--bew-border-color);
+  border-radius: 6px;
+}
+
+.bvp-help__separator {
+  font-size: 12px;
+  color: var(--bew-text-3);
+}
+/* #endregion */
+
+/* #region 过场 */
+.bvp-fade-enter-active,
+.bvp-fade-leave-active {
+  transition: opacity var(--bvp-duration) var(--bvp-ease);
+}
+
+.bvp-fade-enter-from,
+.bvp-fade-leave-to {
+  opacity: 0;
+}
+/* #endregion */
+
+/* #region 动效降级 */
+@media (prefers-reduced-motion: reduce) {
+  :host,
+  :host * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .bvp-fab,
+  .bvp-compact,
+  .bvp-icon-btn,
+  .bvp-compact__progress-fill {
+    transition: none !important;
+  }
+
+  /* 没有动效时直接切换，不做位移/淡入淡出 */
+  .bvp-slide-enter-active,
+  .bvp-slide-leave-active {
+    transition: none !important;
+  }
+
+  .bvp-slide-enter-from,
+  .bvp-slide-leave-to {
+    transform: none;
+    opacity: 1;
+  }
+}
+/* #endregion */

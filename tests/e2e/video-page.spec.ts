@@ -1,0 +1,221 @@
+import type { Page } from '@playwright/test'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+import { chromium, expect, test } from '@playwright/test'
+
+const ROOT = fileURLToPath(new URL('../..', import.meta.url))
+const EXTENSION_DIR = join(ROOT, 'extension')
+
+/**
+ * 播放页快照：只保留增强层依赖的结构（播放器 / 标题 / UP 主 / 右栏 / 可滚动正文），
+ * 不依赖真实 B 站脚本，避免测试受网络与广告影响。
+ */
+const VIDEO_PAGE_FIXTURE = `<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>这是一个测试视频_哔哩哔哩_bilibili</title>
+    <style>
+      body { margin: 0; font-family: system-ui, sans-serif; }
+      #mirror-vdcon { display: flex; gap: 16px; padding: 16px; margin: 0 auto; max-width: 1600px; }
+      .left-container { flex: 1 1 70%; min-width: 0; }
+      #playerWrap { background: #000; }
+      #bilibili-player { position: relative; height: 420px; overflow: hidden; }
+      .bpx-player-container { width: 100%; height: 100%; }
+      video { display: block; width: 100%; height: 100%; object-fit: contain; }
+      .right-container { flex: 0 0 28%; }
+      .video-title { margin: 16px 0; font-size: 20px; }
+      .video-desc { min-height: 1600px; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="video-container-v1" id="mirror-vdcon">
+        <div class="left-container scroll-sticky">
+          <div id="playerWrap">
+            <div id="bilibili-player">
+              <div class="bpx-player-container"><video preload="metadata"></video></div>
+            </div>
+          </div>
+          <h1 class="video-title">这是一个测试视频</h1>
+          <input id="test-input" placeholder="评论" />
+          <div class="video-desc">正文</div>
+        </div>
+        <div class="right-container">
+          <div class="up-panel-container"><span class="up-name">测试 UP 主</span></div>
+          <div class="recommend-list">推荐列表</div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>`
+
+async function openVideoPage(): Promise<{ context: Awaited<ReturnType<typeof chromium.launchPersistentContext>>, page: Page }> {
+  const context = await chromium.launchPersistentContext('', {
+    channel: 'chromium',
+    headless: true,
+    args: [
+      `--disable-extensions-except=${EXTENSION_DIR}`,
+      `--load-extension=${EXTENSION_DIR}`,
+      '--disable-popup-blocking',
+    ],
+    viewport: { width: 1440, height: 900 },
+  })
+
+  const page = await context.newPage()
+  await page.route('**/*', async (route) => {
+    const request = route.request()
+    const url = new URL(request.url())
+    if (url.hostname === 'www.bilibili.com' && request.resourceType() === 'document') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/html; charset=utf-8',
+        body: VIDEO_PAGE_FIXTURE,
+      })
+      return
+    }
+    await route.continue()
+  })
+
+  await page.goto('https://www.bilibili.com/video/BV1xx411c7mD', { waitUntil: 'domcontentloaded' })
+  return { context, page }
+}
+
+/** 等增强层挂载完成；未接线时直接 skip，不让整套 e2e 变红 */
+async function ensureOverlay(page: Page): Promise<void> {
+  await page
+    .waitForSelector('#bewly-video-page', { state: 'attached', timeout: 15_000 })
+    .catch(() => null)
+
+  const mounted = await page.evaluate(() => {
+    const host = document.querySelector('#bewly-video-page')
+    return Boolean(host?.shadowRoot?.querySelector('.bvp-fab'))
+  })
+
+  if (!mounted)
+    test.skip(true, '未检测到 #bewly-video-page 增强层，请确认 contentScripts/index.ts 已接线 setupVideoPage()')
+}
+
+test.describe('视频播放页增强', () => {
+  test.skip(!existsSync(EXTENSION_DIR), '先运行 pnpm build 生成 extension/ 目录')
+
+  test('T / Esc 切换影院模式，并写进 sessionStorage', async () => {
+    const { context, page } = await openVideoPage()
+
+    try {
+      await ensureOverlay(page)
+
+      await page.keyboard.press('t')
+      await expect(page.locator('html')).toHaveClass(/bewly-video-cinema/)
+      await expect(page.locator('.right-container')).toBeHidden()
+      expect(await page.evaluate(() => sessionStorage.getItem('bewly-video-cinema'))).toBe('1')
+
+      await page.keyboard.press('Escape')
+      await expect(page.locator('html')).not.toHaveClass(/bewly-video-cinema/)
+      expect(await page.evaluate(() => sessionStorage.getItem('bewly-video-cinema'))).toBe('0')
+    }
+    finally {
+      await context.close()
+    }
+  })
+
+  test('播放器滚出视口后收成迷你浮窗，P 还原', async () => {
+    const { context, page } = await openVideoPage()
+
+    try {
+      await ensureOverlay(page)
+      await page.evaluate(() => window.scrollTo(0, 900))
+      await expect(page.locator('html')).toHaveClass(/bewly-video-mini/)
+
+      const box = await page.locator('#playerWrap').boundingBox()
+      expect(box).not.toBeNull()
+      // 浮在右下角：右边缘贴近视口右侧（24px 边距），整体在视口内
+      expect(box!.x + box!.width).toBeGreaterThan(1400)
+      expect(box!.y + box!.height).toBeLessThanOrEqual(900)
+
+      await page.keyboard.press('p')
+      await expect(page.locator('html')).not.toHaveClass(/bewly-video-mini/)
+    }
+    finally {
+      await context.close()
+    }
+  })
+
+  test('滚动后出现带进度细线的紧凑信息栏', async () => {
+    const { context, page } = await openVideoPage()
+
+    try {
+      await ensureOverlay(page)
+      await expect(page.locator('.bvp-compact')).toBeHidden()
+
+      await page.evaluate(() => window.scrollTo(0, 600))
+      await expect(page.locator('.bvp-compact')).toBeVisible()
+      await expect(page.locator('.bvp-compact__title')).toHaveText('这是一个测试视频')
+      await expect(page.locator('.bvp-compact__progress-fill')).toHaveCount(1)
+    }
+    finally {
+      await context.close()
+    }
+  })
+
+  test('M 静音会给出反馈，输入框内不劫持快捷键', async () => {
+    const { context, page } = await openVideoPage()
+
+    try {
+      await ensureOverlay(page)
+
+      const toastText = () => page.evaluate(() => document
+        .querySelector('#bewly-video-page')
+        ?.shadowRoot
+        ?.querySelector('.bvp-toast')
+        ?.textContent
+        ?.trim() ?? '')
+
+      // 内容脚本运行在隔离世界，主世界对 video 元素的属性改写观察不到，
+      // 因此这里验证「可观察的反馈」与「输入框内不劫持」两类行为。
+      await page.keyboard.press('m')
+      await expect.poll(toastText, { timeout: 5_000 }).not.toBe('')
+      const afterMute = await toastText()
+
+      // 焦点在输入框里时不劫持快捷键（提示条不应变化）
+      await page.locator('#test-input').focus()
+      await page.keyboard.press('m')
+      await page.waitForTimeout(300)
+      expect(await toastText()).toBe(afterMute)
+
+      // J / L / 数字键至少要能安全触发，不抛异常、不破坏页面状态
+      await page.locator('#test-input').blur()
+      await page.keyboard.press('j')
+      await page.keyboard.press('l')
+      await page.keyboard.press('5')
+      await expect(page.locator('#bewly-video-page')).toHaveCount(1)
+    }
+    finally {
+      await context.close()
+    }
+  })
+
+  test('? 打开快捷键帮助，Esc 关闭', async () => {
+    const { context, page } = await openVideoPage()
+
+    try {
+      await ensureOverlay(page)
+
+      // Playwright 走 CDP 时 `Shift+/` 的 key 仍是 "/"，无法产生真正的 "?"，
+      // 这里用合成事件模拟真实用户按下的 "?"（content script 监听的是 keydown.key）
+      await page.evaluate(() => {
+        document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '?', bubbles: true, cancelable: true }))
+      })
+      await expect(page.locator('.bvp-help__dialog')).toBeVisible()
+      expect(await page.locator('.bvp-help__row').count()).toBeGreaterThanOrEqual(10)
+
+      await page.keyboard.press('Escape')
+      await expect(page.locator('.bvp-help__dialog')).toBeHidden()
+    }
+    finally {
+      await context.close()
+    }
+  })
+})

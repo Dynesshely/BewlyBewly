@@ -12,6 +12,7 @@ import { markNativeFilteredCards } from '~/utils/nativeFilter'
 import { SVG_ICONS } from '~/utils/svgIcons'
 import { version } from '../../package.json'
 import { muteNativeScripts, setNativeGuardEnabled } from './nativeGuard'
+import { setupVideoPage } from './videoPage'
 import App from './views/App.vue'
 
 import '~/styles'
@@ -229,6 +230,10 @@ async function onDOMLoaded() {
       await injectAppWhenIdle()
     }
   }
+
+  // 视频播放页增强层（影院模式 / 迷你播放器 / 快捷键 / 紧凑信息栏）
+  // 内部会自行判断是否原生视频页，非视频页是空操作
+  setupVideoPage()
 
   // 原生页面（搜索页等）的屏蔽词过滤：标记式隐藏，可逆
   if (settings.value.nativeFilterEnabled && !isFullyTakenOverPage())

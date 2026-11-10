@@ -1,0 +1,859 @@
+/**
+ * 列表页（历史 / 稍后再看 / 收藏）共享样式。
+ * 由 listShared 组件通过 script 引入一次，全站共享；所有类名以 .bewly-list 前缀，
+ * 颜色只用既有 CSS 变量，因此天然适配暗色模式与自定义主题色。
+ */
+
+.bewly-list-page {
+  --bew-list-toolbar-height: 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 48px;
+}
+
+.bewly-list-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* #region Hero 页头 */
+.bewly-list-hero {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  min-height: 112px;
+  padding: 16px 20px;
+  overflow: hidden;
+  border-radius: var(--bew-radius);
+  background: linear-gradient(120deg, var(--bew-fill-1), transparent 72%);
+}
+
+.bewly-list-hero--with-cover {
+  background: var(--bew-fill-2);
+}
+
+.bewly-list-hero__bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.bewly-list-hero__bg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.16);
+  filter: blur(26px) saturate(150%);
+  opacity: 0.45;
+}
+
+.bewly-list-hero__bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, var(--bew-bg), color-mix(in oklab, var(--bew-bg), transparent 55%));
+}
+
+.bewly-list-hero__body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.bewly-list-hero__text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.bewly-list-hero__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--bew-text-1);
+  text-wrap: balance;
+}
+
+.bewly-list-hero__subtitle {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--bew-text-3);
+}
+
+.bewly-list-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+/* #endregion */
+
+/* #region 收藏夹分类胶囊 */
+.bewly-list-chips {
+  display: flex;
+  gap: 8px;
+  padding: 2px 2px 6px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+.bewly-list-chip {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--bew-text-2);
+  cursor: pointer;
+  background: var(--bew-fill-1);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  transition:
+    background-color 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    color 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.bewly-list-chip:hover {
+  color: var(--bew-text-1);
+  background: var(--bew-fill-2);
+}
+
+.bewly-list-chip.is-active {
+  color: var(--bew-theme-color);
+  background: var(--bew-theme-color-20);
+  border-color: var(--bew-theme-color-40);
+}
+
+.bewly-list-chip:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+
+.bewly-list-chip__count {
+  font-size: 12px;
+  color: var(--bew-text-3);
+}
+
+.bewly-list-chip.is-active .bewly-list-chip__count {
+  color: var(--bew-theme-color);
+  opacity: 0.8;
+}
+/* #endregion */
+
+/* #region 工具条 */
+.bewly-list-toolbar {
+  position: sticky;
+  top: var(--bew-top-bar-height);
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--bew-list-toolbar-height);
+  padding: 8px 12px;
+  background: var(--bew-elevated);
+  border: 1px solid transparent;
+  border-radius: var(--bew-radius);
+  transition:
+    box-shadow 200ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    border-color 200ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    background-color 200ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.bewly-list-toolbar.is-stuck {
+  background: var(--bew-elevated-solid);
+  backdrop-filter: var(--bew-filter-glass-1);
+  border-color: var(--bew-border-color);
+  box-shadow: var(--bew-shadow-2);
+}
+
+.bewly-list-toolbar__meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.bewly-list-toolbar__title {
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--bew-text-1);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bewly-list-toolbar__count {
+  flex: 0 0 auto;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--bew-text-3);
+}
+
+.bewly-list-toolbar__spacer {
+  flex: 1 1 0;
+}
+
+.bewly-list-toolbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.bewly-list-toolbar__help {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.bewly-list-toolbar__icon-btn {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  font-size: 16px;
+  color: var(--bew-text-2);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  transition:
+    background-color 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    color 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.bewly-list-toolbar__icon-btn:hover {
+  color: var(--bew-text-1);
+  background: var(--bew-fill-1);
+}
+
+.bewly-list-toolbar__icon-btn[aria-expanded="true"] {
+  color: var(--bew-theme-color);
+  background: var(--bew-theme-color-20);
+}
+
+.bewly-list-toolbar__icon-btn:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 1px;
+}
+
+/* 分段控件：视图切换 */
+.bewly-list-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--bew-fill-1);
+  border-radius: 10px;
+}
+
+.bewly-list-segmented__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--bew-text-2);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  transition:
+    background-color 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    color 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.bewly-list-segmented__btn:hover {
+  color: var(--bew-text-1);
+  background: var(--bew-fill-1);
+}
+
+.bewly-list-segmented__btn.is-active {
+  color: var(--bew-theme-color);
+  background: var(--bew-elevated-solid);
+  box-shadow: var(--bew-shadow-1);
+}
+
+.bewly-list-segmented__btn:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 1px;
+}
+
+.bewly-list-segmented__icon {
+  font-size: 14px;
+}
+
+@media (max-width: 720px) {
+  .bewly-list-segmented__label {
+    display: none;
+  }
+}
+
+/* 排序：原生 select，键盘天然可达 */
+.bewly-list-select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.bewly-list-select select {
+  height: 30px;
+  padding: 0 26px 0 10px;
+  font-size: 12px;
+  color: var(--bew-text-2);
+  cursor: pointer;
+  appearance: none;
+  background: var(--bew-fill-1);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  transition: background-color 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.bewly-list-select select:hover {
+  color: var(--bew-text-1);
+  background: var(--bew-fill-2);
+}
+
+.bewly-list-select select:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 1px;
+}
+
+.bewly-list-select option {
+  color: var(--bew-text-1);
+  background: var(--bew-elevated-solid);
+}
+
+.bewly-list-select::after {
+  position: absolute;
+  right: 10px;
+  width: 6px;
+  height: 6px;
+  pointer-events: none;
+  content: "";
+  border-right: 2px solid var(--bew-text-3);
+  border-bottom: 2px solid var(--bew-text-3);
+  transform: rotate(45deg) translateY(-1px);
+}
+
+/* 关键词过滤 */
+.bewly-list-filter {
+  display: flex;
+  flex: 1 1 180px;
+  align-items: center;
+  gap: 6px;
+  min-width: 140px;
+  max-width: 320px;
+  height: 30px;
+  padding: 0 8px;
+  background: var(--bew-fill-1);
+  border-radius: 8px;
+  transition:
+    box-shadow 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    background-color 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.bewly-list-filter:focus-within {
+  background: var(--bew-elevated-solid);
+  box-shadow: inset 0 0 0 2px var(--bew-theme-color);
+}
+
+.bewly-list-filter__icon {
+  flex: 0 0 auto;
+  font-size: 14px;
+  color: var(--bew-text-3);
+}
+
+.bewly-list-filter input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  font-size: 12px;
+  color: var(--bew-text-1);
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+
+.bewly-list-filter input::placeholder {
+  color: var(--bew-text-3);
+}
+
+.bewly-list-filter__clear {
+  display: grid;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  font-size: 12px;
+  color: var(--bew-text-3);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  place-items: center;
+}
+
+.bewly-list-filter__clear:hover {
+  color: var(--bew-text-1);
+  background: var(--bew-fill-2);
+}
+
+.bewly-list-filter__clear:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 1px;
+}
+
+/* 排序提示 */
+.bewly-list-sort-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--bew-text-3);
+}
+/* #endregion */
+
+/* #region 快捷键说明浮层 */
+.bewly-list-help {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  width: min(330px, 86vw);
+  padding: 12px 14px;
+  background: var(--bew-elevated-solid);
+  border: 1px solid var(--bew-border-color);
+  border-radius: var(--bew-radius);
+  box-shadow: var(--bew-shadow-3);
+}
+
+.bewly-list-help:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+
+.bewly-list-help__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.bewly-list-help__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--bew-text-1);
+}
+
+.bewly-list-help__close {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  font-size: 14px;
+  color: var(--bew-text-3);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  place-items: center;
+}
+
+.bewly-list-help__close:hover {
+  color: var(--bew-text-1);
+  background: var(--bew-fill-1);
+}
+
+.bewly-list-help__close:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 1px;
+}
+
+.bewly-list-help__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+
+.bewly-list-help__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bewly-list-help__keys {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  min-width: 76px;
+}
+
+.bewly-list-help__keys kbd {
+  min-width: 22px;
+  padding: 1px 6px;
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--bew-text-2);
+  text-align: center;
+  background: var(--bew-fill-1);
+  border: 1px solid var(--bew-border-color);
+  border-radius: 6px;
+}
+
+.bewly-list-help__label {
+  flex: 1;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--bew-text-2);
+}
+
+.bewly-list-help__note {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--bew-text-3);
+}
+/* #endregion */
+
+/* #region 分组与网格 */
+.bewly-list-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bewly-list-group + .bewly-list-group {
+  margin-top: 8px;
+}
+
+.bewly-list-group__header {
+  position: sticky;
+  top: calc(var(--bew-top-bar-height) + var(--bew-list-toolbar-height, 56px));
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  margin: 0;
+  padding: 0 10px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 34px;
+  color: var(--bew-text-1);
+  background: var(--bew-elevated);
+  backdrop-filter: var(--bew-filter-glass-1);
+  border-radius: 10px;
+}
+
+.bewly-list-group__count {
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 18px;
+  color: var(--bew-text-3);
+  background: var(--bew-fill-1);
+  border-radius: 6px;
+}
+
+.bewly-list-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.bewly-list-grid--comfortable {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.bewly-list-grid--compact {
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.bewly-list-grid--list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bewly-list-grid--list .bewly-list-card + .bewly-list-card {
+  border-top: 1px solid var(--bew-border-color);
+}
+/* #endregion */
+
+/* #region 卡片 */
+.bewly-list-card {
+  position: relative;
+  min-width: 0;
+}
+
+.bewly-list-card--list {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: stretch;
+}
+
+.bewly-list-card__body {
+  position: relative;
+  min-width: 0;
+}
+
+.bewly-list-card__video {
+  margin-bottom: 0 !important;
+}
+
+/* 时间轴：仅在列表模式且宽度足够时显示 */
+.bewly-list-card__rail {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .bewly-list-card--list {
+    grid-template-columns: 92px 1fr;
+  }
+
+  .bewly-list-card__rail {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    padding: 12px 16px 0 0;
+    border-right: 2px dashed var(--bew-fill-2);
+  }
+
+  .bewly-list-card__rail::before {
+    position: absolute;
+    top: 15px;
+    right: -5px;
+    width: 8px;
+    height: 8px;
+    content: "";
+    background: var(--bew-fill-3);
+    border-radius: 50%;
+    transition:
+      background-color 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
+      transform 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+
+  .bewly-list-card--list:hover .bewly-list-card__rail::before,
+  .bewly-list-card--list:focus-within .bewly-list-card__rail::before {
+    background: var(--bew-theme-color);
+    transform: scale(1.25);
+  }
+
+  .bewly-list-card__rail-time {
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--bew-text-3);
+    white-space: nowrap;
+  }
+}
+
+/* hover / focus 快捷操作 */
+.bewly-list-card__actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  display: flex;
+  gap: 4px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    opacity 160ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    transform 160ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.bewly-list-card:hover .bewly-list-card__actions,
+.bewly-list-card:focus-within .bewly-list-card__actions {
+  pointer-events: auto;
+  opacity: 1;
+  transform: none;
+}
+
+.bewly-list-card__action {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  font-size: 15px;
+  color: var(--bew-text-2);
+  cursor: pointer;
+  background: var(--bew-elevated-solid);
+  border: 1px solid var(--bew-border-color);
+  border-radius: 8px;
+  box-shadow: var(--bew-shadow-1);
+  transition:
+    color 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    background-color 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  place-items: center;
+}
+
+.bewly-list-card__action:hover {
+  color: var(--bew-theme-color);
+  background: var(--bew-elevated-solid-hover);
+}
+
+.bewly-list-card__action.is-danger:hover {
+  color: var(--bew-error-color);
+}
+
+.bewly-list-card__action:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+
+/* 观看进度 */
+.bewly-list-card__progress {
+  margin-top: 6px;
+}
+
+.bewly-list-card__progress-track {
+  height: 3px;
+  overflow: hidden;
+  background: var(--bew-fill-2);
+  border-radius: 999px;
+}
+
+.bewly-list-card__progress-fill {
+  height: 100%;
+  background: var(--bew-theme-color);
+  border-radius: 999px;
+  transition: width 200ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.bewly-list-card__progress-text {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--bew-text-3);
+}
+/* #endregion */
+
+/* #region 空状态 */
+.bewly-list-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 56px 16px;
+  text-align: center;
+}
+
+.bewly-list-empty__art {
+  position: relative;
+  display: grid;
+  width: 96px;
+  height: 96px;
+  margin-bottom: 4px;
+  place-items: center;
+}
+
+.bewly-list-empty__ring {
+  position: absolute;
+  inset: 0;
+  border: 1px dashed var(--bew-fill-3);
+  border-radius: 50%;
+  animation: bewly-list-ring-spin 28s linear infinite;
+}
+
+.bewly-list-empty__ring--inner {
+  inset: 14px;
+  border-style: solid;
+  border-color: var(--bew-fill-2);
+  animation-direction: reverse;
+  animation-duration: 20s;
+}
+
+.bewly-list-empty__icon {
+  position: relative;
+  z-index: 1;
+  font-size: 34px;
+  color: var(--bew-theme-color);
+}
+
+.bewly-list-empty__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--bew-text-1);
+  text-wrap: balance;
+}
+
+.bewly-list-empty__desc {
+  max-width: 46ch;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--bew-text-3);
+}
+
+.bewly-list-empty__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+@keyframes bewly-list-ring-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* #endregion */
+
+/* #region 骨架屏 */
+.bewly-list-skeleton {
+  pointer-events: none;
+  user-select: none;
+}
+/* #endregion */
+
+/* #region 降级：减少动态效果 */
+@media (prefers-reduced-motion: reduce) {
+  .bewly-list-page *,
+  .bewly-list-page *::before,
+  .bewly-list-page *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+
+  .bewly-list-card__actions {
+    transform: none;
+  }
+}
+/* #endregion */

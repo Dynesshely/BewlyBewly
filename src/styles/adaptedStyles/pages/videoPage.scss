@@ -403,3 +403,128 @@
   }
   //  #endregion
 }
+// #region 播放页增强层的宿主页面布局
+//
+// 增强层 UI（浮动控件 / 紧凑信息栏 / 快捷键帮助）在 src/contentScripts/videoPage 自己创建的
+// 独立 shadow root 里，不在本文件；本文件只负责它需要改动的「原生页面布局」。
+// 两个状态由 JS 在 <html> 上切换：
+//   .bewly-video-cinema —— 影院模式（播放器铺满视口宽度、隐藏右栏、背景压暗）
+//   .bewly-video-mini   —— 播放器滚出视口后收成右下角浮窗
+.bewly-design.videoPage {
+  // #region 影院模式
+  &.bewly-video-cinema {
+    #mirror-vdcon,
+    .video-container-v1 {
+      max-width: 100% !important;
+      padding-right: 0 !important;
+      padding-left: 0 !important;
+    }
+
+    .left-container,
+    .left-container.scroll-sticky {
+      flex: 0 0 100% !important;
+      width: 100% !important;
+      max-width: none !important;
+    }
+
+    // 右栏（UP 主信息、推荐列表）整体隐藏
+    .right-container,
+    .right-container * {
+      display: none !important;
+    }
+
+    #playerWrap {
+      position: relative;
+      z-index: 10;
+      width: 100% !important;
+      height: auto !important;
+    }
+
+    #bilibili-player,
+    #bilibili-player .bpx-player-container {
+      width: 100% !important;
+      height: auto !important;
+      aspect-ratio: 16 / 9;
+    }
+
+    #bilibili-player .bpx-player-video-wrap,
+    #bilibili-player .bpx-player-video-area {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    // 页面背景压暗：除播放器外的内容降到 38% 不透明度
+    body {
+      background-color: color-mix(in oklab, var(--bew-bg), black 58%) !important;
+    }
+
+    // 播放器以外的一切（标题区、UP 主、推荐、评论）压暗到 38%
+    #app > :not(#mirror-vdcon),
+    #mirror-vdcon > :not(.left-container),
+    .left-container > :not(#playerWrap) {
+      opacity: 0.38;
+      transition: opacity 200ms cubic-bezier(0.22, 0.61, 0.36, 1);
+    }
+  }
+  // #endregion
+
+  // #region 滚动迷你播放器
+  &.bewly-video-mini {
+    // 浮窗要相对视口定位：清掉可能给 #playerWrap 建立包含块（transform / filter / contain）的上游属性
+    #app,
+    #mirror-vdcon,
+    .video-container-v1,
+    .left-container {
+      transform: none !important;
+      filter: none !important;
+      contain: none !important;
+      will-change: auto !important;
+    }
+
+    // 播放器脱离文档流后左栏用占位高度撑住，避免页面内容上跳
+    // --bvp-mini-placeholder 由 JS 在收缩前测量写入
+    .left-container,
+    .left-container.scroll-sticky {
+      min-height: var(--bvp-mini-placeholder, 0px);
+    }
+
+    #playerWrap {
+      position: fixed !important;
+      top: auto !important;
+      right: 24px !important;
+      bottom: 24px !important;
+      left: auto !important;
+      z-index: 2147483100 !important;
+      width: min(420px, 34vw) !important; // 与 shadow root 里的 --bvp-mini-width 保持一致
+      height: auto !important;
+      aspect-ratio: 16 / 9;
+      margin: 0 !important;
+      overflow: hidden;
+      background: var(--bew-elevated-solid);
+      border-radius: var(--bew-radius);
+      box-shadow: var(--bew-shadow-3);
+    }
+
+    #bilibili-player,
+    #bilibili-player .bpx-player-container {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    #bilibili-player .bpx-player-video-wrap,
+    #bilibili-player .bpx-player-video-area {
+      width: 100% !important;
+      height: 100% !important;
+    }
+  }
+  // #endregion
+
+  @media (prefers-reduced-motion: reduce) {
+    &.bewly-video-cinema #app > :not(#mirror-vdcon),
+    &.bewly-video-cinema #mirror-vdcon > :not(.left-container),
+    &.bewly-video-cinema .left-container > :not(#playerWrap) {
+      transition: none;
+    }
+  }
+}
+// #endregion

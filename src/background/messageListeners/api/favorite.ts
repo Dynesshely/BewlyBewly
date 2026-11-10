@@ -32,6 +32,25 @@ const API_FAVORITE = {
     afterHandle: AHS.J_D,
   },
   // https://github.com/SocialSisterYi/bilibili-API-collect/blob/master/docs/fav/action.md#%E6%89%B9%E9%87%8F%E5%88%A0%E9%99%A4%E5%86%85%E5%AE%B9
+  // 收藏 / 取消收藏单个资源（可一次提交到多个收藏夹）
+  // https://socialsisteryi.github.io/bilibili-API-collect/docs/video/collection.html
+  dealFavoriteResource: {
+    url: 'https://api.bilibili.com/x/v3/fav/resource/deal',
+    _fetch: {
+      method: 'post',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+      },
+      body: {
+        rid: 0,
+        type: 2,
+        add_media_ids: '',
+        del_media_ids: '',
+        csrf: '',
+      },
+    },
+    afterHandle: AHS.J_D,
+  },
   patchDelFavoriteResources: {
     url: 'https://api.bilibili.com/x/v3/fav/resource/batch-del',
     _fetch: {

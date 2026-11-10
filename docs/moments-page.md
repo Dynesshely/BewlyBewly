@@ -168,3 +168,101 @@ src/contentScripts/views/Moments/
 - `composables/useMomentsDensity.ts` —— 密度偏好（模块级单例 + localStorage 持久化）
 - `utils/clipboard.ts` —— 复制文本 + execCommand 回退
 - `utils/download.ts` —— 图片 fetch-blob 下载 + 扩展名推断
+
+## 第 8 轮增强：离屏优化（虚拟列表）
+
+> 只改「列表渲染与离屏样式」，**没有改 `MomentCard.vue`**（同一目录下另有「动态页点赞」工作流在改它），
+> 也没有改 `i18n.ts` / `useMomentsFeed.ts`（同样由点赞工作流占用）。
+> 开关文案放在独立的小字典 `composables/useVirtualListI18n.ts`，避免并发写同一个 i18n 文件。
+
+### 目标
+
+长列表（1000+ 条）时只让视口附近的卡片真正渲染，离屏卡片**保留 DOM**（不卸载），
+图片状态、正文展开状态、点赞等局部状态都不会丢；同时滚动条高度保持稳定。
+
+### 实现
+
+新增 `composables/useVirtualList.ts`（轻量虚拟列表，不定高、不卸载节点）：
+
+1. **两个 IntersectionObserver 划分区间**（`root` = App 的 `.bewly-scroll-container`）：
+   - 活跃带：`rootMargin: "150% 0px"` → 视口上下各 1.5 屏；
+   - 缓冲区：`rootMargin: "300% 0px"` → 视口上下各 3 屏。
+   用 `rootMargin` 的百分比而不是手算偏移量，天然适配不定高卡片，也不依赖整体高度测量。
+2. **按区间给卡片根节点写内联样式**（只写这两个属性，不碰其它内联样式与类名）：
+
+   | 位置 | content-visibility | 说明 |
+   | --- | --- | --- |
+   | 当前 j/k 高亮卡 | `visible` | 强制正常渲染，scrollIntoView 一定落到真实位置 |
+   | 活跃带内 | `visible` | 正常渲染 |
+   | 缓冲区（1.5–3 屏） | `auto` | 浏览器跳过离屏渲染，仍参与布局 |
+   | 3 屏以外 | `hidden` | 跳过渲染与布局，但 DOM 与内部状态完整保留 |
+
+   三种状态都写 `contain-intrinsic-size: auto <高度>px`，用记住的真实高度占位，避免滚动条跳动。
+3. **高度来源**：进入活跃带的卡片用**一个共享的 ResizeObserver** 量真实高度并按 index 缓存；
+   从未进过活跃带的卡片用估算高度（320px）兜底，进入活跃带后立刻换成真实高度。
+   卡片本身不改，只在列表层用 ResizeObserver 量根节点。
+4. **不卸载、不重排**：所有卡片始终由 `v-for="visibleCards"` 渲染，DOM 顺序、key、事件、
+   组件状态都不变；虚拟化只控制「渲染不渲染内容」。
+5. **性能取舍**：没有使用 `will-change` —— 它是会持续占用合成层的提示，给上千张卡片加
+   `will-change` 反而更吃内存 / 合成开销；这里靠 `content-visibility` 的 contenment +
+   `contain-intrinsic-size` 达到跳过渲染的目的（文档留档，避免后续被误加回去）。
+
+### 开关
+
+- 工具条右侧新增「离屏优化」胶囊（原生 `<button type="button">`，`aria-pressed` + `title` 说明，Tab 可达），
+  与「只看视频」并排；
+- 状态存 `localStorage` 的 `bewly-moments-optimize`（`1` / `0`，缺省开启）；
+- **关闭时**：断开两个观察器 + ResizeObserver，移除所有卡片上的 `content-visibility` /
+  `contain-intrinsic-size`，完全退回改动前的「全部渲染」行为。
+
+### 与既有功能的兼容
+
+| 功能 | 为什么不受影响 |
+| --- | --- |
+| j/k / ↑↓ 高亮 | 高亮卡被强制 `visible`；`useMomentsShortcuts.scrollIntoView` 对 `hidden` 卡片也有盒模型，能正确滚到位 |
+| 只看视频筛选 | 过滤后的列表仍是同一批 `key`，函数 ref 在重排时重新注册 index；筛选逻辑本身未改 |
+| 无限加载 | 新卡片挂载时由函数 ref 注册并立即写入当前状态；观察器只增不减，不重建列表 |
+| 图片大图 | lightbox 是列表外的独立组件，与卡片渲染状态无关 |
+| 卡片密度 | 密度切换后调用 `resetMeasurements()` 清掉旧高度，进入活跃带时重新测量 |
+| 展开 / 收起正文 | 展开是卡片内部状态；`content-visibility` 不重挂组件，状态保留 |
+
+### 新增文件
+
+- `composables/useVirtualList.ts` —— 区间观察 + 内联样式写入 + 高度测量
+- `composables/useVirtualListI18n.ts` —— 开关的 3 个文案 key（cmn-CN / en）
+
+### 已知限制
+
+- `content-visibility: hidden` 的卡片不在无障碍树里，读屏用户快速跳转时只会读到视口附近的卡片
+  （虚拟列表的通用取舍；卡片本身没有可聚焦元素，j/k 高亮卡始终可见）；
+- 从未滚动到过的卡片用 320px 估算高度，首屏的滚动条总高度是近似值，滚到附近后自动校正；
+- 浏览器需支持 `content-visibility`（Chromium 85+ / Firefox 125+ / Safari 18+）；
+  不支持时该属性被忽略，功能退化为「全部渲染」，不报错；
+- 观察器随「列表长度变化」整体重新 observe 一遍（每加载一页一次），1000 条量级下的开销可忽略；
+- 本轮不处理转发卡内部嵌套的原动态（它随外层卡片一起显隐）。
+
+## 第 8 轮：点赞写操作
+
+互动条里的「点赞」由只读计数变成可点的真实操作（整个模块里**唯一**的写操作，转发 / 评论仍不做）。
+
+- **接口**：`api.moment.likeMoment({ dyn_id_str, up, csrf })`，`dyn_id_str` 取卡片的 `id`
+  （即接口返回的 `id_str`），`up: 1` 点赞 / `2` 取消，`csrf` 用 `getCSRF()`。
+- **登录判断**：点击时先看 `getUserID()` 与 `getCSRF()`；没有就只给
+  「需要先登录 B 站才能点赞」的警告 toast，**不发请求**。接口返回 `-101` 时按未登录处理并回滚。
+- **乐观更新**：点击后立刻切换高亮（实心红心）与计数 `+1 / -1`（计数不会小于 0），
+  再发请求；失败（`code !== 0`、网络异常、接口无响应）一律回滚到点击前的值并 toast
+  （优先用接口 message，没有就用「点赞失败，请稍后重试」）。成功 toast「已点赞 / 已取消点赞」。
+- **防重复提交**：同一张卡在请求期间按钮 `disabled` + `aria-busy`，重复点击不会并发写。
+- **点赞态来源**：列表首次加载时读取接口的 `module_stat.like.status`（已赞的官方状态），
+  之后由本地乐观更新维护；刷新页面会重新以接口返回为准。
+- **键盘可达**：点赞是原生 `<button type="button">`，Tab 可聚焦、Enter / Space 触发；
+  点击用 `.stop` 阻止冒泡，不会触发卡片点击或 j/k 高亮；`aria-pressed` 暴露当前状态。
+- **只读边界**：除点赞外没有任何写接口调用；点赞失败不会影响卡片其它交互（打开、复制、图片放大）。
+
+### 第 8 轮改动文件
+
+- `components/MomentCard.vue` —— 互动条点赞按钮（高亮态、pending 态、无障碍属性）
+- `composables/useMomentLike.ts`（新增）—— 点赞请求、乐观更新、回滚、toast、防并发
+- `composables/useMomentsFeed.ts` —— 新增 `toggleLike` / `isLikePending` 列表侧入口
+- `types.ts`、`utils/normalize.ts` —— `MomentStats.liked` 与 `module_stat.like.status` 解析
+- `i18n.ts` —— 点赞相关文案（cmn-CN / en）

@@ -47,6 +47,8 @@ export interface MomentStats {
   forward: number
   comment: number
   like: number
+  /** 当前登录用户是否已点赞（接口 module_stat.like.status） */
+  liked: boolean
 }
 
 export interface MomentAuthor {
@@ -184,6 +186,8 @@ export interface RawDynamicModule {
 export interface RawStatCount {
   count?: number
   forbidden?: boolean
+  /** 仅 like 有：当前用户是否已点赞 */
+  status?: boolean
 }
 
 export interface RawModules {

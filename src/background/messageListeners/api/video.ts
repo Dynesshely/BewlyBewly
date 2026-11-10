@@ -115,6 +115,23 @@ const API_VIDEO = {
     afterHandle: AHS.J_D,
   },
   // https://socialsisteryi.github.io/bilibili-API-collect/docs/video/videostream_url.html#%E8%8E%B7%E5%8F%96%E8%A7%86%E9%A2%91%E6%B5%81%E5%9C%B0%E5%9D%80-web%E7%AB%AF
+  // 视频点赞 / 取消点赞
+  // https://socialsisteryi.github.io/bilibili-API-collect/docs/video/like.html
+  likeVideo: {
+    url: 'https://api.bilibili.com/x/web-interface/archive/like',
+    _fetch: {
+      method: 'post',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+      },
+      body: {
+        aid: 0,
+        like: 1,
+        csrf: '',
+      },
+    },
+    afterHandle: AHS.J_D,
+  },
   getVideoPreview: {
     url: 'https://api.bilibili.com/x/player/wbi/playurl',
     _fetch: {

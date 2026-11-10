@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { MomentsDensity } from '../composables/useMomentsDensity'
 import type { MomentCard, MomentImage } from '../types'
+import { useMomentLike } from '../composables/useMomentLike'
 import { useMomentsOpen } from '../composables/useMomentsOpen'
 import { useMomentsI18n } from '../i18n'
 import { copyTextToClipboard } from '../utils/clipboard'
@@ -28,6 +29,7 @@ const emit = defineEmits<{
 
 const { t, count, time, typeLabel } = useMomentsI18n()
 const { openInNewTab } = useMomentsOpen()
+const { toggleLike, isLikePending } = useMomentLike()
 
 const TEXT_LINES = 4
 const DENSE_TEXT_LINES = 2
@@ -65,6 +67,11 @@ function toggleExpanded() {
 
 function handleAuthorClick() {
   openInNewTab(props.card.author.jumpUrl)
+}
+
+/** 点赞 / 取消点赞：乐观更新 + 失败回滚 + toast 都在 useMomentLike 里 */
+function handleLike() {
+  void toggleLike(props.card)
 }
 
 function forwardImages(index: number) {
@@ -200,10 +207,23 @@ watch(() => [props.density, props.compact], async () => {
           <span class="i-tabler:message-circle" aria-hidden="true" />
           {{ count(card.stats.comment) }}
         </span>
-        <span class="moment-card__stat" :title="t('stat_like')">
-          <span class="i-tabler:heart" aria-hidden="true" />
+        <button
+          type="button"
+          class="moment-card__stat moment-card__stat--like"
+          :class="{ 'is-liked': card.stats.liked }"
+          :disabled="isLikePending(card.id)"
+          :aria-pressed="card.stats.liked"
+          :aria-busy="isLikePending(card.id)"
+          :aria-label="`${card.stats.liked ? t('like_cancel') : t('like')} ${count(card.stats.like)}`"
+          :title="card.stats.liked ? t('like_cancel') : t('like')"
+          @click.stop="handleLike"
+        >
+          <span
+            :class="card.stats.liked ? 'i-tabler:heart-filled' : 'i-tabler:heart'"
+            aria-hidden="true"
+          />
           {{ count(card.stats.like) }}
-        </span>
+        </button>
         <div class="moment-card__actions">
           <button
             v-if="card.text"
@@ -513,6 +533,42 @@ watch(() => [props.density, props.compact], async () => {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   line-height: 1.5;
+}
+
+.moment-card__stat--like {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  transition:
+    color var(--moment-duration) var(--moment-ease),
+    transform var(--moment-duration) var(--moment-ease);
+
+  &:hover:not(:disabled) {
+    color: var(--bew-theme-color);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--bew-theme-color);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  &.is-liked {
+    color: var(--bew-theme-color);
+
+    .i-tabler\:heart-filled {
+      transform: scale(1.08);
+    }
+  }
+
+  &:disabled {
+    cursor: progress;
+    opacity: 0.65;
+  }
 }
 
 .moment-card__actions {

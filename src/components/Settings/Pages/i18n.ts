@@ -23,6 +23,8 @@ export interface PagesSettingsMessages {
   groupVideoCardDesc: string
   cardPreview: string
   cardPreviewDesc: string
+  cardQuickActions: string
+  cardQuickActionsDesc: string
   groupListPage: string
   groupListPageDesc: string
   historyViewMode: string
@@ -85,6 +87,8 @@ const CMN_CN: PagesSettingsMessages = {
   groupVideoCardDesc: '视频卡片本身的交互增强（首页、搜索、列表页等所有出现卡片的位置）',
   cardPreview: '悬停预览',
   cardPreviewDesc: '悬停卡片 0.9 秒后静音播放最多 6 秒的小片段；触屏、减少动态效果偏好，或卡片数据里没有 cid 时不生效',
+  cardQuickActions: '悬停操作条',
+  cardQuickActionsDesc: '悬停卡片时在左下角显示点赞 / 收藏 / 稍后再看；未登录时只提示不请求，失败会自动回滚',
   groupListPage: '列表页',
   groupListPageDesc: '观看历史 / 稍后再看 / 收藏页的默认视图与排序',
   historyViewMode: '观看历史视图',
@@ -146,6 +150,8 @@ const EN: PagesSettingsMessages = {
   groupVideoCardDesc: 'Interaction enhancements that apply to every video card (home, search, list pages and so on)',
   cardPreview: 'Hover preview',
   cardPreviewDesc: 'Hover a card for 0.9s to play a muted clip of up to 6 seconds. Disabled on touch devices, with reduced motion, or when the card data has no cid.',
+  cardQuickActions: 'Hover action bar',
+  cardQuickActionsDesc: 'Show like / favorite / watch-later buttons at the bottom-left of a hovered card. Not signed in? You get a hint instead of a request; failures roll back automatically.',
   groupListPage: 'List pages',
   groupListPageDesc: 'Default view mode and sorting for history, watch later and favorites',
   historyViewMode: 'History view',

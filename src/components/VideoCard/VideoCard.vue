@@ -7,6 +7,8 @@ import Button from '~/components/Button.vue'
 import { isCardPreviewCtrlBarEnabled } from '~/components/VideoCardPreview/previewSettings'
 import { useCardPreview } from '~/components/VideoCardPreview/useCardPreview'
 import VideoCardPreview from '~/components/VideoCardPreview/VideoCardPreview.vue'
+import { cardQuickActionsEnabled } from '~/components/VideoCardQuickActions/preferences'
+import VideoCardQuickActions from '~/components/VideoCardQuickActions/VideoCardQuickActions.vue'
 import { useBewlyApp } from '~/composables/useAppProvider'
 import { accessKey, settings } from '~/logic'
 import { useMainStore } from '~/stores/mainStore'
@@ -352,7 +354,7 @@ provide('getVideoType', () => props.type!)
                 rounded="$bew-radius"
                 text="!white xs"
                 bg="black opacity-60"
-                class="group-hover:opacity-0"
+                class="group-hover:opacity-0 group-focus-within:opacity-0"
                 duration-300
               >
                 {{ video.duration ? calcCurrentTime(video.duration) : video.durationStr }}
@@ -391,9 +393,18 @@ provide('getVideoType', () => props.type!)
                 {{ video.badge.text }}
               </div>
 
-              <!-- Watcher later button -->
+              <!-- Quick actions（点赞 / 收藏 / 稍后再看，悬停或聚焦时显示） -->
+              <VideoCardQuickActions
+                v-if="cardQuickActionsEnabled"
+                :video="video"
+                :show-watch-later="showWatcherLater"
+                :watch-later-active="isInWatchLater"
+                @toggle-watch-later="toggleWatchLater"
+              />
+
+              <!-- 关闭悬停操作条时，保留原有的单独「稍后再看」按钮，避免能力回退 -->
               <button
-                v-if="showWatcherLater"
+                v-else-if="showWatcherLater"
                 pos="absolute top-0 right-0" z="2"
                 p="x-2 y-1" m="1"
                 rounded="$bew-radius"

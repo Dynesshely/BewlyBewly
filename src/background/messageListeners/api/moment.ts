@@ -33,6 +33,23 @@ const API_MOMENT = {
     },
     afterHandle: AHS.J_D,
   },
+  // 动态点赞 / 取消点赞
+  // https://socialsisteryi.github.io/bilibili-API-collect/docs/dynamic/like.html
+  likeMoment: {
+    url: 'https://api.bilibili.com/x/dynamic/feed/dyn/thumb',
+    _fetch: {
+      method: 'post',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+      },
+      body: {
+        dyn_id_str: '',
+        up: 1,
+        csrf: '',
+      },
+    },
+    afterHandle: AHS.J_D,
+  },
   getMoments: {
     url: 'https://api.bilibili.com/x/polymer/web-dynamic/v1/feed/all',
     _fetch: {

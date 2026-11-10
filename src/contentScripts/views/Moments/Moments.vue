@@ -10,6 +10,8 @@ import { MOMENTS_DENSITIES, useMomentsDensity } from './composables/useMomentsDe
 import { useMomentsFeed } from './composables/useMomentsFeed'
 import { useMomentsOpen } from './composables/useMomentsOpen'
 import { useMomentsShortcuts } from './composables/useMomentsShortcuts'
+import { useVirtualList } from './composables/useVirtualList'
+import { useVirtualListI18n } from './composables/useVirtualListI18n'
 import { NATIVE_MOMENTS_URL, useMomentsI18n } from './i18n'
 
 /**
@@ -19,8 +21,9 @@ import { NATIVE_MOMENTS_URL, useMomentsI18n } from './i18n'
  * 支持无限加载、九宫格图片、大图预览、正文折叠与 j/k 键盘浏览。
  */
 const { t } = useMomentsI18n()
+const { t: vt } = useVirtualListI18n()
 const { openVideo, openInNewTab } = useMomentsOpen()
-const { handlePageRefresh, handleReachBottom } = useBewlyApp()
+const { handlePageRefresh, handleReachBottom, scrollbarRef } = useBewlyApp()
 
 const {
   cards,
@@ -38,6 +41,35 @@ const {
 } = useMomentsFeed()
 
 const { density, setDensity } = useMomentsDensity()
+
+// #region 离屏优化（虚拟列表）
+/** localStorage 开关：默认开，关闭时完全退回「全部渲染」的现状 */
+const OPTIMIZE_STORAGE_KEY = 'bewly-moments-optimize'
+
+function readOptimizeEnabled(): boolean {
+  try {
+    const raw = window.localStorage.getItem(OPTIMIZE_STORAGE_KEY)
+    return raw === null
+      ? true
+      : raw !== '0'
+  }
+  catch {
+    return true
+  }
+}
+
+const optimizeEnabled = ref<boolean>(readOptimizeEnabled())
+
+function setOptimizeEnabled(value: boolean) {
+  optimizeEnabled.value = value
+  try {
+    window.localStorage.setItem(OPTIMIZE_STORAGE_KEY, value ? '1' : '0')
+  }
+  catch {
+    // 隐私模式 / 存储被禁用：本次会话内仍然生效，只是刷新不保持
+  }
+}
+// #endregion
 
 const activeIndex = ref<number>(-1)
 /** 高亮卡片的 id：筛选切换后用它把高亮停在原来那张卡上 */
@@ -61,6 +93,20 @@ const videoFilterEmpty = computed(() => videoOnly.value && !visibleCards.value.l
 
 /** 「只看视频」时自动补页的次数上限（见 setupLoadMoreObserver） */
 let denseAutoLoadBudget = 3
+
+/**
+ * 离屏优化：只给卡片根节点写 content-visibility / contain-intrinsic-size，
+ * 不卸载节点、不接管渲染顺序，所以 j/k、筛选、无限加载、lightbox、密度都不受影响。
+ */
+const virtualList = useVirtualList({
+  enabled: () => optimizeEnabled.value && visibleCards.value.length > 0,
+  count: () => visibleCards.value.length,
+  activeIndex: () => activeIndex.value,
+  getScrollRoot: () => (scrollbarRef.value as HTMLElement | null) ?? null,
+})
+
+/** 密度切换会整体改变卡片高度：清掉旧测量值，滚回附近时重量 */
+watch(density, () => virtualList.resetMeasurements())
 
 const densityOptions = computed(() => MOMENTS_DENSITIES.map(value => ({
   value,
@@ -264,18 +310,32 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <button
-        type="button"
-        class="moments-chip"
-        :class="{ 'is-active': videoOnly }"
-        :aria-pressed="videoOnly"
-        :title="t('filter_video_hint')"
-        @click="videoOnly = !videoOnly"
-      >
-        <span class="i-tabler:movie" aria-hidden="true" />
-        <span>{{ t('filter_video_only') }}</span>
-        <span v-if="videoOnly" class="moments-chip__count">{{ visibleCards.length }}</span>
-      </button>
+      <div class="moments-toolbar__group">
+        <button
+          type="button"
+          class="moments-chip"
+          :class="{ 'is-active': videoOnly }"
+          :aria-pressed="videoOnly"
+          :title="t('filter_video_hint')"
+          @click="videoOnly = !videoOnly"
+        >
+          <span class="i-tabler:movie" aria-hidden="true" />
+          <span>{{ t('filter_video_only') }}</span>
+          <span v-if="videoOnly" class="moments-chip__count">{{ visibleCards.length }}</span>
+        </button>
+
+        <button
+          type="button"
+          class="moments-chip"
+          :class="{ 'is-active': optimizeEnabled }"
+          :aria-pressed="optimizeEnabled"
+          :title="optimizeEnabled ? vt('optimizeHintOn') : vt('optimizeHintOff')"
+          @click="setOptimizeEnabled(!optimizeEnabled)"
+        >
+          <span class="i-tabler:bolt" aria-hidden="true" />
+          <span>{{ vt('optimize') }}</span>
+        </button>
+      </div>
     </div>
 
     <div class="moments-keys" role="note" :aria-label="t('keyboard_title')">
@@ -329,6 +389,7 @@ onUnmounted(() => {
       <MomentCardView
         v-for="(card, index) in visibleCards"
         :key="card.id"
+        :ref="el => virtualList.setItemRef(el, index)"
         :card="card"
         :active="index === activeIndex"
         :density="density"

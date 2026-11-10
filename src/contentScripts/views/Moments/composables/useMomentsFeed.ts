@@ -8,6 +8,7 @@ import type { MomentCard, RawMomentResult } from '../types'
 import api from '~/utils/api'
 
 import { normalizeMoments } from '../utils/normalize'
+import { useMomentLike } from './useMomentLike'
 
 /** 接口方法未在 it 里声明类型，这里只收窄参数签名 */
 interface GetMomentsOptions {
@@ -181,6 +182,26 @@ export function useMomentsFeed() {
     void loadFirst()
   }
 
+  /**
+   * 点赞 / 取消点赞（第 8 轮写操作）。
+   *
+   * 直接操作列表里的响应式卡片对象：乐观更新、失败回滚、防重复提交与 toast
+   * 都在 `useMomentLike` 里实现，这里只做一层列表侧的入口。
+   */
+  const { toggleLike: toggleCardLike, isLikePending } = useMomentLike()
+
+  /**
+   * @param cardOrId 要操作的卡片，或它的动态 id（会在当前列表里查找）
+   */
+  async function toggleLike(cardOrId: MomentCard | string): Promise<boolean> {
+    const card = typeof cardOrId === 'string'
+      ? cards.value.find(item => item.id === cardOrId)
+      : cardOrId
+    if (!card)
+      return false
+    return toggleCardLike(card)
+  }
+
   return {
     cards,
     status,
@@ -193,6 +214,8 @@ export function useMomentsFeed() {
     loadMore,
     retryMore,
     refresh,
+    toggleLike,
+    isLikePending,
     LOGIN_REQUIRED_CODE,
   }
 }

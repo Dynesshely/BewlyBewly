@@ -256,6 +256,7 @@ export function normalizeMoment(item: RawMomentItem | null | undefined, depth = 
       forward: Number(stats?.forward?.count) || 0,
       comment: Number(stats?.comment?.count) || 0,
       like: Number(stats?.like?.count) || 0,
+      liked: stats?.like?.status === true,
     },
     jumpUrl: detailUrl(item, major, video?.jumpUrl || article?.jumpUrl || live?.jumpUrl || ''),
   }

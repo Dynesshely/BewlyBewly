@@ -221,3 +221,78 @@
 - 搜索按文案做简单的 `includes` 匹配（不区分大小写），不做拼音 / 模糊匹配；
 - 重置只恢复 `originalSettings` 的字段默认值，不清理旧 localStorage / sessionStorage 残留（各模块的一次性迁移逻辑照常生效）；
 - 分组导航与搜索栏吸顶高度按设置面板标题 80px 估算，若后续标题条高度调整，`Pages.vue` 里的 `top: 5rem` 与 `SettingsGroupSection.vue` 的 `scroll-margin-top: 172px` 需同步调整。
+## 九、第 22 轮：设置导入 / 导出
+
+> 「页面增强」页底部新增「数据」区：把当前 `settings` 导出成 JSON 备份，或从备份文件导入并整体覆盖。
+> 只读写 `settings` 响应式对象，未改 `src/logic/storage.ts` 的结构。
+
+### 1. 导出
+
+- 点击「导出设置」→ 生成 `bewly-settings-YYYYMMDD.json`（本地时区日期）并触发浏览器下载；
+- 文件结构：
+
+```json
+{
+  "version": 1,
+  "exportedAt": "2025-01-01T00:00:00.000Z",
+  "settings": {
+    "videoPageCinemaMode": true,
+    "historyViewMode": "comfortable",
+    "momentsDensity": "comfortable"
+  }
+}
+```
+
+> `settings` 的键与 `originalSettings` 完全一致（上例只列了 3 个字段）。
+>
+> - `settings` 里只包含 `originalSettings` 定义的字段（按同一份字段清单遍历），**不含**其它 storage key
+  （如 `gridLayout`、`sidePanel`、`accessKey` 等都不导出）；
+- 导出失败（Blob / 下载被拦截等）时状态行提示「导出失败，请重试」，不影响当前设置。
+
+### 2. 导入（校验 → 二次确认 → 覆盖）
+
+点击「导入设置」→ 选择 JSON 文件后，先做**纯校验**，全部通过才弹出面板内的二次确认：
+
+| 校验项 | 规则 | 失败提示 |
+|---|---|---|
+| JSON 语法 | `JSON.parse` 成功 | 文件不是有效的 JSON |
+| 顶层结构 | 必须是普通对象；`settings` 必须是普通对象 | 文件格式不正确：需要包含 settings 对象 |
+| 版本 | `version` 必须等于当前导出格式版本 `1` | 不支持的设置版本：`{version}` |
+| 字段类型 | 已知字段的值类型必须与 `originalSettings` 的默认值一致（数组 / 普通对象 / 其它按 `typeof` 比较） | 字段 `{field}` 的类型与默认值不一致 |
+| 可导入项 | 至少有一个已知字段被提供 | 文件里没有可导入的设置项 |
+
+补充规则：
+
+- **未知字段忽略**：`settings` 里不属于 `originalSettings` 的键会被直接丢弃，不报错、不写入；
+- **缺失字段保留**：文件中没有出现的已知字段不会被清空（保持当前值）；即「覆盖文件里给出的字段」；
+- 校验阶段不改动任何设置；任何一步失败只显示原因并回到原样；
+- 校验通过后显示「确认导入？」面板：说明将覆盖的条目数，提供「确认导入 / 取消」；
+- 确认后把字段逐个写入 `settings`，状态行提示「已导入 N 项设置」；写入异常时只提示错误，已写入的字段不会回滚（见「已知限制」）；
+- 导入会立即生效：`settings` 是响应式的，各模块的 `watch` / 计算属性会跟着更新；`useStorageLocal` 会把新值写回 `storage.local`；
+- 取消 / 确认后焦点回到「导入设置」按钮；二次确认出现时焦点自动落在「确认导入」上。
+
+### 3. 键盘与无障碍
+
+- 导出 / 导入 / 确认 / 取消都是原生 `<button type="button">`，Tab 可达、Enter / Space 触发；
+- 二次确认面板 `role="alertdialog"`，带 `aria-label`；打开时自动聚焦「确认导入」；
+- 面板内按 `Esc` 取消导入（`@keydown.esc` 阻止冒泡，避免顺手关掉整个设置面板）；
+- 状态行 `role="status"` + `aria-live="polite"`，成功 / 失败都会播报；
+- 隐藏的原生 `input[type=file]` 保留 `aria-label`，选完文件后焦点回到导入按钮；
+- 所有按钮 `:focus-visible` 用主题色描边；暗色沿用 `--bew-*` 变量；
+- `@media (forced-colors: active)` 下按钮 / 确认框改用系统色（`ButtonText` / `Highlight`），避免高对比度模式对比不足；
+- `prefers-reduced-motion: reduce` 关闭按钮过渡。
+
+### 4. 已知限制
+
+- 导出格式版本固定为 `1`，没有兼容旧版本文件的能力（旧/未知版本会被明确拒绝，不会静默导入）；
+- 字段类型校验只到「数组 / 普通对象 / 基础类型」这一层，不校验嵌套结构（例如 `dockItemsConfig` 内部字段、`keyboardShortcuts` 的键名）与枚举取值合法性；导入后若出现非法枚举，由对应模块按自身兜底逻辑处理；
+- 只覆盖文件中出现的已知字段，未出现的字段保持当前值（相当于「按字段覆盖」而不是「整对象替换」）；
+- 导入写入不可中断：若极端情况下写入中途抛错，已写入的字段不会回滚（正常路径已用 try/catch 包裹，仅提示，不回滚）；
+- 导出 / 导入只覆盖「页面增强」页涉及的 `settings` 字段清单，不包含其它模块的 localStorage / sessionStorage 偏好；
+- 文件选择 / 下载行为依赖浏览器；在扩展的 shadow DOM 里通过临时 `<a download>` 触发，未做「另存为」对话框定制。
+
+### 5. 自测记录
+
+- `pnpm exec eslint src/components/Settings/Pages/Pages.vue src/components/Settings/Pages/i18n.ts --fix` 后再裸跑：0 error 0 warning；
+- `pnpm run typecheck`：0 error；
+- 未跑 build / playwright、未碰浏览器、未 git。

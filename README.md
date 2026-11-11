@@ -71,6 +71,7 @@ E2E_ONLINE=1 pnpm exec playwright test tests/e2e/background.spec.ts  # online AP
 - [Dependency policy](docs/dependency-policy.md) — pinned versions and upgrade checklist
 - [Performance](docs/performance.md) — first-paint baseline, optimizations and evaluation notes
 - [AI filtering](docs/ai-filter.md) — optional AI screening of cards (OpenAI-compatible API, privacy and fallback)
+- [Upgrade summary](docs/upgrade-summary.md) — user-facing overview of the page upgrades (features, shortcuts, settings)
 - [Privacy](PRIVACY.md) — what data the extension reads, stores and sends
 - [Changelog](CHANGELOG.md) — performance, features and fixes in this fork
 

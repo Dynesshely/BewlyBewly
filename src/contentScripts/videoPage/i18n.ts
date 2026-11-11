@@ -70,6 +70,17 @@ export interface VideoPageMessages {
   autoplayUnavailable: string
   playlistHint: string
   partsHint: string
+  commentsToolbar: string
+  commentsSortHot: string
+  commentsSortLatest: string
+  commentsSortUnavailable: string
+  commentSortHotToast: string
+  commentSortLatestToast: string
+  commentsOnlyUp: string
+  commentsUpUnavailable: string
+  commentsOnlyUpOn: string
+  commentsOnlyUpOff: string
+  commentsExpand: string
   collectionHint: string
   /** 形如「已跳到 {percent}%」，用 formatPercent 替换占位符 */
   percent: string
@@ -112,6 +123,17 @@ const CMN_CN: VideoPageMessages = {
   playlistHint: '点条目切换视频；A 切自动连播；Esc 关闭面板',
   partsHint: '点条目切换分P；Esc 关闭面板',
   collectionHint: '点条目切换合集视频；Esc 关闭面板',
+  commentsToolbar: '评论增强',
+  commentsSortHot: '最热',
+  commentsSortLatest: '最新',
+  commentsSortUnavailable: '没有找到原生评论排序',
+  commentSortHotToast: '已按最热排序',
+  commentSortLatestToast: '已按最新排序',
+  commentsOnlyUp: '只看 UP 主',
+  commentsUpUnavailable: '没有找到 UP 主标识，暂不能只看 UP',
+  commentsOnlyUpOn: '只看 UP 主评论',
+  commentsOnlyUpOff: '显示全部评论',
+  commentsExpand: '展开',
   percent: '已跳到 {percent}%',
   shortcut: {
     seekBack: '后退 10 秒',
@@ -174,6 +196,17 @@ const EN: VideoPageMessages = {
   playlistHint: 'Click an item to switch, A toggles autoplay, Esc closes',
   partsHint: 'Click an item to switch part, Esc closes',
   collectionHint: 'Click an item to switch video in this collection, Esc closes',
+  commentsToolbar: 'Comment tools',
+  commentsSortHot: 'Top',
+  commentsSortLatest: 'Newest',
+  commentsSortUnavailable: 'Native comment sorting not found',
+  commentSortHotToast: 'Sorted by top comments',
+  commentSortLatestToast: 'Sorted by newest comments',
+  commentsOnlyUp: 'Uploader only',
+  commentsUpUnavailable: 'Uploader badge not found, cannot filter',
+  commentsOnlyUpOn: 'Showing uploader comments only',
+  commentsOnlyUpOff: 'Showing all comments',
+  commentsExpand: 'Expand',
   percent: 'Jumped to {percent}%',
   shortcut: {
     seekBack: 'Back 10 seconds',
@@ -232,6 +265,17 @@ const CMN_TW: VideoPageMessages = {
   playlistHint: '點項目切換影片；A 切換自動連播；Esc 關閉面板',
   partsHint: '點項目切換分P；Esc 關閉面板',
   collectionHint: '點項目切換合集影片；Esc 關閉面板',
+  commentsToolbar: '評論增強',
+  commentsSortHot: '最熱',
+  commentsSortLatest: '最新',
+  commentsSortUnavailable: '找不到原生評論排序',
+  commentSortHotToast: '已按最熱排序',
+  commentSortLatestToast: '已按最新排序',
+  commentsOnlyUp: '只看 UP 主',
+  commentsUpUnavailable: '找不到 UP 主標識，暫不能只看 UP',
+  commentsOnlyUpOn: '只看 UP 主評論',
+  commentsOnlyUpOff: '顯示全部評論',
+  commentsExpand: '展開',
   autoplay: '自動連播',
   autoplayOn: '已開啟自動連播：播完自動切下一個',
   autoplayOff: '已關閉自動連播',
@@ -267,6 +311,17 @@ const JYUT: VideoPageMessages = {
   playlistHint: '撳項目切換影片；A 切換自動連播；Esc 關閉面板',
   partsHint: '撳項目切換分P；Esc 關閉面板',
   collectionHint: '撳項目切換合集影片；Esc 關閉面板',
+  commentsToolbar: '評論增強',
+  commentsSortHot: '最熱',
+  commentsSortLatest: '最新',
+  commentsSortUnavailable: '搵唔到原生評論排序',
+  commentSortHotToast: '已按最熱排序',
+  commentSortLatestToast: '已按最新排序',
+  commentsOnlyUp: '淨係睇 UP 主',
+  commentsUpUnavailable: '搵唔到 UP 主標記，暫時淨係睇唔到',
+  commentsOnlyUpOn: '淨係顯示 UP 主評論',
+  commentsOnlyUpOff: '顯示晒所有評論',
+  commentsExpand: '打開',
   cinemaOn: '入咗影院模式，撳 Esc 退出',
   cinemaOff: '已經退出影院模式',
   restored: '還原咗播放器',

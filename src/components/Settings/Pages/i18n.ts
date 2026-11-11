@@ -87,6 +87,26 @@ export interface PagesSettingsMessages {
   groupChannelDesc: string
   channelDensity: string
   channelDensityDesc: string
+
+  // 第 22 轮：数据导入 / 导出
+  groupData: string
+  groupDataDesc: string
+  exportSettings: string
+  exportSettingsHint: string
+  exportSuccess: string
+  exportError: string
+  importSettings: string
+  importSettingsHint: string
+  importConfirmTitle: string
+  importConfirmDesc: string
+  importConfirm: string
+  importCancel: string
+  importSuccess: string
+  importErrorJson: string
+  importErrorShape: string
+  importErrorVersion: string
+  importErrorField: string
+  importErrorEmpty: string
 }
 
 const CMN_CN: PagesSettingsMessages = {
@@ -163,6 +183,24 @@ const CMN_CN: PagesSettingsMessages = {
   groupChannelDesc: 'B 站原生分区页（bilibili.com/v/*、/channel/*）与排行榜页的增强浮层',
   channelDensity: '列表密度',
   channelDensityDesc: '紧凑档缩小卡片间距与标题字号，一屏能看到更多内容',
+  groupData: '数据',
+  groupDataDesc: '备份 / 恢复「页面增强」相关设置；只包含本页的 settings 字段，不含其它存储',
+  exportSettings: '导出设置',
+  exportSettingsHint: '下载当前设置的 JSON 文件，可在其它设备导入',
+  exportSuccess: '已导出设置文件',
+  exportError: '导出失败，请重试',
+  importSettings: '导入设置',
+  importSettingsHint: '选择 JSON 文件，校验通过后覆盖当前设置',
+  importConfirmTitle: '确认导入？',
+  importConfirmDesc: '将用文件中的 {count} 项设置覆盖当前设置，此操作无法撤销',
+  importConfirm: '确认导入',
+  importCancel: '取消',
+  importSuccess: '已导入 {count} 项设置',
+  importErrorJson: '文件不是有效的 JSON',
+  importErrorShape: '文件格式不正确：需要包含 settings 对象',
+  importErrorVersion: '不支持的设置版本：{version}',
+  importErrorField: '字段 {field} 的类型与默认值不一致',
+  importErrorEmpty: '文件里没有可导入的设置项',
 }
 
 const EN: PagesSettingsMessages = {
@@ -239,6 +277,24 @@ const EN: PagesSettingsMessages = {
   groupChannelDesc: 'Enhancement overlay on native Bilibili channel pages (bilibili.com/v/*, /channel/*) and ranking pages',
   channelDensity: 'List density',
   channelDensityDesc: 'Compact tightens card gaps and the title size so more content fits on one screen.',
+  groupData: 'Data',
+  groupDataDesc: 'Back up or restore the page enhancement settings. Only the settings fields on this page are included — no other storage.',
+  exportSettings: 'Export settings',
+  exportSettingsHint: 'Download the current settings as JSON and import them on another device',
+  exportSuccess: 'Settings file exported',
+  exportError: 'Export failed, please try again',
+  importSettings: 'Import settings',
+  importSettingsHint: 'Pick a JSON file; once validated it overwrites the current settings',
+  importConfirmTitle: 'Import these settings?',
+  importConfirmDesc: 'This overwrites the current settings with the {count} entries from the file and cannot be undone',
+  importConfirm: 'Import',
+  importCancel: 'Cancel',
+  importSuccess: 'Imported {count} settings',
+  importErrorJson: 'The file is not valid JSON',
+  importErrorShape: 'Invalid file structure: a settings object is required',
+  importErrorVersion: 'Unsupported settings version: {version}',
+  importErrorField: 'Field {field} has a different type than the default value',
+  importErrorEmpty: 'The file contains no importable settings',
 }
 
 const CMN_TW: PagesSettingsMessages = {
@@ -315,6 +371,24 @@ const CMN_TW: PagesSettingsMessages = {
   groupChannelDesc: 'B 站原生分區頁（bilibili.com/v/*、/channel/*）與排行榜頁的增強浮層',
   channelDensity: '清單密度',
   channelDensityDesc: '緊湊檔縮小卡片間距與標題字級，一屏能看到更多內容',
+  groupData: '資料',
+  groupDataDesc: '備份 / 還原「頁面增強」相關設定；只包含本頁的 settings 欄位，不含其它儲存',
+  exportSettings: '匯出設定',
+  exportSettingsHint: '下載目前設定的 JSON 檔案，可在其它裝置匯入',
+  exportSuccess: '已匯出設定檔案',
+  exportError: '匯出失敗，請重試',
+  importSettings: '匯入設定',
+  importSettingsHint: '選擇 JSON 檔案，驗證通過後覆蓋目前設定',
+  importConfirmTitle: '確認匯入？',
+  importConfirmDesc: '將用檔案中的 {count} 項設定覆蓋目前設定，此操作無法復原',
+  importConfirm: '確認匯入',
+  importCancel: '取消',
+  importSuccess: '已匯入 {count} 項設定',
+  importErrorJson: '檔案不是有效的 JSON',
+  importErrorShape: '檔案格式不正確：需要包含 settings 物件',
+  importErrorVersion: '不支援的設定版本：{version}',
+  importErrorField: '欄位 {field} 的型態與預設值不一致',
+  importErrorEmpty: '檔案裡沒有可匯入的設定項',
 }
 
 const JYUT: PagesSettingsMessages = {

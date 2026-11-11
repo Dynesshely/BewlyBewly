@@ -476,6 +476,245 @@ function resetGroup(key: GroupKey) {
   }, 1800)
 }
 // #endregion
+
+// #region 数据导入 / 导出（第 22 轮）
+/**
+ * 导出的 JSON 结构：
+ * {
+ *   "version": 1,
+ *   "exportedAt": "2025-01-01T00:00:00.000Z",
+ *   "settings": { ...与 originalSettings 同构的字段... }
+ * }
+ *
+ * 导入时只接受 version === 1；未知字段忽略；已知字段的类型必须与默认值一致；
+ * 校验全部通过后才允许在面板内二次确认，确认后整体覆盖 settings。
+ */
+const SETTINGS_EXPORT_VERSION = 1
+
+type ImportParseResult
+  = | { ok: true, data: Record<string, unknown>, count: number }
+    | { ok: false, message: string }
+
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const importButtonRef = ref<HTMLButtonElement | null>(null)
+const confirmImportButtonRef = ref<HTMLButtonElement | null>(null)
+
+const pendingImport = ref<{ data: Record<string, unknown>, count: number } | null>(null)
+const dataStatus = ref('')
+const dataStatusTone = ref<'success' | 'error' | ''>('')
+let dataStatusTimer: number | null = null
+
+function settingsRecord(): Record<string, unknown> {
+  return settings.value as unknown as Record<string, unknown>
+}
+
+function defaultSettingsRecord(): Record<string, unknown> {
+  return originalSettings as unknown as Record<string, unknown>
+}
+
+function setDataStatus(message: string, tone: 'success' | 'error') {
+  dataStatus.value = message
+  dataStatusTone.value = tone
+  if (dataStatusTimer !== null)
+    window.clearTimeout(dataStatusTimer)
+  dataStatusTimer = window.setTimeout(() => {
+    dataStatusTimer = null
+    dataStatus.value = ''
+    dataStatusTone.value = ''
+  }, 4000)
+}
+
+function pad2(value: number): string {
+  return String(value).padStart(2, '0')
+}
+
+/** 文件名用的日期戳：YYYYMMDD（本地时区） */
+function todayStamp(): string {
+  const now = new Date()
+  return String(now.getFullYear()) + pad2(now.getMonth() + 1) + pad2(now.getDate())
+}
+
+/** 只导出 settings 字段（不含其它 storage key） */
+function buildExportPayload(): Record<string, unknown> {
+  const exported: Record<string, unknown> = {}
+  for (const key of Object.keys(defaultSettingsRecord()))
+    exported[key] = settingsRecord()[key]
+
+  return {
+    version: SETTINGS_EXPORT_VERSION,
+    exportedAt: new Date().toISOString(),
+    settings: exported,
+  }
+}
+
+function exportSettings() {
+  try {
+    const blob = new Blob([
+      JSON.stringify(buildExportPayload(), null, 2),
+    ], {
+      type: 'application/json',
+    })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `bewly-settings-${todayStamp()}.json`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    setDataStatus(t.value.exportSuccess, 'success')
+  }
+  catch {
+    setDataStatus(t.value.exportError, 'error')
+  }
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/** 字段类型与默认值一致：数组 / 普通对象 / 其它按 typeof 比较 */
+function fieldTypeMatches(defaultValue: unknown, value: unknown): boolean {
+  if (Array.isArray(defaultValue))
+    return Array.isArray(value)
+  if (isPlainObject(defaultValue))
+    return isPlainObject(value)
+  return typeof value === typeof defaultValue
+}
+
+function parseImportPayload(text: string): ImportParseResult {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  }
+  catch {
+    return { ok: false, message: t.value.importErrorJson }
+  }
+
+  if (!isPlainObject(parsed))
+    return { ok: false, message: t.value.importErrorShape }
+
+  const version = parsed.version
+  if (version !== SETTINGS_EXPORT_VERSION) {
+    return {
+      ok: false,
+      message: t.value.importErrorVersion.replace('{version}', version == null
+        ? '?'
+        : String(version)),
+    }
+  }
+
+  const rawSettings = parsed.settings
+  if (!isPlainObject(rawSettings))
+    return { ok: false, message: t.value.importErrorShape }
+
+  const defaults = defaultSettingsRecord()
+  const data: Record<string, unknown> = {}
+  for (const key of Object.keys(defaults)) {
+    if (!(key in rawSettings))
+      continue
+    const value = rawSettings[key]
+    if (!fieldTypeMatches(defaults[key], value)) {
+      return {
+        ok: false,
+        message: t.value.importErrorField.replace('{field}', key),
+      }
+    }
+    data[key] = value
+  }
+
+  const count = Object.keys(data).length
+  if (count === 0)
+    return { ok: false, message: t.value.importErrorEmpty }
+
+  return { ok: true, data, count }
+}
+
+function triggerImport() {
+  pendingImport.value = null
+  fileInputRef.value?.click()
+}
+
+async function onImportFileChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  // 允许连续两次选择同一个文件
+  input.value = ''
+  if (!file)
+    return
+
+  let text = ''
+  try {
+    text = await file.text()
+  }
+  catch {
+    setDataStatus(t.value.importErrorJson, 'error')
+    importButtonRef.value?.focus()
+    return
+  }
+
+  const result = parseImportPayload(text)
+  if (!result.ok) {
+    pendingImport.value = null
+    setDataStatus(result.message, 'error')
+    importButtonRef.value?.focus()
+    return
+  }
+
+  dataStatus.value = ''
+  dataStatusTone.value = ''
+  pendingImport.value = { data: result.data, count: result.count }
+}
+
+/** 二次确认后整体覆盖 settings（只覆盖文件里出现的字段） */
+function confirmImport() {
+  const pending = pendingImport.value
+  if (!pending)
+    return
+
+  try {
+    const target = settingsRecord()
+    for (const [key, value] of Object.entries(pending.data))
+      target[key] = value
+  }
+  catch {
+    setDataStatus(t.value.importErrorShape, 'error')
+    return
+  }
+
+  pendingImport.value = null
+  setDataStatus(t.value.importSuccess.replace('{count}', String(pending.count)), 'success')
+  importButtonRef.value?.focus()
+}
+
+function cancelImport() {
+  pendingImport.value = null
+  importButtonRef.value?.focus()
+}
+
+/** 二次确认面板里的 Esc：只在确认态拦截，避免吞掉设置面板自己的 Esc */
+function handleDataKeydown(event: KeyboardEvent) {
+  if (!pendingImport.value || event.key !== 'Escape')
+    return
+  event.preventDefault()
+  event.stopPropagation()
+  cancelImport()
+}
+
+watch(pendingImport, async (value) => {
+  if (!value)
+    return
+  await nextTick()
+  confirmImportButtonRef.value?.focus()
+})
+
+onBeforeUnmount(() => {
+  if (dataStatusTimer !== null) {
+    window.clearTimeout(dataStatusTimer)
+    dataStatusTimer = null
+  }
+})
+// #endregion
 </script>
 
 <template>
@@ -728,6 +967,96 @@ function resetGroup(key: GroupKey) {
         <Select v-model="settings.homeCardDensity" :options="densityOptions" w="full" />
       </SettingsItem>
     </SettingsGroupSection>
+
+    <!-- 第 22 轮：数据导入 / 导出（不属于单页偏好，不进顶部导航与搜索过滤） -->
+    <SettingsGroupSection
+      group-key="data"
+      :title="t.groupData"
+      :desc="t.groupDataDesc"
+      :show-reset="false"
+    >
+      <div class="pages-data" @keydown="handleDataKeydown">
+        <div class="pages-data__actions">
+          <button
+            type="button"
+            class="pages-data__button"
+            :title="t.exportSettingsHint"
+            @click="exportSettings"
+          >
+            <span class="i-tabler:download" aria-hidden="true" />
+            <span>{{ t.exportSettings }}</span>
+          </button>
+
+          <button
+            ref="importButtonRef"
+            type="button"
+            class="pages-data__button"
+            :title="t.importSettingsHint"
+            @click="triggerImport"
+          >
+            <span class="i-tabler:upload" aria-hidden="true" />
+            <span>{{ t.importSettings }}</span>
+          </button>
+
+          <input
+            ref="fileInputRef"
+            type="file"
+            accept="application/json,.json"
+            class="pages-data__file"
+            tabindex="-1"
+            :aria-label="t.importSettings"
+            @change="onImportFileChange"
+          >
+        </div>
+
+        <p class="pages-data__hint">
+          {{ t.exportSettingsHint }} · {{ t.importSettingsHint }}
+        </p>
+
+        <p
+          v-if="dataStatus"
+          class="pages-data__status"
+          :class="`is-${dataStatusTone}`"
+          role="status"
+          aria-live="polite"
+        >
+          {{ dataStatus }}
+        </p>
+
+        <div
+          v-if="pendingImport"
+          class="pages-data__confirm"
+          role="alertdialog"
+          aria-modal="false"
+          :aria-label="t.importConfirmTitle"
+        >
+          <p class="pages-data__confirm-title">
+            {{ t.importConfirmTitle }}
+          </p>
+          <p class="pages-data__confirm-desc">
+            {{ t.importConfirmDesc.replace('{count}', String(pendingImport.count)) }}
+          </p>
+          <div class="pages-data__confirm-actions">
+            <button
+              ref="confirmImportButtonRef"
+              type="button"
+              class="pages-data__button is-primary"
+              @click="confirmImport"
+            >
+              <span class="i-tabler:check" aria-hidden="true" />
+              <span>{{ t.importConfirm }}</span>
+            </button>
+            <button
+              type="button"
+              class="pages-data__button"
+              @click="cancelImport"
+            >
+              {{ t.importCancel }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </SettingsGroupSection>
   </div>
 </template>
 
@@ -871,5 +1200,156 @@ function resetGroup(key: GroupKey) {
   outline: 2px solid var(--bew-theme-color);
   outline-offset: 2px;
   border-radius: 6px;
+}
+
+/* 第 22 轮：数据导入 / 导出 */
+.pages-data {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.pages-data__actions {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pages-data__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--bew-border-color);
+  border-radius: 999px;
+  background: var(--bew-fill-1);
+  color: var(--bew-text-1);
+  font-size: 12px;
+  line-height: 1.5;
+  cursor: pointer;
+  transition:
+    color var(--bew-motion-fast, 120ms) var(--bew-ease-out, ease),
+    background-color var(--bew-motion-fast, 120ms) var(--bew-ease-out, ease),
+    border-color var(--bew-motion-fast, 120ms) var(--bew-ease-out, ease);
+}
+
+.pages-data__button:hover {
+  color: var(--bew-theme-color);
+  background: var(--bew-fill-2);
+  border-color: var(--bew-theme-color-40);
+}
+
+.pages-data__button:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+
+.pages-data__button.is-primary {
+  color: var(--bew-text-auto);
+  background: var(--bew-theme-color);
+  border-color: var(--bew-theme-color);
+}
+
+.pages-data__button.is-primary:hover {
+  color: var(--bew-text-auto);
+  opacity: 0.9;
+}
+
+/* 隐藏的原生 file input：仍可被读屏聚焦，但视觉上不占位 */
+.pages-data__file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pages-data__hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--bew-text-3);
+}
+
+.pages-data__status {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.pages-data__status.is-success {
+  color: var(--bew-success-color);
+}
+
+.pages-data__status.is-error {
+  color: var(--bew-error-color);
+}
+
+.pages-data__confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--bew-border-color);
+  border-radius: var(--bew-radius);
+  background: var(--bew-fill-alt);
+}
+
+.pages-data__confirm-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bew-text-1);
+}
+
+.pages-data__confirm-desc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--bew-text-2);
+}
+
+.pages-data__confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pages-data__button {
+    transition: none;
+  }
+}
+
+/* 高对比度模式：用系统色，避免主题色 / 透明度对比不足 */
+@media (forced-colors: active) {
+  .pages-data__button {
+    border-color: ButtonText;
+    color: ButtonText;
+    background: ButtonFace;
+  }
+
+  .pages-data__button.is-primary {
+    border-color: Highlight;
+    color: HighlightText;
+    background: Highlight;
+  }
+
+  .pages-data__button:focus-visible {
+    outline: 2px solid Highlight;
+  }
+
+  .pages-data__confirm {
+    border-color: ButtonText;
+  }
+
+  .pages-data__status.is-success,
+  .pages-data__status.is-error {
+    color: CanvasText;
+  }
 }
 </style>

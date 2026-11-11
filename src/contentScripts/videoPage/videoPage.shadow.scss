@@ -395,3 +395,80 @@
   }
 }
 /* #endregion */
+/* #region 评论区增强（排序胶囊 / 只看 UP / 长评论展开） */
+.bvp-comment-toolbar {
+  position: fixed;
+  z-index: 3;
+  display: flex;
+  gap: var(--bvp-gap);
+  align-items: center;
+  max-width: min(320px, calc(100vw - 16px));
+  padding: 4px;
+  pointer-events: auto;
+  background: var(--bew-elevated);
+  border: 1px solid var(--bew-border-color);
+  border-radius: 999px;
+  box-shadow: var(--bew-shadow-2);
+  backdrop-filter: var(--bew-filter-glass-1);
+}
+
+.bvp-comment-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  font-size: 12px;
+  color: var(--bew-text-2);
+  white-space: nowrap;
+  border-radius: 999px;
+  transition:
+    color var(--bvp-duration) var(--bvp-ease),
+    background-color var(--bvp-duration) var(--bvp-ease);
+}
+
+.bvp-comment-btn:hover:not(:disabled) {
+  color: var(--bew-text-1);
+  background: var(--bew-fill-1);
+}
+
+.bvp-comment-btn[aria-pressed="true"] {
+  color: var(--bew-theme-color);
+  background: color-mix(in oklab, var(--bew-theme-color), transparent 88%);
+}
+
+.bvp-comment-btn:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.bvp-comment-toolbar__divider {
+  width: 1px;
+  height: 16px;
+  background: var(--bew-border-color);
+}
+
+.bvp-comment-expand {
+  position: fixed;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 88px;
+  height: 32px;
+  font-size: 12px;
+  color: var(--bew-text-1);
+  pointer-events: auto;
+  background: var(--bew-elevated-solid);
+  border: 1px solid var(--bew-border-color);
+  border-radius: 10px;
+  box-shadow: var(--bew-shadow-2);
+  transition:
+    color var(--bvp-duration) var(--bvp-ease),
+    background-color var(--bvp-duration) var(--bvp-ease);
+}
+
+.bvp-comment-expand:hover {
+  color: var(--bew-theme-color);
+  background: var(--bew-elevated-hover);
+}
+/* #endregion */

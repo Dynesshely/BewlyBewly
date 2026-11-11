@@ -25,6 +25,7 @@ import {
   setCompact,
   setMini,
 } from './actions'
+import { setupComments, syncComments } from './comments'
 import PlaylistPanel from './components/PlaylistPanel.vue'
 import VideoPageOverlay from './components/VideoPageOverlay.vue'
 import {
@@ -71,6 +72,7 @@ const SYNC_INTERVAL = 500
 let hostEl: HTMLDivElement | null = null
 let vueApp: App | null = null
 let disposeShortcuts: (() => void) | null = null
+let disposeComments: (() => void) | null = null
 let stopSettingsWatch: (() => void) | null = null
 let syncTimer: number | null = null
 let scrollFrame = 0
@@ -119,6 +121,9 @@ function mount(): void {
 
   if (settings.value.videoPageShortcuts)
     disposeShortcuts = setupShortcuts()
+
+  // 评论区增强（排序 / 只看 UP / 长评论折叠）：没有评论区时组件自身不渲染
+  disposeComments = setupComments()
 
   window.addEventListener('scroll', handleScroll, { passive: true })
   window.addEventListener('resize', handleScroll, { passive: true })
@@ -179,6 +184,10 @@ function unmount(): void {
   if (disposeShortcuts) {
     disposeShortcuts()
     disposeShortcuts = null
+  }
+  if (disposeComments) {
+    disposeComments()
+    disposeComments = null
   }
 
   window.removeEventListener('scroll', handleScroll)
@@ -262,6 +271,9 @@ function sync(): void {
   ui.title = getVideoTitle()
   ui.upName = getUploaderName()
   ui.danmakuOn = isDanmakuEnabled()
+
+  // 评论区：标记 UP / 探测排序 tab / 折叠长评论（没有评论区时内部会提前返回）
+  syncComments()
 }
 
 function handleScroll(): void {

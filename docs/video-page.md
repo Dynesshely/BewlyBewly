@@ -233,3 +233,46 @@ header 是推荐类文案，条目指向其它 bvid。
 - 现代分P 条目没有链接，`[`/`]` 依赖 `.active` 类或 URL 的 `p=` 序号；若两者都拿不到，当前项下标为 -1，
   `[`/`]` 会从列表首/尾开始切换
 - 面板标题跟随来源：播放列表 / 选集 / 合集；文案来自模块内 i18n（四种语言）
+## 评论区增强（第 22 轮）
+
+播放器增强之外，本轮补了评论区三件事：**排序快捷**、**只看 UP 主**、**长评论折叠**。
+所有注入 UI 都在 `#bewly-video-page` 的 shadow root 里（原生 `<button>` + `aria-pressed` + `:focus-visible`），
+**不改 B 站评论 DOM 结构、不拦原生交互**（点赞 / 回复 / 展开完全照旧）。
+
+### 1. 排序快捷
+
+- 评论区顶部出现一个胶囊工具条（fixed 定位，随评论区滚动）；
+- 提供「最热 / 最新」两个按钮，点击**只点原生排序 tab**（`.reply-sort` / `.comment-sort` 里的 tab），不自己发请求；
+- `aria-pressed` 跟随原生 tab 的高亮类（`active` / `aria-selected`）自动同步；
+- 找不到原生排序标签时，工具条里不出现这两个按钮（工具条仍可显示「只看 UP」）。
+
+### 2. 只看 UP 主
+
+- 依赖原生 `.up-mark` 标识：每次同步给 UP 主评论打 `data-bewly-comment-up`；
+- 开关打开时给 `<html>` 加 `bewly-comments-only-up`，页面级 CSS 隐藏 `.reply-item:not([data-bewly-comment-up])`
+  （楼中楼跟随其所在的顶层评论一起显示 / 隐藏）；
+- **页面上一个 `.up-mark` 都找不到时开关保持禁用**，标题与提示说明「没有找到 UP 主标识，暂不能只看 UP」，不做假开关；
+- 状态存 `sessionStorage`（key `bewly-comments-only-up`），切换排序 / 加载新评论时会重新标记并重新应用。
+
+### 3. 长评论折叠
+
+- 用 `ResizeObserver` + 初始测量判断：评论高度超过 **400px** 时打 `data-bewly-comment-clamped`；
+  页面级 CSS 给 `max-height: 400px; overflow: hidden` + 底部 80px 渐隐遮罩；
+- 「展开」按钮在 shadow 浮层里按评论位置 fixed 定位（随滚动 / resize 重算，只保留视口内的按钮），
+  点击后给评论打 `data-bewly-comment-expanded`，恢复完整高度并移除按钮；
+- 为减少布局抖动，每条评论只做一次初始折叠判定（`data-bewly-comment-fold-checked`），
+  之后的高度变化由 `ResizeObserver` 驱动。
+
+### 与影院模式共存
+
+影院模式会压暗评论区（第 1 轮的行为），评论增强 UI（工具条 / 展开按钮）随之隐藏（`v-if="!ui.cinema"`），
+退出影院后自动恢复；影院模式下也不会计算折叠按钮坐标。
+
+### 已知限制
+
+- 评论 DOM 选择器按仓库既有证据：`#comment` / `#commentapp` / `.comment-container` / `.reply-list` / `.reply-item`；
+  若 B 站改成虚拟列表或换类名，「只看 UP」会因找不到 `.up-mark` 而禁用、折叠按钮不出现（功能降级，不误伤页面）；
+- 只看 UP 只隐藏**顶层**非 UP 评论（楼中楼跟随父评论），避免把 UP 评论下的对话拆掉；
+- 展开按钮是 fixed 定位的浮层按钮：极端情况下（评论区被父级 `transform` 建立包含块）位置可能偏移，
+  但按钮仍在视口内；如果需要可改成 absolute + 文档坐标；
+- 折叠判定只看高度 > 400px，不区分图片 / 文字；展开状态不持久化（重新进入页面会再次折叠）。

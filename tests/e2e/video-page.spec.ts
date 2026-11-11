@@ -1195,3 +1195,194 @@ test.describe('选集判定：只有 （x/y） 进度文案的 pod', () => {
     }
   })
 })
+/**
+ * 评论区 fixture：`.reply-sort` 原生排序 tab + `.reply-list` 下 6 条顶层评论
+ *（2 条带 `.up-mark`，1 条 620px 超高 `#tall-comment` 用于长评论折叠）。
+ * 排序 tab 的点击只记录到 dataset 并搬 active 类，模拟 B 站的原生排序行为。
+ */
+const COMMENT_PAGE_FIXTURE = `<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>评论区测试_哔哩哔哩_bilibili</title>
+    <style>
+      body { margin: 0; font-family: system-ui, sans-serif; }
+      #mirror-vdcon { display: flex; gap: 16px; padding: 16px; margin: 0 auto; max-width: 1600px; }
+      .left-container { flex: 1 1 70%; min-width: 0; }
+      #playerWrap { background: #000; }
+      #bilibili-player { position: relative; height: 420px; overflow: hidden; }
+      .bpx-player-container { width: 100%; height: 100%; }
+      video { display: block; width: 100%; height: 100%; object-fit: contain; }
+      .video-title { margin: 16px 0; font-size: 20px; }
+      #comment { margin-top: 24px; }
+      .reply-sort { display: flex; gap: 12px; margin-bottom: 8px; }
+      .reply-sort .sort-tab { padding: 4px 8px; cursor: pointer; }
+      .reply-sort .sort-tab.active { font-weight: 600; background: #eee; }
+      .reply-list { display: flex; flex-direction: column; gap: 12px; }
+      .reply-item { padding: 8px; border: 1px solid #ddd; }
+      .up-mark { display: inline-block; padding: 0 4px; color: #fff; background: #fb7299; font-size: 11px; }
+      .reply-content { margin-top: 6px; color: #333; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="video-container-v1" id="mirror-vdcon">
+        <div class="left-container scroll-sticky">
+          <div id="playerWrap">
+            <div id="bilibili-player">
+              <div class="bpx-player-container"><video preload="metadata"></video></div>
+            </div>
+          </div>
+          <h1 class="video-title">评论区测试视频</h1>
+          <div id="comment">
+            <div class="reply-sort" id="reply-sort">
+              <span class="sort-tab active" data-sort="hot">最热</span>
+              <span class="sort-tab" data-sort="latest">最新</span>
+            </div>
+            <div class="reply-list" id="reply-list">
+              <div class="reply-item"><div class="user-name">用户 A</div><div class="reply-content">普通评论 1</div></div>
+              <div class="reply-item"><div class="user-name">UP 主</div><span class="up-mark">UP</span><div class="reply-content">UP 主评论 1</div></div>
+              <div class="reply-item"><div class="user-name">用户 B</div><div class="reply-content">普通评论 2</div></div>
+              <div class="reply-item"><div class="user-name">UP 主</div><span class="up-mark">UP</span><div class="reply-content">UP 主评论 2</div></div>
+              <div class="reply-item"><div class="user-name">用户 C</div><div class="reply-content">普通评论 3</div></div>
+              <div class="reply-item" id="tall-comment" style="height: 620px"><div class="user-name">用户 D</div><div class="reply-content">这是一条很长的评论，用来验证折叠。</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      document.querySelectorAll('.reply-sort .sort-tab').forEach((tab) => {
+        tab.addEventListener('click', () => {
+          document.querySelectorAll('.reply-sort .sort-tab').forEach((el) => el.classList.remove('active'))
+          tab.classList.add('active')
+          document.body.dataset.sortClicked = tab.dataset.sort
+        })
+      })
+    </script>
+  </body>
+</html>`
+
+async function openCommentPage(): Promise<{ context: BrowserContext, page: Page }> {
+  const context = await launchExtension({ allowPopups: true })
+
+  const page = await context.newPage()
+  await page.route('**/*', async (route) => {
+    const request = route.request()
+    const url = new URL(request.url())
+    if (url.hostname === 'www.bilibili.com' && request.resourceType() === 'document') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/html; charset=utf-8',
+        body: COMMENT_PAGE_FIXTURE,
+      })
+      return
+    }
+    await route.continue()
+  })
+
+  await page.goto('https://www.bilibili.com/video/BV1comment1', { waitUntil: 'domcontentloaded' })
+  return { context, page }
+}
+
+test.describe('评论区增强', () => {
+  skipIfExtensionMissing()
+
+  test('评论工具条出现在评论区：最热 / 最新切换点原生 tab', async () => {
+    const { context, page } = await openCommentPage()
+
+    try {
+      await ensureOverlay(page)
+
+      const toolbar = page.locator('.bvp-comment-toolbar')
+      await expect(toolbar).toBeVisible()
+      await expect(toolbar.locator('[data-bvp-action="comment-sort-hot"]')).toHaveAttribute('aria-pressed', 'true')
+
+      await toolbar.locator('[data-bvp-action="comment-sort-latest"]').click()
+      await expect.poll(() => page.evaluate(() => document.body.dataset.sortClicked ?? ''), { timeout: 5_000 }).toBe('latest')
+
+      await toolbar.locator('[data-bvp-action="comment-sort-hot"]').click()
+      await expect.poll(() => page.evaluate(() => document.body.dataset.sortClicked ?? ''), { timeout: 5_000 }).toBe('hot')
+    }
+    finally {
+      await context.close()
+    }
+  })
+
+  test('只看 UP 主：只剩 2 条带 .up-mark 的评论，再点恢复', async () => {
+    const { context, page } = await openCommentPage()
+
+    try {
+      await ensureOverlay(page)
+
+      expect(await page.locator('.reply-item[data-bewly-comment-up]').count()).toBe(2)
+
+      await page.locator('[data-bvp-action="comment-only-up"]').click()
+      await expect(page.locator('html')).toHaveClass(/bewly-comments-only-up/)
+      await expect(page.locator('.reply-item:visible')).toHaveCount(2)
+
+      await page.locator('[data-bvp-action="comment-only-up"]').click()
+      await expect(page.locator('html')).not.toHaveClass(/bewly-comments-only-up/)
+      await expect(page.locator('.reply-item:visible')).toHaveCount(6)
+    }
+    finally {
+      await context.close()
+    }
+  })
+
+  test('长评论（>400px）折叠并出现展开按钮，展开后恢复', async () => {
+    const { context, page } = await openCommentPage()
+
+    try {
+      await ensureOverlay(page)
+
+      await expect(page.locator('#tall-comment')).toHaveAttribute('data-bewly-comment-clamped', '')
+      // 展开按钮只对视口内的评论渲染：先滚到长评论再断言，否则会假红
+      await page.locator('#tall-comment').scrollIntoViewIfNeeded()
+
+      const expandButton = page.locator('.bvp-comment-expand')
+      await expect(expandButton).toHaveCount(1)
+
+      await expandButton.click()
+      await expect(page.locator('#tall-comment')).toHaveAttribute('data-bewly-comment-expanded', '')
+      await expect(page.locator('#tall-comment')).not.toHaveAttribute('data-bewly-comment-clamped', '')
+      await expect(page.locator('.bvp-comment-expand')).toHaveCount(0)
+    }
+    finally {
+      await context.close()
+    }
+  })
+
+  test('影院模式下评论增强 UI 跟随隐藏', async () => {
+    const { context, page } = await openCommentPage()
+
+    try {
+      await ensureOverlay(page)
+      await expect(page.locator('.bvp-comment-toolbar')).toBeVisible()
+
+      await page.keyboard.press('t')
+      await expect(page.locator('html')).toHaveClass(/bewly-video-cinema/)
+      await expect(page.locator('.bvp-comment-toolbar')).toHaveCount(0)
+      await expect(page.locator('.bvp-comment-expand')).toHaveCount(0)
+
+      await page.keyboard.press('Escape')
+      await expect(page.locator('.bvp-comment-toolbar')).toBeVisible()
+    }
+    finally {
+      await context.close()
+    }
+  })
+
+  test('没有评论区时评论增强整块不渲染', async () => {
+    const { context, page } = await openVideoPage()
+
+    try {
+      await ensureOverlay(page)
+      await expect(page.locator('.bvp-comment-toolbar')).toHaveCount(0)
+      await expect(page.locator('.bvp-comment-expand')).toHaveCount(0)
+    }
+    finally {
+      await context.close()
+    }
+  })
+})

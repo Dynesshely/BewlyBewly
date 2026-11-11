@@ -528,3 +528,42 @@
   }
 }
 // #endregion
+// #region 评论区增强（标记 / 只看 UP / 长评论折叠）
+// 属性标记由 src/contentScripts/videoPage/comments.ts 打在原生评论节点上；
+// 这里只做「隐藏非 UP」与「折叠长评论」的视觉效果，不动评论结构、不拦原生交互。
+.bewly-design.videoPage {
+  // 只看 UP 主：整页只有 UP 主评论可见（楼中楼跟随其所在的顶层评论一起显示 / 隐藏）
+  &.bewly-comments-only-up {
+    .reply-item:not([data-bewly-comment-up]) {
+      display: none !important;
+    }
+  }
+
+  // 长评论折叠：max-height + 底部渐隐，展开按钮在增强层 shadow 浮层里
+  .reply-item[data-bewly-comment-clamped] {
+    position: relative;
+    max-height: 400px;
+    overflow: hidden;
+  }
+
+  .reply-item[data-bewly-comment-clamped]::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 80px;
+    pointer-events: none;
+    background: linear-gradient(to bottom, transparent, var(--bew-bg, var(--bew-content-solid)));
+  }
+
+  .reply-item[data-bewly-comment-expanded] {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .reply-item[data-bewly-comment-expanded]::after {
+    content: none;
+  }
+}
+// #endregion

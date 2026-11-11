@@ -9,6 +9,13 @@ export interface SelectionItemView {
   active: boolean
 }
 
+/** 长评论折叠按钮（fixed 定位，随滚动更新） */
+export interface CommentFoldButtonView {
+  id: number
+  top: number
+  left: number
+}
+
 /** 覆盖层 UI 状态。整个模块只用一个实例，生命周期与页面入口一致。 */
 export interface VideoPageUiState {
   /** 播放器已经找到，UI 可以交互了 */
@@ -29,6 +36,22 @@ export interface VideoPageUiState {
   selectionItems: SelectionItemView[]
   /** 当前选集项下标，-1 表示判定失败 */
   selectionCurrentIndex: number
+  /** 评论区是否存在（没有评论区时评论增强整块不渲染） */
+  commentFound: boolean
+  /** 是否找到原生排序标签（最热 / 最新） */
+  commentSortAvailable: boolean
+  /** 当前生效的排序（'' 表示判定不出） */
+  commentActiveSort: '' | 'hot' | 'latest'
+  /** 是否找到 UP 主标识（找不到时「只看 UP」禁用并说明） */
+  commentUpAvailable: boolean
+  /** 只看 UP 主评论 */
+  commentsOnlyUp: boolean
+  /** 评论工具条是否在视口内（fixed 坐标） */
+  commentToolbarVisible: boolean
+  commentToolbarTop: number
+  commentToolbarLeft: number
+  /** 长评论折叠按钮（fixed 坐标） */
+  commentFoldButtons: CommentFoldButtonView[]
   cinema: boolean
   mini: boolean
   compact: boolean
@@ -54,6 +77,15 @@ function createInitialState(): VideoPageUiState {
     playlistAutoplay: false,
     selectionItems: [],
     selectionCurrentIndex: -1,
+    commentFound: false,
+    commentSortAvailable: false,
+    commentActiveSort: '',
+    commentUpAvailable: false,
+    commentsOnlyUp: false,
+    commentToolbarVisible: false,
+    commentToolbarTop: 0,
+    commentToolbarLeft: 0,
+    commentFoldButtons: [],
     cinema: false,
     mini: false,
     compact: false,

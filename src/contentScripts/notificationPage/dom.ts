@@ -313,3 +313,11 @@ export function isEditableEvent(event: KeyboardEvent): boolean {
   }
   return false
 }
+
+/**
+ * 页面自检用的关键选择器（第 24 轮，只读导出）。
+ */
+export const probeSelectors: string[] = [
+  ITEM_SELECTOR,
+  ...LIST_ROOT_SELECTORS.slice(0, 2),
+]

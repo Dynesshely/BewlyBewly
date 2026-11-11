@@ -372,3 +372,11 @@ export function isFromOverlay(event: Event, hostId: string): boolean {
 export function prefersReducedMotion(): boolean {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
+
+/**
+ * 页面自检用的关键选择器（第 24 轮，只读导出）。
+ */
+export const probeSelectors: string[] = [
+  ...PLAYER_SELECTORS.slice(0, 4),
+  ...ASIDE_SELECTORS.slice(0, 2),
+]

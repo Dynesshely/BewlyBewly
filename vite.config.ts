@@ -116,5 +116,10 @@ export default defineConfig(({ command }) => ({
   test: {
     globals: true,
     environment: 'jsdom',
+    // root 在 src/，这里显式纳入仓库根的单测目录（第 24 轮快捷键盘注册表校验等）
+    include: [
+      '**/*.{test,spec}.{js,ts,jsx,tsx}',
+      '../tests/unit/**/*.{test,spec}.{js,ts,jsx,tsx}',
+    ],
   },
 }))

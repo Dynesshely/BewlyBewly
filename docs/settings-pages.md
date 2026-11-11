@@ -296,3 +296,44 @@
 - `pnpm exec eslint src/components/Settings/Pages/Pages.vue src/components/Settings/Pages/i18n.ts --fix` 后再裸跑：0 error 0 warning；
 - `pnpm run typecheck`：0 error；
 - 未跑 build / playwright、未碰浏览器、未 git。
+## 十、第 24 轮：两个缺失的开关（评论区增强 / 列表页滚动记忆）
+
+> 第 23 轮及之前已实现「视频页评论区增强」与「列表页返回恢复滚动位置」，但设置页没有对应开关。
+> 本轮把 `videoPageComments` 与 `enableListScrollMemory` 接进「页面增强」页，字段由 `storage.ts` 提供（默认 `true`，只读使用、未改默认值）。
+
+### 新增开关
+
+| 分组 | 开关 | settings 字段 | 默认 | 说明 |
+|---|---|---|---|---|
+| 视频播放页 | 评论区增强 | `videoPageComments` | `true` | 评论排序快捷（最热 / 最新）、只看 UP 主、长评论折叠；关闭后评论区保持 B 站原生样式 |
+| 列表页 | 返回恢复滚动位置 | `enableListScrollMemory` | `true` | 从视频页返回历史 / 稍后再看 / 收藏时，恢复离开前的浏览位置并高亮原来那张卡 |
+
+### 交互细节
+
+- 两个开关都放在各自分组已有设置项之后（视频播放页第 4 项、列表页第 5 项），参与分组搜索过滤；
+- 都参与「重置本组」：`reset()` 会把字段恢复为 `originalSettings.videoPageComments` / `originalSettings.enableListScrollMemory`（即 `true`）；
+- **`aria-describedby`**：说明文案渲染在带固定 id 的 `<span>` 上（`pages-desc-video-comments` / `pages-desc-list-scroll-memory`），并关联到真正被读屏识别的原生 `<input type="checkbox">`；
+- 为此新增通用小组件 `src/components/Settings/Pages/PagesSwitch.vue`：
+  - 视觉与全局 `Radio` 一致（同尺寸 50×25 拨杆、主题色选中态），但原生 checkbox 用「视觉隐藏但仍可获得焦点」的方式隐藏（`clip-path`，而非 `hidden`），因此 `aria-describedby` 真正生效；
+  - 支持 `v-model`（`defineModel<boolean>`）、`describedby`、`inputId`；
+  - `focus-visible` 主题色描边、`prefers-reduced-motion: reduce` 关闭过渡、`@media (forced-colors: active)` 下用系统色（`ButtonText` / `Highlight`）；
+- 运行时行为不变：两个字段早已被对应模块（视频页评论区 / 列表页滚动记忆）以 `settings.xxx` 为总开关读取，设置一改即实时生效，无需刷新；
+- 不改任何业务默认值，也未修改 `storage.ts` 的结构与默认值。
+
+### 文案（四语言）
+
+| key | cmn-CN | cmn-TW | en |
+|---|---|---|---|
+| `videoPageComments` | 评论区增强 | 留言區增強 | Comment enhancements |
+| `videoPageCommentsDesc` | 评论排序快捷（最热 / 最新）、只看 UP 主、长评论折叠；关闭后评论区保持 B 站原生样式 | 留言排序快捷（最熱 / 最新）、只看 UP 主、長留言摺疊；關閉後留言區保持 B 站原生樣式 | Quick sort (hot / latest), only-uploader filter and long-comment collapsing. When off, the comment area keeps its native Bilibili style. |
+| `listScrollMemory` | 返回恢复滚动位置 | 返回時恢復捲動位置 | Restore scroll position on return |
+| `listScrollMemoryDesc` | 从视频页返回历史 / 稍后再看 / 收藏时，恢复离开前的浏览位置并高亮原来那张卡 | 由影片頁返回歷史 / 稍後再看 / 收藏時，恢復離開前的瀏覽位置並高亮原本那張卡 | When coming back from a video to history / watch later / favorites, restore the previous position and highlight the card you left on. |
+
+jyut 继承 cmn-TW（与其它数据类文案一致）。
+
+### 已知限制
+
+- 开关只负责总开关：关闭后对应模块不接管，但已产生的本地状态（例如列表页已记录的滚动位置）不会被清理，重新打开后继续沿用；
+- 「只重置本组」会同时把这两个开关恢复为默认 `true`，列表页分组的重置按钮因此会一起重置视图 / 排序 / 滚动记忆四项；
+- `PagesSwitch` 只为本轮两个开关新增，其它开关仍是全局 `Radio`（无 `aria-describedby`）；若后续要统一，可逐步替换；
+- 本次自测仅 eslint + typecheck（按分工未跑 build / playwright、未碰浏览器）。

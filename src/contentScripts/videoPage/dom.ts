@@ -967,3 +967,16 @@ export function goToAdjacentSelectionItem(direction: -1 | 1): boolean {
 }
 
 // #endregion
+
+/**
+ * 页面自检用的关键选择器（第 24 轮，只读导出）。
+ *
+ * 与上面的候选列表同源：只取「能证明播放器 / 页面结构存在」的前几项，
+ * 供 contentScripts/diagnostics 汇总，不参与任何业务逻辑。
+ */
+export const probeSelectors: string[] = [
+  '#bilibili-player',
+  '.bpx-player-container',
+  '#playerWrap',
+  ...TITLE_SELECTORS.slice(0, 2),
+]

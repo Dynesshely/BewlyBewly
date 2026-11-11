@@ -203,3 +203,12 @@ export function isFromBewlyUi(event: Event): boolean {
 export function prefersReducedMotion(): boolean {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
+
+/**
+ * 页面自检用的关键选择器（第 24 轮，只读导出）。
+ */
+export const probeSelectors: string[] = [
+  ...RESULT_ROOT_SELECTORS.slice(0, 2),
+  ...VIDEO_CARD_SELECTORS.slice(0, 2),
+  ...USER_CARD_SELECTORS.slice(0, 1),
+]

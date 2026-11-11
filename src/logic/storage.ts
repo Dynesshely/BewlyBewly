@@ -133,11 +133,15 @@ export interface Settings {
   videoPageMiniPlayer: boolean
   /** 视频播放页：增强快捷键（J/K/L 等） */
   videoPageShortcuts: boolean
+  /** 视频播放页：评论区增强（排序 / 只看 UP / 长评论折叠） */
+  videoPageComments: boolean
   /** 列表页默认视图 / 排序 */
   historyViewMode: ListViewMode
   watchLaterViewMode: ListViewMode
   favoritesViewMode: ListViewMode
   listDefaultSort: ListSortMode
+  /** 列表页：从视频页返回时恢复滚动位置 */
+  enableListScrollMemory: boolean
   /** 搜索起始页：粘贴 B 站链接时直接打开 */
   searchPageDirectPasteEnabled: boolean
 
@@ -291,10 +295,12 @@ export const originalSettings: Settings = {
   videoPageCinemaMode: true,
   videoPageMiniPlayer: true,
   videoPageShortcuts: true,
+  videoPageComments: true,
   historyViewMode: 'comfortable',
   watchLaterViewMode: 'comfortable',
   favoritesViewMode: 'comfortable',
   listDefaultSort: 'time',
+  enableListScrollMemory: true,
   searchPageDirectPasteEnabled: true,
 
   momentsDensity: 'comfortable',

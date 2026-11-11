@@ -29,6 +29,9 @@ export interface PagesSettingsMessages {
   videoPageMiniPlayerDesc: string
   videoPageShortcuts: string
   videoPageShortcutsDesc: string
+  /** 第 24 轮：视频页评论区增强 */
+  videoPageComments: string
+  videoPageCommentsDesc: string
   groupVideoCard: string
   groupVideoCardDesc: string
   cardPreview: string
@@ -37,6 +40,9 @@ export interface PagesSettingsMessages {
   cardQuickActionsDesc: string
   groupListPage: string
   groupListPageDesc: string
+  /** 第 24 轮：列表页返回恢复滚动位置 */
+  listScrollMemory: string
+  listScrollMemoryDesc: string
   historyViewMode: string
   watchLaterViewMode: string
   favoritesViewMode: string
@@ -107,6 +113,10 @@ export interface PagesSettingsMessages {
   importErrorVersion: string
   importErrorField: string
   importErrorEmpty: string
+
+  // 第 24 轮：页面自检
+  groupDiagnostics: string
+  groupDiagnosticsDesc: string
 }
 
 const CMN_CN: PagesSettingsMessages = {
@@ -126,6 +136,8 @@ const CMN_CN: PagesSettingsMessages = {
   videoPageMiniPlayerDesc: '播放器滚出视口后收缩到右下角浮窗，按 P 或点击按钮还原',
   videoPageShortcuts: '增强快捷键',
   videoPageShortcutsDesc: 'J/K/L、←/→、C/M/F/T 等快捷键；关闭后按键完全交还给 B 站原生快捷键',
+  videoPageComments: '评论区增强',
+  videoPageCommentsDesc: '评论排序快捷（最热 / 最新）、只看 UP 主、长评论折叠；关闭后评论区保持 B 站原生样式',
   groupVideoCard: '视频卡片',
   groupVideoCardDesc: '视频卡片本身的交互增强（首页、搜索、列表页等所有出现卡片的位置）',
   cardPreview: '悬停预览',
@@ -134,6 +146,8 @@ const CMN_CN: PagesSettingsMessages = {
   cardQuickActionsDesc: '悬停卡片时在右下角显示点赞 / 收藏 / 稍后再看；收藏可多选收藏夹，已收藏再点即取消。未登录时只提示不请求，失败会自动回滚',
   groupListPage: '列表页',
   groupListPageDesc: '观看历史 / 稍后再看 / 收藏页的默认视图与排序',
+  listScrollMemory: '返回恢复滚动位置',
+  listScrollMemoryDesc: '从视频页返回历史 / 稍后再看 / 收藏时，恢复离开前的浏览位置并高亮原来那张卡',
   historyViewMode: '观看历史视图',
   watchLaterViewMode: '稍后再看视图',
   favoritesViewMode: '收藏夹视图',
@@ -201,6 +215,8 @@ const CMN_CN: PagesSettingsMessages = {
   importErrorVersion: '不支持的设置版本：{version}',
   importErrorField: '字段 {field} 的类型与默认值不一致',
   importErrorEmpty: '文件里没有可导入的设置项',
+  groupDiagnostics: '诊断',
+  groupDiagnosticsDesc: '检查当前页面各增强模块是否挂载、关键选择器是否命中，并给出降级原因；纯本地运行，不上报任何数据',
 }
 
 const EN: PagesSettingsMessages = {
@@ -220,6 +236,8 @@ const EN: PagesSettingsMessages = {
   videoPageMiniPlayerDesc: 'Shrink the player into a floating window once it scrolls out of view. Restore with P or the button.',
   videoPageShortcuts: 'Enhanced shortcuts',
   videoPageShortcutsDesc: 'J/K/L, ←/→, C/M/F/T and more. When off, every key is handed back to the native Bilibili shortcuts.',
+  videoPageComments: 'Comment enhancements',
+  videoPageCommentsDesc: 'Quick sort (hot / latest), only-uploader filter and long-comment collapsing. When off, the comment area keeps its native Bilibili style.',
   groupVideoCard: 'Video cards',
   groupVideoCardDesc: 'Interaction enhancements that apply to every video card (home, search, list pages and so on)',
   cardPreview: 'Hover preview',
@@ -228,6 +246,8 @@ const EN: PagesSettingsMessages = {
   cardQuickActionsDesc: 'Show like / favorite / watch-later buttons at the bottom-right of a hovered card. Favorites support multi-folder selection, and clicking again removes them. Not signed in? You get a hint instead of a request; failures roll back automatically.',
   groupListPage: 'List pages',
   groupListPageDesc: 'Default view mode and sorting for history, watch later and favorites',
+  listScrollMemory: 'Restore scroll position on return',
+  listScrollMemoryDesc: 'When coming back from a video to history / watch later / favorites, restore the previous position and highlight the card you left on.',
   historyViewMode: 'History view',
   watchLaterViewMode: 'Watch later view',
   favoritesViewMode: 'Favorites view',
@@ -295,6 +315,8 @@ const EN: PagesSettingsMessages = {
   importErrorVersion: 'Unsupported settings version: {version}',
   importErrorField: 'Field {field} has a different type than the default value',
   importErrorEmpty: 'The file contains no importable settings',
+  groupDiagnostics: 'Diagnostics',
+  groupDiagnosticsDesc: 'Check whether page enhancements are mounted and key selectors match, with degradation reasons. Runs locally — no data is reported.',
 }
 
 const CMN_TW: PagesSettingsMessages = {
@@ -314,6 +336,8 @@ const CMN_TW: PagesSettingsMessages = {
   videoPageMiniPlayerDesc: '播放器滾出視口後收縮到右下角浮窗，按 P 或點擊按鈕還原',
   videoPageShortcuts: '增強快速鍵',
   videoPageShortcutsDesc: 'J/K/L、←/→、C/M/F/T 等快速鍵；關閉後按鍵完全交還給 B 站原生快速鍵',
+  videoPageComments: '留言區增強',
+  videoPageCommentsDesc: '留言排序快捷（最熱 / 最新）、只看 UP 主、長留言摺疊；關閉後留言區保持 B 站原生樣式',
   groupVideoCard: '影片卡片',
   groupVideoCardDesc: '影片卡片本身的互動增強（首頁、搜尋、清單頁等所有出現卡片的位置）',
   cardPreview: '懸停預覽',
@@ -322,6 +346,8 @@ const CMN_TW: PagesSettingsMessages = {
   cardQuickActionsDesc: '懸停卡片時在右下角顯示按讚 / 收藏 / 稍後再看；收藏可多選收藏夾，已收藏再點即取消。未登入時只提示不請求，失敗會自動回滾',
   groupListPage: '清單頁',
   groupListPageDesc: '觀看歷史 / 稍後再看 / 收藏頁的預設檢視與排序',
+  listScrollMemory: '返回時恢復捲動位置',
+  listScrollMemoryDesc: '由影片頁返回歷史 / 稍後再看 / 收藏時，恢復離開前的瀏覽位置並高亮原本那張卡',
   historyViewMode: '觀看歷史檢視',
   watchLaterViewMode: '稍後再看檢視',
   favoritesViewMode: '收藏夾檢視',
@@ -389,6 +415,8 @@ const CMN_TW: PagesSettingsMessages = {
   importErrorVersion: '不支援的設定版本：{version}',
   importErrorField: '欄位 {field} 的型態與預設值不一致',
   importErrorEmpty: '檔案裡沒有可匯入的設定項',
+  groupDiagnostics: '診斷',
+  groupDiagnosticsDesc: '檢查目前頁面各增強模組是否掛載、關鍵選擇器是否命中，並給出降級原因；純本機執行，不上報任何資料',
 }
 
 const JYUT: PagesSettingsMessages = {

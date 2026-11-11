@@ -220,3 +220,60 @@ R 沉浸阅读 · [ 字号减小 · ] 字号增大 · T 回到顶部 · Esc 退�
 - 首页没有独立 scope，`isHomePage()` 为假且 scope 只有 `global` 时（例如番剧页、活动页）按「不确定页面」回退旧行为；
 - 折叠区条目灰显但不可聚焦（与参考条目一致的既有交互），用键盘时 `↑` / `↓` 会直接跳过；
 - scope 判定只看 URL（含 `?page=xxx`），原生页内嵌 iframe 抽屉里不算对应 scope。
+## 第 24 轮：快捷键注册表兜底校验（单测）
+
+新增 `tests/unit/shortcutRegistry.spec.ts`（vitest），把「新增快捷键」时必须满足的约束固化成 CI 能跑的门禁。
+文件里的断言失败信息统一带 **entry id / scope / 键位**，例如：
+
+```text
+键位冲突（规范化后）：scope=list 组合键「v」被 [list-cycle-view] scope=list keys=V i18nKey=keyboard_registry.actions.list_cycle_view 与 [list-cycle-sort] scope=list keys=Shift , V i18nKey=keyboard_registry.actions.list_cycle_sort 同时占用
+```
+
+### 新增快捷键必须过的四条校验
+
+1. **同一 scope 内默认键位唯一（原始）**：`SHORTCUT_REGISTRY` 里同一 scope 的两个 entry 不能占用同一个键位字符串；
+   范围写法（`0 – 9`、`1 – 4`）会展开后逐个比较，`chord`（组合键）按整组比较。
+2. **规范化后仍唯一**：大小写（`V` / `v`）、修饰键顺序（`Shift+Ctrl+k` / `Ctrl+Shift+k`）、
+   别名（`Cmd` / `Command` / `Meta`、`Ctrl` / `Control`、`Alt` / `Opt`）归一化之后仍然不能冲突。
+   —— 这条能抓到「原始写法不同、实际按下去是同一个键」的隐蔽冲突。
+3. **每个 action 的 scope / label key / 四语言文案齐全**：
+   - `scope` 必填且必须在 `SHORTCUT_SCOPES` 里；
+   - `i18nKey` 必填，且在 `src/_locales/{cmn-CN,cmn-TW,jyut,en}.yml` 里都有非空文案；
+   - 有 `shortcutActionId` 的条目，其 action 必须在 `SHORTCUT_ACTIONS` 里登记；反过来，登记过的动作也必须在注册表里出现（避免帮助面板漏项）；
+   - 每个 scope 的分组标题 `keyboard_registry.scopes.<scope>` 在四种语言里都存在。
+4. **所有 scope 都在帮助面板分组顺序里有定义**：`SHORTCUT_SCOPES` 不能重复，且 `groupShortcutsByScope()` 的输出顺序必须与它一致，
+   不允许出现空分组 —— 否则帮助面板的分组顺序与「当前页」标记会错位。
+
+### 怎么跑
+
+```bash
+# 只跑注册表校验（vitest 的 root 是 src/，所以用 --dir 指到仓库根的 tests/unit）
+pnpm exec vitest --run --dir tests/unit
+
+# 跑全部单测（既有 5 个 spec + 本 spec）
+pnpm exec vitest --run --root src --dir tests/unit   # 注册表校验
+pnpm test -- --run                                    # 仓库原有单测（src/tests/**）
+```
+
+> ⚠️ 两个注意点（踩过）：
+> 1. `vite.config.ts` 里 `root: r('src')`，所以 `pnpm test -- --run` 只会发现 `src/tests/**`；
+>    `tests/unit/**` 必须用 `--dir tests/unit` 显式指过去（相对当前工作目录解析）。
+> 2. 测试文件在仓库根、被测源码在 `src/`：不要用 `~/...` 别名（vitest root 在 src，仓库外模块解析不到），
+>    用相对路径 `../../src/constants/shortcutRegistry`；`_locales` 目录用 `process.cwd()` 解析
+>    （`import.meta.url` 在 Vite 里会是 http URL，`fileURLToPath` 会抛 `The URL must be of scheme file`）。
+
+### 校验器自身的回归
+
+单测最后有一组「避免校验器假绿」的用例：
+
+- 规范化函数对 `Shift+Ctrl+k` / `Ctrl+Shift+K` / `Cmd+k` / `Meta+K` / `Space` / `?` 的输出；
+- 范围键位展开（`video-percent` → 10 个键位、`notification-jump-category` → 1–4）；
+- **冲突能被检出**：用合成 entry 断言 `collectKeyConflicts(fakeEntries, 'normalized')` 能报出
+  `[fake-a]` / `[fake-b]` 与 `scope=list`，确保这套校验不是「永远通过」的空壳。
+
+### 已知限制
+
+- 校验只覆盖**注册表自身**：各模块内部的 keydown 处理是否与注册表一致，仍靠人工核对
+  （注册表是只读登记表，不执行按键）；
+- 文案校验是「key 存在且非空」，不校验文案语义与长度；嵌套 YAML 只支持本仓库 `_locales` 的「缩进 + key: value」结构；
+- 自定义改键（`settings.keyboardShortcuts`）可能与默认键位冲突，本轮不校验用户配置（改键冲突在设置页由现有逻辑处理）。

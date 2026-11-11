@@ -1,10 +1,12 @@
 <script lang="ts" setup>
 import { migrateLegacyCardQuickActionsSetting } from '~/components/VideoCardQuickActions/preferences'
-import { originalSettings, settings } from '~/logic'
+import DiagnosticsPanel from '~/contentScripts/diagnostics/DiagnosticsPanel.vue'
 
+import { originalSettings, settings } from '~/logic'
 import SettingsGroupSection from '../components/SettingsGroupSection.vue'
 import SettingsItem from '../components/SettingsItem.vue'
 import { usePagesSettingsMessages } from './i18n'
+import PagesSwitch from './PagesSwitch.vue'
 
 /**
  * 「页面增强」设置页。
@@ -85,11 +87,17 @@ const groups = computed<SettingGroupDef[]>(() => [
     key: 'videoPage',
     title: t.value.groupVideoPage,
     desc: t.value.groupVideoPageDesc,
-    items: ['videoPageCinemaMode', 'videoPageMiniPlayer', 'videoPageShortcuts'],
+    items: [
+      'videoPageCinemaMode',
+      'videoPageMiniPlayer',
+      'videoPageShortcuts',
+      'videoPageComments',
+    ],
     reset: () => {
       settings.value.videoPageCinemaMode = originalSettings.videoPageCinemaMode
       settings.value.videoPageMiniPlayer = originalSettings.videoPageMiniPlayer
       settings.value.videoPageShortcuts = originalSettings.videoPageShortcuts
+      settings.value.videoPageComments = originalSettings.videoPageComments
     },
   },
   {
@@ -111,12 +119,14 @@ const groups = computed<SettingGroupDef[]>(() => [
       'watchLaterViewMode',
       'favoritesViewMode',
       'defaultSort',
+      'listScrollMemory',
     ],
     reset: () => {
       settings.value.historyViewMode = originalSettings.historyViewMode
       settings.value.watchLaterViewMode = originalSettings.watchLaterViewMode
       settings.value.favoritesViewMode = originalSettings.favoritesViewMode
       settings.value.listDefaultSort = originalSettings.listDefaultSort
+      settings.value.enableListScrollMemory = originalSettings.enableListScrollMemory
     },
   },
   {
@@ -204,6 +214,7 @@ const itemSearchText: Record<string, () => string[]> = {
   videoPageCinemaMode: () => [t.value.videoPageCinemaMode, t.value.videoPageCinemaModeDesc],
   videoPageMiniPlayer: () => [t.value.videoPageMiniPlayer, t.value.videoPageMiniPlayerDesc],
   videoPageShortcuts: () => [t.value.videoPageShortcuts, t.value.videoPageShortcutsDesc],
+  videoPageComments: () => [t.value.videoPageComments, t.value.videoPageCommentsDesc],
   cardPreview: () => [t.value.cardPreview, t.value.cardPreviewDesc],
   cardQuickActions: () => [t.value.cardQuickActions, t.value.cardQuickActionsDesc],
   historyViewMode: () => [
@@ -231,6 +242,7 @@ const itemSearchText: Record<string, () => string[]> = {
     t.value.sortDuration,
     t.value.sortTitle,
   ],
+  listScrollMemory: () => [t.value.listScrollMemory, t.value.listScrollMemoryDesc],
   directPaste: () => [t.value.directPaste, t.value.directPasteDesc],
   momentsDensity: () => [
     t.value.momentsDensity,
@@ -789,6 +801,13 @@ onBeforeUnmount(() => {
       <SettingsItem v-if="itemVisible('videoPageShortcuts')" :title="t.videoPageShortcuts" :desc="t.videoPageShortcutsDesc">
         <Radio v-model="settings.videoPageShortcuts" />
       </SettingsItem>
+
+      <SettingsItem v-if="itemVisible('videoPageComments')" :title="t.videoPageComments">
+        <template #desc>
+          <span id="pages-desc-video-comments">{{ t.videoPageCommentsDesc }}</span>
+        </template>
+        <PagesSwitch v-model="settings.videoPageComments" describedby="pages-desc-video-comments" />
+      </SettingsItem>
     </SettingsGroupSection>
 
     <SettingsGroupSection
@@ -834,6 +853,13 @@ onBeforeUnmount(() => {
 
       <SettingsItem v-if="itemVisible('defaultSort')" :title="t.defaultSort" :desc="t.defaultSortDesc">
         <Select v-model="settings.listDefaultSort" :options="sortOptions" w="full" />
+      </SettingsItem>
+
+      <SettingsItem v-if="itemVisible('listScrollMemory')" :title="t.listScrollMemory">
+        <template #desc>
+          <span id="pages-desc-list-scroll-memory">{{ t.listScrollMemoryDesc }}</span>
+        </template>
+        <PagesSwitch v-model="settings.enableListScrollMemory" describedby="pages-desc-list-scroll-memory" />
       </SettingsItem>
     </SettingsGroupSection>
 
@@ -966,6 +992,16 @@ onBeforeUnmount(() => {
       <SettingsItem v-if="itemVisible('homeCardDensity')" :title="t.homeCardDensity" :desc="t.homeCardDensityDesc">
         <Select v-model="settings.homeCardDensity" :options="densityOptions" w="full" />
       </SettingsItem>
+    </SettingsGroupSection>
+
+    <!-- 第 24 轮：页面自检（只读、不发请求、不参与顶部导航与搜索过滤） -->
+    <SettingsGroupSection
+      group-key="diagnostics"
+      :title="t.groupDiagnostics"
+      :desc="t.groupDiagnosticsDesc"
+      :show-reset="false"
+    >
+      <DiagnosticsPanel />
     </SettingsGroupSection>
 
     <!-- 第 22 轮：数据导入 / 导出（不属于单页偏好，不进顶部导航与搜索过滤） -->

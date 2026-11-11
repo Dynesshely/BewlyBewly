@@ -233,46 +233,65 @@ header 是推荐类文案，条目指向其它 bvid。
 - 现代分P 条目没有链接，`[`/`]` 依赖 `.active` 类或 URL 的 `p=` 序号；若两者都拿不到，当前项下标为 -1，
   `[`/`]` 会从列表首/尾开始切换
 - 面板标题跟随来源：播放列表 / 选集 / 合集；文案来自模块内 i18n（四种语言）
-## 评论区增强（第 22 轮）
+## 评论区增强（第 23 轮：按真实 Web Components 重写）
 
-播放器增强之外，本轮补了评论区三件事：**排序快捷**、**只看 UP 主**、**长评论折叠**。
-所有注入 UI 都在 `#bewly-video-page` 的 shadow root 里（原生 `<button>` + `aria-pressed` + `:focus-visible`），
-**不改 B 站评论 DOM 结构、不拦原生交互**（点赞 / 回复 / 展开完全照旧）。
+> 第 22 轮的实现基于 light DOM（`.reply-list` / `.reply-item` / `.up-mark`），**真机上完全不生效**，
+> 已在第 23 轮按实测结构重写。评论区现在是 **Web Components + shadow DOM**，页面级 CSS 选不到任何目标节点，
+> 所有隐藏 / 折叠样式必须**注入到对应 shadow root**。
 
-### 1. 排序快捷
+### 真机 DOM 层级（2026-11 实测）
 
-- 评论区顶部出现一个胶囊工具条（fixed 定位，随评论区滚动）；
-- 提供「最热 / 最新」两个按钮，点击**只点原生排序 tab**（`.reply-sort` / `.comment-sort` 里的 tab），不自己发请求；
-- `aria-pressed` 跟随原生 tab 的高亮类（`active` / `aria-selected`）自动同步；
-- 找不到原生排序标签时，工具条里不出现这两个按钮（工具条仍可显示「只看 UP」）。
+```
+#commentapp
+  └─ bili-comments (shadowRoot)
+       ├─ bili-comments-header-renderer (shadowRoot)
+       │    └─ #navbar
+       │         ├─ #title (h2 评论 + #count)
+       │         └─ #sort-actions.hot
+       │              └─ bili-text-button（「最热」）/ bili-text-button（「最新」）
+       └─ bili-comment-thread-renderer × N (shadowRoot)
+            ├─ bili-comment-renderer (shadowRoot)
+            │    ├─ #header → bili-comment-user-info (shadowRoot)
+            │    │              ├─ #user-name
+            │    │              └─ #user-up   ← 只有 UP 本人的评论才有
+            │    ├─ #content            ← 正文
+            │    └─ #footer
+            └─ #replies > bili-comment-replies-renderer (shadowRoot)
+```
 
-### 2. 只看 UP 主
+### 实现要点
 
-- 依赖原生 `.up-mark` 标识：每次同步给 UP 主评论打 `data-bewly-comment-up`；
-- 开关打开时给 `<html>` 加 `bewly-comments-only-up`，页面级 CSS 隐藏 `.reply-item:not([data-bewly-comment-up])`
-  （楼中楼跟随其所在的顶层评论一起显示 / 隐藏）；
-- **页面上一个 `.up-mark` 都找不到时开关保持禁用**，标题与提示说明「没有找到 UP 主标识，暂不能只看 UP」，不做假开关；
-- 状态存 `sessionStorage`（key `bewly-comments-only-up`），切换排序 / 加载新评论时会重新标记并重新应用。
+- **探测**：逐层 `#commentapp → bili-comments.shadowRoot → bili-comments-header-renderer.shadowRoot → #navbar / #sort-actions`，
+  线程 `bili-comment-thread-renderer.shadowRoot → bili-comment-renderer.shadowRoot → #content`，
+  UP 标识 `bili-comment-renderer → #header → bili-comment-user-info.shadowRoot → #user-up`；任何一层失败都不渲染对应 UI。
+- **排序**：工具条固定在 `#navbar` 下方（`top = navbar.bottom + 6`），点「最热 / 最新」直接 `bili-text-button.click()`；
+  当前态优先读 `#sort-actions` 的 class（`hot` / `latest`），其次读按钮 `active`；都推断不出时只提供点击、不显示按下态。
+- **只看 UP**：遍历线程，读老三件（renderer → #header → user-info shadow → #user-up）给 UP 线程打 `data-bewly-comment-up="1"`；
+  同时向 **bili-comments 的 shadowRoot** 注入一次 `<style id="bewly-comments-style">`：
+  `:host([data-bewly-only-up]) bili-comment-thread-renderer:not([data-bewly-comment-up="1"]) { display: none }`，
+  开关只切换宿主上的 `data-bewly-only-up` 属性；没有 UP 标识时开关禁用并说明。
+- **长评论折叠**：读每个 `bili-comment-renderer` shadow 内 `#content` 的 `scrollHeight`（> 400px 折叠；
+  用 `scrollHeight` 而不是 rect 高度，避免折叠后高度变化导致抖动），给 renderer 打 `data-bewly-comment-clamped`，
+  并向**该 renderer 的 shadowRoot** 注入 `<style id="bewly-comment-fold-style">`：
+  `:host([data-bewly-comment-clamped]) #content { max-height: 400px; overflow: hidden; mask-image: linear-gradient(...) }`。
+  展开按钮仍在 videoPage 的 shadow 浮层里（fixed，跟随 thread 矩形），点击后打 `data-bewly-comment-expanded`、移除折叠标记。
+- **动态性**：`MutationObserver` 观察 **bili-comments 的 shadowRoot**（childList/subtree，节流 300ms）补处理懒加载 / 分页新线程；
+  评论区未挂载或被整段替换时会自动重新观察；每拍 500ms 的 `syncComments()` 兜底。
+- **卸载**：移除所有注入的 `<style>`、清掉所有 `data-bewly-*` 属性、断开观察器，评论区恢复原样。
+- **与影院模式共存**：影院模式压暗评论区时工具条 / 展开按钮隐藏（`v-if="!ui.cinema"`），退出后恢复。
 
-### 3. 长评论折叠
+### 用户可见行为
 
-- 用 `ResizeObserver` + 初始测量判断：评论高度超过 **400px** 时打 `data-bewly-comment-clamped`；
-  页面级 CSS 给 `max-height: 400px; overflow: hidden` + 底部 80px 渐隐遮罩；
-- 「展开」按钮在 shadow 浮层里按评论位置 fixed 定位（随滚动 / resize 重算，只保留视口内的按钮），
-  点击后给评论打 `data-bewly-comment-expanded`，恢复完整高度并移除按钮；
-- 为减少布局抖动，每条评论只做一次初始折叠判定（`data-bewly-comment-fold-checked`），
-  之后的高度变化由 `ResizeObserver` 驱动。
-
-### 与影院模式共存
-
-影院模式会压暗评论区（第 1 轮的行为），评论增强 UI（工具条 / 展开按钮）随之隐藏（`v-if="!ui.cinema"`），
-退出影院后自动恢复；影院模式下也不会计算折叠按钮坐标。
+1. 评论区顶部（`#navbar` 下方）出现胶囊工具条：最热 / 最新 / 只看 UP 主。
+2. 「只看 UP 主」只保留 UP 主本人的评论线程；页面上没有 `#user-up` 时开关禁用并说明。
+3. 正文超过 400px 的评论默认折叠（底部渐隐），右下角出现「展开」按钮，点击后完整显示。
+4. 所有控件是 shadow 浮层里的原生 `<button>`：Tab 可达、aria 状态、focus-visible 描边，不破坏原生评论交互。
 
 ### 已知限制
 
-- 评论 DOM 选择器按仓库既有证据：`#comment` / `#commentapp` / `.comment-container` / `.reply-list` / `.reply-item`；
-  若 B 站改成虚拟列表或换类名，「只看 UP」会因找不到 `.up-mark` 而禁用、折叠按钮不出现（功能降级，不误伤页面）；
-- 只看 UP 只隐藏**顶层**非 UP 评论（楼中楼跟随父评论），避免把 UP 评论下的对话拆掉；
-- 展开按钮是 fixed 定位的浮层按钮：极端情况下（评论区被父级 `transform` 建立包含块）位置可能偏移，
-  但按钮仍在视口内；如果需要可改成 absolute + 文档坐标；
-- 折叠判定只看高度 > 400px，不区分图片 / 文字；展开状态不持久化（重新进入页面会再次折叠）。
+- 选择器全部依赖上述自定义元素名与 shadow 内部 id；B 站改组件名 / 结构后对应功能降级（不渲染或禁用），不会误改页面。
+- 「只看 UP」只处理顶层 `bili-comment-thread-renderer`；楼中楼跟随其所属顶层线程显隐。
+- 折叠判定只看 `#content` 的 `scrollHeight > 400px`，不含图片懒加载后的二次变化（ResizeObserver 会在尺寸变化时重算）。
+- 展开按钮是 fixed 定位的浮层按钮，只对视口内的线程渲染；滚动时按 rAF 重算坐标。
+- e2e 用 fixture 脚本 `attachShadow` 手工构造同样的层级；真实页面仍建议人工确认一次。
+

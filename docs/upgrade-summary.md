@@ -1,6 +1,6 @@
 # 升级总览（用户向）
 
-本文汇总第 1–21 轮对 BewlyBewly（Dynesshely fork）的**用户可见改动**，按页面组织；
+本文汇总第 1–23 轮对 BewlyBewly（Dynesshely fork）的**用户可见改动**，按页面组织；
 另附快捷键总表、设置项清单与已知限制。实现细节与调试信息见各模块文档（文末索引）。
 
 适用页面：B 站桌面网页版。新增能力大多「不替换原生页面、只在上面叠加增强」；找不到页面结构时自动降级或隐藏，不会留下空浮层。
@@ -23,6 +23,17 @@
 - 增强快捷键：J/L 快退快进、K 播放暂停、←/→ 5 秒、C 弹幕、M 静音、F 全屏、Shift+P 画中画、0–9 跳进度。
 - 选集面板：播放列表页（/list/*）显示播放列表、普通多 P 视频显示分 P、合集视频显示合集；[ / ] 切上一个 / 下一个，A 自动连播。
 - 紧凑信息栏与播放器浮动按钮可一键还原、退出影院、打开快捷键帮助。
+- 详见：[video-page](video-page.md)
+
+### 视频评论区（视频播放页下方）
+
+- 评论区顶部出现胶囊工具条：**最热 / 最新**一键切换（只点 B 站原生排序按钮，不自己发请求）、**只看 UP 主**开关。
+- 长评论（正文高度 > 400px）自动折叠并显示「展开」按钮，展开后恢复完整高度；折叠 / 展开状态不持久化。
+- 评论区是 **Web Components + shadow DOM**（`bili-comments` 等），增强 UI 在 shadow 浮层里，
+  隐藏 / 折叠样式注入到对应 shadow root，卸载或关闭开关后完全还原，不改 B 站评论 DOM 与交互。
+- 第 23 轮按真机 Web Components 结构重写（第 22 轮基于 light DOM 的选择器已移除）：
+  逐层探测 `bili-comments` → header / thread / renderer / user-info 的 shadow root，全部失败则不渲染。
+- 找不到评论区结构时不渲染任何 UI；找不到 UP 标识时「只看 UP」禁用并说明原因。
 - 详见：[video-page](video-page.md)
 
 ### 番剧页
@@ -85,8 +96,8 @@
 
 ### 直播页
 
-- 浮动面板：影院模式（T）、隐藏右侧栏（H，真机结构不支持时禁用并说明）、弹幕开关（C）、全屏（F）、快捷键说明（?）。
-- 影院模式隐藏顶部操作条、播放器按视口高度铺满并保持画面完整；窄屏（≤900px）不遮挡播放器控件。
+- 浮动面板：影院模式（T）、隐藏下方推荐 / 榜单区（H，真机结构不支持时禁用并说明）、弹幕开关（C）、全屏（F）、快捷键说明（?）。
+- 影院模式隐藏顶部操作条、播放器按视口高度铺满并保持画面完整，下方推荐 / 榜单区一并隐藏（不产生多余滚动条）；窄屏（≤900px）不遮挡播放器控件。
 - 详见：[live-page](live-page.md)
 
 ### 全局
@@ -96,6 +107,10 @@
 - 设置页新增「页面增强」分组，集中管理上述页面增强开关；设置项含说明与默认值。
 - 界面支持简中 / 繁中 / 粤语 / 英文四种语言；暗色模式、高对比度、减少动态效果、窄屏（≤900 / ≤640px）适配。
 - 图片加载失败统一显示虚线占位（按图片 / 视频封面 / 头像区分图标与读屏文案），不重试、不抖动；空态 / 错误态 / 骨架屏统一风格。
+- **设置导入 / 导出**：「页面增强」页底部「数据」区可把设置导出成 JSON 备份（`bewly-settings-YYYYMMDD.json`），
+  或从备份导入（先校验版本 / 字段类型，再二次确认后按字段覆盖）。
+- **键盘可达与焦点管理**：命令面板、快捷键帮助、设置搜索、各页面浮动面板、收藏夹面板、右键菜单、评论工具条等
+  打开后焦点落在第一个可操作元素，Tab / Shift+Tab 在面板内循环，Esc 关闭并把焦点还回触发按钮；所有可交互元素有 `:focus-visible` 描边。
 - 详见：[keyboard-registry](keyboard-registry.md)、[keyboard-navigation](keyboard-navigation.md)、[zen-mode](zen-mode.md)、[focus-browse](focus-browse.md)、[ai-filter](ai-filter.md)、[settings-pages](settings-pages.md)、[i18n-modules](i18n-modules.md)、[accessibility](accessibility.md)、[responsive](responsive.md)、[fallback](fallback.md)、[feedback-states](feedback-states.md)
 
 ## 二、快捷键总表（按页面）
@@ -237,7 +252,9 @@
 
 ## 三、设置项清单（全部字段与默认值）
 
-> 来源：`src/logic/storage.ts` 的 `originalSettings`。共 **115** 个字段；标「本升级新增」的分组为第 1–21 轮过程中加入或接入的页面增强设置。
+> 来源：`src/logic/storage.ts` 的 `originalSettings`。共 **115** 个字段；标「本升级新增」的分组为第 1–23 轮过程中加入或接入的页面增强设置。
+> 第 19–23 轮新增的都是「能力开关」（收藏夹管理、稍后再看 toggle、焦点里直接可用），没有引入新的 storage 字段；
+> 第 22 轮的设置导入 / 导出只读写这份字段清单，不改结构。
 > 值为 `空字符串` / `空数组` / `空对象` 表示对应控件未填写或列表为空。
 
 ### 页面增强（本升级新增）
@@ -423,13 +440,41 @@
 - **列表页**：离屏优化关闭后恢复全量渲染；收藏夹管理需要登录，接口失败时 toast 并保持原状态。
 - **搜索**：热搜接口失败 / 未登录时回落到内置词表；10 分钟缓存内不重复请求最新热搜。
 - **动态页**：离屏优化在长列表更吃性能的取舍；只看视频时若整页无视频会限制自动补页并提示。
-- **消息 / 空间 / 分区 / 直播**：页面结构不匹配时对应功能禁用/隐藏（如直播「隐藏侧栏」在真机结构下保持禁用）。
+- **消息 / 空间 / 分区 / 直播**：页面结构不匹配时对应功能禁用/隐藏（如直播页找不到可隐藏的下方区块时开关保持禁用）。
+- **评论区**：B 站改版换掉 `bili-comments` 等自定义元素、或换成虚拟列表 / closed shadow root 时，
+  排序快捷 / 只看 UP / 折叠会整体降级（不渲染或禁用），不会误伤原生评论；初始只渲染部分线程，增强随之逐步生效。
+- **直播页下方区块**：影院模式会隐藏舞台之外的同级区块；若 B 站改成独立定位 / 跨容器结构，找不到可隐藏区块时开关保持禁用。
+- **设置导入 / 导出**：导出格式版本固定为 1，旧版本文件会被明确拒绝；只覆盖文件里出现的已知字段，不校验嵌套结构与枚举合法性。
+- **收藏夹管理**：新建 / 重命名 / 删除都需要登录，接口失败时 toast 并保持原状态；同名判断只在本地提示，最终以 B 站接口为准。
 - **文章**：普通专栏 / OPUS 支持；旧专栏「跳转 OPUS」过渡页 5 秒内未跳转保持静默；移动版专栏只做兜底判定。
 - **窄屏**：≤900 / ≤640px 已做换行与次要元素隐藏，但未在全部机型实测；部分工具条在窄屏会隐藏文字只留图标。
 - **AI 筛选**：需要自备 OpenAI 兼容接口与 Key，卡片标题等公开信息会发送到你配置的 AI 服务；不配置则不启用。
 - **图片兜底**：只在图片真正加载失败后显示占位，不重试；不能替代网络问题排查。
 
-## 五、文档索引
+## 五、第 19–23 轮变化速览
+
+> 第 18 轮之前的完整能力已写进上面的「按页面总览」；这里只列第 19–23 轮（含第 22 轮评论区重写）新增或明显变化的用户可见能力。
+
+| 轮次 | 能力 | 用户可见变化 | 详见 |
+| --- | --- | --- | --- |
+| 19 | 图片加载失败兜底 | 封面 / 头像 / 动态媒体 / 列表头图 / 番剧时间表图加载失败时显示统一的虚线占位（按图片 / 视频 / 头像区分图标与读屏文案），不重试、不抖动、不改变占位尺寸 | [fallback](fallback.md) |
+| 19 | 焦点陷阱与键盘可达 | 命令面板、快捷键帮助、设置搜索、各页面浮动面板打开后焦点在面板内循环，Esc 关闭并回焦触发按钮；Tab / Shift+Tab 不会跑丢 | [accessibility](accessibility.md) |
+| 19 | 新建收藏夹 / 稍后再看开关 | 卡片收藏面板可新建收藏夹（行内输入，Enter 提交 / Esc 取消）；「稍后再看」按钮变成开关，已加入再点即移除，失败回滚 + toast | [video-card-quick-actions](video-card-quick-actions.md) |
+| 20 | 焦点补漏（收藏夹面板 / 右键菜单 / 列表快捷键帮助） | 收藏夹面板与列表快捷键帮助 Tab 循环；右键菜单 ↑↓ 移动、Enter 执行、Esc 关闭并焦点回卡片，菜单项 `role="menuitem"` | [accessibility](accessibility.md) |
+| 20 | 首页 / 列表页滚动位置记忆 | 首页切子标签恢复该标签的滚动位置、刷新回顶部；历史 / 稍后再看 / 收藏从视频页返回时按最近卡片锚点恢复 | [scroll-memory](scroll-memory.md) |
+| 20 | 动态页灯箱兜底与焦点管理 | 灯箱大图失败显示统一占位、加载中显示骨架；灯箱 `role="dialog"` + Tab 陷阱，Esc 关闭后焦点回打开它的图片 | [moments-page](moments-page.md) |
+| 21 | 收藏页收藏夹管理 | 胶囊「⋯」菜单支持重命名（行内输入）与删除（二次确认）；行末「+ 新建收藏夹」；当前夹被删时自动切到第一个可用夹或空态 | [list-pages](list-pages.md) |
+| 22 | 设置导入 / 导出 | 「页面增强 → 数据」导出 JSON 备份、导入前校验版本与字段类型并二次确认，按字段覆盖 | [settings-pages](settings-pages.md) |
+| 22–23 | 评论区增强（按真实 Web Components 重写） | 评论工具条「最热 / 最新」「只看 UP」；长评论（> 400px）折叠 + 「展开」；样式注入到对应 shadow root，卸载即还原 | [video-page](video-page.md) |
+| 23 | 直播页下方区块适配 | 「隐藏侧栏」语义改为「隐藏下方推荐 / 榜单区」，影院模式一并隐藏，避免多余滚动条；找不到可控区块时开关禁用 | [live-page](live-page.md) |
+
+### 兼容与降级
+
+- 上述能力都遵循「找不到页面结构就不渲染 / 禁用对应开关」的原则，不修改 B 站原生 DOM 与交互；
+- 评论区已从 light DOM 选择器改为 `bili-comments` 等自定义元素 + shadow DOM 探测（见 [testing](testing.md) 的 fixture 做法）；
+- 写操作（收藏夹管理、稍后再看、点赞、收藏）都需要登录：未登录只提示不发请求，失败 toast 并保持原状态。
+
+## 六、文档索引
 
 - 功能与页面：[home-density](home-density.md)、[focus-browse](focus-browse.md)、[zen-mode](zen-mode.md)、[scroll-memory](scroll-memory.md)、[video-page](video-page.md)、[list-pages](list-pages.md)、[search-page](search-page.md)、[moments-page](moments-page.md)、[notification-page](notification-page.md)、[space-page](space-page.md)、[article-page](article-page.md)、[channel-page](channel-page.md)、[live-page](live-page.md)、[anime-search-pages](anime-search-pages.md)
 - 卡片与交互：[video-card-preview](video-card-preview.md)、[video-card-quick-actions](video-card-quick-actions.md)、[keyboard-navigation](keyboard-navigation.md)、[keyboard-registry](keyboard-registry.md)

@@ -24,6 +24,7 @@ import {
   markLiveStage,
   notifyPlayerResize,
   resetAsideCache,
+  resetBelowCache,
 } from './dom'
 import { getMessages } from './i18n'
 import {
@@ -117,7 +118,15 @@ export function toggleCinema(): void {
 }
 // #endregion
 
-// #region 隐藏侧栏
+// #region 隐藏舞台下方区块（第 23 轮语义修正）
+/**
+ * 隐藏 / 显示舞台下方的「推荐 / 榜单」区块。
+ *
+ * 历史：第 4 轮按「右侧聊天列」实现（`.aside-area`），但真机（live.bilibili.com/6）上
+ * **不存在右侧栏**，所以第 23 轮改成结构化判定「舞台下方的兄弟区块」（见 dom.ts
+ * `findBelowRegions`）。函数名保留 `setHideAside` 以免牵动 keyboard / overlay 的调用点，
+ * 语义在内部与文案里已改为「下方推荐 / 榜单」。
+ */
 export function setHideAside(on: boolean, options: { silent?: boolean } = {}): void {
   if (on && !ui.asideAvailable) {
     if (!options.silent)
@@ -203,13 +212,14 @@ export function togglePanel(open?: boolean): void {
 
 /** 重新识别播放器 / 侧栏 / 控件，并同步面板可用性与状态（首屏、切房间、DOM 变化时调用） */
 export function syncPage(): void {
-  const { player, aside } = markLiveStage()
+  const { player, aside, below } = markLiveStage()
   if (player)
     playerSeenOnce = true
 
   const hadPlayer = ui.playerReady
   ui.playerReady = Boolean(player)
-  ui.asideAvailable = Boolean(aside)
+  // 第 23 轮：真机有「下方区块」而没有右侧栏，两者都算「可隐藏区域」
+  ui.asideAvailable = Boolean(aside) || below.length > 0
   ui.danmakuAvailable = findDanmakuToggle() !== null
   ui.danmakuOn = isDanmakuEnabled()
   ui.fullscreenAvailable = findFullscreenButton() !== null || Boolean(player)
@@ -254,6 +264,7 @@ export function cleanupDom(): void {
   }
   clearLiveStage()
   resetAsideCache()
+  resetBelowCache()
   removePageStyles()
   const html = document.documentElement
   html.classList.remove(ROOT_CLASS_CINEMA, ROOT_CLASS_HIDE_ASIDE)

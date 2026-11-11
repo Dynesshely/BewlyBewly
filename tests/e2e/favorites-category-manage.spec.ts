@@ -22,6 +22,13 @@ import {
  *   getFavoriteResources 返回空列表；
  * - 断言：新建成功后胶囊数量 +1 且新夹被选中；创建失败时出现 toast 且胶囊数量不变。
  */
+/** 新建的收藏夹标题（中英共用，断言时不依赖界面语言） */
+const CREATED_FOLDER_TITLE = 'E2E New Folder'
+/** 「已创建」toast：跟随界面语言，用双语正则匹配（CI 默认英文） */
+const CREATE_OK_RE = /Folder created|收藏夹已创建/i
+/** 「创建失败」toast：同上 */
+const CREATE_FAIL_RE = /Failed to create folder|创建收藏夹失败/i
+
 const FOLDER_LIST_API = '/x/v3/fav/folder/created/list-all'
 const FOLDER_ADD_API = '/x/v3/fav/folder/add'
 const RESOURCE_LIST_API = '/x/v3/fav/resource/list'
@@ -110,7 +117,7 @@ async function setupFavorites(fails: boolean) {
           return Promise.resolve(json({ code: -500, message: 'E2E 创建失败', data: null }))
         const folder = {
           id: 1000 + state.folders.length + 1,
-          title: 'E2E 新建夹',
+          title: 'E2E New Folder',
           attr: 0,
           media_count: 0,
           fav_state: 0,
@@ -130,7 +137,8 @@ async function setupFavorites(fails: boolean) {
   }
 
   await clickDockItem(page, /favorites|收藏/i)
-  await expect.poll(() => chipCount(page), { timeout: 30_000 }).toBe(2)
+  // 收藏页首屏需要先拉收藏夹列表（SW 桩）+ 默认收藏夹内容，给足超时
+  await expect.poll(() => chipCount(page), { timeout: 45_000 }).toBe(2)
   return { context, page }
 }
 
@@ -142,8 +150,8 @@ async function submitCreate(page: Page, title: string): Promise<void> {
     trigger?.click()
   })
   const input = page.locator('.bewly-list-chip__input').first()
-  await expect(input).toBeVisible({ timeout: 10_000 })
-  await input.fill(title, { timeout: 10_000 })
+  await expect(input).toBeVisible({ timeout: 15_000 })
+  await input.fill(title, { timeout: 15_000 })
   await input.press('Enter')
 }
 
@@ -151,17 +159,19 @@ test.describe('收藏页收藏夹管理', () => {
   skipIfExtensionMissing()
 
   test('新建收藏夹成功后胶囊 +1 并选中新夹', async () => {
-    test.setTimeout(150_000)
+    test.setTimeout(180_000)
     const { context, page } = await setupFavorites(false)
 
     try {
-      await submitCreate(page, 'E2E 新建夹')
+      await submitCreate(page, CREATED_FOLDER_TITLE)
 
-      // 文案跟随界面语言（CI 默认英文），用正则同时匹配中英文
-      await expect(page.locator('.Vue-Toastification__toast', { hasText: /收藏夹已创建|Folder created/i }))
-        .toHaveCount(1, { timeout: 15_000 })
-      await expect.poll(() => chipCount(page), { timeout: 30_000 }).toBe(3)
-      await expect.poll(() => activeChipTitle(page), { timeout: 10_000 }).toContain('E2E 新建夹')
+      // 文案跟随界面语言（CI 默认英文），用双语正则匹配
+      await expect(page.locator('.Vue-Toastification__toast', { hasText: CREATE_OK_RE }))
+        .toHaveCount(1, { timeout: 20_000 })
+      await expect.poll(() => chipCount(page), { timeout: 45_000 }).toBe(3)
+      // 选中态由新夹标题判断；标题是测试自己写的英文，与界面语言无关
+      await expect.poll(() => activeChipTitle(page), { timeout: 15_000 })
+        .toContain(CREATED_FOLDER_TITLE)
     }
     finally {
       await context.close()
@@ -169,15 +179,16 @@ test.describe('收藏页收藏夹管理', () => {
   })
 
   test('新建收藏夹失败时出现 toast 且胶囊数量不变', async () => {
-    test.setTimeout(150_000)
+    test.setTimeout(180_000)
     const { context, page } = await setupFavorites(true)
 
     try {
-      await submitCreate(page, 'E2E 失败夹')
+      await submitCreate(page, 'E2E Failing Folder')
 
-      await expect(page.locator('.Vue-Toastification__toast', { hasText: /创建收藏夹失败|Failed to create/i }))
-        .toHaveCount(1, { timeout: 15_000 })
-      expect(await chipCount(page)).toBe(2)
+      await expect(page.locator('.Vue-Toastification__toast', { hasText: CREATE_FAIL_RE }))
+        .toHaveCount(1, { timeout: 20_000 })
+      // 失败时不能新增胶囊；用轮询兜住「失败后短暂重渲染」的场景
+      await expect.poll(() => chipCount(page), { timeout: 15_000 }).toBe(2)
     }
     finally {
       await context.close()

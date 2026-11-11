@@ -71,6 +71,13 @@ export const ANCESTOR_ATTR = 'data-bewly-live-ancestor'
 export const HANDLE_BAR_ATTR = 'data-bewly-live-handle-bar'
 /** 播放器画面容器（真机 `.live-player-bg`，影院模式要铺满舞台） */
 export const VIDEO_BG_ATTR = 'data-bewly-live-video-bg'
+/**
+ * 舞台下方的区块（第 23 轮：真机没有右侧聊天列，页面下方 y≈2818 有「推荐 / 榜单」类容器）。
+ *
+ * 影院模式与「隐藏下方推荐 / 榜单」都作用在属性上：
+ * 只隐藏**结构的兄弟节点**，不隐藏舞台本身。
+ */
+export const BELOW_ATTR = 'data-bewly-live-below'
 
 const EDITABLE_SELECTOR = [
   'input',
@@ -185,6 +192,70 @@ function findAsideByHeuristic(player: HTMLElement): HTMLElement | null {
   return best
 }
 
+/**
+ * 舞台下方的「推荐 / 榜单」区块（第 23 轮新增，替代真机上并不存在的右侧栏）。
+ *
+ * 真机实测（live.bilibili.com/6，2026-11）：播放器舞台在页面顶部，下方 y≈2818
+ * 有宽约 610px 的区块（class 含 `layerWrapperRoot` / `_layoutContainerRoot_`，内容是礼物 / 榜单类）。
+ * B 站类名是 CSS Module 哈希，不能硬编码，因此用结构判定：
+ *
+ * 1. 从舞台开始向上遍历祖先（到 body 为止，最多 6 层）；
+ * 2. 每一层收集「不包含舞台、不是 fixed/sticky、宽度 >= minWidth、高度 >= 60、
+ *    且整体位于舞台底部以下（16px 容差）」的兄弟节点；
+ * 3. 命中的节点打 `data-bewly-live-below`，去重后返回。
+ *
+ * 之所以允许在多个层级同时命中：B 站的「下方区块」外面可能还套着若干层布局容器，
+ * 外层命中会把内层一起隐藏，重复命中没有副作用（去重保证只有一个节点）。
+ */
+let belowCache: HTMLElement[] = []
+
+export function findBelowRegions(player: HTMLElement | null = findPlayer()): HTMLElement[] {
+  // 已经隐藏过的区块量不出 rect（display:none），所以命中后按缓存复用，
+  // 只要节点还连着、且舞台没换，就不再重新测量 —— 否则开关会自己抖动成「不可用」。
+  if (belowCache.length && belowCache.every(node => node.isConnected))
+    return belowCache
+  if (!player)
+    return []
+
+  belowCache = detectBelowRegions(player)
+  return belowCache
+}
+
+/** 卸载 / 离开页面时清掉缓存 */
+export function resetBelowCache(): void {
+  belowCache = []
+}
+
+function detectBelowRegions(player: HTMLElement): HTMLElement[] {
+  const playerRect = player.getBoundingClientRect()
+  const playerBottom = playerRect.bottom
+  const minWidth = Math.max(240, Math.min(window.innerWidth * 0.18, 520))
+
+  const result: HTMLElement[] = []
+  const seen = new Set<HTMLElement>()
+  let node: HTMLElement | null = player.parentElement
+  for (let depth = 0; node && node !== document.body && node !== document.documentElement && depth < 6; depth++, node = node.parentElement) {
+    for (const sibling of Array.from(node.children)) {
+      if (!(sibling instanceof HTMLElement) || sibling === player || sibling.contains(player))
+        continue
+      if (seen.has(sibling))
+        continue
+      const style = getComputedStyle(sibling)
+      if (style.position === 'fixed' || style.position === 'sticky' || style.display === 'none')
+        continue
+      const rect = sibling.getBoundingClientRect()
+      if (rect.width < minWidth || rect.height < 60)
+        continue
+      // 只收「完全位于舞台下方」的块，避免把顶栏 / 播放器同排的元素也隐藏掉
+      if (rect.top < playerBottom - 16)
+        continue
+      seen.add(sibling)
+      result.push(sibling)
+    }
+  }
+  return result
+}
+
 /** 播放器控制条里的弹幕开关 */
 export function findDanmakuToggle(): HTMLElement | null {
   return firstMatch<HTMLElement>(DANMAKU_SELECTORS)
@@ -213,12 +284,12 @@ export function isDanmakuEnabled(): boolean {
  * 只要祖先建立了层叠上下文，`position: fixed` 的舞台就会被 body::before 遮罩盖住
  * （第 4 轮番剧页踩过这个坑：整页变灰、播放器不见）。
  */
-export function markLiveStage(): { player: HTMLElement | null, aside: HTMLElement | null } {
+export function markLiveStage(): { player: HTMLElement | null, aside: HTMLElement | null, below: HTMLElement[] } {
   clearLiveStage()
 
   const player = findPlayer()
   if (!player)
-    return { player: null, aside: null }
+    return { player: null, aside: null, below: [] }
 
   player.setAttribute(PLAYER_ATTR, '')
 
@@ -242,13 +313,18 @@ export function markLiveStage(): { player: HTMLElement | null, aside: HTMLElemen
       common.setAttribute(LAYOUT_ATTR, '')
   }
 
+  // 舞台下方区块（第 23 轮）：真机没有右侧栏，可隐藏的是这些推荐 / 榜单区块
+  const below = findBelowRegions(player)
+  for (const region of below)
+    region.setAttribute(BELOW_ATTR, '')
+
   let parent = player.parentElement
   while (parent && parent !== document.body && parent !== document.documentElement) {
     parent.setAttribute(ANCESTOR_ATTR, '')
     parent = parent.parentElement
   }
 
-  return { player, aside }
+  return { player, aside, below }
 }
 
 export function clearLiveStage(): void {
@@ -259,6 +335,7 @@ export function clearLiveStage(): void {
     ANCESTOR_ATTR,
     HANDLE_BAR_ATTR,
     VIDEO_BG_ATTR,
+    BELOW_ATTR,
   ]
   for (const attr of attrs) {
     document.querySelectorAll<HTMLElement>(`[${attr}]`).forEach(node => node.removeAttribute(attr))

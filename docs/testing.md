@@ -211,3 +211,69 @@ pnpm exec playwright test --repeat-each=1   # 连续执行命令 N 次
 1. **等「稳定」而不是等「一次命中」**：滚动恢复有中间态，`expect.poll` 单次命中后立刻读值可能读到回落值；
 2. **按真实滚动元素断言**：`.bewly-scroll-container` 在 `#bewly` shadow root 内，`document.querySelector` 拿不到；
 3. **首页刷新用例要容错浏览器 restoration 的时机**：轮询到回顶后再断言，不要固定 `waitForTimeout`。
+## 十、第 23 轮：评论区 Web Components fixture + 两个 spec 的加固
+
+### 事实（2026-11 真机确认）
+
+视频播放页评论区不是普通 light DOM，而是 **B 站自研 Web Components + shadow DOM**：
+
+```
+#commentapp
+  └─ bili-comments (shadowRoot)
+       ├─ bili-comments-header-renderer (shadowRoot)
+       │    └─ #navbar
+       │         ├─ #title (h2 评论 + #count)
+       │         └─ #sort-actions.hot → bili-text-button（「最热」/「最新」）
+       └─ bili-comment-thread-renderer × N (shadowRoot)
+            ├─ bili-comment-renderer (shadowRoot)
+            │    ├─ #header → bili-comment-user-info (shadowRoot) → #user-name / #user-up
+            │    ├─ #content   ← 正文（长评论 > 400px 触发折叠）
+            │    └─ #footer
+            └─ #replies > bili-comment-replies-renderer (shadowRoot)
+```
+
+三个直接后果：
+
+1. **页面级 CSS 选不到**：`bili-comments .#content` 之类的选择器无效，样式必须注入到对应 shadow root
+   （`bili-comments` 的 shadow 管线程显隐、每个 `bili-comment-renderer` 的 shadow 管正文折叠）；
+2. **Playwright 的 CSS locator 能穿透 open shadow root**，但 `page.evaluate` 里的 `document.querySelector`
+   **不能** —— 需要逐层 `element.shadowRoot.querySelector`；
+3. **排序是自定义元素**（`bili-text-button`），不是 `button`；点击要用 `click()` 派发，
+   不能依赖原生按钮的键盘/表单行为。
+
+### 做法（fixture 侧）
+
+`tests/e2e/video-page.spec.ts` 的评论区 fixture 用脚本在页面里 **attachShadow 构造**同样的层级
+（define 最小自定义元素 + `attachShadow({ mode: 'open' })`，把 `#navbar` / `#content` / `#user-up` 放进 shadow），
+而不是在 HTML 里平铺 `div`。这样：
+
+- 增强模块的「逐层探测」路径被真实覆盖（浅层 light DOM fixture 会让探测直接失败，测不到任何分支）；
+- 断言 shadow 内的属性（`data-bewly-comment-up` / `data-bewly-comment-clamped`）与注入的 `<style>` 才有意义；
+- 点击 `bili-text-button` 与「只看 UP」的可见性断言都可以直接穿透 shadow root 检查。
+
+### fixture 写法要点
+
+1. **每一层都要 open shadow**：`bili-comments` / `bili-comments-header-renderer` / `bili-comment-thread-renderer` /
+   `bili-comment-renderer` / `bili-comment-user-info` 各自 `attachShadow({ mode: 'open' })`；
+2. **宿主元素先 `customElements.define` 再 append**（否则 `attachShadow` 与升级顺序可能不一致）；
+3. **文本与结构要可区分**：`#sort-actions` 的两个 `bili-text-button` 文本分别是「最热」「最新」，
+   UP 评论的 `bili-comment-user-info` shadow 里放 `#user-up`、非 UP 评论不放；
+4. **长评论用高度撑开**：`#content` 里塞足够多的段落让 `getBoundingClientRect().height > 400`，
+   否则折叠分支永远不触发；
+5. **断言穿透**：先 `document.querySelector('bili-comments')`，再逐层 `.shadowRoot` 取节点；
+   Playwright locator 的 CSS 也能穿透，但跨多层的后代选择器在旧版里偶有差异，跨 3 层以上优先 `evaluate` 手工走。
+
+### 已知限制
+
+- 真实评论区有**懒加载 / 分页**：初始只渲染部分线程，fixture 里按固定 3–4 个线程写，不模拟无限加载；
+- B 站随时可能升级 Web Components 结构（类名 / 层级），fixture 与探测逻辑需要同步更新；
+- 只能覆盖 open shadow root：若将来改成 `mode: 'closed'`，增强模块与 e2e 都拿不到内部节点，需要退化为「不渲染 UI」。
+### 本轮加固的两个 spec（第 23 轮）
+
+| 文件 | 加固点 |
+| --- | --- |
+| `tests/e2e/scroll-memory.spec.ts` | 子标签只按下标/数量判断；等待 45s；滚动目标按容器可达高度；sessionStorage key 用 poll；刷新回顶轮询 100 次 |
+| `tests/e2e/favorites-category-manage.spec.ts` | 标题改与语言无关的 `E2E New Folder`；toast 用双语正则；超时提升到 45s/20s/180s；数量断言用 poll |
+
+两条原则：**断言只依赖与语言无关的信号**（下标 / 属性 / data-* / 自己写入的英文标题），
+**等待只依赖状态**（`expect.poll` / `waitForFunction`），不写「睡够 N 毫秒然后读一次」。

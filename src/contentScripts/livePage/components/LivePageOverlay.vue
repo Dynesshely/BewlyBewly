@@ -114,6 +114,7 @@ const shortcutRows = computed(() => [
 ])
 
 const cinemaTitle = computed(() => ui.playerReady ? t.value.cinema : t.value.cinemaUnavailable)
+// 第 23 轮：「隐藏侧栏」→「隐藏下方推荐 / 榜单」；开关文案与禁用说明都走新语义
 const asideTitle = computed(() => ui.asideAvailable ? t.value.hideAside : t.value.asideUnavailable)
 const danmakuTitle = computed(() => ui.danmakuAvailable ? t.value.danmaku : t.value.danmakuUnavailable)
 const fullscreenTitle = computed(() => ui.fullscreenAvailable ? t.value.fullscreen : t.value.fullscreenUnavailable)

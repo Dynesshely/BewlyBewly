@@ -1196,9 +1196,16 @@ test.describe('选集判定：只有 （x/y） 进度文案的 pod', () => {
   })
 })
 /**
- * 评论区 fixture：`.reply-sort` 原生排序 tab + `.reply-list` 下 6 条顶层评论
- *（2 条带 `.up-mark`，1 条 620px 超高 `#tall-comment` 用于长评论折叠）。
- * 排序 tab 的点击只记录到 dataset 并搬 active 类，模拟 B 站的原生排序行为。
+ * 评论区 fixture：复刻真机 Web Components 结构（2026-11 实测）。
+ *
+ * #commentapp > bili-comments (shadowRoot)
+ *   ├─ bili-comments-header-renderer (shadowRoot) → #navbar → #title / #sort-actions.hot
+ *   │     └─ bili-text-button「最热」/ bili-text-button「最新」
+ *   └─ bili-comment-thread-renderer × 6 (shadowRoot)
+ *        └─ bili-comment-renderer (shadowRoot) → #header / #content / #footer
+ *             └─ bili-comment-user-info (shadowRoot) → #user-name / #user-up（仅 UP 评论）
+ *
+ * 6 条线程里 2 条带 #user-up（UP 主），最后一条 #content 高 620px（长评论折叠）。
  */
 const COMMENT_PAGE_FIXTURE = `<!doctype html>
 <html lang="zh-CN">
@@ -1214,14 +1221,11 @@ const COMMENT_PAGE_FIXTURE = `<!doctype html>
       .bpx-player-container { width: 100%; height: 100%; }
       video { display: block; width: 100%; height: 100%; object-fit: contain; }
       .video-title { margin: 16px 0; font-size: 20px; }
-      #comment { margin-top: 24px; }
-      .reply-sort { display: flex; gap: 12px; margin-bottom: 8px; }
-      .reply-sort .sort-tab { padding: 4px 8px; cursor: pointer; }
-      .reply-sort .sort-tab.active { font-weight: 600; background: #eee; }
-      .reply-list { display: flex; flex-direction: column; gap: 12px; }
-      .reply-item { padding: 8px; border: 1px solid #ddd; }
-      .up-mark { display: inline-block; padding: 0 4px; color: #fff; background: #fb7299; font-size: 11px; }
-      .reply-content { margin-top: 6px; color: #333; }
+      #commentapp { margin-top: 24px; }
+      bili-comments, bili-comments-header-renderer, bili-comment-thread-renderer,
+      bili-comment-renderer, bili-comment-user-info { display: block; }
+      bili-text-button { display: inline-block; padding: 4px 8px; cursor: pointer; }
+      bili-text-button.active { font-weight: 600; background: #eee; }
     </style>
   </head>
   <body>
@@ -1234,31 +1238,100 @@ const COMMENT_PAGE_FIXTURE = `<!doctype html>
             </div>
           </div>
           <h1 class="video-title">评论区测试视频</h1>
-          <div id="comment">
-            <div class="reply-sort" id="reply-sort">
-              <span class="sort-tab active" data-sort="hot">最热</span>
-              <span class="sort-tab" data-sort="latest">最新</span>
-            </div>
-            <div class="reply-list" id="reply-list">
-              <div class="reply-item"><div class="user-name">用户 A</div><div class="reply-content">普通评论 1</div></div>
-              <div class="reply-item"><div class="user-name">UP 主</div><span class="up-mark">UP</span><div class="reply-content">UP 主评论 1</div></div>
-              <div class="reply-item"><div class="user-name">用户 B</div><div class="reply-content">普通评论 2</div></div>
-              <div class="reply-item"><div class="user-name">UP 主</div><span class="up-mark">UP</span><div class="reply-content">UP 主评论 2</div></div>
-              <div class="reply-item"><div class="user-name">用户 C</div><div class="reply-content">普通评论 3</div></div>
-              <div class="reply-item" id="tall-comment" style="height: 620px"><div class="user-name">用户 D</div><div class="reply-content">这是一条很长的评论，用来验证折叠。</div></div>
-            </div>
-          </div>
+          <div id="commentapp"></div>
         </div>
       </div>
     </div>
     <script>
-      document.querySelectorAll('.reply-sort .sort-tab').forEach((tab) => {
-        tab.addEventListener('click', () => {
-          document.querySelectorAll('.reply-sort .sort-tab').forEach((el) => el.classList.remove('active'))
-          tab.classList.add('active')
-          document.body.dataset.sortClicked = tab.dataset.sort
+      (function () {
+        const commentapp = document.getElementById('commentapp')
+
+        const comments = document.createElement('bili-comments')
+        commentapp.appendChild(comments)
+        const commentsShadow = comments.attachShadow({ mode: 'open' })
+
+        // header：title + sort-actions（bili-text-button）
+        const header = document.createElement('bili-comments-header-renderer')
+        const headerShadow = header.attachShadow({ mode: 'open' })
+        const navbar = document.createElement('div')
+        navbar.id = 'navbar'
+        const title = document.createElement('h2')
+        title.id = 'title'
+        title.textContent = '评论'
+        const sortActions = document.createElement('div')
+        sortActions.id = 'sort-actions'
+        sortActions.className = 'hot'
+        const hotButton = document.createElement('bili-text-button')
+        hotButton.textContent = '最热'
+        hotButton.className = 'active'
+        const latestButton = document.createElement('bili-text-button')
+        latestButton.textContent = '最新'
+        sortActions.append(hotButton, latestButton)
+        navbar.append(title, sortActions)
+        headerShadow.appendChild(navbar)
+        commentsShadow.appendChild(header)
+
+        ;[hotButton, latestButton].forEach((button) => {
+          button.addEventListener('click', () => {
+            ;[hotButton, latestButton].forEach(el => el.classList.remove('active'))
+            button.classList.add('active')
+            const kind = button === latestButton ? 'latest' : 'hot'
+            sortActions.className = kind
+            document.body.dataset.sortClicked = kind
+          })
         })
-      })
+
+        // 6 条线程：2 条 UP、1 条长评论
+        const threadData = [
+          { up: false, text: '普通评论 1', height: 60 },
+          { up: true, text: 'UP 主评论 1', height: 60 },
+          { up: false, text: '普通评论 2', height: 60 },
+          { up: true, text: 'UP 主评论 2', height: 60 },
+          { up: false, text: '普通评论 3', height: 60 },
+          { up: false, text: '很长很长的评论', height: 620 },
+        ]
+
+        threadData.forEach((data, index) => {
+          const thread = document.createElement('bili-comment-thread-renderer')
+          thread.setAttribute('data-thread-index', String(index))
+          if (data.height > 400)
+            thread.id = 'tall-thread'
+          const threadShadow = thread.attachShadow({ mode: 'open' })
+          commentsShadow.appendChild(thread)
+
+          const renderer = document.createElement('bili-comment-renderer')
+          const rendererShadow = renderer.attachShadow({ mode: 'open' })
+          threadShadow.appendChild(renderer)
+
+          const headerBox = document.createElement('div')
+          headerBox.id = 'header'
+          const userInfo = document.createElement('bili-comment-user-info')
+          const userInfoShadow = userInfo.attachShadow({ mode: 'open' })
+          const userName = document.createElement('span')
+          userName.id = 'user-name'
+          userName.textContent = data.up ? 'UP 主' : '用户 ' + index
+          userInfoShadow.appendChild(userName)
+          if (data.up) {
+            const userUp = document.createElement('span')
+            userUp.id = 'user-up'
+            userUp.textContent = 'UP'
+            userInfoShadow.appendChild(userUp)
+          }
+          headerBox.appendChild(userInfo)
+
+          const content = document.createElement('div')
+          content.id = 'content'
+          content.style.height = data.height + 'px'
+          content.style.overflow = 'hidden'
+          content.textContent = data.text
+
+          const footer = document.createElement('div')
+          footer.id = 'footer'
+          footer.textContent = '点赞 · 回复'
+
+          rendererShadow.append(headerBox, content, footer)
+        })
+      })()
     </script>
   </body>
 </html>`
@@ -1285,10 +1358,10 @@ async function openCommentPage(): Promise<{ context: BrowserContext, page: Page 
   return { context, page }
 }
 
-test.describe('评论区增强', () => {
+test.describe('评论区增强（Web Components）', () => {
   skipIfExtensionMissing()
 
-  test('评论工具条出现在评论区：最热 / 最新切换点原生 tab', async () => {
+  test('工具条贴在 #navbar：最热 / 最新点 bili-text-button', async () => {
     const { context, page } = await openCommentPage()
 
     try {
@@ -1296,10 +1369,12 @@ test.describe('评论区增强', () => {
 
       const toolbar = page.locator('.bvp-comment-toolbar')
       await expect(toolbar).toBeVisible()
+      // #sort-actions.hot → 最热处于按下态
       await expect(toolbar.locator('[data-bvp-action="comment-sort-hot"]')).toHaveAttribute('aria-pressed', 'true')
 
       await toolbar.locator('[data-bvp-action="comment-sort-latest"]').click()
       await expect.poll(() => page.evaluate(() => document.body.dataset.sortClicked ?? ''), { timeout: 5_000 }).toBe('latest')
+      await expect(toolbar.locator('[data-bvp-action="comment-sort-latest"]')).toHaveAttribute('aria-pressed', 'true')
 
       await toolbar.locator('[data-bvp-action="comment-sort-hot"]').click()
       await expect.poll(() => page.evaluate(() => document.body.dataset.sortClicked ?? ''), { timeout: 5_000 }).toBe('hot')
@@ -1309,43 +1384,44 @@ test.describe('评论区增强', () => {
     }
   })
 
-  test('只看 UP 主：只剩 2 条带 .up-mark 的评论，再点恢复', async () => {
+  test('只看 UP 主：非 UP 线程 display:none，只剩 2 条', async () => {
     const { context, page } = await openCommentPage()
 
     try {
       await ensureOverlay(page)
 
-      expect(await page.locator('.reply-item[data-bewly-comment-up]').count()).toBe(2)
+      await expect(page.locator('bili-comment-thread-renderer[data-bewly-comment-up="1"]')).toHaveCount(2, { timeout: 10_000 })
+      await expect(page.locator('bili-comment-thread-renderer:visible')).toHaveCount(6)
 
       await page.locator('[data-bvp-action="comment-only-up"]').click()
       await expect(page.locator('html')).toHaveClass(/bewly-comments-only-up/)
-      await expect(page.locator('.reply-item:visible')).toHaveCount(2)
+      await expect(page.locator('bili-comment-thread-renderer:visible')).toHaveCount(2)
 
       await page.locator('[data-bvp-action="comment-only-up"]').click()
-      await expect(page.locator('html')).not.toHaveClass(/bewly-comments-only-up/)
-      await expect(page.locator('.reply-item:visible')).toHaveCount(6)
+      await expect(page.locator('bili-comment-thread-renderer:visible')).toHaveCount(6)
     }
     finally {
       await context.close()
     }
   })
 
-  test('长评论（>400px）折叠并出现展开按钮，展开后恢复', async () => {
+  test('长评论（#content > 400px）折叠并出现展开按钮，展开后消失', async () => {
     const { context, page } = await openCommentPage()
 
     try {
       await ensureOverlay(page)
 
-      await expect(page.locator('#tall-comment')).toHaveAttribute('data-bewly-comment-clamped', '')
-      // 展开按钮只对视口内的评论渲染：先滚到长评论再断言，否则会假红
-      await page.locator('#tall-comment').scrollIntoViewIfNeeded()
+      const clampedRenderer = page.locator('bili-comment-renderer[data-bewly-comment-clamped]')
+      await expect(clampedRenderer).toHaveCount(1, { timeout: 10_000 })
 
+      // 展开按钮只对视口内的线程渲染：先滚到长评论再断言
+      await page.locator('#tall-thread').scrollIntoViewIfNeeded()
       const expandButton = page.locator('.bvp-comment-expand')
       await expect(expandButton).toHaveCount(1)
 
       await expandButton.click()
-      await expect(page.locator('#tall-comment')).toHaveAttribute('data-bewly-comment-expanded', '')
-      await expect(page.locator('#tall-comment')).not.toHaveAttribute('data-bewly-comment-clamped', '')
+      await expect(page.locator('bili-comment-renderer[data-bewly-comment-expanded]')).toHaveCount(1)
+      await expect(page.locator('bili-comment-renderer[data-bewly-comment-clamped]')).toHaveCount(0)
       await expect(page.locator('.bvp-comment-expand')).toHaveCount(0)
     }
     finally {

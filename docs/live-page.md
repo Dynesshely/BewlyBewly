@@ -194,3 +194,64 @@ B 站改类名不会让样式错位，只可能让某个功能「找不到 → �
   会退化为「找不到 → 开关禁用」，不会误隐藏内容；
 - 影院模式下顶部操作条被隐藏；若某些直播间把必要按钮也放在该条里，退出影院后即恢复；
 - 窄屏定位用 viewport 媒体查询，直播页若被嵌在 iframe 里不会启用模块（入口已排除 iframe）。
+## 第 23 轮：下方区块适配（「隐藏侧栏」语义修正）
+
+### 真机 DOM 证据（2026-11-11，live.bilibili.com/6）
+
+| 项 | 实测结果 |
+| --- | --- |
+| 播放器舞台 | `.live-non-revenue-player`，位置约 (x=369, y=94)，尺寸 1320×917 |
+| 舞台子节点 | `.live-player-handle-bar.expandable`（顶部操作条，高 183px）+ `.live-player-bg`（画面 1320×734） |
+| 右侧聊天列 | **不存在** —— `.aside-area` / `#aside-area` / `.player-and-aside-area` 全部为空 |
+| 页面下方 | y≈2818 处有宽约 610px 的区块，class 含 `layerWrapperRoot` / `_layoutContainerRoot_`，内容是礼物 / 榜单类 |
+
+结论：**真机上没有「右侧栏」可隐藏**。可隐藏的是「舞台下方的推荐 / 榜单区块」，影院模式也需要它一起隐藏，
+否则铺满的播放器下面会留一长条内容。
+
+### 新的判定（`dom.ts#findBelowRegions`）
+
+不硬编码 B 站的 CSS Module 哈希类名，用结构判定：
+
+1. 从舞台开始向上遍历父节点（到 `body` 为止，最多 6 层）；
+2. 每一层收集「**不包含舞台**、不是 `position: fixed/sticky`、宽度 ≥ max(240, min(18vw, 520))、
+   高度 ≥ 60、且整体位于舞台底部以下（16px 容差）」的兄弟节点；
+3. 命中节点打 `data-bewly-live-below`，去重后返回；
+4. 命中结果按节点缓存（隐藏后 `getBoundingClientRect()` 变 0，不缓存开关会抖成「不可用」），
+   舞台被替换 / 卸载时清缓存。
+
+### 行为
+
+| 场景 | 行为 |
+| --- | --- |
+| 影院模式（T） | 舞台 fixed + 100vh；隐藏顶部操作条；隐藏所有 `[data-bewly-live-below]`；`body { overflow: hidden }`，不再有滚动条 |
+| 面板「隐藏下方推荐 / 榜单」（H） | 只隐藏 `[data-bewly-live-below]`，舞台位置与尺寸不变 |
+| 页面没有下方区块 | 开关 disabled，`:title` 与面板底部说明显示「未识别到可隐藏的下方区块（本页可能没有推荐 / 榜单）」 |
+| 切房间 / 页面重渲染 | MutationObserver 去抖 300ms 重新探测；播放器消失时自动退出影院模式 |
+
+### 文案变更（四语言，模块 i18n）
+
+- 简中：「隐藏侧栏」→「隐藏下方推荐 / 榜单」；toast 与禁用说明同步；
+- 英文：「Hide sidebar」→「Hide below feed / ranking」；
+- 繁中 / 粤语同步；快捷键说明里的 H 行一并改。
+
+> 内部标识保持不变：`ui.hideAside`、`setHideAside()`、`html.bewly-live-hide-aside`、
+> `data-bewly-live-aside` 都沿用 —— 改名会牵动 keyboard / overlay / e2e 与已存偏好
+> （`bewly-live-hide-aside`），收益为零；语义已在注释与 UI 说明里更正。
+
+### 本轮改动文件
+
+- `dom.ts`：新增 `BELOW_ATTR` / `findBelowRegions()` / `detectBelowRegions()` / `resetBelowCache()`；
+  `markLiveStage()` 返回值加 `below` 并打标记；`clearLiveStage()` 清理新属性；
+- `actions.ts`：`syncPage()` 用「右侧栏 or 下方区块」判定可用性；`cleanupDom()` 清缓存；
+- `constants.ts`：`ROOT_CLASS_HIDE_ASIDE` 语义注释更新；
+- `livePage.page.scss`：影院模式隐藏 `[data-bewly-live-below]` + `body{overflow:hidden}`；
+  隐藏开关同时作用于 `[data-bewly-live-aside]` 与 `[data-bewly-live-below]`；
+- `i18n.ts`：四语言文案；`components/LivePageOverlay.vue`：开关说明注释；本文件。
+
+### 已知限制（第 23 轮）
+
+- 结构启发式依赖「舞台下方有独立块」：若 B 站把推荐 / 榜单塞进与舞台同一个父容器内部（而不是兄弟节点），
+  判定会落空 → 开关禁用（不会误隐藏播放器）；
+- 宽度下限 `max(240, min(18vw, 520))`：超窄窗口（<640px）下 240px 下限可能漏判细长榜单条，同样退化为禁用态；
+- 影院模式的 `body { overflow: hidden }` 随类名移除自动恢复，但若其它脚本同时改 `body.style.overflow` 内联样式，可能互相覆盖；
+- 未在真机浏览器验证（本轮不允许跑 playwright / 碰浏览器）：判定逻辑与实测坐标一一对应，最终效果需 Lead 用调试窗口确认一次。

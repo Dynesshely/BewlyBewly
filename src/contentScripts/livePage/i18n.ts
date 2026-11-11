@@ -57,10 +57,10 @@ const CMN_CN: LivePageMessages = {
   cinemaOff: '已退出影院模式',
   cinemaUnavailable: '没有找到直播播放器',
 
-  hideAside: '隐藏侧栏',
-  asideOn: '已隐藏右侧栏',
-  asideOff: '已显示右侧栏',
-  asideUnavailable: '未识别到可隐藏的侧栏（新版直播页结构可能不支持）',
+  hideAside: '隐藏下方推荐 / 榜单',
+  asideOn: '已隐藏下方推荐 / 榜单',
+  asideOff: '已显示下方推荐 / 榜单',
+  asideUnavailable: '未识别到可隐藏的下方区块（本页可能没有推荐 / 榜单）',
 
   danmaku: '弹幕开关',
   danmakuOn: '弹幕已开启',
@@ -77,7 +77,7 @@ const CMN_CN: LivePageMessages = {
 
   shortcut: {
     cinema: '影院模式',
-    aside: '隐藏右侧栏',
+    aside: '隐藏下方推荐 / 榜单',
     danmaku: '弹幕开关',
     fullscreen: '全屏',
     help: '打开 / 关闭面板',
@@ -96,10 +96,10 @@ const EN: LivePageMessages = {
   cinemaOff: 'Cinema mode off',
   cinemaUnavailable: 'Live player not found',
 
-  hideAside: 'Hide sidebar',
-  asideOn: 'Sidebar hidden',
-  asideOff: 'Sidebar shown',
-  asideUnavailable: 'No hideable sidebar detected (this live layout may not support it)',
+  hideAside: 'Hide below feed / ranking',
+  asideOn: 'Below feed hidden',
+  asideOff: 'Below feed shown',
+  asideUnavailable: 'No hideable below section detected on this page',
 
   danmaku: 'Danmaku',
   danmakuOn: 'Danmaku on',
@@ -116,7 +116,7 @@ const EN: LivePageMessages = {
 
   shortcut: {
     cinema: 'Cinema mode',
-    aside: 'Hide the sidebar',
+    aside: 'Hide below feed / ranking',
     danmaku: 'Toggle danmaku',
     fullscreen: 'Fullscreen',
     help: 'Toggle the panel',
@@ -135,10 +135,10 @@ const CMN_TW: LivePageMessages = {
   cinemaOff: '已退出影院模式',
   cinemaUnavailable: '找不到直播播放器',
 
-  hideAside: '隱藏側欄',
-  asideOn: '已隱藏右側欄',
-  asideOff: '已顯示右側欄',
-  asideUnavailable: '未識別到可隱藏的側欄（新版直播頁結構可能不支援）',
+  hideAside: '隱藏下方推薦 / 榜單',
+  asideOn: '已隱藏下方推薦 / 榜單',
+  asideOff: '已顯示下方推薦 / 榜單',
+  asideUnavailable: '未識別到可隱藏的下方區塊（本頁可能沒有推薦 / 榜單）',
 
   danmaku: '彈幕開關',
   danmakuOn: '彈幕已開啟',
@@ -155,7 +155,7 @@ const CMN_TW: LivePageMessages = {
 
   shortcut: {
     cinema: '影院模式',
-    aside: '隱藏右側欄',
+    aside: '隱藏下方推薦 / 榜單',
     danmaku: '彈幕開關',
     fullscreen: '全螢幕',
     help: '開啟 / 關閉面板',
@@ -167,16 +167,16 @@ const JYUT: LivePageMessages = {
   ...CMN_TW,
   openPanel: '打開直播增強面板',
   cinemaUnavailable: '搵唔到直播播放器',
-  asideOn: '收埋咗右邊欄',
-  asideOff: '顯示返右邊欄',
-  asideUnavailable: '搵唔到可以收埋嘅側欄（新版直播頁或者未支援）',
+  asideOn: '收埋咗下面嘅推薦 / 榜單',
+  asideOff: '顯示返下面嘅推薦 / 榜單',
+  asideUnavailable: '搵唔到可以收埋嘅下面區塊（呢頁可能冇推薦 / 榜單）',
   danmakuUnavailable: '搵唔到原生彈幕開關',
   fullscreenFailed: '入唔到全螢幕',
   hint: '面板同快速鍵淨係影響呢一頁，狀態喺呢個分頁入面保持',
   playerNotFound: '搵唔到直播播放器，轉頭自動再試',
   shortcut: {
     cinema: '影院模式',
-    aside: '收埋右邊欄',
+    aside: '收埋下面推薦 / 榜單',
     danmaku: '彈幕開關',
     fullscreen: '全螢幕',
     help: '打開 / 關閉面板',

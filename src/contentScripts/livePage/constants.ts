@@ -11,7 +11,12 @@ export const HOST_ID = 'bewly-live-page'
 export const ROOT_CLASS_PAGE = 'bewly-live-page'
 /** 影院模式（压暗 + 播放器铺满） */
 export const ROOT_CLASS_CINEMA = 'bewly-live-cinema'
-/** 隐藏右侧栏 */
+/**
+ * 隐藏「舞台下方推荐 / 榜单」区。
+ *
+ * 第 23 轮真机核实：直播页**没有**右侧聊天列，可隐藏的是舞台下方的推荐 / 榜单区块。
+ * 类名沿用第 4 轮的 `bewly-live-hide-aside`（样式与 e2e 都引用它，改名没有收益）。
+ */
 export const ROOT_CLASS_HIDE_ASIDE = 'bewly-live-hide-aside'
 
 /** 页面级 <style> 的 id（直播页没有 adaptedStyles 分支，由模块自行注入） */

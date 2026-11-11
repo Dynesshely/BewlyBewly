@@ -10,8 +10,9 @@
  *   html.bewly-live-hide-aside  隐藏右侧栏
  * 属性标记（由 dom.ts 打在原生节点上，不依赖 B 站的哈希类名）：
  *   [data-bewly-live-player]    播放器舞台
- *   [data-bewly-live-aside]     右侧栏（礼物 / 榜单 / 推荐）
- *   [data-bewly-live-layout]    播放器与侧栏的共同祖先
+ *   [data-bewly-live-aside]     旧语义的右侧栏（真机上通常不存在）
+ *   [data-bewly-live-below]     舞台下方的推荐 / 榜单区块（第 23 轮真机核实：这才是可隐藏的东西）
+ *   [data-bewly-live-layout]    播放器与「右侧栏」的共同祖先
  *   [data-bewly-live-ancestor]  播放器祖先链（影院模式下清层叠上下文用）
  *
  * 颜色只用 --bew-* 变量；不使用 :has()；!important 只出现在「必须压过 B 站内联样式」
@@ -86,9 +87,20 @@ html.bewly-live-page.bewly-live-cinema {
     display: none !important;
   }
 
+  // 第 23 轮：真机没有右侧栏，影院模式下要清掉的是舞台下方的推荐 / 榜单区块，
+  // 否则铺满的播放器下面还会留一长条内容（并产生滚动条）
+  [data-bewly-live-below] {
+    display: none !important;
+  }
+
   [data-bewly-live-layout] {
     width: 100% !important;
     max-width: none !important;
+  }
+
+  // 影院模式：舞台铺满后页面不应再有可滚动区域（下方区块已 display:none）
+  body {
+    overflow: hidden !important;
   }
 
   // 压暗页面其余内容：舞台 z-index 更高，浮层（shadow host）更高，都留在遮罩之上
@@ -103,9 +115,10 @@ html.bewly-live-page.bewly-live-cinema {
 }
 // #endregion
 
-// #region 隐藏侧栏
+// #region 隐藏舞台下方区块（第 23 轮语义修正：原「隐藏侧栏」）
 html.bewly-live-page.bewly-live-hide-aside {
-  [data-bewly-live-aside] {
+  [data-bewly-live-aside],
+  [data-bewly-live-below] {
     display: none !important;
   }
 

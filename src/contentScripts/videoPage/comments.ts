@@ -1,12 +1,26 @@
 /**
  * 视频页评论区增强：排序快捷 / 只看 UP 主 / 长评论折叠。
  *
- * 设计原则：
- * - 不改 B 站评论 DOM 结构：只给评论打属性（`data-bewly-comment-up` / `-clamped` / `-expanded`），
- *   由页面级 CSS（`videoPage.scss`）负责隐藏 / 折叠；展开按钮在 shadow 浮层里（fixed 定位）。
- * - 排序只点原生 tab，不自己发请求；找不到原生排序标签时工具条隐藏该功能。
- * - 只看 UP 依赖原生 `.up-mark` 标识；整页都没有该标识时开关禁用并提示（不做假开关）。
- * - 与影院模式共存：影院模式压暗评论区时，增强 UI 由组件侧 `v-if="!ui.cinema"` 隐藏。
+ * ⚠️ 真实评论区是 **Web Components + shadow DOM**（2026-11 实测）：
+ *
+ * ```
+ * #commentapp
+ *   └─ bili-comments (shadowRoot)
+ *        ├─ bili-comments-header-renderer (shadowRoot)
+ *        │    └─ #navbar → #title / #sort-actions → bili-text-button（最热 / 最新）
+ *        └─ bili-comment-thread-renderer × N (shadowRoot)
+ *             ├─ bili-comment-renderer (shadowRoot)
+ *             │    ├─ #header → bili-comment-user-info (shadowRoot) → #user-name / #user-up
+ *             │    ├─ #content
+ *             │    └─ #footer
+ *             └─ #replies ...
+ * ```
+ *
+ * 因此页面级 CSS 选不到任何目标节点：隐藏 / 折叠样式必须**注入到对应 shadow root**
+ * （`bili-comments` 的 shadow 管线程显隐；每个 `bili-comment-renderer` 的 shadow 管正文折叠），
+ * 并且只靠我们打在宿主元素上的属性（`data-bewly-*`）生效，一旦还原属性 / 移除 style 就完全恢复原样。
+ *
+ * 增强 UI（工具条 / 展开按钮）仍在 videoPage 的 shadow 浮层里，按 #navbar / thread 的 rect 固定定位。
  */
 import { showToast } from './actions'
 import { getMessages } from './i18n'
@@ -14,174 +28,213 @@ import { ui } from './state'
 
 export type CommentSortKind = 'hot' | 'latest'
 
-const COMMENT_ROOT_SELECTORS = [
-  '#comment',
-  '#commentapp',
-  '.comment-container',
-  '#comment .comment-container',
-]
-const REPLY_LIST_SELECTORS = ['.reply-list', '[class*="reply-list"]']
-const REPLY_ITEM_SELECTOR = '.reply-item'
-const UP_MARK_SELECTORS = ['.up-mark', '[class*="up-mark"]', '[class*="upMark"]']
-const SORT_CONTAINER_SELECTORS = [
-  '.reply-sort',
-  '.comment-sort',
-  '[class*="reply-sort"]',
-  '[class*="comment-sort"]',
-]
+const COMMENTS_HOST_SELECTOR = 'bili-comments'
+const HEADER_EL_SELECTOR = 'bili-comments-header-renderer'
+const THREAD_EL_SELECTOR = 'bili-comment-thread-renderer'
+const RENDERER_EL_SELECTOR = 'bili-comment-renderer'
+const USER_INFO_EL_SELECTOR = 'bili-comment-user-info'
 
 const HOT_TEXT_RE = /最热|热门/
 const LATEST_TEXT_RE = /最新/
-const ACTIVE_TOKEN_RE = /(?:^|[-_])(?:active|selected|current|on)(?:[-_]|$)/i
+const ACTIVE_TOKEN_RE = /(?:^|[-_])(?:active|selected|current|checked)(?:[-_]|$)/i
 
 const ONLY_UP_ROOT_CLASS = 'bewly-comments-only-up'
 const ONLY_UP_STORAGE_KEY = 'bewly-comments-only-up'
-/** 超过这个高度（px）的长评论默认折叠 */
+const ONLY_UP_HOST_ATTR = 'data-bewly-only-up'
+const UP_ATTR = 'data-bewly-comment-up'
+const CLAMPED_ATTR = 'data-bewly-comment-clamped'
+const EXPANDED_ATTR = 'data-bewly-comment-expanded'
+const FOLD_ID_ATTR = 'data-bewly-comment-fold-id'
+
+const COMMENTS_STYLE_ID = 'bewly-comments-style'
+const FOLD_STYLE_ID = 'bewly-comment-fold-style'
+
+/** >400px 的长评论默认折叠 */
 const FOLD_HEIGHT = 400
 const FOLD_BUTTON_HEIGHT = 32
 const FOLD_BUTTON_WIDTH = 88
+const OBSERVE_THROTTLE = 300
 
-const ALL_ATTRS = [
-  'data-bewly-comment-up',
-  'data-bewly-comment-clamped',
-  'data-bewly-comment-expanded',
-  'data-bewly-comment-fold-id',
-  'data-bewly-comment-fold-checked',
-]
+/** 注入到 bili-comments shadow：只看 UP 时隐藏没有标记的线程 */
+const COMMENTS_STYLE = `
+:host([${ONLY_UP_HOST_ATTR}]) ${THREAD_EL_SELECTOR}:not([${UP_ATTR}="1"]) {
+  display: none !important;
+}
+`
 
-let resizeObserver: ResizeObserver | null = null
-const observedItems = new Set<HTMLElement>()
-const clampedItems = new Map<number, HTMLElement>()
-let nextFoldId = 1
+/** 注入到每个 bili-comment-renderer shadow：折叠正文（用 mask 渐隐，不依赖颜色变量） */
+const FOLD_STYLE = `
+:host([${CLAMPED_ATTR}]) #content {
+  max-height: ${FOLD_HEIGHT}px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 62%, transparent);
+  mask-image: linear-gradient(to bottom, #000 62%, transparent);
+}
+:host([${EXPANDED_ATTR}]) #content {
+  max-height: none !important;
+  overflow: visible !important;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+}
+`
+
+let observer: MutationObserver | null = null
+let observeTimer: number | null = null
 let rafId = 0
+let nextFoldId = 1
+/** 折叠按钮 id → 渲染器 / 线程宿主 */
+const foldTargets = new Map<number, { renderer: HTMLElement, thread: HTMLElement }>()
+/** 已注入样式 / 已打标记的节点，卸载时清理 */
+const styledShadows = new Set<ShadowRoot>()
+const touchedThreads = new Set<HTMLElement>()
+const touchedRenderers = new Set<HTMLElement>()
+let styledCommentsShadow: ShadowRoot | null = null
 let disposeListeners: (() => void) | null = null
 
 function messages() {
   return getMessages()
 }
 
-function firstMatch<T extends Element>(selectors: string[]): T | null {
-  for (const selector of selectors) {
-    const el = document.querySelector<T>(selector)
-    if (el)
-      return el
-  }
-  return null
+// #region 探测（穿透 shadow DOM）
+function getCommentsHost(): HTMLElement | null {
+  const app = document.querySelector('#commentapp') ?? document.querySelector('#comment') ?? document
+  return app.querySelector<HTMLElement>(COMMENTS_HOST_SELECTOR)
+    ?? document.querySelector<HTMLElement>(COMMENTS_HOST_SELECTOR)
 }
 
-export function findCommentRoot(): HTMLElement | null {
-  return firstMatch<HTMLElement>(COMMENT_ROOT_SELECTORS)
+function getCommentsShadow(): ShadowRoot | null {
+  return getCommentsHost()?.shadowRoot ?? null
 }
 
-function findReplyList(): HTMLElement | null {
-  const root = findCommentRoot()
-  if (root) {
-    const inRoot = firstMatchWithin<HTMLElement>(root, REPLY_LIST_SELECTORS)
-    if (inRoot)
-      return inRoot
-  }
-  return firstMatch<HTMLElement>(REPLY_LIST_SELECTORS)
+function getHeaderEl(): HTMLElement | null {
+  return getCommentsShadow()?.querySelector<HTMLElement>(HEADER_EL_SELECTOR) ?? null
 }
 
-function firstMatchWithin<T extends Element>(root: HTMLElement, selectors: string[]): T | null {
-  for (const selector of selectors) {
-    const el = root.querySelector<T>(selector)
-    if (el)
-      return el
-  }
-  return null
+function getHeaderShadow(): ShadowRoot | null {
+  return getHeaderEl()?.shadowRoot ?? null
 }
 
-/** 顶层评论（排除楼中楼里的 .reply-item） */
-function getReplyItems(): HTMLElement[] {
-  const list = findReplyList()
-  if (!list)
+/** 评论区排序容器（#sort-actions，class 里带 hot / latest） */
+function getSortActions(): HTMLElement | null {
+  return getHeaderShadow()?.querySelector<HTMLElement>('#sort-actions') ?? null
+}
+
+function getSortButtonElements(): HTMLElement[] {
+  const actions = getSortActions()
+  if (!actions)
     return []
 
-  const direct = Array.from(list.children).filter(
-    (el): el is HTMLElement => el instanceof HTMLElement && el.classList.contains('reply-item'),
-  )
-  if (direct.length)
-    return direct
-
-  return Array.from(list.querySelectorAll<HTMLElement>(REPLY_ITEM_SELECTOR))
-    .filter(el => !el.parentElement?.closest(REPLY_ITEM_SELECTOR))
+  return Array.from(actions.querySelectorAll<HTMLElement>('bili-text-button, button, [role="button"]'))
+    .filter(el => (el.textContent?.trim() ?? '').length > 0)
 }
 
-function findUpMark(item: HTMLElement): HTMLElement | null {
-  return firstMatchWithin<HTMLElement>(item, UP_MARK_SELECTORS)
+function getThreads(): HTMLElement[] {
+  const shadow = getCommentsShadow()
+  if (!shadow)
+    return []
+  return Array.from(shadow.querySelectorAll<HTMLElement>(THREAD_EL_SELECTOR))
 }
+
+function getRenderer(thread: HTMLElement): HTMLElement | null {
+  return thread.shadowRoot?.querySelector<HTMLElement>(RENDERER_EL_SELECTOR) ?? null
+}
+
+function getRendererContent(renderer: HTMLElement): HTMLElement | null {
+  return renderer.shadowRoot?.querySelector<HTMLElement>('#content') ?? null
+}
+
+/** UP 主标识：#user-up 只存在于 UP 本人的评论（位于 bili-comment-user-info 的 shadow 内） */
+function threadHasUpBadge(thread: HTMLElement): boolean {
+  const renderer = getRenderer(thread)
+  const userInfo = renderer?.shadowRoot?.querySelector<HTMLElement>(USER_INFO_EL_SELECTOR)
+  return Boolean(userInfo?.shadowRoot?.querySelector('#user-up'))
+}
+
+function getNavbarEl(): HTMLElement | null {
+  return getHeaderShadow()?.querySelector<HTMLElement>('#navbar') ?? null
+}
+// #endregion
+
+// #region shadow 样式注入
+function ensureStyleInShadow(shadow: ShadowRoot, id: string, css: string): void {
+  if (shadow.getElementById(id) as HTMLElement | null)
+    return
+  const style = document.createElement('style')
+  style.id = id
+  style.textContent = css
+  shadow.appendChild(style)
+}
+
+function removeStyleFromShadow(shadow: ShadowRoot, id: string): void {
+  shadow.getElementById(id)?.remove()
+}
+
+function ensureCommentsStyle(): void {
+  const shadow = getCommentsShadow()
+  if (!shadow)
+    return
+  ensureStyleInShadow(shadow, COMMENTS_STYLE_ID, COMMENTS_STYLE)
+  styledCommentsShadow = shadow
+}
+
+function ensureFoldStyle(renderer: HTMLElement): void {
+  const shadow = renderer.shadowRoot
+  if (!shadow || styledShadows.has(shadow))
+    return
+  ensureStyleInShadow(shadow, FOLD_STYLE_ID, FOLD_STYLE)
+  styledShadows.add(shadow)
+}
+// #endregion
 
 // #region 排序
-function findSortContainer(): HTMLElement | null {
-  return firstMatch<HTMLElement>(SORT_CONTAINER_SELECTORS)
+function isActiveButton(el: HTMLElement): boolean {
+  if (el.getAttribute('aria-selected') === 'true' || el.getAttribute('aria-pressed') === 'true')
+    return true
+  return el.className
+    .split(/\s+/)
+    .some(token => ACTIVE_TOKEN_RE.test(token))
 }
 
-function isActiveTab(el: HTMLElement): boolean {
-  const candidates: (HTMLElement | null)[] = [
-    el,
-    el.closest<HTMLElement>('li, button, a, [role="tab"]'),
-  ]
-  return candidates.some((node) => {
-    if (!node)
-      return false
-    if (node.getAttribute('aria-selected') === 'true' || node.getAttribute('aria-current'))
-      return true
-    return node.className
-      .split(/\s+/)
-      .some(token => ACTIVE_TOKEN_RE.test(token))
-  })
-}
-
-/** 原生排序 tab（最热 / 最新）；两个都找不到时该功能隐藏 */
-export function getSortTabs(): { hot: HTMLElement | null, latest: HTMLElement | null } {
-  const container = findSortContainer()
-  if (!container)
-    return { hot: null, latest: null }
-
-  const candidates = Array.from(
-    container.querySelectorAll<HTMLElement>('li, button, a, [role="tab"], span, div'),
-  )
-
-  // 只取「文字命中且没有同样命中的子元素」的最内层节点，避免点到外层整块
-  const innermost = candidates.filter((el) => {
-    const text = el.textContent?.trim() ?? ''
-    if (!HOT_TEXT_RE.test(text) && !LATEST_TEXT_RE.test(text))
-      return false
-    return !Array.from(el.children).some((child) => {
-      const childText = child.textContent?.trim() ?? ''
-      return HOT_TEXT_RE.test(childText) || LATEST_TEXT_RE.test(childText)
-    })
-  })
-
-  const pick = (re: RegExp) => innermost.find(el => re.test(el.textContent?.trim() ?? '')) ?? null
+/** 原生排序按钮（最热 / 最新），按文本匹配 bili-text-button */
+export function getSortButtons(): { hot: HTMLElement | null, latest: HTMLElement | null } {
+  const buttons = getSortButtonElements()
+  const pick = (re: RegExp) => buttons.find(el => re.test(el.textContent?.trim() ?? '')) ?? null
   return {
     hot: pick(HOT_TEXT_RE),
     latest: pick(LATEST_TEXT_RE),
   }
 }
 
+/** 当前排序：#sort-actions 的 class（真机是 .hot / .latest）优先，其次按钮 active 态 */
 export function getActiveSort(): '' | CommentSortKind {
-  const { hot, latest } = getSortTabs()
-  if (latest && isActiveTab(latest))
+  const actions = getSortActions()
+  if (actions) {
+    const className = actions.className
+    if (/latest|newest|new/i.test(className))
+      return 'latest'
+    if (/hot|popular|default/i.test(className))
+      return 'hot'
+  }
+
+  const { hot, latest } = getSortButtons()
+  if (latest && isActiveButton(latest))
     return 'latest'
-  if (hot && isActiveTab(hot))
+  if (hot && isActiveButton(hot))
     return 'hot'
   return ''
 }
 
-/** 点原生排序 tab（不自己发请求） */
+/** 点原生排序按钮（bili-text-button），不自己发请求 */
 export function clickCommentSort(kind: CommentSortKind): void {
-  const tab = getSortTabs()[kind]
-  if (!tab) {
+  const button = getSortButtons()[kind]
+  if (!button) {
     showToast(messages().commentsSortUnavailable)
     return
   }
 
-  const clickable = tab.closest<HTMLElement>('li, button, a, [role="tab"]') ?? tab
-  clickable.click()
+  button.click()
 
-  // 乐观更新，下一拍 sync 会用原生高亮校正
+  // 乐观更新，下一拍 sync 会用原生状态校正
   ui.commentActiveSort = kind
   showToast(kind === 'hot'
     ? messages().commentSortHotToast
@@ -208,12 +261,13 @@ function storeOnlyUp(on: boolean): void {
   }
 }
 
-/** 真正决定是否隐藏的类：必须「开关打开 + 页面上确实有 UP 标识」才生效 */
+/** 真正的显隐由注入到 bili-comments shadow 的样式 + 宿主属性决定 */
 function applyOnlyUpState(): void {
-  document.documentElement.classList.toggle(
-    ONLY_UP_ROOT_CLASS,
-    ui.commentsOnlyUp && ui.commentUpAvailable,
-  )
+  const host = getCommentsHost()
+  const on = ui.commentsOnlyUp && ui.commentUpAvailable
+  if (host)
+    host.toggleAttribute(ONLY_UP_HOST_ATTR, on)
+  document.documentElement.classList.toggle(ONLY_UP_ROOT_CLASS, on)
 }
 
 export function toggleCommentsOnlyUp(): void {
@@ -239,70 +293,55 @@ function setCommentsOnlyUp(on: boolean): void {
 // #endregion
 
 // #region 长评论折叠
-function ensureFoldObserver(): void {
-  if (resizeObserver)
-    return
+function setClamped(renderer: HTMLElement, thread: HTMLElement): number {
+  ensureFoldStyle(renderer)
+  renderer.setAttribute(CLAMPED_ATTR, '')
+  touchedRenderers.add(renderer)
 
-  resizeObserver = new ResizeObserver((entries) => {
-    for (const entry of entries) {
-      const el = entry.target
-      if (el instanceof HTMLElement)
-        evaluateFold(el)
-    }
-    refreshFoldPositions()
-  })
-}
-
-function observeItem(item: HTMLElement): void {
-  if (observedItems.has(item))
-    return
-  ensureFoldObserver()
-  observedItems.add(item)
-  resizeObserver?.observe(item)
-}
-
-function ensureFoldId(el: HTMLElement): number {
-  const existing = Number(el.getAttribute('data-bewly-comment-fold-id') ?? '')
-  if (existing) {
-    clampedItems.set(existing, el)
+  const existing = Number(thread.getAttribute(FOLD_ID_ATTR) ?? '')
+  if (existing && foldTargets.has(existing)) {
+    foldTargets.set(existing, { renderer, thread })
     return existing
   }
+
   const id = nextFoldId++
-  el.setAttribute('data-bewly-comment-fold-id', String(id))
-  clampedItems.set(id, el)
+  thread.setAttribute(FOLD_ID_ATTR, String(id))
+  touchedThreads.add(thread)
+  foldTargets.set(id, { renderer, thread })
   return id
 }
 
-function clearClamp(el: HTMLElement): void {
-  const id = Number(el.getAttribute('data-bewly-comment-fold-id') ?? '')
-  el.removeAttribute('data-bewly-comment-clamped')
-  el.removeAttribute('data-bewly-comment-fold-id')
+function clearFold(renderer: HTMLElement, thread: HTMLElement): void {
+  const id = Number(thread.getAttribute(FOLD_ID_ATTR) ?? '')
+  renderer.removeAttribute(CLAMPED_ATTR)
+  thread.removeAttribute(FOLD_ID_ATTR)
   if (id)
-    clampedItems.delete(id)
+    foldTargets.delete(id)
 }
 
-/** 单条评论的折叠判定：高度 > 400px 且没有展开时折叠 */
-function evaluateFold(el: HTMLElement): void {
-  if (!el.isConnected) {
-    clearClamp(el)
-    return
-  }
-
-  if (el.hasAttribute('data-bewly-comment-expanded'))
+/** 单条评论的折叠判定：正文 > 400px 且没有展开 */
+function evaluateFold(thread: HTMLElement, renderer: HTMLElement): void {
+  const content = getRendererContent(renderer)
+  if (!content)
     return
 
-  const tooTall = el.scrollHeight > FOLD_HEIGHT || el.getBoundingClientRect().height > FOLD_HEIGHT
-  if (tooTall) {
-    if (!el.hasAttribute('data-bewly-comment-clamped'))
-      el.setAttribute('data-bewly-comment-clamped', '')
-    ensureFoldId(el)
+  if (renderer.hasAttribute(EXPANDED_ATTR))
+    return
+
+  // 必须用 scrollHeight：折叠后 #content 的 rect 高度只有 400，用它判断会在
+  // 「折叠 → 高度 <=400 → 取消折叠 → 高度恢复」之间每拍抖动
+  const height = content.scrollHeight > 0
+    ? content.scrollHeight
+    : content.getBoundingClientRect().height
+  if (height > FOLD_HEIGHT) {
+    setClamped(renderer, thread)
   }
-  else {
-    clearClamp(el)
+  else if (renderer.hasAttribute(CLAMPED_ATTR)) {
+    clearFold(renderer, thread)
   }
 }
 
-/** 展开按钮是 fixed 定位，需要随滚动 / 尺寸变化重算（只保留视口内的） */
+/** 展开按钮 fixed 定位：按 thread 矩形算，只保留视口内的 */
 function refreshFoldPositions(): void {
   if (ui.cinema) {
     if (ui.commentFoldButtons.length)
@@ -311,13 +350,13 @@ function refreshFoldPositions(): void {
   }
 
   const next: { id: number, top: number, left: number }[] = []
-  for (const [id, el] of clampedItems) {
-    if (!el.isConnected || el.hasAttribute('data-bewly-comment-expanded')) {
-      clampedItems.delete(id)
+  for (const [id, { thread }] of foldTargets) {
+    if (!thread.isConnected) {
+      foldTargets.delete(id)
       continue
     }
 
-    const rect = el.getBoundingClientRect()
+    const rect = thread.getBoundingClientRect()
     if (rect.bottom < 0 || rect.top > window.innerHeight)
       continue
 
@@ -335,115 +374,143 @@ function refreshFoldPositions(): void {
   }
 
   const changed = next.length !== ui.commentFoldButtons.length
-    || next.some((btn, index) => {
+    || next.some((button, index) => {
       const prev = ui.commentFoldButtons[index]
       return !prev
-        || prev.id !== btn.id
-        || Math.abs(prev.top - btn.top) > 0.5
-        || Math.abs(prev.left - btn.left) > 0.5
+        || prev.id !== button.id
+        || Math.abs(prev.top - button.top) > 0.5
+        || Math.abs(prev.left - button.left) > 0.5
     })
   if (changed)
     ui.commentFoldButtons = next
 }
 
 export function expandComment(id: number): void {
-  const el = clampedItems.get(id)
-  if (!el)
+  const target = foldTargets.get(id)
+  if (!target)
     return
 
-  el.setAttribute('data-bewly-comment-expanded', '')
-  clearClamp(el)
+  target.renderer.setAttribute(EXPANDED_ATTR, '')
+  target.renderer.removeAttribute(CLAMPED_ATTR)
+  target.thread.removeAttribute(FOLD_ID_ATTR)
+  touchedRenderers.add(target.renderer)
+  foldTargets.delete(id)
   refreshFoldPositions()
 }
 // #endregion
 
 // #region 同步 / 生命周期
-function updateToolbarPosition(root: HTMLElement): void {
-  const rect = root.getBoundingClientRect()
-  const visible = rect.bottom > 0 && rect.top < window.innerHeight - 40
-  ui.commentToolbarVisible = visible
-  if (!visible)
+function updateToolbarPosition(): void {
+  const navbar = getNavbarEl()
+  if (!navbar) {
+    ui.commentToolbarVisible = false
+    return
+  }
+
+  const rect = navbar.getBoundingClientRect()
+  const inView = rect.bottom > 0 && rect.top < window.innerHeight - 40
+  ui.commentToolbarVisible = inView
+  if (!inView)
     return
 
-  ui.commentToolbarTop = Math.max(8, Math.min(rect.top + 8, window.innerHeight - 56))
-  ui.commentToolbarLeft = Math.max(8, Math.min(rect.left + 8, window.innerWidth - 340))
+  // 贴在 #navbar 下方、左对齐：不遮挡原生排序按钮与标题
+  ui.commentToolbarTop = Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - 56))
+  ui.commentToolbarLeft = Math.max(8, Math.min(rect.left, window.innerWidth - 340))
 }
 
-function markUpComments(items: HTMLElement[]): void {
-  let upCount = 0
-  for (const item of items) {
-    const isUp = Boolean(findUpMark(item))
+/** 标记 UP 线程；返回是否有至少一个 UP 标识 */
+function markUpThreads(threads: HTMLElement[]): boolean {
+  let hasUp = false
+  for (const thread of threads) {
+    const isUp = threadHasUpBadge(thread)
     if (isUp) {
-      upCount++
-      if (!item.hasAttribute('data-bewly-comment-up'))
-        item.setAttribute('data-bewly-comment-up', '')
+      hasUp = true
+      if (thread.getAttribute(UP_ATTR) !== '1')
+        thread.setAttribute(UP_ATTR, '1')
     }
-    else if (item.hasAttribute('data-bewly-comment-up')) {
-      item.removeAttribute('data-bewly-comment-up')
+    else if (thread.hasAttribute(UP_ATTR)) {
+      thread.removeAttribute(UP_ATTR)
     }
+    touchedThreads.add(thread)
   }
-  ui.commentUpAvailable = upCount > 0
-  applyOnlyUpState()
+  return hasUp
 }
 
-/** 每个 500ms 同步拍调用一次；DOM 变化时也能靠它收敛 */
+/** 每个 500ms 同步拍 + MutationObserver 都会调用 */
 export function syncComments(): void {
-  const root = findCommentRoot()
-  ui.commentFound = Boolean(root)
-
-  if (!root) {
+  const host = getCommentsHost()
+  ui.commentFound = Boolean(host)
+  if (!host) {
     ui.commentSortAvailable = false
     ui.commentToolbarVisible = false
     ui.commentUpAvailable = false
     if (ui.commentFoldButtons.length)
       ui.commentFoldButtons = []
-    clampedItems.clear()
+    foldTargets.clear()
     applyOnlyUpState()
     return
   }
 
-  const items = getReplyItems()
-  markUpComments(items)
+  ensureCommentsStyle()
+  observeCommentsShadow()
 
-  // 分页 / 切排序后旧评论会从 DOM 移除：顺手停掉观察，避免 ResizeObserver 长期持有旧节点
-  for (const observed of Array.from(observedItems)) {
-    if (observed.isConnected)
-      continue
-    resizeObserver?.unobserve(observed)
-    observedItems.delete(observed)
-  }
+  const threads = getThreads()
+  const hasUp = markUpThreads(threads)
+  ui.commentUpAvailable = hasUp
+  applyOnlyUpState()
 
-  const tabs = getSortTabs()
-  ui.commentSortAvailable = Boolean(tabs.hot && tabs.latest)
+  const buttons = getSortButtons()
+  ui.commentSortAvailable = Boolean(buttons.hot && buttons.latest)
   const active = getActiveSort()
   if (ui.commentActiveSort !== active)
     ui.commentActiveSort = active
 
-  for (const item of items) {
-    observeItem(item)
-    if (!item.hasAttribute('data-bewly-comment-fold-checked')) {
-      evaluateFold(item)
-      item.setAttribute('data-bewly-comment-fold-checked', '')
-    }
+  for (const thread of threads) {
+    const renderer = getRenderer(thread)
+    if (renderer)
+      evaluateFold(thread, renderer)
   }
 
-  updateToolbarPosition(root)
+  updateToolbarPosition()
   refreshFoldPositions()
 }
 
-/** 滚动 / 尺寸变化时只更新 fixed 按钮与工具条坐标 */
 function schedulePositionUpdate(): void {
   if (rafId)
     return
   rafId = window.requestAnimationFrame(() => {
     rafId = 0
-    const root = findCommentRoot()
-    if (root)
-      updateToolbarPosition(root)
+    updateToolbarPosition()
     refreshFoldPositions()
   })
 }
 
+function scheduleObservedSync(): void {
+  if (observeTimer !== null)
+    window.clearTimeout(observeTimer)
+  observeTimer = window.setTimeout(() => {
+    observeTimer = null
+    syncComments()
+  }, OBSERVE_THROTTLE)
+}
+
+let observedShadow: ShadowRoot | null = null
+
+function observeCommentsShadow(): void {
+  const shadow = getCommentsShadow()
+  if (!shadow)
+    return
+  // 评论区可能比浮层晚挂载 / 被整段替换：shadow 变了就重新观察
+  if (observer && observedShadow === shadow)
+    return
+
+  observer?.disconnect()
+  observer = new MutationObserver(() => scheduleObservedSync())
+  observer.observe(shadow, { childList: true, subtree: true })
+  observedShadow = shadow
+}
+
+/** 评论区可能异步挂载（懒加载）：没找到时下一拍 setup 之外的 sync 会重试 */
 export function setupComments(): () => void {
   ui.commentsOnlyUp = readStoredOnlyUp()
   applyOnlyUpState()
@@ -451,26 +518,55 @@ export function setupComments(): () => void {
   window.addEventListener('scroll', schedulePositionUpdate, { passive: true })
   window.addEventListener('resize', schedulePositionUpdate, { passive: true })
   syncComments()
+  observeCommentsShadow()
 
   disposeListeners = () => {
     window.removeEventListener('scroll', schedulePositionUpdate)
     window.removeEventListener('resize', schedulePositionUpdate)
+
     if (rafId) {
       window.cancelAnimationFrame(rafId)
       rafId = 0
     }
-    resizeObserver?.disconnect()
-    resizeObserver = null
-    observedItems.clear()
-    clampedItems.clear()
+    if (observeTimer !== null) {
+      window.clearTimeout(observeTimer)
+      observeTimer = null
+    }
+    observer?.disconnect()
+    observer = null
+    observedShadow = null
+
+    // 清掉注入的样式
+    if (styledCommentsShadow) {
+      removeStyleFromShadow(styledCommentsShadow, COMMENTS_STYLE_ID)
+      styledCommentsShadow = null
+    }
+    for (const shadow of styledShadows)
+      removeStyleFromShadow(shadow, FOLD_STYLE_ID)
+    styledShadows.clear()
+
+    // 清掉所有标记
+    for (const thread of touchedThreads) {
+      thread.removeAttribute(UP_ATTR)
+      thread.removeAttribute(FOLD_ID_ATTR)
+    }
+    touchedThreads.clear()
+    for (const renderer of touchedRenderers) {
+      renderer.removeAttribute(CLAMPED_ATTR)
+      renderer.removeAttribute(EXPANDED_ATTR)
+    }
+    touchedRenderers.clear()
+    foldTargets.clear()
+
+    getCommentsHost()?.removeAttribute(ONLY_UP_HOST_ATTR)
+    document.documentElement.classList.remove(ONLY_UP_ROOT_CLASS)
+
     ui.commentsOnlyUp = false
-    applyOnlyUpState()
-    for (const attr of ALL_ATTRS)
-      document.querySelectorAll<HTMLElement>(`[${attr}]`).forEach(node => node.removeAttribute(attr))
     ui.commentFoldButtons = []
     ui.commentToolbarVisible = false
     ui.commentFound = false
   }
+
   return disposeListeners
 }
 

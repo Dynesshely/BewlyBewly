@@ -13,6 +13,9 @@ export type ProbeReasonCode
     | 'host-missing'
     | 'covering-overlay'
 
+/** 用户可在设置里开关的模块（用于把「用户关闭」转成具体建议） */
+export type ProbeSettingKey = 'videoPage' | 'videoComments' | 'listScrollMemory'
+
 /** 结果分组：正常 / 降级 / 不可用 + 页面类型 */
 export type ProbeGroupName
   = | 'home'
@@ -59,6 +62,8 @@ export interface ProbeItem {
   covering?: boolean
   /** 额外说明（可选，展示用） */
   note?: string
+  /** 若因用户关闭而降级，对应设置项（用于生成建议文案） */
+  settingKey?: ProbeSettingKey
 }
 
 /** 一次自检的报告 */
@@ -73,4 +78,8 @@ export interface ProbeReport {
   coveringCount: number
   /** 探测时是否处于「设置页覆盖页面内容」的状态 */
   coveredBySettings: boolean
+  /** 扩展版本（来自 manifest） */
+  version: string
+  /** 报告生成时间（ISO 字符串） */
+  generatedAt: string
 }

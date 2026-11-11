@@ -96,3 +96,64 @@
 - **动态页键盘提示条在 ≤640 被隐藏**：触屏设备用不到，但外接键盘用户可依赖帮助面板（`?`）；
 - **原生页面板内滚动**：面板 `max-height` 收敛后内容在面板内滚动（不是页面滚动），属于预期行为；
 - 列表页吸顶工具条高度由 JS 写入 `--bew-list-toolbar-height`，换行后会自动重新测量（ResizeObserver），无需改逻辑。
+## 5. 第 25 轮：窄屏（≤1024px / ≤768px）全站回归
+
+本轮把断点从「≤900 / ≤640」扩到「≤1024 / ≤768」，逐项检查 5 处窄屏可用性问题。
+所有修复都只用 `flex-wrap` / `min-width: 0` / `clamp()` / `max-width: calc()` 与媒体查询，
+**没有 `!important` 堆叠，不改桌面端（≥1280px）视觉，也不改任何业务逻辑**。
+
+### 5.1 设置页（`components/Settings/Pages/Pages.vue`）
+
+| 问题（窄屏表现） | 修复 | 断点 |
+| --- | --- | --- |
+| 分组胶囊行 `.pages-nav__track` 是 `overflow-x:auto` 的 flex 容器，父级 `.pages-nav` 未设 `min-width:0`，长标题会把内容栏挤窄 | `.pages-nav { min-width: 0 }` + 轨道 `scroll-padding-inline`（键盘聚焦时自动滚入视野） | ≤1024px |
+| 吸顶工具栏 `.pages-toolbar` 左右负边距只有 640px 档，1024/768 下与内容对齐错位 | 补 1024px（-1.75rem）与 768px（-1rem）两档边距；768px 下工具栏改纵向排列 | ≤1024 / ≤768px |
+| 胶囊文字在 768px 下过大、占满一行 | `.pages-nav__pill { padding-inline: 0.625rem; font-size: 0.6875rem }` | ≤768px |
+| 数据导入 / 导出按钮与确认框按钮在窄屏被裁切 | `.pages-data__actions{flex-wrap:wrap}`、`.pages-data__button{max-width:100%}`、确认框按钮左对齐 | ≤768px |
+
+### 5.2 诊断面板（`contentScripts/diagnostics/DiagnosticsPanel.vue`，只加 CSS）
+
+| 问题 | 修复 | 断点 |
+| --- | --- | --- |
+| 环境信息是 `grid-template-columns: max-content minmax(0,1fr)`，长 UserAgent 会把面板撑出横向滚动 | 1024px 起把标签列钳到 `minmax(0, 8.5rem)`；768px 起整表改为单列（标签在上、值在下）+ `overflow-wrap: anywhere` | ≤1024 / ≤768px |
+| 结果条目 `.diagnostics__item` 一行排开（名称 / 原因 / 元信息），窄屏下挤成细长条 | 768px 起 `flex-direction: column`，名称、原因、元信息各占一行 | ≤768px |
+
+> 与 C 工作流并行：本轮**只新增媒体查询**，没有改诊断面板的结构、文案与逻辑。
+
+### 5.3 评论区工具条（`contentScripts/videoPage/components/CommentToolbar.vue`）
+
+| 问题 | 修复 | 断点 |
+| --- | --- | --- |
+| 工具条是 `fixed` + 内联 left/top（由 comments.ts clamp 到视口内），窄屏下三个按钮挤成一行会被裁切 | `flex-wrap: wrap` + `row-gap`，`max-width: min(320px, calc(100vw - 24px))`，圆角从 999px 改为 14px（换行后胶囊形会露馅） | ≤1024px |
+| 768px 下按钮仍偏大，紧贴 / 盖住视频信息栏 | `max-width: calc(100vw - 16px)`、按钮高 24px / 字号 11px | ≤768px |
+
+### 5.4 收藏夹胶囊「⋯」菜单与删除确认框（`contentScripts/views/listShared/styles/listPage.scss`）
+
+| 问题 | 修复 | 断点 |
+| --- | --- | --- |
+| 900px 档会把胶囊行 `flex-wrap: wrap`，收藏夹多时行高失控、把工具条顶下去 | 1024px 起改回单行横向滚动（`flex-wrap: nowrap` + `max-width: 100%`） | ≤1024px |
+| 「⋯」菜单与删除确认框是 `absolute` 相对胶囊定位，窄屏会顶出视口右侧被裁掉 | `max-width: calc(100vw - 32px)` + `max-height: min(60vh, 320px)` + 内部 `overflow-y: auto`；确认框宽度 `min(236px, calc(100vw - 32px))`；新建输入框 `min(140px, calc(100vw - 140px))` | ≤768px |
+
+### 5.5 长评论展开按钮（`contentScripts/videoPage/components/CommentFoldButtons.vue`）
+
+| 问题 | 修复 | 断点 |
+| --- | --- | --- |
+| 按钮 `left` 由 thread 右边缘算（`rect.right - 88`），窄屏正文几乎占满整行，按钮压在文字上 | 新增 `matchMedia('(max-width: 768px)')`：窄屏时按钮样式改为 `right: 8px`（不再用传入的 left），按钮缩到 76×30 / 字号 11px | ≤768px |
+
+> 展开按钮的位置是在模板里按媒体查询切换的（`matchMedia` + `onMounted` 监听），
+> 因为定位值是 JS 算出来的内联样式，纯 CSS 无法覆盖 `left`。点击逻辑与 `comments.ts` 完全没动。
+
+### 5.6 自测
+
+- 改动文件的 scoped `<style>` 与 `listPage.scss` 全部通过 `sass` 编译；
+- `pnpm exec eslint <改动文件> --fix` 后裸跑：0 error 0 warning；
+- `pnpm run typecheck`：0 error；
+- 未跑 build / playwright、未碰浏览器、未 git —— 窄屏观感需要 Lead 构建后在 1024 / 768 / 640 三档走查一次。
+
+### 5.7 已知限制（第 25 轮）
+
+- 断点只覆盖「本轮点名的 5 处界面」，其它页面（动态 / 列表 / 首页）沿用第 17 轮的 ≤900/≤640 规则；
+- 评论区工具条的定位仍由 JS 计算，CSS 只能改换行与尺寸；若 B 站评论容器宽度突变，工具条可能仍偏向一侧；
+- 诊断面板在 ≤768 改为单列后更长，面板本身依赖父级滚动，长报告需要滚动查看（预期行为）；
+- 设置页 768px 档把工具栏改成纵向排列，吸收了「胶囊行 + 搜索框」两行高度，未做折叠；
+- 展开按钮在窄屏贴右内侧，若 B 站评论区本身有右侧留白，按钮会比正文右边缘再靠里 8px（可接受）。

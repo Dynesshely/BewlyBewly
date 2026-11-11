@@ -49,6 +49,23 @@ export interface DiagnosticsMessages {
   coveringOverlayHint: string
   /** 结果摘要里「覆盖中」的展示文案（含占位符） */
   summaryCovering: string
+  /** 报告元信息 */
+  version: string
+  generatedAt: string
+  /** 可执行建议标签 */
+  adviceLabel: string
+  adviceCoveringOverlay: string
+  adviceNotApplicable: string
+  adviceEnableVideoPage: string
+  adviceEnableVideoComments: string
+  adviceEnableListScrollMemory: string
+  adviceLogin: string
+  adviceSelectorsMiss: string
+  adviceNoSelectors: string
+  adviceHostMissing: string
+  /** 下载 .md */
+  download: string
+  downloadFailed: string
   /** 页面类型显示名（键与 probe.detectPageKind 的返回值一致） */
   pageKindLabels: Record<string, string>
 }
@@ -92,6 +109,20 @@ const CMN_CN: DiagnosticsMessages = {
   statusCovering: '覆盖中',
   coveringOverlayHint: '当前设置页覆盖了页面内容，部分模块无法探测；关闭设置页后重新运行会更准确。',
   summaryCovering: '覆盖中 {covering}',
+  version: '版本',
+  generatedAt: '生成时间',
+  adviceLabel: '建议',
+  adviceCoveringOverlay: '关闭设置页后重新运行自检；若仍显示覆盖中，请刷新页面',
+  adviceNotApplicable: '这是当前页面的正常状态；切换到对应页面后重新运行自检即可看到结果',
+  adviceEnableVideoPage: '在「设置 → 页面增强 → 视频播放页」中开启影院模式 / 迷你播放器 / 快捷键任一开关',
+  adviceEnableVideoComments: '在「设置 → 页面增强 → 视频播放页」中开启「视频页评论区增强」',
+  adviceEnableListScrollMemory: '在「设置 → 页面增强 → 列表页」中开启「列表页返回恢复滚动位置」',
+  adviceLogin: '登录 B 站账号后重新运行自检；未登录时只提示、不发请求',
+  adviceSelectorsMiss: '可能是页面还没加载完或 B 站已改版：稍等片刻重跑；若持续出现，请复制报告提 issue',
+  adviceNoSelectors: '这是开发期保护：请联系维护者补充该模块的 probeSelectors',
+  adviceHostMissing: '尝试刷新页面；若仍缺失，检查是否有其它扩展 / 浏览器策略拦截了扩展浮层',
+  download: '下载 .md',
+  downloadFailed: '下载失败，请重试',
   pageKindLabels: {
     home: '首页',
     video: '视频播放页',
@@ -149,6 +180,20 @@ const CMN_TW: DiagnosticsMessages = {
   statusCovering: '覆蓋中',
   coveringOverlayHint: '目前設定頁覆蓋了頁面內容，部分模組無法偵測；關閉設定頁後重新執行會更準確。',
   summaryCovering: '覆蓋中 {covering}',
+  version: '版本',
+  generatedAt: '產生時間',
+  adviceLabel: '建議',
+  adviceCoveringOverlay: '關閉設定頁後重新執行自檢；若仍顯示覆蓋中，請重新整理頁面',
+  adviceNotApplicable: '這是目前頁面的正常狀態；切換到對應頁面後重新執行自檢即可看到結果',
+  adviceEnableVideoPage: '在「設定 → 頁面增強 → 影片播放頁」中開啟影院模式 / 迷你播放器 / 快速鍵任一開關',
+  adviceEnableVideoComments: '在「設定 → 頁面增強 → 影片播放頁」中開啟「影片頁留言區增強」',
+  adviceEnableListScrollMemory: '在「設定 → 頁面增強 → 清單頁」中開啟「清單頁返回恢復捲動位置」',
+  adviceLogin: '登入 B 站帳號後重新執行自檢；未登入時只提示、不發請求',
+  adviceSelectorsMiss: '可能是頁面還沒載入完或 B 站已改版：稍等片刻再跑；若持續出現，請複製報告提 issue',
+  adviceNoSelectors: '這是開發期保護：請聯絡維護者補上該模組的 probeSelectors',
+  adviceHostMissing: '嘗試重新整理頁面；若仍缺少，檢查是否有其它擴充功能 / 瀏覽器策略攔截了擴充功能浮層',
+  download: '下載 .md',
+  downloadFailed: '下載失敗，請重試',
   pageKindLabels: {
     home: '首頁',
     video: '影片播放頁',
@@ -198,6 +243,20 @@ const JYUT: DiagnosticsMessages = {
   statusCovering: '蓋住中',
   coveringOverlayHint: '而家設定頁蓋住咗頁面內容，有啲模組探測唔到；閂咗設定頁再行一次會準啲。',
   summaryCovering: '蓋住中 {covering}',
+  version: '版本',
+  generatedAt: '產生時間',
+  adviceLabel: '建議',
+  adviceCoveringOverlay: '閂咗設定頁再行自檢；如果仲係顯示蓋住中，就重新載入頁面',
+  adviceNotApplicable: '呢個係目前頁面嘅正常狀態；轉去對應頁面再行自檢就見到結果',
+  adviceEnableVideoPage: '喺「設定 → 頁面增強 → 影片播放頁」開返影院模式 / 迷你播放器 / 快速鍵其中一個',
+  adviceEnableVideoComments: '喺「設定 → 頁面增強 → 影片播放頁」開返「影片頁留言區增強」',
+  adviceEnableListScrollMemory: '喺「設定 → 頁面增強 → 清單頁」開返「清單頁返回恢復捲動位置」',
+  adviceLogin: '登入 B 站帳號再行自檢；未登入淨係提示、唔發請求',
+  adviceSelectorsMiss: '可能頁面未載入完或者 B 站改咗版：等一陣再行；如果仲係咁，複製報告去開 issue',
+  adviceNoSelectors: '呢個係開發期保護：請聯絡維護者補返該模組嘅 probeSelectors',
+  adviceHostMissing: '試下重新載入頁面；如果仲係冇，睇下有冇其他擴充 / 瀏覽器策略擋咗擴充浮層',
+  download: '下載 .md',
+  downloadFailed: '下載唔到，再試一次',
   pageKindLabels: {
     home: '主頁',
     video: '影片播放頁',
@@ -255,6 +314,20 @@ const EN: DiagnosticsMessages = {
   statusCovering: 'Covered',
   coveringOverlayHint: 'The Settings overlay is covering the page, so some modules cannot be probed. Close Settings and run the self-check again for accurate results.',
   summaryCovering: 'Covered {covering}',
+  version: 'Version',
+  generatedAt: 'Generated at',
+  adviceLabel: 'Advice',
+  adviceCoveringOverlay: 'Close Settings and run the self-check again; refresh the page if it still reports “covered”.',
+  adviceNotApplicable: 'This is expected on the current page. Switch to the matching page and run the self-check again.',
+  adviceEnableVideoPage: 'Enable any of Cinema mode / Mini player / Enhanced shortcuts in Settings → Page enhancements → Video page.',
+  adviceEnableVideoComments: 'Enable “Video page comments” in Settings → Page enhancements → Video page.',
+  adviceEnableListScrollMemory: 'Enable “Restore scroll position when returning to list pages” in Settings → Page enhancements → List pages.',
+  adviceLogin: 'Sign in to Bilibili and run the self-check again. Without signing in it only prompts, no requests are made.',
+  adviceSelectorsMiss: 'The page may still be loading or Bilibili changed its markup. Try again in a moment; if it persists, copy the report and open an issue.',
+  adviceNoSelectors: 'Developer safeguard: ask the maintainer to add probeSelectors for this module.',
+  adviceHostMissing: 'Try refreshing the page; if it is still missing, check whether another extension or browser policy is blocking the overlay.',
+  download: 'Download .md',
+  downloadFailed: 'Download failed, please try again',
   pageKindLabels: {
     home: 'Home',
     video: 'Video page',

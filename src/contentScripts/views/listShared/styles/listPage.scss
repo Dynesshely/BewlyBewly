@@ -912,3 +912,34 @@
   }
 }
 /* #endregion */
+
+/* #region 窄屏适配（第 25 轮）：收藏夹胶囊「⋯」菜单 / 删除确认框不超出视口 */
+@media (max-width: 1024px) {
+  /* 胶囊过多时保持单行横向滚动（原 900px 档会 flex-wrap，行高随收藏夹数量增长） */
+  .bewly-list-chips {
+    flex-wrap: nowrap;
+    max-width: 100%;
+    scroll-padding-inline: 4px;
+  }
+}
+
+@media (max-width: 768px) {
+  /* 菜单 / 确认框是 absolute 定位（相对胶囊），窄屏必须限制宽度并允许内部滚动，
+     否则会顶到视口右侧被裁掉（第 21 轮实测溢出）。 */
+  .bewly-list-chip__menu,
+  .bewly-list-chip__confirm {
+    max-width: calc(100vw - 32px);
+    max-height: min(60vh, 320px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .bewly-list-chip__confirm {
+    width: min(236px, calc(100vw - 32px));
+  }
+
+  .bewly-list-chip__input {
+    width: min(140px, calc(100vw - 140px));
+  }
+}
+/* #endregion */

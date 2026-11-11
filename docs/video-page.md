@@ -295,3 +295,27 @@ header 是推荐类文案，条目指向其它 bvid。
 - 展开按钮是 fixed 定位的浮层按钮，只对视口内的线程渲染；滚动时按 rAF 重算坐标。
 - e2e 用 fixture 脚本 `attachShadow` 手工构造同样的层级；真实页面仍建议人工确认一次。
 
+### 懒加载 / 翻页 / 重排后的状态保持（第 25 轮）
+
+评论区有懒加载与分页（初始只渲染部分线程），用户还可能切换排序导致线程列表整体重建。本轮补齐了状态保持：
+
+1. **「只看 UP」自动套用到新线程**：
+   - UP 标记逻辑抽成 `processThread(thread)`，全量扫描与增量路径都走同一份实现；
+   - 只要开关是开的，新线程一旦被打上 `data-bewly-comment-up="1"` 就会自动被注入到
+     `bili-comments` shadow 的样式隐藏（非 UP 线程 `display:none`），不需要用户再点一次；
+   - 新线程里没有 UP 时不会误关用户选择：可用性由「当前 DOM 里仍有 UP 线程」决定（`upThreads`），
+     线程被移除后 `pruneDisconnected()` 会清理引用。
+2. **长评论折叠自动套用**：新线程同样走 `evaluateFold`，`#content.scrollHeight > 400px` 即打折叠标记并注入样式。
+3. **容器被重建（切排序 / 整段替换）**：MutationObserver 检测到 header / `bili-comments` 增删或节点删除时
+   标记 `pendingFullScan`，300ms 后做一次**全量重扫**；用户选择（只看 UP / 折叠）会重新应用，
+   不依赖任何临时 DOM 引用。
+4. **分页性能**：MutationObserver 回调不再统一做全量扫描，而是先把新增的 `bili-comment-thread-renderer`
+   收集进 `pendingThreads`，300ms 节流后**只处理新线程**（增量），并只做轻量的排序状态 / 工具条位置刷新；
+   只有结构性变更（header 替换、线程被删除、shadow 换新）才升级为全量重扫。
+
+已知限制：
+
+- 增量判定依赖 MutationObserver 的 `addedNodes`；若 B 站把新线程挂在观察范围之外（例如换了一个新的子 shadow），
+  目前靠 500ms 的 `syncComments()` 兜底会补上，但首帧可能延迟到下一拍；
+- 「只看 UP」只保留顶层 `bili-comment-thread-renderer`；楼中楼跟随所属线程显示 / 隐藏；
+- 折叠状态不持久化（重新进入页面会重新判一次），用户点开过的评论在重排后会重新折叠 —— 与 B 站自身行为一致。

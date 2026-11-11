@@ -9,8 +9,9 @@
  *
  * 结果按「正常 / 降级 / 不可用」分组，供设置页「诊断」组展示与复制为 Markdown。
  */
-import type { ProbeGroupName, ProbeItem, ProbeReasonCode, ProbeReport, ProbeStatus } from './types'
+import type { ProbeGroupName, ProbeItem, ProbeReasonCode, ProbeReport, ProbeSettingKey, ProbeStatus } from './types'
 
+import browser from 'webextension-polyfill'
 import { getActiveShortcutScopes, SHORTCUT_REGISTRY } from '~/constants/shortcutRegistry'
 import { settings } from '~/logic'
 import { probeSelectors as articleSelectors, getArticlePageKind } from '../articlePage/dom'
@@ -37,6 +38,16 @@ export interface ProbeEnvironment {
 
 export interface ProbeResult extends ProbeReport {
   env: ProbeEnvironment
+}
+
+/** 扩展版本号：优先读 manifest，失败时回退 'unknown'（不抛错） */
+export function getExtensionVersion(): string {
+  try {
+    return browser.runtime.getManifest().version ?? 'unknown'
+  }
+  catch {
+    return 'unknown'
+  }
 }
 
 function countMatches(selector: string): number {
@@ -144,6 +155,8 @@ interface ProbeSpec {
   enabled?: boolean
   requiresLogin?: boolean
   note?: string
+  /** 若因用户关闭而降级，对应设置项（用于生成「去设置里开启」建议） */
+  settingKey?: ProbeSettingKey
 }
 
 export function collectProbeItems(): ProbeItem[] {
@@ -170,6 +183,7 @@ export function collectProbeItems(): ProbeItem[] {
       applies: /^\/(?:video|list|bangumi\/play)\//.test(location.pathname),
       selectors: videoSelectors,
       enabled: settings.value.videoPageCinemaMode || settings.value.videoPageMiniPlayer || settings.value.videoPageShortcuts,
+      settingKey: 'videoPage',
     },
     {
       name: '视频页评论区增强',
@@ -177,6 +191,7 @@ export function collectProbeItems(): ProbeItem[] {
       applies: /^\/video\//.test(location.pathname),
       selectors: ['#commentapp', 'bili-comments', 'bili-comment-thread-renderer'],
       enabled: settings.value.videoPageComments !== false,
+      settingKey: 'videoComments',
       note: '评论区是 Web Components + shadow DOM，只从宿主元素判断',
     },
     {
@@ -207,6 +222,7 @@ export function collectProbeItems(): ProbeItem[] {
       applies: /^\/list\//.test(location.pathname) || /^\/(?:history|watchlater|favorites|medialist)/.test(location.pathname),
       selectors: ['.bewly-list-page', '.bili-video-card', '[data-bewly-list-card]'],
       enabled: settings.value.enableListScrollMemory !== false,
+      settingKey: 'listScrollMemory',
     },
     {
       name: '搜索结果页增强',
@@ -295,6 +311,7 @@ export function collectProbeItems(): ProbeItem[] {
         selectorCount: selectors.length,
         reasonCode: 'covering-overlay',
         note: spec.note,
+        settingKey: spec.settingKey,
       }
     }
 
@@ -338,6 +355,7 @@ export function collectProbeItems(): ProbeItem[] {
       selectorCount: selectors.length,
       reasonCode,
       note: spec.note,
+      settingKey: spec.settingKey,
     }
   })
 }
@@ -361,7 +379,39 @@ export function collectProbeReport(): ProbeResult {
     unavailableCount: items.filter(item => item.status === 'unavailable').length,
     coveringCount: items.filter(item => item.covering).length,
     coveredBySettings: isCoveredBySettings(),
+    version: getExtensionVersion(),
+    generatedAt: new Date().toISOString(),
     env,
+  }
+}
+
+/**
+ * 每个降级 / 不可用项的可执行建议（四语言由调用方传入 messages）。
+ *
+ * 建议是「下一步该做什么」，不是重复原因：用户看到原因后能立刻知道怎么处理。
+ */
+export function adviceText(item: ProbeItem, t: import('./i18n').DiagnosticsMessages): string {
+  switch (item.reasonCode) {
+    case 'ok':
+      return ''
+    case 'covering-overlay':
+      return t.adviceCoveringOverlay
+    case 'not-applicable':
+      return t.adviceNotApplicable
+    case 'user-disabled':
+      if (item.settingKey === 'videoComments')
+        return t.adviceEnableVideoComments
+      if (item.settingKey === 'listScrollMemory')
+        return t.adviceEnableListScrollMemory
+      return t.adviceEnableVideoPage
+    case 'login-required':
+      return t.adviceLogin
+    case 'selectors-miss':
+      return t.adviceSelectorsMiss
+    case 'no-selectors':
+      return t.adviceNoSelectors
+    case 'host-missing':
+      return t.adviceHostMissing
   }
 }
 
@@ -394,6 +444,8 @@ export function reportToMarkdown(report: ProbeResult, messages: import('./i18n')
   const lines: string[] = [
     `# ${messages.title}`,
     '',
+    `- ${messages.version}：\`${report.version}\``,
+    `- ${messages.generatedAt}：${new Date(report.generatedAt).toLocaleString()}`,
     `- ${messages.pageType}：${pageLabel}`,
     `- 浏览器：\`${report.env.userAgent}\``,
     `- 视口：\`${report.env.viewport}\` @ \`${report.env.devicePixelRatio}x\``,
@@ -430,6 +482,9 @@ export function reportToMarkdown(report: ProbeResult, messages: import('./i18n')
     lines.push(`## ${statusLabels[status]}（${group.length}）`, '')
     for (const item of group) {
       lines.push(`- **${item.name}**：${reasonLabel(item)}`)
+      const advice = adviceText(item, messages)
+      if (advice)
+        lines.push(`  - ${messages.adviceLabel}：${advice}`)
       if (item.hostId)
         lines.push(`  - ${item.hostMounted ? messages.hostMounted : messages.hostNotMounted}（\`#${item.hostId}\`）`)
       const hit = item.selectorCounts.filter(s => s.count > 0)

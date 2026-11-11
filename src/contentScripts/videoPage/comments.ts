@@ -88,6 +88,55 @@ const foldTargets = new Map<number, { renderer: HTMLElement, thread: HTMLElement
 const styledShadows = new Set<ShadowRoot>()
 const touchedThreads = new Set<HTMLElement>()
 const touchedRenderers = new Set<HTMLElement>()
+/** 已经处理过的线程（命中 UP 标识 / 折叠判定的结果都落在属性上） */
+const processedThreads = new WeakSet<HTMLElement>()
+/** 当前仍连着 DOM 的 UP 线程；用来判断「只看 UP」是否可用 */
+const upThreads = new Set<HTMLElement>()
+
+// #region 增量处理（翻页 / 懒加载）
+/** MutationObserver 收集到的、还没处理的新线程 */
+const pendingThreads = new Set<HTMLElement>()
+/** 需要全量重扫（容器被重建 / header 被替换 / shadow 换了） */
+let pendingFullScan = false
+
+function scheduleIncremental(): void {
+  if (observeTimer !== null)
+    window.clearTimeout(observeTimer)
+  observeTimer = window.setTimeout(() => {
+    observeTimer = null
+    if (pendingFullScan) {
+      pendingFullScan = false
+      pendingThreads.clear()
+      syncComments()
+      return
+    }
+
+    const threads = Array.from(pendingThreads)
+    pendingThreads.clear()
+    if (!threads.length)
+      return
+
+    for (const thread of threads) {
+      if (thread.isConnected)
+        processThread(thread)
+    }
+
+    pruneDisconnected()
+    ui.commentUpAvailable = upThreads.size > 0
+    applyOnlyUpState()
+
+    // 新线程可能伴随排序 / 布局变化：只做轻量刷新，不做全量扫描
+    const buttons = getSortButtons()
+    ui.commentSortAvailable = Boolean(buttons.hot && buttons.latest)
+    const active = getActiveSort()
+    if (ui.commentActiveSort !== active)
+      ui.commentActiveSort = active
+
+    updateToolbarPosition()
+    refreshFoldPositions()
+  }, OBSERVE_THROTTLE)
+}
+// #endregion
 let styledCommentsShadow: ShadowRoot | null = null
 let disposeListeners: (() => void) | null = null
 
@@ -418,22 +467,56 @@ function updateToolbarPosition(): void {
   ui.commentToolbarLeft = Math.max(8, Math.min(rect.left, window.innerWidth - 340))
 }
 
-/** 标记 UP 线程；返回是否有至少一个 UP 标识 */
-function markUpThreads(threads: HTMLElement[]): boolean {
-  let hasUp = false
-  for (const thread of threads) {
-    const isUp = threadHasUpBadge(thread)
-    if (isUp) {
-      hasUp = true
-      if (thread.getAttribute(UP_ATTR) !== '1')
-        thread.setAttribute(UP_ATTR, '1')
-    }
-    else if (thread.hasAttribute(UP_ATTR)) {
-      thread.removeAttribute(UP_ATTR)
-    }
-    touchedThreads.add(thread)
+/**
+ * 处理单个线程：标记 UP、判定长评论折叠。
+ *
+ * 全量扫描与增量路径都调用它，因此「翻页 / 加载更多 / 容器重建」后新线程会被自动
+ * 套用用户已有的选择（只看 UP 通过宿主属性 + 注入样式生效，折叠通过 renderer 属性生效）。
+ */
+function processThread(thread: HTMLElement): void {
+  touchedThreads.add(thread)
+
+  if (threadHasUpBadge(thread)) {
+    if (thread.getAttribute(UP_ATTR) !== '1')
+      thread.setAttribute(UP_ATTR, '1')
+    upThreads.add(thread)
   }
-  return hasUp
+  else {
+    if (thread.hasAttribute(UP_ATTR))
+      thread.removeAttribute(UP_ATTR)
+    upThreads.delete(thread)
+  }
+
+  const renderer = getRenderer(thread)
+  if (renderer)
+    evaluateFold(thread, renderer)
+
+  processedThreads.add(thread)
+}
+
+/**
+ * 清掉已经从 DOM 移除的节点引用。
+ *
+ * 切换排序 / 翻页会整段替换线程：不清的话 WeakSet 无所谓，但 Set 会一直增长，
+ * 而且「只看 UP」的可用性会依赖已移除的线程。
+ */
+function pruneDisconnected(): void {
+  for (const thread of Array.from(upThreads)) {
+    if (!thread.isConnected)
+      upThreads.delete(thread)
+  }
+  for (const thread of Array.from(touchedThreads)) {
+    if (!thread.isConnected)
+      touchedThreads.delete(thread)
+  }
+  for (const [id, target] of Array.from(foldTargets)) {
+    if (!target.thread.isConnected)
+      foldTargets.delete(id)
+  }
+  for (const shadow of Array.from(styledShadows)) {
+    if (!shadow.host.isConnected)
+      styledShadows.delete(shadow)
+  }
 }
 
 /** 每个 500ms 同步拍 + MutationObserver 都会调用 */
@@ -455,8 +538,11 @@ export function syncComments(): void {
   observeCommentsShadow()
 
   const threads = getThreads()
-  const hasUp = markUpThreads(threads)
-  ui.commentUpAvailable = hasUp
+  for (const thread of threads)
+    processThread(thread)
+
+  pruneDisconnected()
+  ui.commentUpAvailable = upThreads.size > 0
   applyOnlyUpState()
 
   const buttons = getSortButtons()
@@ -465,14 +551,12 @@ export function syncComments(): void {
   if (ui.commentActiveSort !== active)
     ui.commentActiveSort = active
 
-  for (const thread of threads) {
-    const renderer = getRenderer(thread)
-    if (renderer)
-      evaluateFold(thread, renderer)
-  }
-
   updateToolbarPosition()
   refreshFoldPositions()
+
+  // 全量扫描完成：之前收集的增量信息已经被覆盖，清掉避免下拍重复处理
+  pendingFullScan = false
+  pendingThreads.clear()
 }
 
 function schedulePositionUpdate(): void {
@@ -485,13 +569,44 @@ function schedulePositionUpdate(): void {
   })
 }
 
-function scheduleObservedSync(): void {
-  if (observeTimer !== null)
-    window.clearTimeout(observeTimer)
-  observeTimer = window.setTimeout(() => {
-    observeTimer = null
-    syncComments()
-  }, OBSERVE_THROTTLE)
+/**
+ * 观察回调：只收集「新出现的线程」，不再 300ms 后做全量扫描。
+ *
+ * - 线程级变更（加载更多 / 翻页追加）→ 增量处理新增线程；
+ * - 结构性变更（header 被替换、评论区从无到有）→ 标记全量重扫。
+ */
+function handleMutations(records: MutationRecord[]): void {
+  for (const record of records) {
+    for (const node of Array.from(record.addedNodes)) {
+      if (!(node instanceof HTMLElement))
+        continue
+
+      if (node.matches(THREAD_EL_SELECTOR)) {
+        pendingThreads.add(node)
+        continue
+      }
+      if (node.matches(HEADER_EL_SELECTOR) || node.matches(COMMENTS_HOST_SELECTOR) || node.querySelector(HEADER_EL_SELECTOR))
+        pendingFullScan = true
+
+      const nested = node.querySelectorAll<HTMLElement>(THREAD_EL_SELECTOR)
+      for (const thread of Array.from(nested))
+        pendingThreads.add(thread)
+    }
+
+    // 只有「线程 / header / 评论区宿主」被移除才算结构性变更（切排序整段替换）；
+    // 分页时被替换掉的 loading 占位符不算，避免每次翻页都升级成全量扫描
+    for (const node of Array.from(record.removedNodes)) {
+      if (!(node instanceof HTMLElement))
+        continue
+      if (node.matches(THREAD_EL_SELECTOR) || node.matches(HEADER_EL_SELECTOR)
+        || node.querySelector(THREAD_EL_SELECTOR) || node.querySelector(HEADER_EL_SELECTOR)) {
+        pendingFullScan = true
+      }
+    }
+  }
+
+  if (pendingFullScan || pendingThreads.size)
+    scheduleIncremental()
 }
 
 let observedShadow: ShadowRoot | null = null
@@ -505,9 +620,12 @@ function observeCommentsShadow(): void {
     return
 
   observer?.disconnect()
-  observer = new MutationObserver(() => scheduleObservedSync())
+  observer = new MutationObserver(handleMutations)
   observer.observe(shadow, { childList: true, subtree: true })
   observedShadow = shadow
+  // 换了 shadow：之前收集的增量作废，做一次全量
+  pendingThreads.clear()
+  pendingFullScan = true
 }
 
 /** 评论区可能异步挂载（懒加载）：没找到时下一拍 setup 之外的 sync 会重试 */
@@ -557,6 +675,9 @@ export function setupComments(): () => void {
     }
     touchedRenderers.clear()
     foldTargets.clear()
+    upThreads.clear()
+    pendingThreads.clear()
+    pendingFullScan = false
 
     getCommentsHost()?.removeAttribute(ONLY_UP_HOST_ATTR)
     document.documentElement.classList.remove(ONLY_UP_ROOT_CLASS)

@@ -1218,6 +1218,55 @@ onBeforeUnmount(() => {
   background: var(--bew-fill-2);
 }
 
+/* #region 窄屏适配（第 25 轮）：分组胶囊可横向滚动、内容不被挤压 */
+@media screen and (max-width: 1024px) {
+  .pages-toolbar {
+    margin: 0 -1.75rem 1rem;
+    padding: 0.5rem 1.75rem;
+  }
+
+  /* 胶囊行必须能收缩：flex 容器默认 min-width:auto 会把内容栏挤出视口 */
+  .pages-nav {
+    min-width: 0;
+  }
+
+  .pages-nav__track {
+    /* 让键盘聚焦的胶囊自动滚进可视区，而不是被裁掉 */
+    scroll-padding-inline: 0.5rem;
+    overscroll-behavior-x: contain;
+  }
+}
+
+@media screen and (max-width: 768px) {
+  .pages-toolbar {
+    margin: 0 -1rem 0.75rem;
+    padding: 0.5rem 1rem;
+    /* 吸顶工具栏在窄屏不占满两行：单行胶囊 + 搜索框各自收缩 */
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+
+  .pages-nav__pill {
+    padding-inline: 0.625rem;
+    font-size: 0.6875rem;
+  }
+
+  /* 数据导入 / 导出按钮在窄屏换行而不是被裁切 */
+  .pages-data__actions {
+    flex-wrap: wrap;
+  }
+
+  .pages-data__button {
+    max-width: 100%;
+  }
+
+  .pages-data__confirm-actions {
+    justify-content: flex-start;
+  }
+}
+/* #endregion */
+
 @media screen and (max-width: 640px) {
   .pages-toolbar {
     margin: 0 -1.5rem 1rem;

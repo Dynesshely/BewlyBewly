@@ -1462,3 +1462,266 @@ test.describe('评论区增强（Web Components）', () => {
     }
   })
 })
+
+/**
+ * 懒加载 / 翻页 fixture：与真实结构一致（Web Components + shadow DOM），额外提供：
+ * - `#load-more` 按钮：点击后向 bili-comments 的 shadow 追加 3 个线程（1 非 UP、1 UP、1 超长）；
+ * - 点「最新」：整体重建线程列表（模拟切排序导致容器重建）。
+ * 用来验证「只看 UP」和长评论折叠在翻页 / 重排后会自动应用到新线程。
+ */
+const COMMENT_LAZY_FIXTURE = `<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>评论懒加载测试_哔哩哔哩_bilibili</title>
+    <style>
+      body { margin: 0; font-family: system-ui, sans-serif; }
+      #mirror-vdcon { display: flex; gap: 16px; padding: 16px; margin: 0 auto; max-width: 1600px; }
+      .left-container { flex: 1 1 70%; min-width: 0; }
+      #playerWrap { background: #000; }
+      #bilibili-player { position: relative; height: 420px; overflow: hidden; }
+      .bpx-player-container { width: 100%; height: 100%; }
+      video { display: block; width: 100%; height: 100%; object-fit: contain; }
+      .video-title { margin: 16px 0; font-size: 20px; }
+      #commentapp { margin-top: 24px; }
+      #load-more { margin: 16px 0; padding: 6px 12px; }
+      bili-comments, bili-comments-header-renderer, bili-comment-thread-renderer,
+      bili-comment-renderer, bili-comment-user-info { display: block; }
+      bili-text-button { display: inline-block; padding: 4px 8px; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="video-container-v1" id="mirror-vdcon">
+        <div class="left-container scroll-sticky">
+          <div id="playerWrap">
+            <div id="bilibili-player">
+              <div class="bpx-player-container"><video preload="metadata"></video></div>
+            </div>
+          </div>
+          <h1 class="video-title">评论懒加载测试</h1>
+          <div id="commentapp"></div>
+          <button id="load-more" type="button">加载更多</button>
+        </div>
+      </div>
+    </div>
+    <script>
+      (function () {
+        const commentapp = document.getElementById('commentapp')
+        const comments = document.createElement('bili-comments')
+        commentapp.appendChild(comments)
+        const commentsShadow = comments.attachShadow({ mode: 'open' })
+
+        const header = document.createElement('bili-comments-header-renderer')
+        const headerShadow = header.attachShadow({ mode: 'open' })
+        const navbar = document.createElement('div')
+        navbar.id = 'navbar'
+        const title = document.createElement('h2')
+        title.id = 'title'
+        title.textContent = '评论'
+        const sortActions = document.createElement('div')
+        sortActions.id = 'sort-actions'
+        sortActions.className = 'hot'
+        const hotButton = document.createElement('bili-text-button')
+        hotButton.textContent = '最热'
+        hotButton.className = 'active'
+        const latestButton = document.createElement('bili-text-button')
+        latestButton.textContent = '最新'
+        sortActions.append(hotButton, latestButton)
+        navbar.append(title, sortActions)
+        headerShadow.appendChild(navbar)
+        commentsShadow.appendChild(header)
+
+        function buildThread(data) {
+          const thread = document.createElement('bili-comment-thread-renderer')
+          if (data.id)
+            thread.id = data.id
+          const threadShadow = thread.attachShadow({ mode: 'open' })
+          commentsShadow.appendChild(thread)
+
+          const renderer = document.createElement('bili-comment-renderer')
+          const rendererShadow = renderer.attachShadow({ mode: 'open' })
+          threadShadow.appendChild(renderer)
+
+          const headerBox = document.createElement('div')
+          headerBox.id = 'header'
+          const userInfo = document.createElement('bili-comment-user-info')
+          const userInfoShadow = userInfo.attachShadow({ mode: 'open' })
+          const userName = document.createElement('span')
+          userName.id = 'user-name'
+          userName.textContent = data.up ? 'UP 主' : (data.name || '用户')
+          userInfoShadow.appendChild(userName)
+          if (data.up) {
+            const userUp = document.createElement('span')
+            userUp.id = 'user-up'
+            userUp.textContent = 'UP'
+            userInfoShadow.appendChild(userUp)
+          }
+          headerBox.appendChild(userInfo)
+
+          const content = document.createElement('div')
+          content.id = 'content'
+          content.style.height = (data.height || 60) + 'px'
+          content.style.overflow = 'hidden'
+          content.textContent = data.text || '评论内容'
+
+          const footer = document.createElement('div')
+          footer.id = 'footer'
+          footer.textContent = '点赞 · 回复'
+
+          rendererShadow.append(headerBox, content, footer)
+          return thread
+        }
+
+        function clearThreads() {
+          Array.from(commentsShadow.querySelectorAll('bili-comment-thread-renderer'))
+            .forEach(el => el.remove())
+        }
+
+        ;[
+          { up: false, text: '初始普通评论 1' },
+          { up: true, text: '初始 UP 评论 1' },
+          { up: false, text: '初始普通评论 2' },
+          { up: true, text: '初始 UP 评论 2' },
+        ].forEach(buildThread)
+
+        document.getElementById('load-more').addEventListener('click', () => {
+          ;[
+            { up: false, text: '新普通评论', id: 'new-normal' },
+            { up: true, text: '新 UP 评论', id: 'new-up' },
+            { up: false, text: '新长评论', height: 620, id: 'new-tall' },
+          ].forEach(buildThread)
+          document.body.dataset.loadedMore = 'yes'
+        })
+
+        hotButton.addEventListener('click', () => {
+          hotButton.classList.add('active')
+          latestButton.classList.remove('active')
+          sortActions.className = 'hot'
+          document.body.dataset.sortClicked = 'hot'
+        })
+
+        // 切「最新」= 整体重建线程列表（模拟容器重建）
+        latestButton.addEventListener('click', () => {
+          latestButton.classList.add('active')
+          hotButton.classList.remove('active')
+          sortActions.className = 'latest'
+          document.body.dataset.sortClicked = 'latest'
+          clearThreads()
+          ;[
+            { up: true, text: '重排后的 UP 评论', id: 'sorted-up' },
+            { up: false, text: '重排后的普通评论', id: 'sorted-normal' },
+            { up: false, text: '重排后的长评论', height: 620, id: 'sorted-tall' },
+          ].forEach(buildThread)
+        })
+      })()
+    </script>
+  </body>
+</html>`
+
+async function openLazyCommentPage(): Promise<{ context: BrowserContext, page: Page }> {
+  const context = await launchExtension({ allowPopups: true })
+
+  const page = await context.newPage()
+  await page.route('**/*', async (route) => {
+    const request = route.request()
+    const url = new URL(request.url())
+    if (url.hostname === 'www.bilibili.com' && request.resourceType() === 'document') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/html; charset=utf-8',
+        body: COMMENT_LAZY_FIXTURE,
+      })
+      return
+    }
+    await route.continue()
+  })
+
+  await page.goto('https://www.bilibili.com/video/BV1lazycomment', { waitUntil: 'domcontentloaded' })
+  return { context, page }
+}
+
+test.describe('评论区懒加载 / 翻页状态保持', () => {
+  skipIfExtensionMissing()
+
+  test('只看 UP 打开后，加载更多的新非 UP 线程也被隐藏', async () => {
+    const { context, page } = await openLazyCommentPage()
+
+    try {
+      await ensureOverlay(page)
+      await expect(page.locator('bili-comment-thread-renderer')).toHaveCount(4, { timeout: 10_000 })
+
+      await page.locator('[data-bvp-action="comment-only-up"]').click()
+      await expect(page.locator('html')).toHaveClass(/bewly-comments-only-up/)
+      await expect(page.locator('bili-comment-thread-renderer:visible')).toHaveCount(2)
+
+      await page.locator('#load-more').click()
+      await expect(page.locator('bili-comment-thread-renderer')).toHaveCount(7, { timeout: 10_000 })
+      // 新加入的 3 条里只有 1 条 UP：可见总数 2（旧 UP）+ 1（新 UP）= 3
+      await expect(page.locator('bili-comment-thread-renderer:visible')).toHaveCount(3)
+      await expect(page.locator('#new-normal')).toBeHidden()
+
+      await page.locator('[data-bvp-action="comment-only-up"]').click()
+      await expect(page.locator('bili-comment-thread-renderer:visible')).toHaveCount(7)
+    }
+    finally {
+      await context.close()
+    }
+  })
+
+  test('加载更多的新长评论也被折叠，展开后消失', async () => {
+    const { context, page } = await openLazyCommentPage()
+
+    try {
+      await ensureOverlay(page)
+      await expect(page.locator('bili-comment-thread-renderer')).toHaveCount(4, { timeout: 10_000 })
+      expect(await page.locator('bili-comment-renderer[data-bewly-comment-clamped]').count()).toBe(0)
+
+      await page.locator('#load-more').click()
+      await expect(page.locator('#new-tall')).toBeVisible()
+      await expect(page.locator('bili-comment-renderer[data-bewly-comment-clamped]')).toHaveCount(1, { timeout: 10_000 })
+
+      await page.locator('#new-tall').scrollIntoViewIfNeeded()
+      const expandButton = page.locator('.bvp-comment-expand')
+      await expect(expandButton).toHaveCount(1)
+      await expandButton.click()
+      await expect(page.locator('bili-comment-renderer[data-bewly-comment-expanded]')).toHaveCount(1)
+      await expect(page.locator('bili-comment-renderer[data-bewly-comment-clamped]')).toHaveCount(0)
+    }
+    finally {
+      await context.close()
+    }
+  })
+
+  test('切排序重建容器后，只看 UP 与折叠状态自动恢复', async () => {
+    const { context, page } = await openLazyCommentPage()
+
+    try {
+      await ensureOverlay(page)
+      await expect(page.locator('bili-comment-thread-renderer')).toHaveCount(4, { timeout: 10_000 })
+
+      await page.locator('[data-bvp-action="comment-only-up"]').click()
+      await expect(page.locator('bili-comment-thread-renderer:visible')).toHaveCount(2)
+
+      // 点原生「最新」→ fixture 整体重建线程列表（1 UP / 1 普通 / 1 超长）
+      await page.locator('[data-bvp-action="comment-sort-latest"]').click()
+      await expect.poll(() => page.evaluate(() => document.body.dataset.sortClicked ?? ''), { timeout: 5_000 }).toBe('latest')
+      await expect(page.locator('bili-comment-thread-renderer')).toHaveCount(3, { timeout: 10_000 })
+
+      // 只看 UP 仍开启：非 UP 的 #sorted-normal 被隐藏，只剩 1 条可见
+      await expect(page.locator('html')).toHaveClass(/bewly-comments-only-up/)
+      await expect(page.locator('bili-comment-thread-renderer:visible')).toHaveCount(1)
+      await expect(page.locator('#sorted-normal')).toBeHidden()
+
+      // 被隐藏线程量不到高度，先关掉只看 UP 让长评论参与折叠判定，再打开只看 UP
+      await page.locator('[data-bvp-action="comment-only-up"]').click()
+      await expect(page.locator('bili-comment-thread-renderer:visible')).toHaveCount(3)
+      await expect(page.locator('bili-comment-renderer[data-bewly-comment-clamped]')).toHaveCount(1, { timeout: 10_000 })
+      await page.locator('#sorted-tall').scrollIntoViewIfNeeded()
+      await expect(page.locator('.bvp-comment-expand')).toHaveCount(1)
+    }
+    finally {
+      await context.close()
+    }
+  })
+})

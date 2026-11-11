@@ -44,6 +44,11 @@ export interface DiagnosticsMessages {
   reasonSelectorsMiss: string
   reasonNoSelectors: string
   reasonHostMissing: string
+  reasonCoveringOverlay: string
+  statusCovering: string
+  coveringOverlayHint: string
+  /** 结果摘要里「覆盖中」的展示文案（含占位符） */
+  summaryCovering: string
   /** 页面类型显示名（键与 probe.detectPageKind 的返回值一致） */
   pageKindLabels: Record<string, string>
 }
@@ -83,6 +88,10 @@ const CMN_CN: DiagnosticsMessages = {
   reasonSelectorsMiss: '关键选择器一个都没命中（页面可能未渲染完成或站点已改版）',
   reasonNoSelectors: '没有声明关键选择器',
   reasonHostMissing: '关键选择器命中，但增强浮层没有挂载',
+  reasonCoveringOverlay: '设置页覆盖中，无法探测（关闭设置页后重跑更准确）',
+  statusCovering: '覆盖中',
+  coveringOverlayHint: '当前设置页覆盖了页面内容，部分模块无法探测；关闭设置页后重新运行会更准确。',
+  summaryCovering: '覆盖中 {covering}',
   pageKindLabels: {
     home: '首页',
     video: '视频播放页',
@@ -136,6 +145,10 @@ const CMN_TW: DiagnosticsMessages = {
   reasonSelectorsMiss: '關鍵選擇器一個都沒命中（頁面可能未渲染完成或站點已改版）',
   reasonNoSelectors: '沒有宣告關鍵選擇器',
   reasonHostMissing: '關鍵選擇器命中，但增強浮層沒有掛載',
+  reasonCoveringOverlay: '設定頁覆蓋中，無法偵測（關閉設定頁後重跑更準確）',
+  statusCovering: '覆蓋中',
+  coveringOverlayHint: '目前設定頁覆蓋了頁面內容，部分模組無法偵測；關閉設定頁後重新執行會更準確。',
+  summaryCovering: '覆蓋中 {covering}',
   pageKindLabels: {
     home: '首頁',
     video: '影片播放頁',
@@ -181,6 +194,10 @@ const JYUT: DiagnosticsMessages = {
   reasonSelectorsMiss: '關鍵選擇器一個都冇命中（頁面可能未渲染完或者站點改咗版）',
   reasonNoSelectors: '冇宣告關鍵選擇器',
   reasonHostMissing: '關鍵選擇器命中，但增強浮層未掛',
+  reasonCoveringOverlay: '設定頁蓋住咗，探測唔到（閂咗設定頁再行會準啲）',
+  statusCovering: '蓋住中',
+  coveringOverlayHint: '而家設定頁蓋住咗頁面內容，有啲模組探測唔到；閂咗設定頁再行一次會準啲。',
+  summaryCovering: '蓋住中 {covering}',
   pageKindLabels: {
     home: '主頁',
     video: '影片播放頁',
@@ -234,6 +251,10 @@ const EN: DiagnosticsMessages = {
   reasonSelectorsMiss: 'No key selector matched (page may still be rendering or the site changed)',
   reasonNoSelectors: 'No key selectors declared',
   reasonHostMissing: 'Key selectors matched, but the overlay is not mounted',
+  reasonCoveringOverlay: 'Covered by the Settings overlay — close Settings and run again for an accurate result',
+  statusCovering: 'Covered',
+  coveringOverlayHint: 'The Settings overlay is covering the page, so some modules cannot be probed. Close Settings and run the self-check again for accurate results.',
+  summaryCovering: 'Covered {covering}',
   pageKindLabels: {
     home: 'Home',
     video: 'Video page',

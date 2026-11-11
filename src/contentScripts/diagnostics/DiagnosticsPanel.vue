@@ -18,8 +18,10 @@ const groups = computed(() => {
   const items = result.value?.items ?? []
   return {
     ok: items.filter((item: ProbeItem) => item.status === 'ok'),
-    degraded: items.filter((item: ProbeItem) => item.status === 'degraded'),
+    // 设置页覆盖导致无法探测的项单独列出，不计入「降级」
+    degraded: items.filter((item: ProbeItem) => item.status === 'degraded' && !item.covering),
     unavailable: items.filter((item: ProbeItem) => item.status === 'unavailable'),
+    covering: items.filter((item: ProbeItem) => item.covering),
   }
 })
 </script>
@@ -52,6 +54,13 @@ const groups = computed(() => {
     <template v-else>
       <p class="diagnostics__summary" role="status" aria-live="polite">
         {{ t.summary.replace('{ok}', String(result.okCount)).replace('{degraded}', String(result.degradedCount)).replace('{unavailable}', String(result.unavailableCount)) }}
+        <template v-if="result.coveringCount">
+          · {{ t.summaryCovering.replace('{covering}', String(result.coveringCount)) }}
+        </template>
+      </p>
+
+      <p v-if="result.coveredBySettings" class="diagnostics__hint is-covering" role="status">
+        {{ t.coveringOverlayHint }}
       </p>
 
       <dl class="diagnostics__env">
@@ -72,13 +81,13 @@ const groups = computed(() => {
       </dl>
 
       <div
-        v-for="group in (['ok', 'degraded', 'unavailable'] as const)"
+        v-for="group in (['covering', 'ok', 'degraded', 'unavailable'] as const)"
         :key="group"
         class="diagnostics__group"
       >
         <template v-if="groups[group].length">
           <h4 class="diagnostics__group-title">
-            {{ group === 'ok' ? t.statusOk : group === 'degraded' ? t.statusDegraded : t.statusUnavailable }}
+            {{ group === 'ok' ? t.statusOk : group === 'degraded' ? t.statusDegraded : group === 'covering' ? t.statusCovering : t.statusUnavailable }}
             ({{ groups[group].length }})
           </h4>
           <ul class="diagnostics__list">
@@ -118,6 +127,14 @@ const groups = computed(() => {
   font-size: 0.8125rem;
   line-height: 1.6;
   color: var(--bew-text-2);
+}
+
+.diagnostics__hint.is-covering {
+  padding: 0.5rem 0.75rem;
+  color: var(--bew-text-1);
+  background: var(--bew-fill-1);
+  border-left: 3px solid var(--bew-theme-color);
+  border-radius: 6px;
 }
 
 .diagnostics__actions {

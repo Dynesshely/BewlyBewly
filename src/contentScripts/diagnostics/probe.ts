@@ -59,6 +59,44 @@ function countActiveShortcuts(): number {
   }
 }
 
+/**
+ * 是否处于「设置页覆盖页面内容」的状态。
+ *
+ * 设置页是 `#bewly` shadow root 里的全屏浮层（`Settings.vue` 根节点 + `#settings-window`），
+ * 打开后首页 / 列表 / 动态等页面内容会被卸载或隐藏，导致选择器探测不到——这不是功能坏了。
+ * 这里同时兼容老版本（只有全屏 fixed 包裹层）与当前版本（有 `#settings-window`）。
+ */
+export function isCoveredBySettings(): boolean {
+  const shadow = document.querySelector('#bewly')?.shadowRoot
+  if (!shadow)
+    return false
+  // 当前版本：设置窗口有固定 id，最可靠
+  if (shadow.querySelector('#settings-window'))
+    return true
+  // 兼容：设置页根节点是 shadow root 下的全屏 fixed 容器（含 settings-content）
+  const content = shadow.querySelector('.settings-content')
+  if (!content)
+    return false
+  const root = content.closest<HTMLElement>('.fixed')
+  return Boolean(root)
+}
+
+/** 依赖「页面内容」、会被设置页覆盖影响的模块分组 */
+const CONTENT_DEPENDENT_GROUPS: ProbeGroupName[] = [
+  'home',
+  'list',
+  'moments',
+  'bangumi',
+  'anime',
+  'video',
+  'channel',
+  'space',
+  'article',
+  'search',
+  'notification',
+  'live',
+]
+
 /** 已注入的浮动层宿主（nativeOverlay 的 host 元素） */
 function isHostMounted(hostId: string): boolean {
   if (hasNativeOverlay(hostId))
@@ -110,6 +148,7 @@ interface ProbeSpec {
 
 export function collectProbeItems(): ProbeItem[] {
   const pageKind = detectPageKind()
+  const coveredBySettings = isCoveredBySettings()
   const isHome = /(?:^|\.)bilibili\.com$/.test(location.hostname) && (location.pathname === '/' || location.pathname === '/index.html')
 
   const specs: ProbeSpec[] = [
@@ -241,6 +280,24 @@ export function collectProbeItems(): ProbeItem[] {
     let status: ProbeStatus = 'ok'
     let reasonCode: ProbeReasonCode = 'ok'
 
+    // 设置页覆盖页面内容时，依赖页面内容的模块无法探测：
+    // 单列为「覆盖中」，不计入降级（避免误导成功能坏了）
+    if (coveredBySettings && applies && CONTENT_DEPENDENT_GROUPS.includes(spec.group) && matchedCount === 0) {
+      return {
+        name: spec.name,
+        group: 'degraded',
+        status: 'degraded',
+        covering: true,
+        hostId,
+        hostMounted,
+        selectorCounts,
+        matchedCount,
+        selectorCount: selectors.length,
+        reasonCode: 'covering-overlay',
+        note: spec.note,
+      }
+    }
+
     if (!applies) {
       status = 'unavailable'
       reasonCode = 'not-applicable'
@@ -300,8 +357,10 @@ export function collectProbeReport(): ProbeResult {
     pageKind: detectPageKind(),
     items,
     okCount: items.filter(item => item.status === 'ok').length,
-    degradedCount: items.filter(item => item.status === 'degraded').length,
+    degradedCount: items.filter(item => item.status === 'degraded' && !item.covering).length,
     unavailableCount: items.filter(item => item.status === 'unavailable').length,
+    coveringCount: items.filter(item => item.covering).length,
+    coveredBySettings: isCoveredBySettings(),
     env,
   }
 }
@@ -323,6 +382,8 @@ export function reasonText(item: ProbeItem, t: import('./i18n').DiagnosticsMessa
       return t.reasonNoSelectors
     case 'host-missing':
       return t.reasonHostMissing
+    case 'covering-overlay':
+      return t.reasonCoveringOverlay
   }
 }
 
@@ -340,13 +401,30 @@ export function reportToMarkdown(report: ProbeResult, messages: import('./i18n')
     `- Bewly 主应用挂载：${report.env.bewlyMounted ? '是' : '否'}`,
     `- 自检时间：${new Date().toLocaleString()}`,
     '',
-    `正常 ${report.okCount} · 降级 ${report.degradedCount} · 不可用 ${report.unavailableCount}`,
+    `正常 ${report.okCount} · 降级 ${report.degradedCount} · 不可用 ${report.unavailableCount}${report.coveringCount
+      ? ` · 覆盖中 ${report.coveringCount}`
+      : ''}`,
     '',
   ]
 
-  const statusLabels = { ok: messages.statusOk, degraded: messages.statusDegraded, unavailable: messages.statusUnavailable }
-  for (const status of ['ok', 'degraded', 'unavailable'] as const) {
-    const group = report.items.filter(item => item.status === status)
+  if (report.coveredBySettings)
+    lines.push(`> ${messages.coveringOverlayHint}`, '')
+
+  const statusLabels = {
+    ok: messages.statusOk,
+    degraded: messages.statusDegraded,
+    unavailable: messages.statusUnavailable,
+    covering: messages.statusCovering,
+  }
+  for (const status of [
+    'ok',
+    'degraded',
+    'unavailable',
+    'covering',
+  ] as const) {
+    const group = status === 'covering'
+      ? report.items.filter(item => item.covering)
+      : report.items.filter(item => item.status === status && !item.covering)
     if (!group.length)
       continue
     lines.push(`## ${statusLabels[status]}（${group.length}）`, '')

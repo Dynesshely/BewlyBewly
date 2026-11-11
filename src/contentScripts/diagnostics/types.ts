@@ -11,6 +11,7 @@ export type ProbeReasonCode
     | 'selectors-miss'
     | 'no-selectors'
     | 'host-missing'
+    | 'covering-overlay'
 
 /** 结果分组：正常 / 降级 / 不可用 + 页面类型 */
 export type ProbeGroupName
@@ -54,6 +55,8 @@ export interface ProbeItem {
   selectorCount: number
   /** 降级 / 不可用原因代码（正常为 ok） */
   reasonCode: ProbeReasonCode
+  /** 是否因为「设置页覆盖了页面内容」而无法探测（不计入降级统计） */
+  covering?: boolean
   /** 额外说明（可选，展示用） */
   note?: string
 }
@@ -66,4 +69,8 @@ export interface ProbeReport {
   okCount: number
   degradedCount: number
   unavailableCount: number
+  /** 因设置页覆盖而无法探测的模块数（单列，不计入降级） */
+  coveringCount: number
+  /** 探测时是否处于「设置页覆盖页面内容」的状态 */
+  coveredBySettings: boolean
 }

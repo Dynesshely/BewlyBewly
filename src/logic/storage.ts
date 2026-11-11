@@ -135,6 +135,10 @@ export interface Settings {
   videoPageShortcuts: boolean
   /** 视频播放页：评论区增强（排序 / 只看 UP / 长评论折叠） */
   videoPageComments: boolean
+  /** 视频播放页：评论区移到播放器右侧同高（第 27 轮） */
+  videoPageCommentColumn: boolean
+  /** 视频播放页：推荐视频改为页面下部横向聚焦视图（第 27 轮） */
+  videoPageRecommendRail: boolean
   /** 列表页默认视图 / 排序 */
   historyViewMode: ListViewMode
   watchLaterViewMode: ListViewMode
@@ -296,6 +300,8 @@ export const originalSettings: Settings = {
   videoPageMiniPlayer: true,
   videoPageShortcuts: true,
   videoPageComments: true,
+  videoPageCommentColumn: true,
+  videoPageRecommendRail: true,
   historyViewMode: 'comfortable',
   watchLaterViewMode: 'comfortable',
   favoritesViewMode: 'comfortable',

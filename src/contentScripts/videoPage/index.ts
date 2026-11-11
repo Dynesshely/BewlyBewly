@@ -25,6 +25,7 @@ import {
   setCompact,
   setMini,
 } from './actions'
+import { setupCommentColumn, syncCommentColumn } from './commentColumn'
 import { setupComments, syncComments } from './comments'
 import PlaylistPanel from './components/PlaylistPanel.vue'
 import VideoPageOverlay from './components/VideoPageOverlay.vue'
@@ -45,6 +46,7 @@ import {
   markPlayerStage,
 } from './dom'
 import selectionPanelCss from './playlistPanel.shadow.scss?inline'
+import { bindRailHost, railState, syncRecommendRail, teardownRecommendRail } from './recommendRail'
 import { setupShortcuts } from './shortcuts'
 import { resetUiState, ui } from './state'
 import shadowCss from './videoPage.shadow.scss?inline'
@@ -73,6 +75,7 @@ let hostEl: HTMLDivElement | null = null
 let vueApp: App | null = null
 let disposeShortcuts: (() => void) | null = null
 let disposeComments: (() => void) | null = null
+let disposeCommentColumn: (() => void) | null = null
 let stopSettingsWatch: (() => void) | null = null
 let syncTimer: number | null = null
 let scrollFrame = 0
@@ -115,6 +118,8 @@ function mount(): void {
   const mountPoint = document.createElement('div')
   shadow.appendChild(mountPoint)
   document.body.appendChild(hostEl)
+  // 推荐轨道需要按可见性临时打开宿主命中（见 recommendRail/index.ts 的注释）
+  bindRailHost(hostEl)
 
   vueApp = createApp(VideoPageOverlay)
   vueApp.mount(mountPoint)
@@ -125,6 +130,9 @@ function mount(): void {
   // 评论区增强（排序 / 只看 UP / 长评论折叠）：没有评论区时组件自身不渲染
   disposeComments = setupComments()
 
+  // 评论区移到播放器右侧、与播放器同高（第 27 轮）：找不到结构 / 窄屏 / 影院模式会自动回退
+  disposeCommentColumn = setupCommentColumn()
+
   window.addEventListener('scroll', handleScroll, { passive: true })
   window.addEventListener('resize', handleScroll, { passive: true })
 
@@ -133,8 +141,16 @@ function mount(): void {
 
   // 设置页可能在播放页打开期间修改开关，这里实时响应（设置存在浏览器存储里，跨上下文同步）
   stopSettingsWatch = watch(
-    () => [settings.value.videoPageShortcuts, settings.value.videoPageCinemaMode, settings.value.videoPageMiniPlayer] as const,
-    ([shortcutsEnabled, cinemaEnabled, miniEnabled]) => {
+    () => [
+      settings.value.videoPageShortcuts,
+      settings.value.videoPageCinemaMode,
+      settings.value.videoPageMiniPlayer,
+      settings.value.videoPageRecommendRail,
+    ] as const,
+    ([shortcutsEnabled, cinemaEnabled, miniEnabled, recommendRailEnabled]) => {
+      // 推荐轨道开关：关掉时立刻还原原生列表
+      if (!recommendRailEnabled)
+        syncRecommendRail({ enabled: false, cinema: ui.cinema })
       if (shortcutsEnabled && !disposeShortcuts) {
         disposeShortcuts = setupShortcuts()
       }
@@ -150,6 +166,7 @@ function mount(): void {
         setMini(false)
 
       updateScrollState()
+      syncRecommendRail({ enabled: settings.value.videoPageRecommendRail, cinema: ui.cinema })
     },
   )
 
@@ -189,9 +206,15 @@ function unmount(): void {
     disposeComments()
     disposeComments = null
   }
+  if (disposeCommentColumn) {
+    disposeCommentColumn()
+    disposeCommentColumn = null
+  }
 
   window.removeEventListener('scroll', handleScroll)
   window.removeEventListener('resize', handleScroll)
+
+  teardownRecommendRail()
 
   unbindVideoEnded()
   if (endedTimer !== null) {
@@ -212,6 +235,7 @@ function unmount(): void {
     vueApp = null
   }
 
+  bindRailHost(null)
   hostEl.remove()
   hostEl = null
   resetUiState()
@@ -274,6 +298,18 @@ function sync(): void {
 
   // 评论区：标记 UP / 探测排序 tab / 折叠长评论（没有评论区时内部会提前返回）
   syncComments()
+
+  // 推荐视频轨道（第 27 轮）：读不到卡片时内部会保持原生列表不动
+  syncRecommendRail({
+    enabled: settings.value.videoPageRecommendRail,
+    cinema: ui.cinema,
+  })
+  const railVisible = Boolean(railState.placement && railState.cards.length)
+  if (ui.recommendRailVisible !== railVisible)
+    ui.recommendRailVisible = railVisible
+
+  // 评论区右列布局：B 站可能重渲染 #commentapp / 右栏，每拍校正一次（不满足条件时内部直接还原）
+  syncCommentColumn()
 }
 
 function handleScroll(): void {

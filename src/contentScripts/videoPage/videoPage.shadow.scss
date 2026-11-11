@@ -537,3 +537,215 @@
   }
 }
 /* #endregion */
+
+// ===== 第 27 轮：推荐视频下部横向轨道 =====
+// 说明：videoPage 增强层是**独立 shadow root**（#bewly-video-page），SFC 的 scoped 样式会被
+// 注入到 #bewly 的 shadow 里，进不来 —— 所以轨道样式必须写在这个文件里（组件内不再保留 <style>）。
+//
+// 真机修复（第 27 轮补充）：点击轨道卡片时「抽屉打开 + 页面 URL 也跳到推荐视频」。
+// 根因是命中 / 冒泡两条链路叠加：
+//   1. :host 上 pointer-events: none，轨道子树没有显式 auto 时，点击穿透到下面原生推荐列表的 <a>；
+//   2. 事件出了 shadow 后会被 B 站挂在 document 上的捕获阶段 click 委托接走。
+// 3. 最终真机修法（第三轮）：`:host { pointer-events: none }` 时，浏览器 hit-test 仍会把
+//    B 站的 click 委托跑到宿主上，于是「抽屉打开 + URL 也被改」。所以在**轨道显示期间**
+//    由 index.ts 给宿主写行内 `pointer-events: auto`（recommendRail/index.ts#setHostHitOpen），
+//    轨道隐藏/卸载时清掉行内样式回到 none；下面 `.bvp-root { pointer-events: none }`
+//    保证宿主打开命中时其它浮层区域不会挡住页面点击（各自的按钮/面板仍然 auto）。
+//
+// 因此这里给 .bvp-rail / .bvp-rail__viewport / .bvp-rail__card 显式 pointer-events: auto，
+// z-index 提到 20 压过原生推荐区；组件侧再在**捕获阶段** preventDefault + stopPropagation。
+/* 颜色全部走 --bew-* 变量，暗色 / 高对比度自动跟随；不写死十六进制颜色 */
+/* 宿主命中打开期间（rack 可见），其它浮层区域不能挡住页面点击 */
+.bvp-root {
+  pointer-events: none;
+}
+
+.bvp-rail {
+  position: fixed;
+  /* 压过原生推荐区（.rcmd-tab 的 z-index 通常 < 10），低于合集面板 / 帮助面板 */
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* :host 是 pointer-events: none（浮层不挡页面），轨道必须自己重新打开命中；
+     否则点击会穿透到 B 站原生推荐列表的 <a>，出现「抽屉打开但 URL 也跳转」（真机实测） */
+  pointer-events: auto;
+}
+
+/* 命中区域显式声明：fixed 浮层 + 父级 none 的组合下，只靠子级 auto 才可靠 */
+.bvp-rail .bvp-rail__viewport,
+.bvp-rail .bvp-rail__card {
+  pointer-events: auto;
+}
+
+.bvp-rail__head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.bvp-rail__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bew-text-1);
+}
+
+.bvp-rail__actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.bvp-rail__nav,
+.bvp-rail__close {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  color: var(--bew-text-2);
+  background: var(--bew-elevated-solid);
+  border: 1px solid var(--bew-border-color);
+  border-radius: 50%;
+  transition:
+    color var(--bvp-duration) var(--bvp-ease),
+    background-color var(--bvp-duration) var(--bvp-ease);
+}
+
+.bvp-rail__nav:hover:not(:disabled),
+.bvp-rail__close:hover {
+  color: var(--bew-theme-color);
+  background: var(--bew-elevated-hover);
+}
+
+.bvp-rail__nav:disabled {
+  opacity: 0.4;
+}
+
+.bvp-rail__viewport {
+  overflow: hidden;
+  border-radius: 14px;
+  outline-offset: 4px;
+}
+
+.bvp-rail__track {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  height: 100%;
+  transition: transform 380ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.bvp-rail__card {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  text-align: left;
+  cursor: pointer;
+  background: var(--bew-elevated);
+  border: 1px solid var(--bew-border-color);
+  border-radius: 12px;
+  transition:
+    transform 220ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    border-color 220ms ease,
+    box-shadow 220ms ease;
+}
+
+.bvp-rail__card:hover,
+.bvp-rail__card.is-active {
+  border-color: var(--bew-theme-color-40);
+  box-shadow: var(--bew-shadow-2);
+  transform: translateY(-2px);
+}
+
+.bvp-rail__card:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+
+.bvp-rail__cover {
+  position: relative;
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  background: var(--bew-skeleton);
+  border-radius: 8px;
+}
+
+.bvp-rail__cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bvp-rail__duration {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  padding: 0 4px;
+  font-size: 11px;
+  line-height: 16px;
+  color: #fff;
+  background: rgb(0 0 0 / 62%);
+  border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bvp-rail__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.bvp-rail__card-title {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--bew-text-1);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.bvp-rail__meta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  overflow: hidden;
+  font-size: 11px;
+  color: var(--bew-text-3);
+}
+
+.bvp-rail__up,
+.bvp-rail__views {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bvp-rail__track,
+  .bvp-rail__card {
+    transition: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .bvp-rail__card {
+    border-color: var(--bew-text-3);
+  }
+}
+
+@media (forced-colors: active) {
+  .bvp-rail__card {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+}

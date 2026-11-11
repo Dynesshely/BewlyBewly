@@ -32,6 +32,11 @@ export interface PagesSettingsMessages {
   /** 第 24 轮：视频页评论区增强 */
   videoPageComments: string
   videoPageCommentsDesc: string
+  /** 第 27 轮：评论区分栏 / 推荐视频轨道 */
+  videoPageCommentColumn: string
+  videoPageCommentColumnDesc: string
+  videoPageRecommendRail: string
+  videoPageRecommendRailDesc: string
   groupVideoCard: string
   groupVideoCardDesc: string
   cardPreview: string
@@ -138,6 +143,10 @@ const CMN_CN: PagesSettingsMessages = {
   videoPageShortcutsDesc: 'J/K/L、←/→、C/M/F/T 等快捷键；关闭后按键完全交还给 B 站原生快捷键',
   videoPageComments: '评论区增强',
   videoPageCommentsDesc: '评论排序快捷（最热 / 最新）、只看 UP 主、长评论折叠；关闭后评论区保持 B 站原生样式',
+  videoPageCommentColumn: '评论区移到播放器右侧',
+  videoPageCommentColumnDesc: '把评论区移到播放器右侧、与播放器同高，评论列表在右侧内部滚动；关闭后保持 B 站原生布局（评论区仍在左栏下方）',
+  videoPageRecommendRail: '推荐视频改为下部横向轨道',
+  videoPageRecommendRailDesc: '把右栏推荐视频改成页面下部的横向聚焦轨道，同时可见 4–7 张，交互与首页聚焦浏览一致；关闭后保持 B 站原生布局（推荐列表留在右栏）',
   groupVideoCard: '视频卡片',
   groupVideoCardDesc: '视频卡片本身的交互增强（首页、搜索、列表页等所有出现卡片的位置）',
   cardPreview: '悬停预览',
@@ -238,6 +247,10 @@ const EN: PagesSettingsMessages = {
   videoPageShortcutsDesc: 'J/K/L, ←/→, C/M/F/T and more. When off, every key is handed back to the native Bilibili shortcuts.',
   videoPageComments: 'Comment enhancements',
   videoPageCommentsDesc: 'Quick sort (hot / latest), only-uploader filter and long-comment collapsing. When off, the comment area keeps its native Bilibili style.',
+  videoPageCommentColumn: 'Move comments beside the player',
+  videoPageCommentColumnDesc: 'Move the comment area to the right of the player at the same height, with the comment list scrolling inside that column. When off, keep the native Bilibili layout (comments stay below the left column).',
+  videoPageRecommendRail: 'Recommendations as a bottom rail',
+  videoPageRecommendRailDesc: 'Turn the right-column recommendations into a horizontal focus rail at the bottom of the page showing 4–7 cards, with the same interactions as the home focus browse. When off, keep the native layout (recommendations stay in the right column).',
   groupVideoCard: 'Video cards',
   groupVideoCardDesc: 'Interaction enhancements that apply to every video card (home, search, list pages and so on)',
   cardPreview: 'Hover preview',
@@ -338,6 +351,10 @@ const CMN_TW: PagesSettingsMessages = {
   videoPageShortcutsDesc: 'J/K/L、←/→、C/M/F/T 等快速鍵；關閉後按鍵完全交還給 B 站原生快速鍵',
   videoPageComments: '留言區增強',
   videoPageCommentsDesc: '留言排序快捷（最熱 / 最新）、只看 UP 主、長留言摺疊；關閉後留言區保持 B 站原生樣式',
+  videoPageCommentColumn: '留言區移到播放器右側',
+  videoPageCommentColumnDesc: '把留言區移到播放器右側、與播放器同高，留言列表在右側內部捲動；關閉後保持 B 站原生版面（留言區仍在左欄下方）',
+  videoPageRecommendRail: '推薦影片改為下方橫向軌道',
+  videoPageRecommendRailDesc: '把右欄推薦影片改成頁面下方的橫向聚焦軌道，同時可見 4–7 張，互動與首頁聚焦瀏覽一致；關閉後保持 B 站原生版面（推薦列表留在右欄）',
   groupVideoCard: '影片卡片',
   groupVideoCardDesc: '影片卡片本身的互動增強（首頁、搜尋、清單頁等所有出現卡片的位置）',
   cardPreview: '懸停預覽',

@@ -319,3 +319,55 @@ header 是推荐类文案，条目指向其它 bvid。
   目前靠 500ms 的 `syncComments()` 兜底会补上，但首帧可能延迟到下一拍；
 - 「只看 UP」只保留顶层 `bili-comment-thread-renderer`；楼中楼跟随所属线程显示 / 隐藏；
 - 折叠状态不持久化（重新进入页面会重新判一次），用户点开过的评论在重排后会重新折叠 —— 与 B 站自身行为一致。
+## 评论区右列布局（第 27 轮：评论移到播放器右侧、与播放器同高）
+
+> 用户点名需求：评论区不再堆在左栏底部，而是移到右侧栏、与播放器同高，内部自己滚动。
+> 由设置项 `videoPageCommentColumn`（默认开）控制，关闭后保持 B 站原生布局。
+
+### 真机结构（2026-11，1600×1000，BV1wvWM6RE3Z）
+
+```
+#mirror-vdcon
+  ├─ .left-container（sticky）
+  │    ├─ #playerWrap（播放器，实测高 683）
+  │    ├─ 视频标题 / 工具条 / 简介 …
+  │    └─ #commentapp（评论区 Web Components，原本在左栏底部 y≈1274）
+  └─ .right-container（350 宽）
+       └─ .right-container-inner.scroll-sticky
+            ├─ .up-panel-container
+            ├─ .video-pod-above-modules
+            └─ .rcmd-tab（推荐列表，由「下部横向聚焦轨道」工作流接管，本模块不碰）
+```
+
+### 实现
+
+- **DOM 搬运**：由 `src/contentScripts/videoPage/commentColumn.ts` 创建一个
+  `#bewly-comment-column.bewly-comment-column` 容器，插到 `.right-container-inner` 最前面，
+  再把 `#commentapp` 追加进去；同时记录它原来的 `parent` 与 `nextSibling`。
+- **同高与对齐**：容器高度取 `#playerWrap` 的 `getBoundingClientRect().height`，顶部 `margin-top` 取
+  「播放器顶边 − 右栏顶边」，以 CSS 变量 `--bewly-comment-column-height` / `--bewly-comment-column-offset`
+  写在 `<html>` 上（窗口 resize、每 500ms 同步拍都会重算）；容器 `overflow-y: auto; overscroll-behavior: contain`，
+  内部滚动，**不改动评论 Web Components 自身的内部行为**。
+- **降级（宁缺勿滥）**：找不到 `#mirror-vdcon` / `.right-container-inner`（或 `.right-container`）/ `#playerWrap` /
+  `#commentapp` 任一 → 完全不生效；`<1280px`、影院模式（`html.bewly-video-cinema`）、设置关闭 → 自动还原原生布局。
+- **卸载还原**：把 `#commentapp` 插回原 `parent` 的原 `nextSibling` 位置（原位置失效时兜底 `appendChild`），
+  移除容器与 `html.bewly-comment-column` 类、清掉两个 CSS 变量。
+- **响应 B 站重渲染**：每拍同步时校验 `#commentapp` / 容器是否还连着 DOM；被替换则先还原旧状态再重新接管。
+- `.rcmd-tab`：**本模块不隐藏、不移动**。与「推荐下部轨道」工作流约定：A 只负责评论列；
+  B 在轨道渲染成功后自己给 `.rcmd-tab` 打 `data-bewly-rail-taken` 并隐藏，避免两处互相覆盖。
+
+### 用户可见行为
+
+1. 宽屏（≥1280px）下，评论区从视频下方移到右侧栏、与播放器顶边对齐、高度与播放器一致，评论在右列内部滚动。
+2. 关闭设置项 / 窗口窄于 1280px / 进入影院模式 → 评论区自动回到左栏底部原生位置。
+3. 结构不匹配（B 站改版、评论区未加载完）→ 完全保持原生布局，不出现半吊子重排。
+
+### 已知限制
+
+- 高度跟随 `#playerWrap` 的实测高度；播放器尺寸变化（全屏 / 迷你播放器）会触发一次同步拍重算，
+  极端情况下有一拍延迟；
+- 右栏自身是 `scroll-sticky`：评论列固定高度 + 内部滚动，页面滚动时右栏可整体吸附，行为与 B 站右栏一致；
+- B 站评论区内部若有自己的懒加载 / 分页（`bili-comments`），移动宿主不会影响其加载逻辑（第 23 轮已验证）；
+- 评论区被移动后，原有的评论增强浮层（工具条 / 展开按钮）位置随 `#navbar` / thread 的 rect 重算，
+  因此会自动跟着右列布局；
+- 与「推荐下部轨道」工作流的边界：本模块不碰 `.rcmd-tab`；若 B 工作流未接管，推荐列表会留在右栏（原样）。

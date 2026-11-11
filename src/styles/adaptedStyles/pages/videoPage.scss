@@ -528,3 +528,29 @@
   }
 }
 // #endregion
+// #region 评论区右列布局（第 27 轮：评论移到播放器右侧、与播放器同高）
+//
+// DOM 由 src/contentScripts/videoPage/commentColumn.ts 负责搬运：
+//   #commentapp  →  .bewly-comment-column（插在 .right-container-inner 最前面）
+// 高度 / 顶部偏移由 JS 以 CSS 变量写到 <html> 上（随窗口与播放器尺寸变化刷新）。
+// 关闭开关、窄于 1280px、进入影院模式时 JS 会把节点放回原位并移除 html 类。
+.bewly-design.videoPage {
+  &.bewly-comment-column {
+    .bewly-comment-column {
+      box-sizing: border-box;
+      height: var(--bewly-comment-column-height, 480px);
+      margin-top: var(--bewly-comment-column-offset, 0px);
+      overflow-x: hidden;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      border-radius: var(--bew-radius);
+    }
+
+    // 评论宿主本身不要再撑开 / 加内边距，让 Web Components 自己排版
+    .bewly-comment-column > #commentapp {
+      display: block;
+      width: 100%;
+    }
+  }
+}
+// #endregion

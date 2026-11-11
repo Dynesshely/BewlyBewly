@@ -81,6 +81,12 @@ export interface VideoPageMessages {
   commentsOnlyUpOn: string
   commentsOnlyUpOff: string
   commentsExpand: string
+  /** 推荐轨道标题（第 27 轮） */
+  recommendRailTitle: string
+  recommendRailHint: string
+  recommendRailPrev: string
+  recommendRailNext: string
+  recommendRailClose: string
   collectionHint: string
   /** 形如「已跳到 {percent}%」，用 formatPercent 替换占位符 */
   percent: string
@@ -134,6 +140,11 @@ const CMN_CN: VideoPageMessages = {
   commentsOnlyUpOn: '只看 UP 主评论',
   commentsOnlyUpOff: '显示全部评论',
   commentsExpand: '展开',
+  recommendRailTitle: '推荐视频',
+  recommendRailHint: '推荐视频轨道：← → 切换，Enter 当前页预览，Ctrl/⌘+点击 或 中键新标签页',
+  recommendRailPrev: '上一张',
+  recommendRailNext: '下一张',
+  recommendRailClose: '收起推荐轨道',
   percent: '已跳到 {percent}%',
   shortcut: {
     seekBack: '后退 10 秒',
@@ -207,6 +218,11 @@ const EN: VideoPageMessages = {
   commentsOnlyUpOn: 'Showing uploader comments only',
   commentsOnlyUpOff: 'Showing all comments',
   commentsExpand: 'Expand',
+  recommendRailTitle: 'Recommended videos',
+  recommendRailHint: 'Recommendation rail: ← → to switch, Enter previews here, Ctrl/⌘+click or middle click opens a new tab',
+  recommendRailPrev: 'Previous',
+  recommendRailNext: 'Next',
+  recommendRailClose: 'Hide the recommendation rail',
   percent: 'Jumped to {percent}%',
   shortcut: {
     seekBack: 'Back 10 seconds',
@@ -276,6 +292,11 @@ const CMN_TW: VideoPageMessages = {
   commentsOnlyUpOn: '只看 UP 主評論',
   commentsOnlyUpOff: '顯示全部評論',
   commentsExpand: '展開',
+  recommendRailTitle: '推薦影片',
+  recommendRailHint: '推薦影片軌道：← → 切換，Enter 在當前頁預覽，Ctrl/⌘+點擊 或 中鍵開新分頁',
+  recommendRailPrev: '上一張',
+  recommendRailNext: '下一張',
+  recommendRailClose: '收起推薦軌道',
   autoplay: '自動連播',
   autoplayOn: '已開啟自動連播：播完自動切下一個',
   autoplayOff: '已關閉自動連播',
@@ -322,6 +343,8 @@ const JYUT: VideoPageMessages = {
   commentsOnlyUpOn: '淨係顯示 UP 主評論',
   commentsOnlyUpOff: '顯示晒所有評論',
   commentsExpand: '打開',
+  recommendRailHint: '推薦影片軌道：← → 切換，Enter 喺呢頁預覽，Ctrl/⌘+撳 或 中鍵開新分頁',
+  recommendRailClose: '收埋推薦軌道',
   cinemaOn: '入咗影院模式，撳 Esc 退出',
   cinemaOff: '已經退出影院模式',
   restored: '還原咗播放器',

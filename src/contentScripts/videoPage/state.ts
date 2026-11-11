@@ -52,6 +52,8 @@ export interface VideoPageUiState {
   commentToolbarLeft: number
   /** 长评论折叠按钮（fixed 坐标） */
   commentFoldButtons: CommentFoldButtonView[]
+  /** 推荐轨道是否已渲染（第 27 轮；由 recommendRail/index.ts 写入） */
+  recommendRailVisible: boolean
   cinema: boolean
   mini: boolean
   compact: boolean
@@ -86,6 +88,7 @@ function createInitialState(): VideoPageUiState {
     commentToolbarTop: 0,
     commentToolbarLeft: 0,
     commentFoldButtons: [],
+    recommendRailVisible: false,
     cinema: false,
     mini: false,
     compact: false,

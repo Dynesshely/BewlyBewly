@@ -337,3 +337,43 @@ jyut 继承 cmn-TW（与其它数据类文案一致）。
 - 「只重置本组」会同时把这两个开关恢复为默认 `true`，列表页分组的重置按钮因此会一起重置视图 / 排序 / 滚动记忆四项；
 - `PagesSwitch` 只为本轮两个开关新增，其它开关仍是全局 `Radio`（无 `aria-describedby`）；若后续要统一，可逐步替换；
 - 本次自测仅 eslint + typecheck（按分工未跑 build / playwright、未碰浏览器）。
+## 十一、第 27 轮：视频播放页重排的两个开关
+
+> 第 27 轮实现了两项用户点名改造：评论区移到播放器右侧同高、推荐视频改为页面下部横向聚焦轨道。
+> 两个开关由 `storage.ts` 提供（`videoPageCommentColumn` / `videoPageRecommendRail`，默认 `true`，只读使用、未改默认值），本轮接进「页面增强 → 视频播放页」组。
+
+### 新增开关
+
+| 分组 | 开关 | settings 字段 | 默认 | 说明（关闭后保持 B 站原生布局） |
+|---|---|---|---|---|
+| 视频播放页 | 评论区移到播放器右侧 | `videoPageCommentColumn` | `true` | 评论区移到播放器右侧、与播放器同高，评论列表在右侧内部滚动；关闭后评论区仍在左栏下方 |
+| 视频播放页 | 推荐视频改为下部横向轨道 | `videoPageRecommendRail` | `true` | 右栏推荐改为页面下部横向聚焦轨道（同时可见 4–7 张，交互与首页聚焦浏览一致）；关闭后推荐列表留在右栏 |
+
+### 交互细节
+
+- 两项追加在「视频播放页」组已有 4 项之后（第 5、6 项），顺序与布局改造的先后一致；
+- 都参与分组搜索过滤（搜「评论」「推荐」「轨道」均可命中）与「重置本组」（恢复为 `originalSettings.videoPageCommentColumn` / `originalSettings.videoPageRecommendRail`，即 `true`）；
+- 说明文案通过 `PagesSwitch` 的 `aria-describedby` 关联到原生 checkbox：
+  - `pages-desc-video-comment-column` → `videoPageCommentColumnDesc`
+  - `pages-desc-video-recommend-rail` → `videoPageRecommendRailDesc`
+- 两个说明都明确写了「关闭后保持 B 站原生布局」的具体含义（评论区回左栏下方 / 推荐列表回右栏）；
+- 运行时：字段由视频页增强层（A / B 工作流）作为总开关读取，设置一改即实时生效；<1280px 与影院模式下布局改造还会自动降级为原生布局（与设置开关相互独立）；
+- 未修改 `storage.ts` 结构，也未改任何业务默认值；未改视频页实现代码与 `docs/video-page.md`。
+
+### 文案（四语言）
+
+| key | cmn-CN | cmn-TW | en |
+|---|---|---|---|
+| `videoPageCommentColumn` | 评论区移到播放器右侧 | 留言區移到播放器右側 | Move comments beside the player |
+| `videoPageCommentColumnDesc` | 把评论区移到播放器右侧、与播放器同高，评论列表在右侧内部滚动；关闭后保持 B 站原生布局（评论区仍在左栏下方） | 把留言區移到播放器右側、與播放器同高，留言列表在右側內部捲動；關閉後保持 B 站原生版面（留言區仍在左欄下方） | Move the comment area to the right of the player at the same height; the list scrolls inside that column. When off, keep the native layout (comments stay below the left column). |
+| `videoPageRecommendRail` | 推荐视频改为下部横向轨道 | 推薦影片改為下方橫向軌道 | Recommendations as a bottom rail |
+| `videoPageRecommendRailDesc` | 把右栏推荐视频改成页面下部的横向聚焦轨道，同时可见 4–7 张，交互与首页聚焦浏览一致；关闭后保持 B 站原生布局（推荐列表留在右栏） | 把右欄推薦影片改成頁面下方的橫向聚焦軌道，同時可見 4–7 張，互動與首頁聚焦瀏覽一致；關閉後保持 B 站原生版面（推薦列表留在右欄） | Turn the right-column recommendations into a horizontal focus rail at the bottom showing 4–7 cards with the same interactions as the home focus browse. When off, keep the native layout (recommendations stay in the right column). |
+
+jyut 继承 cmn-TW（与第 24 轮数据类文案一致）。
+
+### 已知限制
+
+- 设置开关只是总开关：关闭后布局改造完全回退到 B 站原生布局，但不会清理已注入的样式（由视频页增强层负责卸载还原）；
+- 视频播放页分组的「重置本组」现在会一起重置 6 个字段（影院 / 迷你 / 快捷键 / 评论增强 / 评论分栏 / 推荐轨道）；
+- 窄屏（<1280px）与影院模式下，即使开关打开，布局改造也会自动降级为原生布局（避免两列放不下）；
+- 本次自测仅 eslint + typecheck（按分工未跑 build / playwright、未碰浏览器）。

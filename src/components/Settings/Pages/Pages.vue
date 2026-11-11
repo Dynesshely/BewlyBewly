@@ -92,12 +92,16 @@ const groups = computed<SettingGroupDef[]>(() => [
       'videoPageMiniPlayer',
       'videoPageShortcuts',
       'videoPageComments',
+      'videoPageCommentColumn',
+      'videoPageRecommendRail',
     ],
     reset: () => {
       settings.value.videoPageCinemaMode = originalSettings.videoPageCinemaMode
       settings.value.videoPageMiniPlayer = originalSettings.videoPageMiniPlayer
       settings.value.videoPageShortcuts = originalSettings.videoPageShortcuts
       settings.value.videoPageComments = originalSettings.videoPageComments
+      settings.value.videoPageCommentColumn = originalSettings.videoPageCommentColumn
+      settings.value.videoPageRecommendRail = originalSettings.videoPageRecommendRail
     },
   },
   {
@@ -215,6 +219,8 @@ const itemSearchText: Record<string, () => string[]> = {
   videoPageMiniPlayer: () => [t.value.videoPageMiniPlayer, t.value.videoPageMiniPlayerDesc],
   videoPageShortcuts: () => [t.value.videoPageShortcuts, t.value.videoPageShortcutsDesc],
   videoPageComments: () => [t.value.videoPageComments, t.value.videoPageCommentsDesc],
+  videoPageCommentColumn: () => [t.value.videoPageCommentColumn, t.value.videoPageCommentColumnDesc],
+  videoPageRecommendRail: () => [t.value.videoPageRecommendRail, t.value.videoPageRecommendRailDesc],
   cardPreview: () => [t.value.cardPreview, t.value.cardPreviewDesc],
   cardQuickActions: () => [t.value.cardQuickActions, t.value.cardQuickActionsDesc],
   historyViewMode: () => [
@@ -807,6 +813,26 @@ onBeforeUnmount(() => {
           <span id="pages-desc-video-comments">{{ t.videoPageCommentsDesc }}</span>
         </template>
         <PagesSwitch v-model="settings.videoPageComments" describedby="pages-desc-video-comments" />
+      </SettingsItem>
+
+      <SettingsItem v-if="itemVisible('videoPageCommentColumn')" :title="t.videoPageCommentColumn">
+        <template #desc>
+          <span id="pages-desc-video-comment-column">{{ t.videoPageCommentColumnDesc }}</span>
+        </template>
+        <PagesSwitch
+          v-model="settings.videoPageCommentColumn"
+          describedby="pages-desc-video-comment-column"
+        />
+      </SettingsItem>
+
+      <SettingsItem v-if="itemVisible('videoPageRecommendRail')" :title="t.videoPageRecommendRail">
+        <template #desc>
+          <span id="pages-desc-video-recommend-rail">{{ t.videoPageRecommendRailDesc }}</span>
+        </template>
+        <PagesSwitch
+          v-model="settings.videoPageRecommendRail"
+          describedby="pages-desc-video-recommend-rail"
+        />
       </SettingsItem>
     </SettingsGroupSection>
 

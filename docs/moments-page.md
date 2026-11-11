@@ -266,3 +266,37 @@ src/contentScripts/views/Moments/
 - `composables/useMomentsFeed.ts` —— 新增 `toggleLike` / `isLikePending` 列表侧入口
 - `types.ts`、`utils/normalize.ts` —— `MomentStats.liked` 与 `module_stat.like.status` 解析
 - `i18n.ts` —— 点赞相关文案（cmn-CN / en）
+
+## 第 20 轮：灯箱图片兜底与焦点管理
+
+灯箱（`components/MomentLightbox.vue`）补齐了「图片失败 / 加载中 / 无障碍焦点」三件事：
+
+- **加载中**：大图未就绪时显示统一骨架 `components/Feedback/SkeletonBlock.vue`（舞台给一个稳定占位尺寸，
+  避免骨架 → 图片切换时布局跳动）；缓存命中时用 `img.complete` 兜底同步一次状态，骨架不会卡住。
+- **加载失败**：换用 `components/Feedback/FallbackImage.vue`（虚线占位 + 图标 + 「图片加载失败」文案，
+  暗色 / 高对比度自带适配）；切换上一张 / 下一张时重置失败与加载态，给新图重新尝试的机会。
+- **对话框语义**：`role="dialog"` + `aria-modal="true"` + `aria-label="图片预览"` + `tabindex="-1"`。
+- **Tab 焦点陷阱**：用第 19 轮同一套写法 —— `getRootNode()`（灯箱在 `#bewly` 的 ShadowRoot 内）
+  的 **捕获阶段** 拦 Tab，`preventDefault` + `stopPropagation` 后手写焦点循环；
+  打开时聚焦第一个可聚焦元素（关闭按钮），焦点不会跑到页面卡片上。
+- **Esc 不穿透**：Esc / ← / → 也挂在 ShadowRoot 捕获阶段，`preventDefault + stopPropagation`，
+  页面与全局快捷键（监听在 window 冒泡阶段）收不到；← / → 仍用于切图。
+- **焦点回归**：打开前记录触发元素（MomentMedia 的九宫格按钮在 click 时先 `focus()`，
+  保证所有浏览器都能记录到），关闭并卸载后把焦点还给那张图片；元素已不在 DOM 时跳过。
+
+不改列表逻辑与 `j` / `k` 键盘浏览：`useMomentsShortcuts` 在灯箱打开时本来就让行（`isOverlayOpen`）。
+
+### 第 20 轮改动文件
+
+- `components/MomentLightbox.vue` —— 骨架 / 失败兜底 / 对话框语义 / Tab 陷阱 / Esc 捕获 / 焦点回归
+- `components/MomentMedia.vue` —— 打开灯箱前把焦点交给被点的图片按钮
+- `i18n.ts` —— `lightbox_title`、`lightbox_image_failed`（四种模块语言）
+
+### 自测
+
+- `pnpm exec eslint` / `pnpm run typecheck` 全绿；
+- 用 jsdom + Vue 运行时把灯箱组件真实挂载验证：Tab / Shift+Tab 各 6 次焦点始终在灯箱内；
+  Esc `defaultPrevented` 且 window 冒泡收不到、灯箱卸载后焦点回到打开它的按钮；
+  图片 `error` 后出现 `.bewly-image-fallback`（aria-label 为「图片加载失败」）、骨架消失；
+  切图后失败态重置、骨架重新出现、`load` 后骨架消失；
+- 测试脚手架（临时目录 + node_modules junction）已删除。

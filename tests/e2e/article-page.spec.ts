@@ -109,6 +109,9 @@ test.describe('文章 / opus 阅读模式', () => {
       // 浮层挂载（独立 shadow root，不依赖 #bewly 应用）
       await expect(page.locator('#bewly-article-page')).toHaveCount(1, { timeout: 30_000 })
       await expect.poll(async () => (await readArticleOverlay(page)).ready, { timeout: 30_000 }).toBe(true)
+      // ready 之后正文宽度/按钮在个别机器上仍有一拍延迟（整套并发运行时出现过 flaky），再等一拍再断言
+      await expect.poll(async () => (await readArticleOverlay(page)).contentWidth > 0, { timeout: 15_000 }).toBe(true)
+      await expect.poll(async () => (await readArticleOverlay(page)).fabCount >= 5, { timeout: 15_000 }).toBe(true)
 
       const initial = await readArticleOverlay(page)
       // 阅读模式下有 5 个按钮：沉浸阅读 / 字号− / 字号+ / 目录 / 回到顶部
@@ -117,6 +120,7 @@ test.describe('文章 / opus 阅读模式', () => {
       expect(initial.readingClass).toBe(false)
 
       // 点「沉浸阅读」→ html.bewly-article-reading + 正文限宽 720
+      await page.locator('#bewly-article-page').waitFor({ state: 'attached' })
       await page.evaluate(() => {
         const root = document.querySelector('#bewly-article-page')?.shadowRoot
         const button = Array.from(root?.querySelectorAll('.bap-fab') ?? [])
@@ -125,9 +129,9 @@ test.describe('文章 / opus 阅读模式', () => {
       })
       await expect.poll(async () => (await readArticleOverlay(page)).readingClass, { timeout: 10_000 }).toBe(true)
 
+      await expect.poll(async () => (await readArticleOverlay(page)).contentMaxWidth, { timeout: 10_000 }).toBe('720px')
       const reading = await readArticleOverlay(page)
       expect(reading.readingPressed).toBe('true')
-      expect(reading.contentMaxWidth).toBe('720px')
       expect(reading.contentWidth).toBeLessThanOrEqual(720)
 
       // 代码块被注入复制按钮

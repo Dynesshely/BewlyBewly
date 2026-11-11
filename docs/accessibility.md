@@ -233,3 +233,44 @@ function moveFocusInPanel(backward: boolean): void {
 - `pnpm exec eslint`（11 个改动文件）：0 error 0 warning；
 - `pnpm run typecheck`：0 error；
 - 未跑 build / playwright；未碰浏览器；未做 git 操作。
+## 6. 第 20 轮：三处焦点补漏 + e2e 断言
+
+第 19 轮给 10 个浮层加了焦点陷阱，但明确排除了三处组件；本轮补齐，写法与第 19 轮完全一致
+（`getRootNode()` 捕获监听 + `preventDefault` + `activeElementDeep()`）。
+
+### 6.1 收藏夹面板（`FavoriteFolderPanel.vue`）
+
+- **Tab 循环**：面板打开后在所在 ShadowRoot（没有则 Document）上挂 capture 阶段的 Tab 监听，
+  `preventDefault` 后在面板内可聚焦元素之间循环；Shift+Tab 反向；没有可聚焦元素时聚焦面板容器（`tabindex="-1"`）。
+- **打开即聚焦**：面板打开后焦点落在第一个可操作元素（关闭按钮）。
+- **Esc**：关闭面板并收起「+ 新建收藏夹」输入（清空草稿）；在输入框里按 Esc 同样关闭面板，
+  输入框内的「取消」按钮只取消输入、不关面板。Esc 已 `stopPropagation`，不会触发下层快捷键。
+- **焦点回归**：打开前记录 `activeElementDeep()`（点击收藏按钮时它已是焦点），
+  关闭 / 卸载时把焦点还给该按钮。
+- 面板仍在操作条内（非模态），因此保持 `aria-modal="false"`。
+
+### 6.2 视频卡右键菜单（`VideoCardContextMenu.vue`）
+
+- 菜单容器 `role="menu"`，每个选项 `role="menuitem"` + `tabindex="-1"`（程序化聚焦、不进入 Tab 序列）。
+- **键盘可达**：打开后自动聚焦第一个菜单项；`ArrowUp` / `ArrowDown` 循环移动，`Home` / `End` 到首尾，
+  `Enter` 执行当前项（复用原有 click 处理），`Esc` 关闭；所有按键都 `preventDefault` + `stopPropagation`，
+  不会触发卡片或页面快捷键。
+- **焦点回归**：关闭后焦点回到卡片 —— 优先卡片内的 `<a href>`（本身可聚焦），否则卡片根节点，
+  保证「右键 → Esc」后键盘用户还能继续操作同一张卡。
+- 焦点可见：`.context-menu-item:focus-visible` 用主题色描边 + `--bew-fill-2` 背景。
+
+### 6.3 列表页快捷键帮助（`ListShortcutHelp.vue`）
+
+- 与 6.1 同一套 Tab 陷阱；打开后聚焦关闭按钮，没有可聚焦元素时聚焦面板容器。
+- Esc 关闭并 `stopPropagation`，避免冒泡到列表页的 `H` / `?` 等快捷键。
+- 焦点回归到列表工具条上的「快捷键」触发按钮（打开前的 `activeElementDeep()`）。
+
+### 6.4 新增 e2e（可运行 playwright）
+
+| 文件 | 用例 | 断言 |
+| --- | --- | --- |
+| `tests/e2e/focus-trap.spec.ts` | 命令面板（Ctrl+K）焦点陷阱 | 打开后焦点在 `.command-palette-mask` 内；连按 Tab 5 次、再连按 Shift+Tab 5 次，每次焦点仍在面板内；Esc 关闭后面板消失 |
+| `tests/e2e/image-fallback.spec.ts` | 封面图 404 兜底 | 拦截 hdslb 图片返回 404 → `[data-video-card] .bewly-image-fallback` 可见且 `role="img"`；同一封面 `<img src>` 只被请求 1 次（失败后不重试） |
+
+**自测结果**：两条新用例单独运行 2/2 passed；与 `card-quick-actions.spec.ts` 一起 `--repeat-each=2` 共 6/6 passed（29.9s）。
+未跑全量、未 build、未 git。

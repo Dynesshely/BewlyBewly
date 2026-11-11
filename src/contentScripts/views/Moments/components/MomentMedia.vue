@@ -49,6 +49,14 @@ function handleLinkKeydown(event: KeyboardEvent) {
     emit('openLink')
   }
 }
+
+/** 打开灯箱前把焦点交给被点的图片按钮：灯箱关闭后焦点会回到这里（第 20 轮） */
+function handleOpenImages(event: MouseEvent, index: number) {
+  const target = event.currentTarget
+  if (target instanceof HTMLElement)
+    target.focus({ preventScroll: true })
+  emit('openImages', index)
+}
 </script>
 
 <template>
@@ -151,7 +159,7 @@ function handleLinkKeydown(event: KeyboardEvent) {
         class="moment-media__cell"
         :style="index === 0 && imageCount === 1 ? singleImageStyle : undefined"
         :aria-label="t('image_alt', { n: index + 1 })"
-        @click="emit('openImages', index)"
+        @click="handleOpenImages($event, index)"
       >
         <Picture :src="image.url" alt="" fallback-kind="image" class="block w-full h-full" />
       </button>

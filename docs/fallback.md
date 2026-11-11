@@ -85,3 +85,20 @@
 - `pnpm run typecheck`：0 error（含新增 Picture props / FallbackImage / 灯箱失败态）；
 - `articlePage.shadow.scss` 通过 sass 编译；
 - 未跑 build / playwright；未碰浏览器；未做 git 操作。
+## 6. 第 20 轮：封面 404 兜底的 e2e 验证
+
+第 4 节里「建议加进 e2e」的验证已在第 20 轮落地：`tests/e2e/image-fallback.spec.ts`。
+
+- **做法**：`page.route('**/*')` 里把 `*.hdslb.com` 的 image 请求全部 `fulfill({ status: 404 })`，
+  文档请求仍用本地首页快照；
+- **断言**：
+  1. `[data-video-card] .bewly-image-fallback` 可见，且带 `role="img"`（读屏可读「视频封面加载失败」）；
+  2. 同一封面的 `<img src>`（排除 `.avif` / `.webp` 候选）**只被请求一次** ——
+     `Picture.vue` 失败后把 `<img>` 换成占位，不会重试、也不会新增请求；
+  3. 请求计数作为 annotation 输出，便于排查。
+- **结果**：用例稳定通过（与 `focus-trap.spec.ts`、`card-quick-actions.spec.ts` 一起 `--repeat-each=2` 共 6/6 passed）。
+
+### 仍未覆盖
+
+- B 站原生文章正文 `<img>`（不归我们渲染）仍然只有全局 `img::before` 兜底；
+- 视频卡封面在「悬停预览失败」时走的是预览模块自己的失败回调（不是图片兜底），本轮未改。

@@ -12,10 +12,14 @@ import { useMainStore } from '~/stores/mainStore'
 
 import emitter from '~/utils/mitt'
 import { useHomeMessages } from './i18n'
+import { restoreHomeScroll, saveHomeScroll, takeHomeScroll } from './scrollMemory'
 import { HomeSubPage } from './types'
 
 const mainStore = useMainStore()
 const { handleBackToTop, scrollbarRef } = useBewlyApp()
+
+/** 正在进行的滚动恢复（切标签 / 卸载时取消，避免和用户抢滚动条） */
+let cancelScrollRestore: (() => void) | null = null
 const handleThrottledBackToTop = useThrottleFn((targetScrollTop: number = 0) => handleBackToTop(targetScrollTop), 1000)
 const t = useHomeMessages()
 
@@ -314,6 +318,10 @@ onMounted(() => {
 watch(scrollbarRef, () => nextTick(bindScrollRoot))
 
 onUnmounted(() => {
+  // 离开首页（切到其它页面）时也记一下当前标签的位置，回来时能接上
+  saveHomeScroll(activatedPage.value, currentScrollTop())
+  cancelScrollRestore?.()
+  cancelScrollRestore = null
   emitter.off(TOP_BAR_VISIBILITY_CHANGE)
   emitter.off('switch-home-tab')
   emitter.off('focus-browse-change')
@@ -322,6 +330,11 @@ onUnmounted(() => {
   zenObserver?.disconnect()
   zenObserver = null
 })
+
+/** 当前滚动容器位置（首页在搜索页模式下顶部有 510px 的壁纸区） */
+function currentScrollTop(): number {
+  return (scrollbarRef.value?.scrollTop ?? 0) as number
+}
 
 function handleChangeTab(tab: HomeTab) {
   if (activatedPage.value === tab.page) {
@@ -338,13 +351,29 @@ function handleChangeTab(tab: HomeTab) {
     return
   }
   else {
-    handleThrottledBackToTop(settings.value.useSearchPageModeOnHomePage ? 510 : 0)
+    // 记住当前标签的滚动位置，切回来时恢复（第 20 轮）
+    saveHomeScroll(activatedPage.value, currentScrollTop())
   }
 
   if (tabContentLoading.value)
     toggleTabContentLoading(false)
 
   activatedPage.value = tab.page
+
+  // 先取消上一轮还没落位的恢复
+  cancelScrollRestore?.()
+  cancelScrollRestore = null
+
+  const savedTop = takeHomeScroll(tab.page)
+  if (savedTop !== null && !focusBrowseActive.value) {
+    // 子标签内容与数据都是异步的：轮询到内容够高再落位，最多等 3s；
+    // 期间用户主动滚动会放弃恢复（rollback 到当前最大值）。
+    cancelScrollRestore = restoreHomeScroll(savedTop, () => scrollbarRef.value ?? null)
+  }
+  else {
+    // 没有记录（首次进入 / 刚从刷新后回来）→ 维持原来的回到顶部行为
+    handleThrottledBackToTop(settings.value.useSearchPageModeOnHomePage ? 510 : 0)
+  }
 }
 
 function toggleTabContentLoading(loading: boolean) {

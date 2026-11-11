@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { MomentImage } from '../types'
+import FallbackImage from '~/components/Feedback/FallbackImage.vue'
+import SkeletonBlock from '~/components/Feedback/SkeletonBlock.vue'
 import { openLinkToNewTab } from '~/utils/main'
 import { useMomentsI18n } from '../i18n'
 import { downloadImage, imageFileExtension } from '../utils/download'
@@ -30,7 +32,179 @@ const counter = computed(() => t('lightbox_counter', {
   total: props.images.length,
 }))
 
+// #region 大图加载兜底（第 20 轮）：加载中骨架、失败用统一占位、切图重置
+/** 当前大图是否仍在加载 */
+const imageLoading = ref(true)
+/** 当前大图是否加载失败：失败后不再重试，切图时重置 */
+const imageFailed = ref(false)
+
+/** 占位阶段给舞台一个稳定尺寸，避免骨架 → 图片切换时布局跳动 */
+const showPlaceholder = computed(() => imageLoading.value || imageFailed.value)
+const stageStyle = computed<Record<string, string> | undefined>(() => showPlaceholder.value
+  ? {
+      minHeight: 'min(52vh, 360px)',
+      minWidth: 'min(520px, 84vw)',
+    }
+  : undefined)
+
+const imageRef = ref<HTMLImageElement | null>(null)
+
+function handleImageLoad() {
+  imageLoading.value = false
+}
+
+function handleImageError() {
+  imageLoading.value = false
+  imageFailed.value = true
+}
+
+/**
+ * 缓存命中时 `load` 可能在 watcher 之前就已完成，`complete` 兜底同步一次状态，
+ * 避免骨架一直挂着。
+ */
+function syncImageState() {
+  const img = imageRef.value
+  if (!img || !img.complete)
+    return
+  if (img.naturalWidth > 0) {
+    imageLoading.value = false
+    imageFailed.value = false
+  }
+  else {
+    imageLoading.value = false
+    imageFailed.value = true
+  }
+}
+
+watch(currentUrl, async () => {
+  imageLoading.value = true
+  imageFailed.value = false
+  await nextTick()
+  syncImageState()
+})
+// #endregion
+
+// #region 键盘可达性（第 19/20 轮）：打开聚焦 / shadowRoot capture 焦点陷阱 / Esc 不穿透 / 关闭焦点回归
 let previousActiveElement: HTMLElement | null = null
+let trappedRoot: ShadowRoot | Document | null = null
+/** 正在关闭：卸载时恢复焦点期间不再拦截 focusin */
+let closing = false
+
+/** 穿透 shadow root 找真正获得焦点的元素（document.activeElement 只会返回 host） */
+function activeElementDeep(): HTMLElement | null {
+  let el = document.activeElement as HTMLElement | null
+  while (el?.shadowRoot?.activeElement)
+    el = el.shadowRoot.activeElement as HTMLElement
+  return el
+}
+
+/** 灯箱内真实可聚焦元素（排除隐藏 / 禁用 / tabindex=-1） */
+function panelFocusables(): HTMLElement[] {
+  const root = dialogRef.value
+  if (!root)
+    return []
+  return Array.from(root.querySelectorAll<HTMLElement>('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'))
+    .filter(el => el.getClientRects().length > 0)
+}
+
+/** 焦点在灯箱内循环；没有可聚焦元素时聚焦对话框本身（tabindex=-1） */
+function moveFocusInPanel(backward: boolean): void {
+  const items = panelFocusables()
+  if (!items.length) {
+    dialogRef.value?.focus({ preventScroll: true })
+    return
+  }
+  const active = activeElementDeep()
+  const current = active
+    ? items.indexOf(active)
+    : -1
+  const next = current < 0
+    ? (backward
+        ? items.length - 1
+        : 0)
+    : (current + (backward
+        ? -1
+        : 1) + items.length) % items.length
+  items[next]?.focus({ preventScroll: true })
+}
+
+/** 捕获阶段拦下 Tab：必须 preventDefault，否则浏览器默认行为会把焦点移出灯箱 */
+function onTabCapture(event: Event): void {
+  if (!(event instanceof KeyboardEvent) || event.key !== 'Tab')
+    return
+  event.preventDefault()
+  event.stopPropagation()
+  moveFocusInPanel(event.shiftKey)
+}
+
+/**
+ * 灯箱打开期间接管 Esc / ← / →。
+ *
+ * 挂在 `getRootNode()`（#bewly 的 ShadowRoot）的 **捕获阶段** 并 stopPropagation：
+ * 页面与全局快捷键都监听在 bubble 阶段的 `window` 上，这样灯箱关闭键不会穿透到下层。
+ */
+function onKeyCapture(event: Event): void {
+  if (!(event instanceof KeyboardEvent))
+    return
+
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    event.stopPropagation()
+    emit('close')
+    return
+  }
+  if (event.key === 'ArrowLeft') {
+    event.preventDefault()
+    event.stopPropagation()
+    step(-1)
+    return
+  }
+  if (event.key === 'ArrowRight') {
+    event.preventDefault()
+    event.stopPropagation()
+    step(1)
+  }
+}
+
+/**
+ * 焦点跑到灯箱外（例如点击了图片、遮罩空白处）时拉回来。
+ *
+ * 不做这一步的话，焦点会落到 body，随后的 Tab 从 body 开始走、绕过 ShadowRoot 捕获陷阱。
+ */
+function onFocusInCapture(event: FocusEvent) {
+  const root = dialogRef.value
+  if (!root || closing)
+    return
+  const target = event.target
+  if (target instanceof Node && root.contains(target))
+    return
+  const focusables = panelFocusables()
+  const fallback = focusables[0] ?? root
+  fallback.focus({ preventScroll: true })
+}
+
+/** 事件发生在 shadow root 内：监听挂到灯箱所在的 root（ShadowRoot / Document） */
+function bindKeyTrap(): void {
+  unbindKeyTrap()
+  const node = dialogRef.value?.getRootNode()
+  if (node instanceof ShadowRoot || node instanceof Document) {
+    trappedRoot = node
+    node.addEventListener('keydown', onTabCapture, true)
+    node.addEventListener('keydown', onKeyCapture, true)
+  }
+  document.addEventListener('focusin', onFocusInCapture, true)
+}
+
+function unbindKeyTrap(): void {
+  document.removeEventListener('focusin', onFocusInCapture, true)
+  if (!trappedRoot)
+    return
+  trappedRoot.removeEventListener('keydown', onTabCapture, true)
+  trappedRoot.removeEventListener('keydown', onKeyCapture, true)
+  trappedRoot = null
+}
+// #endregion
+
 let scrollContainer: HTMLElement | null = null
 let previousOverflow = ''
 
@@ -72,26 +246,6 @@ async function handleDownload() {
   }, 3000)
 }
 
-function handleKeydown(event: KeyboardEvent) {
-  if (event.defaultPrevented)
-    return
-
-  if (event.key === 'Escape') {
-    event.preventDefault()
-    emit('close')
-    return
-  }
-  if (event.key === 'ArrowLeft') {
-    event.preventDefault()
-    step(-1)
-    return
-  }
-  if (event.key === 'ArrowRight') {
-    event.preventDefault()
-    step(1)
-  }
-}
-
 /** 打开时锁住 App 的滚动容器，关闭时还原 */
 function lockScroll() {
   scrollContainer = dialogRef.value?.closest('.bewly-scroll-container') ?? null
@@ -108,21 +262,30 @@ function unlockScroll() {
   scrollContainer = null
 }
 
-onMounted(() => {
-  previousActiveElement = document.activeElement instanceof HTMLElement
-    ? document.activeElement
-    : null
+onMounted(async () => {
+  // 打开灯箱的图片按钮（MomentMedia 在 click 时会把焦点交给它）
+  previousActiveElement = activeElementDeep()
   lockScroll()
-  window.addEventListener('keydown', handleKeydown)
-  nextTick(() => closeButtonRef.value?.focus())
+  await nextTick()
+  bindKeyTrap()
+  syncImageState()
+  const focusables = panelFocusables()
+  if (focusables.length)
+    focusables[0]?.focus({ preventScroll: true })
+  else
+    dialogRef.value?.focus({ preventScroll: true })
 })
 
-onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeydown)
+onBeforeUnmount(() => {
+  closing = true
+  unbindKeyTrap()
   if (downloadMessageTimer)
     clearTimeout(downloadMessageTimer)
   unlockScroll()
-  previousActiveElement?.focus?.()
+  // 关闭后焦点回到打开它的那张图片
+  if (previousActiveElement?.isConnected)
+    previousActiveElement.focus({ preventScroll: false })
+  previousActiveElement = null
 })
 </script>
 
@@ -132,7 +295,8 @@ onUnmounted(() => {
     class="moment-lightbox"
     role="dialog"
     aria-modal="true"
-    :aria-label="t('lightbox_close')"
+    :aria-label="t('lightbox_title')"
+    tabindex="-1"
     @click.self="emit('close')"
   >
     <button
@@ -156,7 +320,33 @@ onUnmounted(() => {
     </button>
 
     <figure class="moment-lightbox__figure" @click.stop>
-      <img :src="currentUrl" :alt="t('image_alt', { n: index + 1 })" decoding="async" fetchpriority="high">
+      <div class="moment-lightbox__stage" :style="stageStyle">
+        <img
+          v-if="!imageFailed"
+          ref="imageRef"
+          :key="currentUrl"
+          class="moment-lightbox__image"
+          :src="currentUrl"
+          :alt="t('image_alt', { n: index + 1 })"
+          decoding="async"
+          fetchpriority="high"
+          @load="handleImageLoad"
+          @error="handleImageError"
+        >
+        <SkeletonBlock
+          v-if="imageLoading && !imageFailed"
+          class="moment-lightbox__skeleton"
+          height="100%"
+          :radius="8"
+        />
+        <FallbackImage
+          v-else-if="imageFailed"
+          class="moment-lightbox__fallback"
+          kind="image"
+          :text="t('lightbox_image_failed')"
+          :aria-label="t('lightbox_image_failed')"
+        />
+      </div>
       <figcaption class="moment-lightbox__caption">
         <span class="moment-lightbox__counter">{{ counter }}</span>
         <span class="moment-lightbox__hint">{{ t('lightbox_hint') }}</span>
@@ -214,13 +404,37 @@ onUnmounted(() => {
   margin: 0;
 }
 
-.moment-lightbox__figure img {
+.moment-lightbox__stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  max-height: calc(100vh - 160px);
+  border-radius: 8px;
+}
+
+.moment-lightbox__image {
   display: block;
   max-width: 100%;
   max-height: calc(100vh - 160px);
   border-radius: 8px;
   object-fit: contain;
   box-shadow: 0 12px 40px rgb(0 0 0 / 45%);
+}
+
+/* 加载中骨架铺满舞台占位，图片加载完成后一起移除，避免空白闪烁 */
+.moment-lightbox__skeleton {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.moment-lightbox__fallback {
+  width: min(720px, 88vw);
+  min-height: min(52vh, 360px);
+  border-radius: 8px;
 }
 
 .moment-lightbox__caption {

@@ -33,6 +33,81 @@ const creating = ref<boolean>(false)
 const draftTitle = ref<string>('')
 const titleInputRef = ref<HTMLInputElement | null>(null)
 
+/** 打开面板前的焦点，关闭时还回去（通常是收藏按钮） */
+let restoreFocusTo: HTMLElement | null = null
+let trappedRoot: ShadowRoot | Document | null = null
+
+/** 穿透 shadow root 找真正获得焦点的元素（document.activeElement 只会返回 host） */
+function activeElementDeep(): HTMLElement | null {
+  let el = document.activeElement as HTMLElement | null
+  while (el?.shadowRoot?.activeElement)
+    el = el.shadowRoot.activeElement as HTMLElement
+  return el
+}
+
+/** 面板内真实可聚焦元素（排除隐藏 / 禁用 / tabindex=-1） */
+function panelFocusables(): HTMLElement[] {
+  const root = panelRef.value
+  if (!root)
+    return []
+  return Array.from(root.querySelectorAll<HTMLElement>('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'))
+    .filter(el => el.getClientRects().length > 0)
+}
+
+/** 焦点在面板内循环；没有可聚焦元素时聚焦面板容器（tabindex=-1） */
+function moveFocusInPanel(backward: boolean): void {
+  const items = panelFocusables()
+  if (!items.length) {
+    panelRef.value?.focus({ preventScroll: true })
+    return
+  }
+  const active = activeElementDeep()
+  const current = active
+    ? items.indexOf(active)
+    : -1
+  const next = current < 0
+    ? (backward
+        ? items.length - 1
+        : 0)
+    : (current + (backward
+        ? -1
+        : 1) + items.length) % items.length
+  items[next]?.focus({ preventScroll: true })
+}
+
+/** 捕获阶段拦下 Tab：必须 preventDefault，否则浏览器默认行为会把焦点移出面板 */
+function onTabCapture(event: Event): void {
+  if (!(event instanceof KeyboardEvent) || event.key !== 'Tab')
+    return
+  event.preventDefault()
+  event.stopPropagation()
+  moveFocusInPanel(event.shiftKey)
+}
+
+/** 面板在 #bewly 的 shadow root 里：监听挂到所在的 ShadowRoot（没有则 Document） */
+function bindTabTrap(): void {
+  unbindTabTrap()
+  const node = panelRef.value?.getRootNode()
+  if (node instanceof ShadowRoot || node instanceof Document) {
+    trappedRoot = node
+    node.addEventListener('keydown', onTabCapture, true)
+  }
+}
+
+function unbindTabTrap(): void {
+  if (trappedRoot) {
+    trappedRoot.removeEventListener('keydown', onTabCapture, true)
+    trappedRoot = null
+  }
+}
+
+/** 关闭面板：收起输入框后把焦点还给打开它的按钮 */
+function closePanel(): void {
+  creating.value = false
+  draftTitle.value = ''
+  emit('close')
+}
+
 const selectedCountText = computed(() => messages.value.selectedCount.replace('{count}', String(props.selectedIds.length)))
 const submitText = computed(() => (props.pending ? messages.value.pending : messages.value.submitFavorite))
 
@@ -51,6 +126,10 @@ function cancelCreate(): void {
   draftTitle.value = ''
 }
 
+function handleEscapeFromInput(): void {
+  closePanel()
+}
+
 function submitCreate(): void {
   const title = draftTitle.value.trim()
   if (!title || props.createPending)
@@ -67,8 +146,11 @@ function folderCountText(folder: FavoriteFolderOption): string {
 }
 
 function focusFirstElement() {
-  const target = panelRef.value?.querySelector<HTMLElement>('.bewly-fav-panel__close, .bewly-fav-panel__option, .bewly-fav-panel__action')
-  target?.focus()
+  const items = panelFocusables()
+  if (items.length)
+    items[0]?.focus({ preventScroll: true })
+  else
+    panelRef.value?.focus({ preventScroll: true })
 }
 
 /** 点击面板外部关闭（Shadow DOM 下用 composedPath 判断真实目标） */
@@ -86,11 +168,8 @@ function handleWindowKeydown(event: KeyboardEvent) {
     return
   if (event.key === 'Escape') {
     event.preventDefault()
-    if (creating.value) {
-      cancelCreate()
-      return
-    }
-    emit('close')
+    event.stopPropagation()
+    closePanel()
   }
 }
 
@@ -108,9 +187,14 @@ watch(() => props.open, async (open) => {
   if (!open) {
     creating.value = false
     draftTitle.value = ''
+    unbindTabTrap()
+    restoreFocusTo?.focus?.({ preventScroll: true })
+    restoreFocusTo = null
   }
   if (open) {
+    restoreFocusTo = activeElementDeep()
     await nextTick()
+    bindTabTrap()
     focusFirstElement()
     // 延迟一帧再挂外部点击监听：避免同一次点击在 document 阶段把刚打开的面板关掉
     attachTimer = setTimeout(() => {
@@ -136,6 +220,9 @@ onMounted(() => window.addEventListener('keydown', handleWindowKeydown))
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleWindowKeydown)
   detachDocumentClick()
+  unbindTabTrap()
+  restoreFocusTo?.focus?.({ preventScroll: true })
+  restoreFocusTo = null
 })
 </script>
 
@@ -147,6 +234,7 @@ onBeforeUnmount(() => {
       class="bewly-fav-panel"
       role="dialog"
       aria-modal="false"
+      tabindex="-1"
       :aria-label="messages.panelTitle"
       @click.stop
     >
@@ -218,7 +306,7 @@ onBeforeUnmount(() => {
             :aria-label="messages.createFolderPlaceholder"
             :disabled="createPending"
             @keydown.enter.prevent="submitCreate"
-            @keydown.esc.prevent.stop="cancelCreate"
+            @keydown.esc.prevent.stop="handleEscapeFromInput"
           >
           <button
             type="button"

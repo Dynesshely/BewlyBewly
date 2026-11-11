@@ -19,6 +19,7 @@ import ListToolbar from '../listShared/components/ListToolbar.vue'
 import { useListI18n } from '../listShared/i18n'
 import { useListPreferences } from '../listShared/preferences'
 import { formatTimeLabel, groupItemsByTime, sortListItems } from '../listShared/timeline'
+import { useListScrollMemory } from '../listShared/useListScrollMemory'
 import { useListShortcuts } from '../listShared/useListShortcuts'
 import { useListVirtual } from '../listShared/useListVirtual'
 import { copyToClipboard } from '../listShared/utils'
@@ -235,6 +236,12 @@ const sections = computed<Array<{ key: string, label: string, items: ListCardIte
 useListVirtual({
   count: () => cards.value.length,
   layoutKey: () => `${viewMode.value}:${sortMode.value}:${filterKeyword.value}`,
+})
+
+/** 滚动位置记忆：浏览器「返回」时按最近卡片锚点恢复（第 20 轮） */
+useListScrollMemory({
+  scope: 'favorites',
+  count: () => cards.value.length,
 })
 
 const sortNote = computed(() => (showsTimeGroup.value

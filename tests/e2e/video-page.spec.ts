@@ -791,3 +791,114 @@ test.describe('分P 选集面板', () => {
     }
   })
 })
+/**
+ * 回归 fixture：普通**单 P** 视频页 + 现代 B 站的「相关推荐 / 接下来播放」列表。
+ *
+ * 真实页面里这个推荐列表的容器是 `video-pod video-pod`、条目是
+ * `pod-item video-pod__item simple`，和分P 复用同一套类名，但条目链接指向的是**别的视频**。
+ * 这里复刻这个结构（8 条不同 bvid、都没有 p=），用来确保不会被误判成多P。
+ */
+const RECOMMEND_POD_FIXTURE = `<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>单P 测试视频_哔哩哔哩_bilibili</title>
+    <style>
+      body { margin: 0; font-family: system-ui, sans-serif; }
+      #mirror-vdcon { display: flex; gap: 16px; padding: 16px; margin: 0 auto; max-width: 1600px; }
+      .left-container { flex: 1 1 70%; min-width: 0; }
+      #playerWrap { background: #000; }
+      #bilibili-player { position: relative; height: 420px; overflow: hidden; }
+      .bpx-player-container { width: 100%; height: 100%; }
+      video { display: block; width: 100%; height: 100%; object-fit: contain; }
+      .right-container { flex: 0 0 28%; }
+      .video-title { margin: 16px 0; font-size: 20px; }
+      .video-desc { min-height: 1600px; }
+      .video-pod__list { display: flex; flex-direction: column; gap: 4px; }
+      .video-pod__item { padding: 6px; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="video-container-v1" id="mirror-vdcon">
+        <div class="left-container scroll-sticky">
+          <div id="playerWrap">
+            <div id="bilibili-player">
+              <div class="bpx-player-container"><video preload="metadata"></video></div>
+            </div>
+          </div>
+          <h1 class="video-title">单P 测试视频</h1>
+          <div class="video-desc">正文</div>
+        </div>
+        <div class="right-container">
+          <div class="video-pod video-pod">
+            <div class="video-pod__list">
+              <div class="pod-item video-pod__item simple"><a href="/video/BV1reco0001">推荐视频 1</a></div>
+              <div class="pod-item video-pod__item simple"><a href="/video/BV1reco0002">推荐视频 2</a></div>
+              <div class="pod-item video-pod__item simple"><a href="/video/BV1reco0003">推荐视频 3</a></div>
+              <div class="pod-item video-pod__item simple"><a href="/video/BV1reco0004">推荐视频 4</a></div>
+              <div class="pod-item video-pod__item simple"><a href="/video/BV1reco0005">推荐视频 5</a></div>
+              <div class="pod-item video-pod__item simple"><a href="/video/BV1reco0006">推荐视频 6</a></div>
+              <div class="pod-item video-pod__item simple"><a href="/video/BV1reco0007">推荐视频 7</a></div>
+              <div class="pod-item video-pod__item simple"><a href="/video/BV1reco0008">推荐视频 8</a></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>`
+
+async function openRecommendPodPage(): Promise<{ context: BrowserContext, page: Page }> {
+  const context = await launchExtension({ allowPopups: true })
+
+  const page = await context.newPage()
+  await page.route('**/*', async (route) => {
+    const request = route.request()
+    const url = new URL(request.url())
+    if (url.hostname === 'www.bilibili.com' && request.resourceType() === 'document') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/html; charset=utf-8',
+        body: RECOMMEND_POD_FIXTURE,
+      })
+      return
+    }
+    await route.continue()
+  })
+
+  await page.goto('https://www.bilibili.com/video/BV17xxLeaEQ4/', { waitUntil: 'domcontentloaded' })
+  return { context, page }
+}
+
+test.describe('选集误判回归（普通单 P 视频）', () => {
+  skipIfExtensionMissing()
+
+  test('相关推荐里的 .video-pod 条目（不同 bvid、无 p=）不会被当成分P', async () => {
+    const { context, page } = await openRecommendPodPage()
+
+    try {
+      await ensureOverlay(page)
+
+      // fixture 确实复刻了误判结构：8 个 .video-pod__item 条目
+      expect(await page.locator('.video-pod__item').count()).toBe(8)
+
+      // 没有 p= 链接、没有 #multi_page / .multi-page-v1
+      expect(await page.locator('a[href*="p="]').count()).toBe(0)
+      expect(await page.locator('#multi_page, .multi-page-v1').count()).toBe(0)
+
+      // 因此不应出现「选集」入口与面板 host
+      await expect(page.locator('[data-bvp-action="selection"]')).toHaveCount(0)
+      await expect(page.locator('#bewly-video-selection')).toHaveCount(0)
+      await expect(page.locator('.bvp-playlist')).toHaveCount(0)
+
+      // [ / ] 也不应被接管：面板不出现
+      await page.keyboard.press(']')
+      await page.waitForTimeout(300)
+      await expect(page.locator('.bvp-playlist')).toHaveCount(0)
+    }
+    finally {
+      await context.close()
+    }
+  })
+})

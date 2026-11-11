@@ -149,3 +149,87 @@ unicode-range 拉取实际用到的切片（通常 2–5 片，而非整份 1.81
   `optimized` 风格断言升级为 `expect(metrics.decodingAsync).toBeGreaterThan(0)`；
 - 本轮**未做网络限速 / 冷缓存**场景测量（fixture 不走真实网络），真实网络下的
   `fetchpriority` 收益需要 Lead 用真实页面或 CDP 限速再验一次。
+
+## 限速验证：fetchpriority 的实际收益（第 14 轮）
+
+第 12 轮给卡片封面 / 头像补了 `loading="lazy"`、`decoding="async"` 与 `fetchpriority`（首屏 high、
+其余 low）；Lead 已重建 `extension/`，本节用 **CDP 网络限速** 复测这些属性是否真的落到
+运行时、以及 `fetchpriority` 在这个场景里的实际效果。
+
+### 测量方法
+
+- `tests/e2e/perf.spec.ts` 新增「限速下的图片加载收益」：`context.newCDPSession(page)` +
+  `Network.emulateNetworkConditions`，**在导航之前**应用限速；
+- 网络档位（每档重复 2 次，取关键指标 min / 两次均值）：
+
+  | 档位 | latency | download | upload |
+  | --- | --- | --- | --- |
+  | Fast 3G | 150ms | 1.6 Mbps | 750 kbps |
+  | Slow 4G | 150ms | 4 Mbps | 3 Mbps |
+
+- 采集：`Network.requestWillBeSent`（图片请求开始时间）、`Network.responseReceived`（首字节到达）、
+  DOM 里卡片图片的 `fetchpriority` / `loading` 与卡片在视口内的位置、`layout-shift` 累计值；
+- 图片 URL 归一化：封面 / 头像是协议相对地址且 `<picture>` 会请求 `.avif` 变体，
+  按「绝对地址 + 变体后缀前缀」关联 DOM 与网络请求；
+- 分组口径：**只比较 672w 封面**（头像 50w 体积小、会干扰），按 DOM `fetchpriority` 分 high / low 两组。
+
+### 基线（不限速，同一构建；`perf.spec.ts` 第一条用例）
+
+| mountMs | 首屏卡片 ms | 卡片数 | 图片数 | lazy | decoding=async | high | low | CLS |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2513 | 3037 | 30 | 62 | 60 | 60 | 12 | 48 | 0 |
+
+`high=12 / low=48` 与「首屏 12 张卡 + 30 张卡各 2 张图（封面 + 头像）」完全对得上：
+首屏 12 张封面 high、其余封面与全部头像 low，`lazy` 与 `decoding=async` 覆盖率 60/60 —
+**第 12 轮的图片属性在重建后已确认生效**。
+
+### 限速结果（每档 2 次，第二行为两次的内部值）
+
+| 档位 | mountMs | 首屏卡片 ms | 首屏卡片数 | 封面首次开始 | high / low 张数 | high 封面在首屏 | low 封面在首屏 | high 首响应 | low 首响应 | high 响应中位 | low 响应中位 | 开始时间差 | CLS |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Fast 3G | 2383 | 2994 | 12 | 2905ms | 12 / 48 | 12 | 0 | 3634ms | 3460ms | 3714ms | 3566ms | -1ms | 0 |
+| Fast 3G（第 2 次） | 2460 | 3035 | 12 | 2938ms | 12 / 48 | 12 | 0 | 3640ms | 3485ms | 3702ms | 3562ms | -1ms | 0 |
+| Slow 4G | 1877 | 2397 | 12 | 1709ms | 12 / 48 | 12 | 0 | 2143ms | 1934ms | 2586ms* | 2435ms | -1ms | 0 |
+| Slow 4G（第 2 次） | 2510 | 3032 | 12 | 2398ms | 12 / 48 | 12 | 0 | 2777ms | 2600ms | 2823ms | 2760ms | -1ms | 0 |
+
+\* Slow 4G 两次内部中位数为 2186ms / 2823ms，表中外层取两次均值 2505ms；为便于对照表中按每次运行列出。
+
+（时间均为「相对首个网络请求」的毫秒值。每次运行都会重新拉起浏览器，绝对耗时有 ±0.5s 波动。）
+
+### 结论
+
+1. **属性分配是正确的**：12 张 high 封面全部在首屏、12 张 low 封面全部在首屏之外
+   （`highCoverFirstScreenCount=12`、`lowCoverFirstScreenCount=0`），说明
+   `VideoCard.vue` 里「挂载时按视口位置决定 high/low」的逻辑在重建后按预期工作。
+2. **请求开始时间不受 fetchpriority 影响**：high 与 low 封面的首个请求几乎同帧发出
+   （差 −1ms），符合预期 —— `fetchpriority` 是调度提示，不是延迟/提前发起请求的开关。
+3. **本机这套测量下没有观察到 high 优先完成**：封面响应的**首批 8 个全部是 low**，
+   high 封面首个响应比 low 晚 170–200ms（Fast 3G）、209ms（Slow 4G），中位数同样晚 148–170ms。
+   也就是说：DOM 属性正确，但「首屏封面先到」这个收益在 fixture + CDP 限速环境里**没有复现**。
+4. **CLS 全档位为 0**：限速把图片拖慢后也没有出现布局抖动，说明封面
+   `aspect-ratio: 16/9` + 骨架同尺寸的占位是有效的。
+5. **无法读取浏览器实际网络优先级**：本机 Chromium 的 `Network.requestWillBeSent` 事件字段为
+   `requestId/loaderId/request/timestamp/wallTime/initiator/type/frameId/hasUserGesture...`，
+   **不含 `initialPriority`**，因此不能断言「浏览器是否采纳了 high」；只能在 DevTools
+   Network 面板的 Priority 列人工核对。
+
+### 对第 12 轮实现的建议（本轮未改业务代码）
+
+1. **首屏封面用 `loading="eager"`**：首屏 12 张当前仍是 `lazy`，浏览器会先跑一轮
+   lazy 可见性判定；改成「首屏 eager + 其余 lazy」通常比只加 fetchpriority 更直接。
+   实现上可以复用现有的 `coverFetchPriority` 判定（同一处 ref + 视口检查）。
+2. **不要指望 fetchpriority 单独生效**：实测它没有改变完成顺序，收益可能在
+   「同主机多图竞争 + lazy 判定」下被抵消；如需确定性优先首屏，建议配合
+   `<link rel="preload">`（仅首屏 3–4 张）或直接 eager。
+3. 若要继续验证，请在 **真实 B 站首页 + DevTools 限速**下看 Priority 列与
+   「Load 时间瀑布」，fixture 环境无法代表真实 CDN / HTTP2 多路复用表现。
+
+### 局限
+
+- 页面文档走本地 fixture（`tests/e2e/fixtures/bilibili-home.html`），图片仍走真实 CDN，
+  与真实首页的 DOM/请求数量不同；
+- 每档只跑 2 次，样本小；`responseReceived` 受连接池与 HTTP 复用影响，单次差异可达 100ms+；
+- CDP 不提供 priority 字段，无法从协议层确认调度决策（见结论 5）；
+- 扩展自身的 JS / CSS 从本地扩展加载，不受限速影响，所以 mount / 首屏卡片耗时
+  主要受页面 fixture 与 CPU 影响，不代表真实弱网下的首屏；
+- 本轮**只测不改**：没有修改任何业务代码，建议项留给后续轮次。

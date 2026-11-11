@@ -300,3 +300,79 @@ OK 四语言键集合一致
 - B 节清单里 C 类（8 行模块外 UI 文案）超出本轮写入范围，未改，清单留给后续工作流；
 - 全仓扫描是文本启发式：注释里出现的中文、拼接出来的中文可能漏检，
   下次补漏建议配合运行界面走查。
+
+---
+
+## 第 14 轮：C 类清单清零（_locales 四语言补齐）
+
+第 13 轮列出的 8 行「模块外硬编码 UI 文案」本轮全部 i18n 化。按简报特批，`src/_locales/**` 四份语言文件同步新增 key，
+key 命名沿用现有命名空间（`ai_filter_status.*` / `settings.*` / `video_card.operation.*`）。
+
+### 1. 已清零的 C 类清单
+
+| 原清单位置 | 原硬编码 | 新 key |
+| --- | --- | --- |
+| `contentScripts/views/App.vue:62` | `AI 初筛中… (n)` | `ai_filter_status.filtering`（`{total}`） |
+| `contentScripts/views/App.vue:66` | `AI 初筛完成` | `ai_filter_status.done` |
+| `contentScripts/views/App.vue:67` | `（保留 n 个）` | `ai_filter_status.done_kept`（`{visible}`） |
+| `contentScripts/views/App.vue:69` | `AI 初筛失败` | `ai_filter_status.failed` |
+| `contentScripts/videoPage/components/FloatingControls.vue:65` | `…（Esc 关闭）` | 复用模块内 i18n 的 `close`，标题改为 `${selectionLabel} · ${t.close}（Esc）` |
+| `components/VideoCard/VideoCardContextMenu/VideoCardContextMenu.vue:26` | `不感兴趣` | `video_card.operation.not_interested`（复用已有 key） |
+| `components/VideoCard/VideoCardContextMenu/VideoCardContextMenu.vue:27` | `不想看此UP主` | `video_card.operation.hide_uploader`（新增） |
+| `components/Settings/BewlyPages/Home/Home.vue:82` | toast `授权成功` | `settings.authorize_success`（新增） |
+
+### 2. 四语言新增 key 一览
+
+| key | cmn-CN | cmn-TW | jyut | en |
+| --- | --- | --- | --- | --- |
+| `ai_filter_status.filtering` | AI 初筛中…（{total}） | AI 初篩中…（{total}） | AI 初篩緊…（{total}） | AI screening… ({total}) |
+| `ai_filter_status.done` | AI 初筛完成 | AI 初篩完成 | AI 初篩完成 | AI screening done |
+| `ai_filter_status.done_kept` | （保留 {visible} 个） | （保留 {visible} 個） | （留低 {visible} 個） | ({visible} kept) |
+| `ai_filter_status.failed` | AI 初筛失败 | AI 初篩失敗 | AI 初篩失敗 | AI screening failed |
+| `settings.authorize_success` | 授权成功 | 授權成功 | 授權成功 | Authorized successfully |
+| `video_card.operation.not_interested` | 不感兴趣 | 不感興趣 | 唔鍾意 | Not Interested |
+| `video_card.operation.hide_uploader` | 不想看此 UP 主 | 不想看此 UP 主 | 唔想睇呢個 UP 主 | Hide Videos from This Uploader |
+
+术语沿用第 12 轮：`初筛 → 初篩`、`授权 → 授權`、`感兴趣 → 感興趣`；粤语用「唔鍾意 / 唔想睇 / 留低 / 初篩緊」。
+
+### 3. 实现说明
+
+- **App.vue**：只在 `<script setup>` 增加 `useI18n()`，把 4 句状态文案换成 `t(...)` 调用；
+  事件监听、计时器、显示/隐藏逻辑与状态变量**完全未改**（按简报要求只动文案）。
+- **VideoCardContextMenu.vue**：`videoOptions` 从 `reactive` 常量改为 `computed`，两个选项的 `name` 实时取 `t(...)`，
+  语言切换后菜单立即更新；原有 `handleMoreCommand(option.id)` 逻辑不变。
+- **Settings/BewlyPages/Home.vue**：脚本里加 `useI18n()`，`toast.success('授权成功')` → `toast.success(t('settings.authorize_success'))`。
+- **FloatingControls.vue**：该组件用的是 videoPage **模块内** i18n（不是 `_locales`），因此不改 `_locales`，
+  改用模块已有的 `t.close`（简中「关闭」/繁中「關閉」/粤语「關閉」/英文「Close」）拼成
+  `${selectionLabel} · ${t.close}（Esc）`，既保持四语言、也不再出现写死的中文。
+- 三处 `_locales` 新 key 已四份同步，占位符（`{total}` / `{visible}`）四种语言一致。
+
+### 4. 第 14 轮自检
+
+临时脚本（`.meta/dynesshely/bewlybewly/check-locales.cjs`，运行后已删除）用 `js-yaml` 解析四份语言文件，
+校验新增 key 是否齐全、非空、占位符一致，并对比四份文件完整键集合：
+
+```text
+OK   ai_filter_status.filtering / done / done_kept / failed
+OK   settings.authorize_success
+OK   video_card.operation.not_interested / hide_uploader
+OK   占位符一致 ai_filter_status.filtering (total)
+OK   占位符一致 ai_filter_status.done_kept (visible)
+键集合对比 cmn-CN ↔ cmn-TW：缺 0，多 0
+键集合对比 cmn-CN ↔ jyut：缺 0，多 0
+键集合对比 cmn-CN ↔ en：缺 0，多 0
+```
+
+另外：
+
+- `pnpm exec eslint App.vue VideoCardContextMenu.vue Home.vue FloatingControls.vue`：0 error 0 warning；
+- `pnpm run typecheck`：0 error；
+- 未跑 build / playwright；未碰浏览器；未做 git 操作。
+
+### 5. 说明与遗留
+
+- 第 13 轮 B 类清单（页面文本匹配 / 接口枚举 / AI 提示词等）按设计**保持中文**，不在此轮范围内；
+- 至此「模块外硬编码 UI 文案」C 类清零；后续如再新增 UI 文案，请直接写进对应模块 `i18n.ts`
+  或 `_locales` 四语言，避免回退；
+- `docs/i18n-modules.md` 第 12 轮起维护的 14 个模块内 i18n 与 `src/_locales` 仍分属两套体系，
+  模块内文案不放 `_locales`（避免大改动），`_locales` 只承载全局/共享文案。

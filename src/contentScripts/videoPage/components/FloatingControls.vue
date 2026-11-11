@@ -69,7 +69,7 @@ const selectionLabel = computed(() => ui.selectionKind === 'parts'
       type="button"
       data-bvp-action="selection"
       :aria-pressed="ui.selectionPanelOpen"
-      :title="`${selectionLabel}（Esc 关闭）`"
+      :title="`${selectionLabel} · ${t.close}（Esc）`"
       @click="toggleSelectionPanel()"
     >
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">

@@ -22,12 +22,19 @@ const emit = defineEmits<{
 
 const getVideoType = inject<() => string>('getVideoType')!
 
-const videoOptions = reactive<{ id: number, name: string }[]>([
-  { id: 1, name: '不感兴趣' },
-  { id: 2, name: '不想看此UP主' },
-])
-
 const { t } = useI18n()
+
+/** 「不感兴趣 / 不想看此 UP 主」跟随界面语言，语言切换后立即更新 */
+const videoOptions = computed<{ id: number, name: string }[]>(() => [
+  {
+    id: 1,
+    name: t('video_card.operation.not_interested'),
+  },
+  {
+    id: 2,
+    name: t('video_card.operation.hide_uploader'),
+  },
+])
 const showContextMenu = ref<boolean>(false)
 const showDislikeDialog = ref<boolean>(false)
 const showPipWindow = ref<boolean>(false)

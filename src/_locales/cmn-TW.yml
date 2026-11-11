@@ -91,6 +91,12 @@ common:
     top: 頂部
     bottom: 底部
 
+ai_filter_status:
+  filtering: 'AI 初篩中…（{total}）'
+  done: AI 初篩完成
+  done_kept: '（保留 {visible} 個）'
+  failed: AI 初篩失敗
+
 iframe_drawer:
   open_in_new_tab: 在新索引標籤開啓連結
   close: 關閉
@@ -301,6 +307,7 @@ settings:
     授權使用後能在首頁推送 bilibili 手機端推介演算法的影片，授權 key 的有效期約爲一個月，過了有效期後，請記得重新取得授權以取得 access
     key。
   authorize_app_more_info_access_key: 關於 access key
+  authorize_success: 授權成功
   scan_qrcode_desc: 使用 Bilibili 手機應用程式掃描這個 QR Code，以授權取得 access key。
 
   disable_filters_for_followed_users: 正在跟隨的使用者不受過濾條件限制
@@ -503,6 +510,7 @@ dock:
 video_card:
   operation:
     not_interested: 不感興趣
+    hide_uploader: 不想看此 UP 主
     open_in_new_tab: 新標籤頁開啓
     open_in_background: 後台開啓
     open_in_new_window: 新視窗開啓

@@ -4,6 +4,7 @@ import type { BewlyAppProvider } from '~/composables/useAppProvider'
 
 import type { DockItem } from '~/stores/mainStore'
 import { useEventListener, useThrottleFn, useToggle } from '@vueuse/core'
+import { useI18n } from 'vue-i18n'
 import { useDark } from '~/composables/useDark'
 import { useFocusBrowse } from '~/composables/useFocusBrowse'
 import { useKeyboardCardNavigation } from '~/composables/useKeyboardCardNavigation'
@@ -18,6 +19,7 @@ import emitter from '~/utils/mitt'
 
 import { setupNecessarySettingsWatchers } from './necessarySettingsWatchers'
 
+const { t } = useI18n()
 const mainStore = useMainStore()
 const settingsStore = useSettingsStore()
 
@@ -59,14 +61,14 @@ emitter.on('toggle-card-info-detail', () => {
   showCardInfoDetail.value = !showCardInfoDetail.value
 })
 emitter.on('ai-filter-start', ({ total }: { total: number }) => {
-  aiFilterStatus.value = `AI 初筛中… (${total})`
+  aiFilterStatus.value = t('ai_filter_status.filtering', { total })
 })
 emitter.on('ai-filter-done', ({ ok, visible }: { ok: boolean, visible?: number }) => {
   aiFilterStatus.value = ok
-    ? `AI 初筛完成${typeof visible === 'number'
-      ? `（保留 ${visible} 个）`
+    ? `${t('ai_filter_status.done')}${typeof visible === 'number'
+      ? t('ai_filter_status.done_kept', { visible })
       : ''}`
-    : 'AI 初筛失败'
+    : t('ai_filter_status.failed')
   if (aiFilterTimer)
     clearTimeout(aiFilterTimer)
   aiFilterTimer = setTimeout(() => {

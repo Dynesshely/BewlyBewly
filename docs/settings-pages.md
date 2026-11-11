@@ -175,3 +175,49 @@
 - 动态页离屏优化只影响卡片根节点上的 `content-visibility` / `contain-intrinsic-size`，不卸载节点；关闭后完全退回「全部渲染」；
 - 设置页改动对已打开的分区页实时生效依赖 `settings` 的 storage 同步链路（与前面各轮相同）；
 - 迁移与 settings 异步读取存在极小的冷启动竞态，settings 读完后由响应式依赖 / watch 纠正。
+## 八、第 14 轮：设置页信息架构优化
+
+> 「页面增强」页已有 11 个分组、20+ 个设置项，垂直很长。本轮加分组导航、设置搜索与分组重置，不改任何字段绑定，也不改 `storage.ts`。
+
+### 新增文件
+
+- `src/components/Settings/components/SettingsGroupSection.vue`（新的通用小组件）：与 `SettingsItemGroup` 视觉一致的设置分组卡片，额外提供分组标题行右侧的「重置本组」按钮、`data-settings-group` 定位标记与「已重置」反馈；
+- `Pages.vue` 改用该组件承载每个分组（内容与字段绑定保持不变）。
+
+### 1. 顶部分组导航
+
+- 横向胶囊导航列出全部 11 个分组：视频播放页 / 视频卡片 / 列表页 / 搜索页 / 动态页 / 消息页 / 搜索结果页 / 用户空间 / 分区排行页 / 文章页 / 首页；
+- 点击胶囊平滑滚动到对应分组（`scrollIntoView` + 分组上的 `scroll-margin-top` 让标题不被吸顶导航挡住）；`prefers-reduced-motion: reduce` 时改为瞬时定位；
+- 当前分组随滚动用 `IntersectionObserver` 高亮（`root` 为设置面板内部的 OverlayScrollbars 滚动容器，`rootMargin` 预留吸顶导航的高度）；当前胶囊激活时会横向滚进导航条可视区；
+- 过滤时导航只保留仍有可见项的分组；当前高亮分组被过滤掉时自动切到第一个可见分组；
+- 工具栏整体吸顶（`position: sticky; top: 80px`，即设置面板标题条下方），背景与设置内容同色，避免内容透出。
+
+### 2. 设置搜索
+
+- 顶部搜索框即时过滤（无输入时全部展示）；匹配范围：分组标题 / 分组说明 / 设置项标题 / 设置项说明 / 选项名（舒适、紧凑、时间、时长、标题、小、中、大等）；
+- 匹配到分组标题 / 说明时，整组设置项都显示；只匹配到个别设置项时，组内其余项隐藏；
+- 过滤后为空的分组整体隐藏（`v-show`，保留 DOM 供 IntersectionObserver 继续工作）；
+- 无匹配时显示「没有匹配的设置」空状态 + 「清空」按钮，搜索框右侧也提供「清空」；
+- 分组标题 / 说明 / 设置项文案变化（切换语言）后搜索索引立刻跟随（搜索文案用 getter 取当前语言）。
+
+### 3. 分组重置
+
+- 每个分组标题右侧有「重置本组」按钮：只把该组涉及的 settings 字段恢复为 `originalSettings` 里的默认值（`src/logic/storage.ts` 只读引用，未修改）；
+- 重置后按钮短暂（1.8s）显示「已重置」，期间不可重复点击；不弹全局 toast；
+- 各组的重置字段：视频播放页 3 项；视频卡片 2 项（预览 / 操作条）；列表页 4 项（三个视图 + 默认排序）；搜索页 1 项；动态页 2 项；消息页 2 项；搜索结果页 / 用户空间 / 分区排行页 / 首页各 1 项；文章页 2 项。
+
+### 4. 键盘可达与动效
+
+- 导航胶囊、清空按钮、重置按钮都是原生 `<button type="button">`，Tab 可达、Enter / Space 触发；胶囊有 `aria-current`，导航有 `aria-label`，搜索区 `role="search"`，空状态 `role="status"`；
+- 胶囊 / 重置按钮的过渡用 `--bew-motion-fast` / `--bew-ease-out` 令牌，`prefers-reduced-motion: reduce` 下去掉过渡，平滑滚动降级为瞬时定位。
+
+### 第 14 轮 Lead 接线
+
+无。新增组件由 `Pages.vue` 直接引入（Settings 目录不参与全局组件注册，符合既有冷路径约定）。
+
+### 第 14 轮已知限制
+
+- 分组导航的滚动高亮依赖设置面板内部的 OverlayScrollbars 滚动容器；若宿主结构变化导致找不到滚动容器，会退化为以视口为 root 的 `IntersectionObserver`，高亮仍可用但位置可能略偏；
+- 搜索按文案做简单的 `includes` 匹配（不区分大小写），不做拼音 / 模糊匹配；
+- 重置只恢复 `originalSettings` 的字段默认值，不清理旧 localStorage / sessionStorage 残留（各模块的一次性迁移逻辑照常生效）；
+- 分组导航与搜索栏吸顶高度按设置面板标题 80px 估算，若后续标题条高度调整，`Pages.vue` 里的 `top: 5rem` 与 `SettingsGroupSection.vue` 的 `scroll-margin-top: 172px` 需同步调整。

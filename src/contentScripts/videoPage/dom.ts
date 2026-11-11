@@ -450,19 +450,29 @@ export interface SelectionContext {
 }
 
 /**
- * 分P 列表候选（按优先级）。
+ * 显式分P 容器：命中即可基本确定是分P 列表。
  *
  * 类名证据来自仓库内的 `videoPage.scss`：
  * `.multi-page-v1 .cur-list .list-box li.on` 是当前 P；`#multi_page` / `.list-box` 是旧版分P 列表。
- * 新版播放页也可能把分P 渲染进 `.video-pod`（`bilibiliEnhanceVideoList.scss` 里 `.simple-base-item`）。
  */
-const PART_ITEM_SELECTORS = [
+const EXPLICIT_PART_ITEM_SELECTORS = [
   '#multi_page .list-box li',
   '.multi-page-v1 .cur-list .list-box li',
   '.multi-page-v1 .list-box li',
   '[class*="multi-page"] .list-box li',
   '#multi_page li',
   '[class*="multi-page"] li',
+]
+
+/**
+ * `.video-pod` 系列：**不能只看容器**。
+ *
+ * 现代 B 站播放页把「相关推荐 / 接下来播放」也渲染成 `video-pod video-pod` 容器 +
+ * `pod-item video-pod__item simple` 条目（条目标题是别的视频），
+ * 与分P 复用同一套样式类。这里必须逐条校验「链接指向当前视频 + 带/可推导 p=」，
+ * 否则任何普通视频页都会被误判成多P。
+ */
+const VIDEOPOD_PART_ITEM_SELECTORS = [
   '.video-pod__list .simple-base-item',
   '.video-pod__item',
 ]
@@ -504,27 +514,74 @@ function getCurrentPartNumber(): number {
   }
 }
 
-function getItemPartNumber(item: HTMLElement): number | null {
-  const candidates: Element[] = [
-    item,
-    ...Array.from(item.querySelectorAll('a')),
-  ]
-  for (const candidate of candidates) {
-    const href = candidate.getAttribute('href')
-    if (!href)
-      continue
+interface ParsedPartLink {
+  bvid: string
+  part: number | null
+}
 
-    try {
-      const param = new URL(href, location.href).searchParams.get('p')
-      const parsed = param
-        ? Number(param)
-        : Number.NaN
-      if (Number.isFinite(parsed))
-        return parsed
+function getItemAnchors(item: HTMLElement): HTMLAnchorElement[] {
+  const anchors = Array.from(item.querySelectorAll<HTMLAnchorElement>('a[href]'))
+  if (item instanceof HTMLAnchorElement)
+    anchors.unshift(item)
+  return anchors
+}
+
+function parsePartLink(anchor: HTMLAnchorElement): ParsedPartLink | null {
+  const href = anchor.getAttribute('href')
+  // 旧版分P 列表有些条目是 javascript:; + JS 切换，解析不出链接
+  if (!href || href.startsWith('javascript:'))
+    return null
+
+  try {
+    const url = new URL(href, location.href)
+    const match = url.pathname.match(/(BV[0-9A-Za-z]+)/)
+    const param = url.searchParams.get('p')
+    const parsed = param
+      ? Number(param)
+      : Number.NaN
+    return {
+      bvid: match?.[1] ?? '',
+      part: Number.isFinite(parsed)
+        ? parsed
+        : null,
     }
-    catch {
-      // 忽略非法 href
-    }
+  }
+  catch {
+    return null
+  }
+}
+
+/** 条目里有没有指向「当前视频」的链接 */
+function hasCurrentVideoLink(item: HTMLElement, bvid: string): boolean {
+  if (!bvid)
+    return false
+  return getItemAnchors(item).some((anchor) => {
+    const parsed = parsePartLink(anchor)
+    return Boolean(parsed && parsed.bvid === bvid)
+  })
+}
+
+/** 条目是否带可推导的分P 信息：链接带 `p=`，或条目自身带 data-p / data-index / data-page */
+function hasPartHint(item: HTMLElement): boolean {
+  return getItemAnchors(item).some(anchor => parsePartLink(anchor)?.part != null)
+    || item.hasAttribute('data-p')
+    || item.hasAttribute('data-index')
+    || item.hasAttribute('data-page')
+}
+
+/** 条目里是否明确链接到别的视频（相关推荐的特征） */
+function isForeignVideoItem(item: HTMLElement, bvid: string): boolean {
+  return getItemAnchors(item).some((anchor) => {
+    const parsed = parsePartLink(anchor)
+    return Boolean(parsed?.bvid && bvid && parsed.bvid !== bvid)
+  })
+}
+
+function getItemPartNumber(item: HTMLElement): number | null {
+  for (const anchor of getItemAnchors(item)) {
+    const parsed = parsePartLink(anchor)
+    if (parsed?.part != null)
+      return parsed.part
   }
   return null
 }
@@ -539,29 +596,49 @@ function getPartCurrentIndex(items: HTMLElement[]): number {
   return items.findIndex(item => getItemPartNumber(item) === current)
 }
 
-function findPartItems(): HTMLElement[] {
-  for (const selector of PART_ITEM_SELECTORS) {
-    const items = Array.from(document.querySelectorAll<HTMLElement>(selector))
-    if (items.length > 1)
-      return items
-  }
+/** 兜底启发式：当前视频下 2 个以上带 p= 的链接（分P 链接的通用特征） */
+function findPartAnchors(bvid: string): HTMLElement[] {
+  if (!bvid)
+    return []
 
-  // 兜底启发式：同一路径下存在 2 个以上带 p= 的视频链接
-  const pathname = location.pathname
   const anchors = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href*="p="]'))
     .filter((anchor) => {
-      try {
-        const url = new URL(anchor.getAttribute('href') ?? '', location.href)
-        return url.pathname === pathname && url.searchParams.has('p')
-      }
-      catch {
-        return false
-      }
+      const parsed = parsePartLink(anchor)
+      return Boolean(parsed && parsed.bvid === bvid && parsed.part != null)
     })
 
   return anchors.length > 1
     ? anchors
     : []
+}
+
+function findPartItems(): HTMLElement[] {
+  const bvid = getCurrentBvid()
+
+  // 1) 显式分P 容器优先：容器本身就是分P 列表，只剔除明确指向其它视频的条目
+  for (const selector of EXPLICIT_PART_ITEM_SELECTORS) {
+    const items = Array.from(document.querySelectorAll<HTMLElement>(selector))
+    if (items.length < 2)
+      continue
+
+    const filtered = bvid
+      ? items.filter(item => !isForeignVideoItem(item, bvid))
+      : items
+    if (filtered.length > 1)
+      return filtered
+  }
+
+  // 2) `.video-pod` 系列：逐条校验链接指向当前 bvid，且同组内至少有一条带 `p=`
+  //    （P1 条目常常省略 p=，只要同组有 p= 就能按顺序推导）
+  for (const selector of VIDEOPOD_PART_ITEM_SELECTORS) {
+    const items = Array.from(document.querySelectorAll<HTMLElement>(selector))
+    const sameVideoItems = items.filter(item => hasCurrentVideoLink(item, bvid))
+    if (sameVideoItems.length > 1 && sameVideoItems.some(hasPartHint))
+      return sameVideoItems
+  }
+
+  // 3) 兜底：当前视频下 2 个以上带 p= 的链接
+  return findPartAnchors(bvid)
 }
 
 /**

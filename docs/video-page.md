@@ -158,10 +158,19 @@ B 站原生播放页（`www.bilibili.com/video/*`、`/list/*`）不是 Bewly 接
 
 - 播放列表：`#playlist-container` / `.video-pod` / `[class*="video-pod"]` 内的 `.video-pod__item`、
   `.video-pod__list .simple-base-item`
-- 分P（按优先级）：`#multi_page .list-box li` → `.multi-page-v1 .cur-list .list-box li` →
-  `.multi-page-v1 .list-box li` → `[class*="multi-page"] .list-box li` → `#multi_page li` →
-  `.video-pod__list .simple-base-item` → `.video-pod__item`
-- 兜底启发式：同一路径下存在 **2 个以上带 `p=` 的视频链接**（`a[href*="p="]`）时，直接把这些链接当分P 条目
+- 分P，按优先级三层判定：
+  1. **显式容器优先**：`#multi_page .list-box li` → `.multi-page-v1 .cur-list .list-box li` →
+     `.multi-page-v1 .list-box li` → `[class*="multi-page"] .list-box li` → `#multi_page li` →
+     `[class*="multi-page"] li`。这类容器本身就是分P 列表，只剔除明确链接到其它视频的条目
+  2. **`.video-pod` 系列必须逐条校验**（`.video-pod__list .simple-base-item` / `.video-pod__item`）：
+     条目链接必须指向**当前页面的 bvid**，且同一组内至少有一条带 `p=`
+     （P1 的链接常省略 `p=`，只要同组有 `p=` 就能按顺序推导）；不满足就不算分P 条目
+  3. **兜底**：当前 bvid 下存在 2 个以上带 `p=` 的链接（`a[href*="p="]`）
+- **为什么不能只认 `.video-pod`**：现代 B 站播放页的「相关推荐 / 接下来播放」同样使用
+  `video-pod video-pod` 容器 + `pod-item video-pod__item simple` 条目（与分P 共用同一套样式类），
+  条目链接指向的是**别的视频**。只按类名判断会让**所有普通单P 视频**都出现「选集」入口，
+  所以必须校验链接的 bvid 与 `p=`；播放列表页（`/list/*`）走独立的 playlist 分支，不受该限制影响
+- **条目数 < 2 一律不渲染入口**：单P 视频即使命中了上面的容器，也不会显示「选集」
 - 当前项：先看原生高亮类（`on` / `active` / `current` / `selected` / `cursor` 或 `aria-current`，
   分P 支持高亮挂在父级 `li` 上），再看 URL 的 `p=` / `bvid` 与条目链接匹配；判定失败时下标为 -1，面板仍可用
 - **任何一类都探测不到时，浮动入口、面板 host、快捷键、帮助项全部不渲染**，不留空浮层
@@ -175,7 +184,9 @@ B 站原生播放页（`www.bilibili.com/video/*`、`/list/*`）不是 Bewly 接
 
 **降级与已知限制**
 
-- 分P 的容器/条目选择器全部按优先级尝试，命中不了就走「2 个以上 `p=` 链接」兜底；
-  两者都失败时入口不出现（不会出现「面板空着」的状态）
+- 分P 的容器/条目选择器全部按优先级尝试，命中不了就走「当前 bvid 下 2 个以上 `p=` 链接」兜底；
+  都失败时入口不出现（不会出现「面板空着」的状态）
+- `.video-pod` 只认「指向当前视频」的条目：如果某个真实页面的分P 链接既不是同 bvid、也没有 `p=`、
+  也没有 `data-p` / `data-index` 等可推导属性，会按「不可判定」处理而不渲染入口（宁可不出入口，也不误判）
 - 面板标题跟随来源：`/list/*` 为「播放列表」，普通多P 视频为「选集」；文案来自模块内 i18n（四种语言）
 - 分P 页不提供自动连播，帮助面板也不会列出 `A`（避免与 B 站自己的分P 自动切换冲突）

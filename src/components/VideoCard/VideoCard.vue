@@ -226,8 +226,12 @@ function handleUndo() {
 
 /** 卡片根节点：用来判断它是否在首屏，从而决定封面图的加载优先级 */
 const cardRootRef = ref<HTMLElement | null>(null)
-/** 首屏（视口内及紧邻视口上方一行）的封面用 high，其余 low */
+/** 首屏（视口内及紧邻视口上方一行）的封面用 high 且不 lazy 加载，其余 low + lazy */
 const coverFetchPriority = ref<'high' | 'low'>('low')
+/** 首屏封面用 eager：lazy + fetchpriority 的组合下首屏图会被推迟到布局后，eager 才能立刻发请求 */
+const coverLoading = computed<'eager' | 'lazy'>(() => (coverFetchPriority.value === 'high'
+  ? 'eager'
+  : 'lazy'))
 
 onMounted(() => {
   const el = cardRootRef.value
@@ -299,7 +303,7 @@ provide('getVideoType', () => props.type!)
             <!-- Video cover -->
             <Picture
               :src="`${removeHttpFromUrl(video.cover)}@672w_378h_1c_!web-home-common-cover`"
-              loading="lazy"
+              :loading="coverLoading"
               decoding="async"
               :fetchpriority="coverFetchPriority"
               w="full" max-w-full align-middle aspect-video object-cover

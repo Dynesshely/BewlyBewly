@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import QRCodeVue from 'qrcode.vue'
+import { useI18n } from 'vue-i18n'
 import { useToast } from 'vue-toastification'
 import draggable from 'vuedraggable'
 
@@ -13,6 +14,7 @@ import SearchPage from '../SearchPage/SearchPage.vue'
 import FilterByTitleTable from './components/FilterByTitleTable.vue'
 import FilterByUserTable from './components/FilterByUserTable.vue'
 
+const { t } = useI18n()
 const mainStore = useMainStore()
 const toast = useToast()
 
@@ -79,7 +81,7 @@ function pollLoginQRCode() {
       showQRCodeDialog.value = false
       accessKey.value = pollRes.data.access_token
       clearInterval(pollLoginQRCodeInterval.value)
-      toast.success('授权成功')
+      toast.success(t('settings.authorize_success'))
     }
     else if (pollRes.code === 86038) {
       await setLoginQRCode()

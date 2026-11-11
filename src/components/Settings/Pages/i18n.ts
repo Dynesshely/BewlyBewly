@@ -13,6 +13,14 @@ import { getModuleMessages, resolveModuleLocale } from '~/utils/moduleI18n'
  */
 export interface PagesSettingsMessages {
   menuTitle: string
+  /** 顶部分组导航的无障碍标题 */
+  nav: string
+  searchPlaceholder: string
+  searchClear: string
+  searchEmpty: string
+  searchEmptyDesc: string
+  resetGroup: string
+  resetGroupDone: string
   groupVideoPage: string
   groupVideoPageDesc: string
   videoPageCinemaMode: string
@@ -83,6 +91,13 @@ export interface PagesSettingsMessages {
 
 const CMN_CN: PagesSettingsMessages = {
   menuTitle: '页面增强',
+  nav: '分组导航',
+  searchPlaceholder: '搜索设置项',
+  searchClear: '清空',
+  searchEmpty: '没有匹配的设置',
+  searchEmptyDesc: '换个关键词试试，或清空搜索查看全部设置',
+  resetGroup: '重置本组',
+  resetGroupDone: '已重置',
   groupVideoPage: '视频播放页',
   groupVideoPageDesc: '针对 B 站原生播放页的增强功能，关闭后对应功能不再接管页面',
   videoPageCinemaMode: '影院模式',
@@ -152,6 +167,13 @@ const CMN_CN: PagesSettingsMessages = {
 
 const EN: PagesSettingsMessages = {
   menuTitle: 'Page enhancements',
+  nav: 'Section navigation',
+  searchPlaceholder: 'Search settings',
+  searchClear: 'Clear',
+  searchEmpty: 'No matching settings',
+  searchEmptyDesc: 'Try another keyword, or clear the search to see every setting',
+  resetGroup: 'Reset group',
+  resetGroupDone: 'Reset done',
   groupVideoPage: 'Video page',
   groupVideoPageDesc: 'Enhancements on top of the native Bilibili video page. Turn one off and it stops taking over the page.',
   videoPageCinemaMode: 'Cinema mode',
@@ -221,6 +243,13 @@ const EN: PagesSettingsMessages = {
 
 const CMN_TW: PagesSettingsMessages = {
   menuTitle: '頁面增強',
+  nav: '分組導覽',
+  searchPlaceholder: '搜尋設定項',
+  searchClear: '清除',
+  searchEmpty: '沒有符合的設定',
+  searchEmptyDesc: '換個關鍵字試下，或者清除搜尋睇全部設定',
+  resetGroup: '重設本組',
+  resetGroupDone: '已重設',
   groupVideoPage: '影片播放頁',
   groupVideoPageDesc: '針對 B 站原生播放頁的增強功能，關閉後對應功能不再接管頁面',
   videoPageCinemaMode: '影院模式',

@@ -737,6 +737,30 @@ onUnmounted(() => {
   }
 }
 
+/* #region 强制色彩（第 26 轮）：主题色按钮 / 选中态在小对比度主题下需要系统色兜底 */
+@media (forced-colors: active) {
+  .moments-button,
+  .moments-chip,
+  .moments-segmented__btn,
+  .moments-segmented {
+    color: ButtonText;
+    background: ButtonFace;
+    border: 1px solid ButtonText;
+  }
+
+  .moments-chip.is-active,
+  .moments-segmented__btn.is-active {
+    color: Highlight;
+    border-color: Highlight;
+  }
+
+  .moments-chip__count {
+    color: HighlightText;
+    background: Highlight;
+  }
+}
+/* #endregion */
+
 /* #region 窄屏适配（第 17 轮）：工具条 / 头图 / 键盘提示 */
 @media (max-width: 900px) {
   .moments-hero {

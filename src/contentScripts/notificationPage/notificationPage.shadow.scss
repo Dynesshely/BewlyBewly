@@ -596,7 +596,7 @@
    --bew-text-3 在暗色下是 60% 透明度，叠在 elevated-solid（#22232b）上约 4.54:1，
    刚好压在 4.5:1 的小字号门槛上；叠到 hover/fill 层或半透明玻璃上会跌破，因此暗色下提一级。这里只把这些**次要但可读**的标签 / 提示 / 快捷键文字在暗色下
    提升到 --bew-text-2（约 10:1），标题与正文层级不变，整体配色不动。 */
-:host(.dark) {
+:host-context(.dark) {
   .bnp-panel__summary,
   .bnp-icon-btn,
   .bnp-group__hint,

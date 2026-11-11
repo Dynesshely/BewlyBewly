@@ -274,3 +274,66 @@ function moveFocusInPanel(backward: boolean): void {
 
 **自测结果**：两条新用例单独运行 2/2 passed；与 `card-quick-actions.spec.ts` 一起 `--repeat-each=2` 共 6/6 passed（29.9s）。
 未跑全量、未 build、未 git。
+
+---
+
+## 第 26 轮：暗色 / 高对比度 / 强制色彩一致性审计
+
+审计口径（`src/contentScripts/**` 与 `src/components/**` 的 `*.scss` / `*.vue` scoped style）：
+
+1. **硬编码颜色**：`#fff` / `#000` / `rgba(0,0,0` / `rgba(255,255,255` 是否出现在自定义控件上而未走 `--bew-*`；
+2. **缺 `@media (forced-colors: active)`** 的自定义控件（按钮 / 开关 / 选中态 / 面板）；
+3. **暗色选择器遗漏**：只写 `html.dark` 漏 `:root.dark` / `:host(.dark)`，或 shadow 组件根本没写暗色块。
+
+### 1. 汇总
+
+- **发现 38 处硬编码颜色**（grep `#fff` / `#000` / `rgba(0,0,0` / `rgba(255,255,255)`），其中多数为设计意图或装饰；
+- **发现 8 个自定义控件密集的文件缺 `forced-colors: active` 兜底**（videoPage / playlistPanel / MomentLightbox / Moments / Home / ListCategoryChips / DiagnosticsPanel / FavoriteFolderPanel）；
+- **发现 1 类真实暗色遗漏**：nativeOverlay 的 8 个 shadow 模块里 `:host(.dark)` 永远不会命中（host 不挂 dark 类）；
+- **已修 8 个样式文件**（2 个 shadow scss + 6 个 Vue scoped style）：补 forced-colors / 暗色提级 / 选择器改成 `:host-context(.dark)`；
+
+### 2. 逐项处理
+
+
+| 位置 | 发现 | 处理 |
+| --- | --- | --- |
+| `videoPage/videoPage.shadow.scss` | 播放页增强层**完全没有**暗色与 `forced-colors` 处理，`--bew-text-3` 的说明 / 快捷键 / 提示文字在暗色浮层上约 4.5:1 临界 | **已修**：补 `:host-context(.dark)` 提一级到 `--bew-text-2`、`prefers-contrast: more` 同步 + 控件边框、`forced-colors` 下按钮 / 选中态 / 快捷键块回落 CanvasText / Highlight |
+| `videoPage/playlistPanel.shadow.scss` | 同上（播放列表面板独立 host，无暗色 / 强制色彩处理） | **已修**：补暗色序号 / 提示提级、`prefers-contrast`、`forced-colors` 面板与当前项高亮 |
+| `Moments/components/MomentLightbox.vue` | 灯箱是深色遮罩 + 半透明白按钮，日常对比度足够，但 High Contrast 下自定义半透明按钮可能不可见 | **已修**：补 `forced-colors`（按钮 / 焦点环 / 说明文字回落系统色） |
+| `Moments/Moments.vue` | 主题色按钮 / 选中 chip / 计数徽标在 forced-colors 下会丢边界 | **已修**：补 `forced-colors`（ButtonFace / Highlight） |
+| `Home/Home.vue` | 回到顶部按钮、密度与布局胶囊是自定义控件，无强制色彩兜底 | **已修**：补 `forced-colors` |
+| `views/listShared/components/ListCategoryChips.vue` | 收藏夹胶囊 / 「⋯」菜单 / 删除确认框是自定义控件，无强制色彩兜底 | **已修**：补 `forced-colors`（含 danger 项用 LinkText） |
+| `diagnostics/DiagnosticsPanel.vue` | 结果面板只写了 `forced-colors` 的 item 边框；暗色下提示 / 次要文字未提级 | **已修**：补暗色提级 + 按钮 / item 的强制色彩兜底 |
+| `components/VideoCardQuickActions/FavoriteFolderPanel.vue` | 收藏夹浮层勾选框 / 主按钮 / 面板边框无强制色彩兜底 | **已修**：补 `forced-colors` |
+
+### 3. 刻意保留（有命中但不是真实风险）
+
+| 位置 | 内容 | 保留原因 |
+| --- | --- | --- |
+| `Moments/components/MomentMedia.vue` | 时长 / 播放量角标的 `rgba(0,0,0,.45~.62)` 底 + `#fff` 字 | 叠在图片上的深色小角标，白字对比度 > 7:1；forced-colors 下图片区域与角标仍可见，改动反而破坏「图片上浮层」的视觉 |
+| `articlePage/articlePage.shadow.scss` | 大图 lightbox 的 `#000` 遮罩、`#fff` 图标/计数 | 全屏深色遮罩上的白字是刻意的高对比设计（> 12:1），已有 `forced-colors` 块覆盖按钮与焦点 |
+| `Moments/Moments.vue`、`Home.vue`、`ListCategoryChips.vue`、`FavoriteFolderPanel.vue`、`DiagnosticsPanel.vue` | 主题色底上的 `#fff` 文字 | 主题色底 + 白字属于设计意图（主题色为深色时对比度充足）；暗色主题色仍带足够亮度，改为变量反而破坏品牌色 |
+| `Dock.vue` / `TopBar.vue` / `About.vue` / `Logo.vue` | `rgba(255,255,255,…)` 阴影、`#fb7299` 等品牌色、mask 渐变 | 阴影 / mask 不承载文字信息；About 的品牌色是刻意配色；`dark:` 变体已跟随主题 |
+| `App.vue` | `color: #fff`（浮层状态条） | 属于全局 UI（`App.vue` 不在本轮写入范围），且为深色主题色底白字 |
+| `VideoCard.vue` | `rgba(255,255,255,.35)` 用作骨架占位色 | 骨架是装饰元素，不承载信息；`--bew-skeleton` 已承载主色 |
+
+### 4. 暗色选择器检查
+
+- 全仓 `html.dark` 命中 **0**：目前暗色类统一由 `useDark()` 加在 `#bewly`、`documentElement`、`body` 上，
+  组件内使用的是 `.dark .xxx`（后代选择器），不存在「只写 html.dark」的遗漏；
+- **发现真实遗漏**：nativeOverlay 的 host 元素本身**没有** dark 类（`useDark()` 只给 `#bewly` / html / body 加），
+  所以各 shadow 模块原有的 `:host(.dark)` 永远不会命中 —— 暗色下这些「次要文字提级」规则实际上从未生效过。
+  本轮把 8 个 shadow scss 里的 `:host(.dark)` 全部改成 **`:host-context(.dark)`**（沿 host 祖先链匹配 `body/html.dark`），
+  暗色下才真正生效；不支持 `:host-context` 的浏览器会忽略该块，退回 `--bew-*` 变量默认值，不会破坏显示。
+- `videoPage` / `playlistPanel` 两个 shadow 之前完全没有暗色块与强制色彩块，本轮补齐。
+
+### 5. 校验
+
+- 8 个改动样式（2 个 scss + 6 个 Vue style 块）用 `pnpm exec sass` 单文件编译：**8/8 通过**；
+- 未跑 build / playwright；未碰浏览器；未做 git 操作。
+
+### 6. 已知限制
+
+- 暗色提升依赖 `:host-context(.dark)`（祖先 `body/html` 有 dark 类时生效）；
+- 硬编码 `#fff` 的白字仍保留在主题色按钮 / 深色遮罩上（设计意图）；若用户使用自定义亮色主题色，对比度由主题色本身决定；
+- forced-colors 只覆盖了「自定义控件密集」的模块；图片角标、阴影、mask 等装饰不处理。

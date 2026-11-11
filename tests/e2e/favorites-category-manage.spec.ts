@@ -195,3 +195,188 @@ test.describe('收藏页收藏夹管理', () => {
     }
   })
 })
+
+/**
+ * 第 26 轮：收藏夹页窄屏（768）走查用例。
+ *
+ * 断言口径（只保证「收藏页自身」不产生横向溢出）：
+ * - 卡片网格固定 2 列（comfortable 视图，minmax(0,1fr) × 2）；
+ * - 胶囊行保持单行（不换行）；
+ * - 收藏页容器 / #bewly 宿主没有横向溢出；
+ * - document 级别的横向滚动由 B 站原生头部的既有行为决定（不在本用例断言范围内），
+ *   实测值写进 annotation 供对照。
+ */
+const NARROW_MEDIAS = Array.from({ length: 3 }, (_, index) => ({
+  id: 2000 + index,
+  type: 2,
+  title: `E2E narrow card ${index + 1}`,
+  cover: 'https://i0.hdslb.com/bfs/archive/e2e-narrow.jpg',
+  intro: 'E2E',
+  page: 1,
+  duration: 120,
+  upper: { mid: 1, name: 'E2E UP', face: '' },
+  cnt_info: { collect: 0, play: 100, danmaku: 1 },
+  link: `bilibili://video/2000${index}`,
+  ctime: 1700000000,
+  pubtime: 1700000000,
+  fav_time: 1700000100 + index,
+  bvid: `BVE2ENARROW${index}`,
+  ugc: { first_cid: 3000 + index },
+}))
+
+test.describe('收藏页窄屏（768）', () => {
+  skipIfExtensionMissing()
+
+  test('卡片 2 列、胶囊单行、收藏页无横向溢出', async () => {
+    test.setTimeout(180_000)
+    const context = await launchExtension()
+
+    try {
+      await seedFakeLoginCookies(context)
+      const page = await context.newPage()
+      // 先设视口再进页面：窄屏样式由媒体查询决定，晚设会让首帧按桌面布局渲染
+      await page.setViewportSize({ width: 768, height: 900 })
+
+      await openHomeFixture(page, { minCards: 1 })
+      await waitForStableCardCount(page, 2)
+
+      const worker = await waitForServiceWorker(context)
+      await worker.evaluate((apis) => {
+        const scope = globalThis as unknown as {
+          __e2eNarrow?: Array<Record<string, unknown>>
+          __e2eFavOriginalFetch?: typeof fetch
+          fetch: typeof fetch
+        }
+        scope.__e2eNarrow = apis.medias
+        scope.__e2eFavOriginalFetch = scope.fetch
+        const json = (body: unknown) => new Response(JSON.stringify(body), {
+          headers: { 'content-type': 'application/json' },
+        })
+
+        scope.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+          const url = typeof input === 'string'
+            ? input
+            : (input instanceof URL
+                ? input.toString()
+                : input.url)
+
+          if (url.includes(apis.folderList)) {
+            return Promise.resolve(json({
+              code: 0,
+              message: '0',
+              data: {
+                list: [
+                  {
+                    id: 1001,
+                    title: 'E2E folder A',
+                    attr: 0,
+                    media_count: 3,
+                    fav_state: 0,
+                    fid: 1001,
+                  },
+                  {
+                    id: 1002,
+                    title: 'E2E folder B',
+                    attr: 0,
+                    media_count: 0,
+                    fav_state: 0,
+                    fid: 1002,
+                  },
+                ],
+                count: 2,
+              },
+            }))
+          }
+          if (url.includes(apis.resourceList)) {
+            return Promise.resolve(json({
+              code: 0,
+              message: '0',
+              data: {
+                info: { id: 1001, cover: '', title: 'E2E folder A' },
+                medias: scope.__e2eNarrow,
+              },
+            }))
+          }
+          return scope.__e2eFavOriginalFetch!(input as RequestInfo, init)
+        }) as typeof fetch
+      }, {
+        folderList: FOLDER_LIST_API,
+        resourceList: RESOURCE_LIST_API,
+        medias: NARROW_MEDIAS,
+      })
+
+      await clickDockItem(page, /favorites|收藏/i)
+      await expect.poll(() => chipCount(page), { timeout: 45_000 }).toBe(2)
+
+      // 等卡片网格出现（3 条收藏）
+      await expect.poll(
+        () => page.evaluate(() => document.querySelector('#bewly')?.shadowRoot?.querySelectorAll('.bewly-list-grid .bewly-list-card').length ?? 0),
+        { timeout: 45_000, message: '收藏页应渲染 3 张卡片' },
+      ).toBe(3)
+
+      const layout = await page.evaluate(() => {
+        const root = document.querySelector('#bewly')?.shadowRoot
+        const grid = root?.querySelector('.bewly-list-grid') as HTMLElement | null
+        const page = root?.querySelector('.bewly-list-page') as HTMLElement | null
+        const chips = root?.querySelector('.bewly-list-chips') as HTMLElement | null
+        const host = document.querySelector('#bewly') as HTMLElement | null
+        const cards = Array.from(grid?.querySelectorAll('.bewly-list-card') ?? []) as HTMLElement[]
+        const columns = grid
+          ? getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length
+          : 0
+        // 第一行卡片数：top 相同的卡片（网格换行判定）
+        const firstRowTop = cards[0]
+          ? Math.round(cards[0].getBoundingClientRect().top)
+          : 0
+        const firstRow = cards.filter(card => Math.abs(Math.round(card.getBoundingClientRect().top) - firstRowTop) <= 2).length
+
+        return {
+          columns,
+          firstRow,
+          cardWidth: cards[0]
+            ? Math.round(cards[0].getBoundingClientRect().width)
+            : 0,
+          gridWidth: grid
+            ? Math.round(grid.getBoundingClientRect().width)
+            : 0,
+          chipsWrap: chips
+            ? getComputedStyle(chips).flexWrap
+            : '',
+          chipsHeight: chips
+            ? Math.round(chips.getBoundingClientRect().height)
+            : 0,
+          chipsScrollable: chips
+            ? chips.scrollWidth > chips.clientWidth
+            : false,
+          pageOverflow: page
+            ? page.scrollWidth - page.clientWidth
+            : -1,
+          hostOverflow: host
+            ? host.scrollWidth - host.clientWidth
+            : -1,
+          docOverflow: document.documentElement.scrollWidth - window.innerWidth,
+          viewportWidth: window.innerWidth,
+        }
+      })
+
+      test.info().annotations.push({
+        type: 'narrow-768',
+        description: JSON.stringify(layout),
+      })
+
+      expect(layout.viewportWidth).toBe(768)
+      // 768 档：2 列（grid-template-columns 两段 + 第一行两张卡片）
+      expect(layout.columns, `768 下网格应为 2 列，实际 ${layout.columns} 列（${JSON.stringify(layout)}）`).toBe(2)
+      expect(layout.firstRow, `768 下第一行应排 2 张卡片，实际 ${layout.firstRow}`).toBe(2)
+      // 胶囊行单行 + 可横向滚动（不换行撑高）
+      expect(layout.chipsWrap).toBe('nowrap')
+      expect(layout.chipsHeight).toBeLessThan(48)
+      // 收藏页自身无横向溢出（document 级别受原生头部影响，只记录不断言）
+      expect(layout.pageOverflow, '收藏页容器不应有横向溢出').toBeLessThanOrEqual(1)
+      expect(layout.hostOverflow, '#bewly 宿主不应有横向溢出').toBeLessThanOrEqual(1)
+    }
+    finally {
+      await context.close()
+    }
+  })
+})

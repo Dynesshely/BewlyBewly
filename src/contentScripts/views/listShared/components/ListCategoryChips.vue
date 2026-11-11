@@ -688,6 +688,39 @@ onBeforeUnmount(() => {
   color: var(--bew-text-2);
 }
 
+@media (forced-colors: active) {
+  .bewly-list-chip,
+  .bewly-list-chip__more,
+  .bewly-list-chip__menu,
+  .bewly-list-chip__menu-item,
+  .bewly-list-chip__confirm,
+  .bewly-list-chip__confirm-btn,
+  .bewly-list-chip__mini,
+  .bewly-list-chip__input {
+    color: ButtonText;
+    background: ButtonFace;
+    border: 1px solid ButtonText;
+  }
+
+  .bewly-list-chip.is-active {
+    color: Highlight;
+    border-color: Highlight;
+  }
+
+  .bewly-list-chip__menu-item.is-danger,
+  .bewly-list-chip__confirm-btn.is-danger {
+    color: LinkText;
+  }
+
+  .bewly-list-chip__more:focus-visible,
+  .bewly-list-chip__menu-item:focus-visible,
+  .bewly-list-chip__confirm-btn:focus-visible,
+  .bewly-list-chip__mini:focus-visible,
+  .bewly-list-chip__input:focus-visible {
+    outline: 2px solid Highlight;
+  }
+}
+
 @media (prefers-contrast: more) {
   .bewly-list-chip__more,
   .bewly-list-chip__input,

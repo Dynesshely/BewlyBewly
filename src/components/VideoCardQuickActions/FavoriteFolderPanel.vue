@@ -615,6 +615,35 @@ onBeforeUnmount(() => {
   opacity: 0.55;
 }
 
+/* 第 26 轮：强制色彩下自定义勾选框 / 主按钮 / 面板边框回落到系统色 */
+@media (forced-colors: active) {
+  .bewly-fav-panel {
+    color: CanvasText;
+    background: Canvas;
+    border: 1px solid CanvasText;
+  }
+
+  .bewly-fav-panel__action,
+  .bewly-fav-panel__option,
+  .bewly-fav-panel__close,
+  .bewly-fav-panel__box {
+    color: ButtonText;
+    background: ButtonFace;
+    border: 1px solid ButtonText;
+  }
+
+  .bewly-fav-panel__action.is-primary {
+    color: Highlight;
+    border-color: Highlight;
+  }
+
+  .bewly-fav-panel__option:focus-visible,
+  .bewly-fav-panel__action:focus-visible,
+  .bewly-fav-panel__close:focus-visible {
+    outline: 2px solid Highlight;
+  }
+}
+
 @media (max-width: 420px) {
   .bewly-fav-panel {
     width: min(236px, calc(100vw - 24px));

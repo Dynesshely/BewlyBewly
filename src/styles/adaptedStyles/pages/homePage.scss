@@ -44,3 +44,43 @@
     }
   }
 }
+
+// #region 窄屏横向溢出（第 26 轮）
+//
+// 首页除公共头部外，还有 `#biliMainHeader` / `.header-channel` 这套「大头部」。
+// 768 实测它们与 .bili-header 一起把文档撑到 1100px（视口 768）。
+// 这里只做“收缩 + 容器内部滚动”，不改桌面端（≥1280px）任何视觉。
+@media (max-width: 1024px) {
+  .bewly-design.homePage {
+    #biliMainHeader,
+    .header-channel,
+    .bili-header__channel {
+      box-sizing: border-box;
+      max-width: 100vw;
+      min-width: 0;
+    }
+
+    // 首页内容栅格：列宽用 minmax(0, 1fr)，避免长标题把栅格撑出视口
+    .recommended-container_floor-aside .container,
+    .recommended-container .container,
+    .bili-grid {
+      max-width: 100%;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .bewly-design.homePage {
+    // 频道条在 768 下只保留内部滚动，不撑宽页面
+    .header-channel {
+      overflow-x: auto;
+      overflow-y: visible;
+      scrollbar-width: none;
+    }
+
+    .header-channel::-webkit-scrollbar {
+      display: none;
+    }
+  }
+}
+// #endregion

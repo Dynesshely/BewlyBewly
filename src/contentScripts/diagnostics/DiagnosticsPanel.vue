@@ -308,6 +308,14 @@ const groups = computed(() => {
   }
 }
 
+/* 暗色：--bew-text-3 在暗色下对比度刚好卡在门槛，提示/次要文字提一级（第 26 轮） */
+.dark .diagnostics__desc,
+.dark .diagnostics__hint,
+.dark .diagnostics__meta,
+.dark .diagnostics__env dt {
+  color: var(--bew-text-2);
+}
+
 @media (forced-colors: active) {
   .diagnostics__item {
     border: 1px solid CanvasText;

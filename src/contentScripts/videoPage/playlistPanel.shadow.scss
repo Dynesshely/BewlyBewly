@@ -214,3 +214,48 @@
   }
 }
 /* #endregion */
+
+/* #region 暗色对比度（第 26 轮）：序号 / 提示在暗色下提一级 */
+:host-context(.dark) {
+  .bvp-playlist__position,
+  .bvp-playlist__index,
+  .bvp-playlist__hint {
+    color: var(--bew-text-2);
+  }
+}
+
+@media (prefers-contrast: more) {
+  .bvp-playlist__position,
+  .bvp-playlist__index,
+  .bvp-playlist__hint {
+    color: var(--bew-text-2);
+  }
+
+  .bvp-playlist__btn,
+  .bvp-playlist__item {
+    border-color: var(--bew-text-3);
+  }
+}
+
+/* 强制色彩模式：面板 / 条目按钮 / 当前项高亮 */
+@media (forced-colors: active) {
+  :host .bvp-playlist,
+  :host .bvp-playlist__btn,
+  :host .bvp-playlist__item {
+    color: CanvasText;
+    background: Canvas;
+    border: 1px solid CanvasText;
+  }
+
+  :host .bvp-playlist__btn[aria-pressed="true"],
+  :host .bvp-playlist__item[aria-current="true"],
+  :host .bvp-playlist__item.is-active {
+    color: Highlight;
+    border-color: Highlight;
+  }
+
+  :host :focus-visible {
+    outline: 2px solid Highlight;
+  }
+}
+/* #endregion */

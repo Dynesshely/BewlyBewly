@@ -157,3 +157,76 @@
 - 诊断面板在 ≤768 改为单列后更长，面板本身依赖父级滚动，长报告需要滚动查看（预期行为）；
 - 设置页 768px 档把工具栏改成纵向排列，吸收了「胶囊行 + 搜索框」两行高度，未做折叠；
 - 展开按钮在窄屏贴右内侧，若 B 站评论区本身有右侧留白，按钮会比正文右边缘再靠里 8px（可接受）。
+## 6. 第 26 轮：窄屏横向滚动条专项（原生头部 1100px 溢出）
+
+### 6.1 真机证据（Lead 实测，ungoogled-chromium 156，2026-11-11）
+
+| 视口 | 现象 |
+| --- | --- |
+| 768×900 | `.bili-header` 宽 **1100px**（视口 768），`.right-entry` / `.v-popover` 被推到 `right=1076`；`document.scrollingElement.scrollWidth = 1100 > innerWidth = 768`，`canScrollX: true`（整页可横向滚动）；`#bewly` 自身宽 762px（正常） |
+| 390×844 | `docScrollW = 1100`，同样可横向滚动 |
+
+结论：横向滚动来自 **B 站原生头部**，不是 Bewly 的 UI（第 25 轮只修了 `#bewly` 内部）。
+
+### 6.2 修复策略（最小侵入）
+
+只改 `src/styles/adaptedStyles/common/common.scss` 与 `pages/homePage.scss`，全部包在 `@media (max-width: 1024px)` / `(max-width: 768px)` 里：
+
+| 步骤 | 规则 | 目的 |
+| --- | --- | --- |
+| 1 | `.bili-header` / `.international-header` / `#biliMainHeader` / `#bili-header-container`：`box-sizing: border-box; max-width: 100vw; min-width: 0` | 头部容器不再按内容宽度撑到 1100px |
+| 2 | 头部内的 `.bili-header__bar` / `.left-entry` / `.right-entry` / `.center-search-container` / `.search-panel` / `.nav-link-item`：`min-width: 0; max-width: 100%; flex-shrink: 1` | 子项可以收缩（默认 `min-width: auto` 会拒绝收缩，正是 1100px 的来源之一） |
+| 3 | 频道条 `.bili-header__channel` / `.header-channel`：`max-width: 100vw; min-width: 0; overflow-x: auto; overflow-y: visible`，条目 `flex: none` | 条目太多时在频道条**内部**横向滚动，页面级不产生横向滚动条 |
+| 4 | 768 档：搜索容器 `flex: 1 1 auto; min-width: 0`，左右入口的 `li` 允许 `min-width: 0` | 768 下搜索框与入口不再溢出 |
+| 5 | 首页（`homePage.scss`）：`#biliMainHeader` / `.header-channel` 同上收缩；`.recommended-container .container` / `.bili-grid` `max-width: 100%` | 首页大头部与内容栅格一并收敛 |
+
+**没有用** `body { overflow-x: hidden }`：它会让 `position: sticky` 失效，并且只是把真实溢出藏起来。
+**没有** 对 `.bili-header` 用 `overflow: hidden`：头部内的下拉菜单（`.v-popover`、频道「更多」）会被一起裁掉。
+
+### 6.3 复测方法（可直接复制进 DevTools Console / Playwright）
+
+```js
+// 1) 页面级横向滚动：核心判据
+const doc = document.scrollingElement
+const canScrollX = doc.scrollWidth > window.innerWidth + 1
+console.log({ viewport: innerWidth, docScrollW: doc.scrollWidth, canScrollX })
+
+// 2) 找真正的溢出元素（穿透 shadow root，递归遍历）
+const offenders = []
+function walk(root) {
+  for (const el of root.querySelectorAll('*')) {
+    const r = el.getBoundingClientRect()
+    if (r.width > 0 && r.right > innerWidth + 1) {
+      offenders.push({
+        tag: el.tagName,
+        cls: String(el.className).slice(0, 90),
+        right: Math.round(r.right),
+        width: Math.round(r.width)
+      })
+    }
+    if (el.shadowRoot)
+      walk(el.shadowRoot)
+  }
+}
+walk(document)
+console.table(offenders.slice(0, 20))
+```
+
+判定：`canScrollX === false` 即通过；`offenders` 里应只剩少量 B 站自身 fixed 浮层（它们不影响文档滚动宽度）。
+
+### 6.4 残余问题与保留原因
+
+- **下拉菜单 / 频道「更多」浮层**：如果它们在 DOM 里是 `position: absolute` 且挂在头部内，收缩后可能被自身容器裁切。
+  本轮**没有**给头部加 `overflow: hidden` 就是为了不裁它们；若真机复测发现头部仍有溢出，
+  可在 `@media (max-width: 1024px)` 里追加下面这段「只裁剪、不隐藏页面滚动」的可选兜底：
+
+  ```scss
+  .bewly-design .bili-header {
+    overflow-x: clip; // 比 hidden 温和：不创建滚动容器，也不影响 sticky
+  }
+  ```
+
+  注意：`overflow-x: clip` 仍可能裁掉头部内的绝对定位浮层，所以只在「不收就溢出」时启用，并在真机上确认下拉菜单仍可见。
+- **B 站自身的固定宽度元素**（例如某些页面的 `min-width: 1100px` 内容容器）：如果不在上面覆盖的类名范围内，
+  需要按页追加规则（`products/*.scss`），本轮只处理了通用头部与首页，避免误伤其它页面。
+- **未在真机验证**：本轮不允许 build/playwright/碰浏览器，改动是纯 CSS 收缩；结论需要在 Lead 构建后于 1024/768/390 三档各跑一次上面的探针确认 `canScrollX === false`。

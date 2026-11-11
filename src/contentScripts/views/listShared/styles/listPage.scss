@@ -943,3 +943,94 @@
   }
 }
 /* #endregion */
+/* #region 窄屏适配（第 26 轮）：收藏夹页 768 / 390 两档 */
+/*
+ * 目标（真机走查口径）：
+ *   - 768px：卡片网格固定 2 列（comfortable / compact 都一样，避免按桌面最小列宽挤成 3 列）；
+ *   - 390px：卡片网格固定 1 列；
+ *   - 胶囊行保持单行横向滚动（不换行、不撑宽页面）；
+ *   - 工具栏按钮允许换行，过滤框在窄屏独占一行；
+ *   - 收藏页容器自身不产生横向溢出（页面级横向滚动由原生头部的既有问题单独处理）。
+ */
+@media (max-width: 768px) {
+  /* 容器与网格：min-width:0 + minmax(0,1fr) 保证子项不会把容器撑宽 */
+  .bewly-list-page {
+    min-width: 0;
+  }
+
+  .bewly-list-grid,
+  .bewly-list-grid--comfortable,
+  .bewly-list-grid--compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  /* 胶囊行：单行 + 横向滚动；min-width:0 让滚动发生在行内而不是撑宽页面 */
+  .bewly-list-chips {
+    flex-wrap: nowrap;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .bewly-list-chips > * {
+    flex: 0 0 auto;
+  }
+
+  /* 工具栏：按钮换行，过滤框独占一行（避免 768 下工具条被挤成横向滚动） */
+  .bewly-list-toolbar {
+    padding-inline: 10px;
+  }
+
+  .bewly-list-filter {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .bewly-list-toolbar__actions {
+    flex: 0 1 auto;
+    justify-content: flex-end;
+  }
+
+  /* 空态：窄屏减小上下留白，避免 390 下「空态比视口还高」的空旷感 */
+  .bewly-list-page .feedback-state {
+    padding-block: 32px;
+  }
+
+  /* 骨架：收紧卡片内边距与封面高度，768 下 2 列时不至于单卡过高 */
+  .bewly-list-skeleton-card {
+    gap: 8px;
+    padding: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* 390 档：1 列卡片（480 覆盖 390/414 等常见手机宽度） */
+  .bewly-list-grid,
+  .bewly-list-grid--comfortable,
+  .bewly-list-grid--compact {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .bewly-list-hero {
+    min-height: 88px;
+  }
+
+  /* 工具栏：视图分段 / 排序 / 过滤各占一行，按钮不互相挤压 */
+  .bewly-list-toolbar {
+    row-gap: 6px;
+  }
+
+  .bewly-list-toolbar__meta {
+    flex: 1 1 100%;
+  }
+
+  .bewly-list-toolbar__actions {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+}
+/* #endregion */

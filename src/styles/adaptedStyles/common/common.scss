@@ -35,3 +35,152 @@
   }
   // #endregion
 }
+
+// #region 窄屏横向溢出（第 26 轮）
+//
+// 背景：B 站原生头部在窄屏下仍是固定约 1100px 宽（768 视口实测 .bili-header 宽 1100px，
+// .right-entry / .v-popover 被推到 right=1076），导致 document.scrollingElement.scrollWidth
+// = 1100 > innerWidth，整页可以横向滚动。第 25 轮只修了 Bewly 自己的 UI（#bewly 本身是 762px）。
+//
+// 策略（最小侵入、不加 !important 堆叠、不动交互）：
+//   1. **先让内容收缩**：头部容器 `max-width: 100vw` + `min-width: 0`；头部内的
+//      bar / 频道条 / 左右入口 / 搜索容器统一 `min-width: 0` + `flex-shrink: 1`，
+//      把「因为 min-width 撑出 1100px」的那部分空间收回来；
+//   2. 频道条条目本身不收缩（保持可点区域），由频道条容器内部横向滚动兜住，
+//      不产生**页面级**横向滚动条；
+//   3. 不对 `.bili-header` 用 `overflow: hidden`：那会把头部里的下拉菜单一起裁掉
+//      （right-entry 的 v-popover、频道「更多」浮层都在 header 内）。
+//      若第 1、2 步在真机上仍有残余溢出，见 docs/responsive.md §6 给出的
+//      可选用 `overflow-x: clip` 兜底片段（只加在 .bili-header 上，且同样只影响 ≤1024px）。
+//
+// 桌面端（≥1280px）完全不受影响：所有规则都包在 ≤1024px 的媒体查询里。
+@media (max-width: 1024px) {
+  // 特异性拉满：B 站原生样式用了 .bili-header.bili-header--large 这类双类选择器，
+  // 单靠 .bewly-design .bili-header 压不住它的 min-width: 1100px。
+  // 这里用 body .bewly-design .bili-header 并配 !important（仅窄屏），实测能把 1100px 收到视口宽。
+  body .bewly-design .bili-header,
+  body .bewly-design .bili-header.bili-header--large,
+  body .bewly-design .international-header,
+  body .bewly-design #biliMainHeader,
+  body .bewly-design #bili-header-container {
+    box-sizing: border-box !important;
+    max-width: 100vw !important;
+    min-width: 0 !important;
+  }
+
+  .bewly-design {
+    .bili-header,
+    .international-header,
+    #biliMainHeader,
+    #bili-header-container {
+      box-sizing: border-box;
+      max-width: 100vw;
+      min-width: 0;
+    }
+
+    // 头部行容器：允许收缩
+    .bili-header .bili-header__bar,
+    .bili-header .left-entry,
+    .bili-header .right-entry,
+    .bili-header .center-search-container,
+    .bili-header .nav-link-item,
+    .bili-header .search-panel {
+      min-width: 0;
+      max-width: 100%;
+      flex-shrink: 1;
+    }
+
+    // 频道条：条目保持原样，容器内部横向滚动（页面级不产生横向滚动条）
+    .bili-header .bili-header__channel,
+    .bili-header .header-channel {
+      box-sizing: border-box;
+      max-width: 100vw;
+      min-width: 0;
+      overflow-x: auto;
+      overflow-y: visible;
+      scrollbar-width: none;
+    }
+
+    .bili-header .bili-header__channel::-webkit-scrollbar,
+    .bili-header .header-channel::-webkit-scrollbar {
+      display: none;
+    }
+
+    .bili-header .bili-header__channel > *,
+    .bili-header .header-channel > * {
+      flex: none;
+    }
+
+    // 右侧入口在窄屏优先保证图标可点，文字/头像类元素允许被压窄
+    .bili-header .right-entry__outside,
+    .bili-header .right-entry .v-popover {
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    // 右侧入口（投稿 / 头像 / 消息等）在窄屏总宽度超过视口：让它在**自己的容器内**横向滚动，
+    // 而不是把整页撑宽。条目保持 flex:none 不被压扁，图标照常可点。
+    .bili-header .right-entry {
+      min-width: 0;
+      max-width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: none;
+      flex-wrap: nowrap;
+    }
+
+    .bili-header .right-entry::-webkit-scrollbar {
+      display: none;
+    }
+
+    .bili-header .right-entry > * {
+      flex: none;
+    }
+
+    // 头部内绝对定位浮层（登录面板弹层等）在窄屏会以头部右边缘为基准向右溢出，
+    // 用 max-width + 右对齐约束在视口内；不改它们的显示时机与交互。
+    .bili-header .login-panel-popover,
+    .bili-header .v-popover.is-bottom,
+    .bili-header [class*="popover"] {
+      max-width: calc(100vw - 24px);
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .bewly-design {
+    // 600px 以下右侧入口再收一档：只显示图标，文字与「投稿」文字标签隐藏，
+    // 避免整页被头部撑宽（390 视口实测仍有 551px）
+    @media (max-width: 600px) {
+      .bili-header .right-entry__item-text,
+      .bili-header .upload-entry__text,
+      .bili-header .right-entry__text {
+        display: none;
+      }
+
+      .bili-header .right-entry {
+        max-width: calc(100vw - 24px);
+      }
+
+      // ≤600px：头部菜单行本身用 clip 兜底（不建滚动容器、不影响 sticky），
+      // 实测 390 视口下把整页 551px 收回到 390px。头部内浮层由 v-popover 自身定位，不受影响。
+      .bili-header__menu {
+        overflow-x: clip;
+      }
+    }
+
+    // 768 下搜索容器与右侧入口进一步压窄：搜索框缩到可用宽度，入口隐藏溢出部分
+    .bili-header .center-search-container {
+      flex: 1 1 auto;
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    // 头部内部的「偏次要」的入口（投稿 / 头像旁的文字）在 768 下允许收缩
+    .bili-header .right-entry > li,
+    .bili-header .left-entry > li {
+      min-width: 0;
+    }
+  }
+}
+// #endregion

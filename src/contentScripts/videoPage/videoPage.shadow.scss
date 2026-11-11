@@ -472,3 +472,68 @@
   background: var(--bew-elevated-hover);
 }
 /* #endregion */
+
+/* #region 暗色对比度（第 26 轮）
+   --bew-text-3 在暗色下约 4.5:1，叠在悬浮面板 / 半透明底上会跌破门槛；
+   只把「次要但可读」的说明 / 快捷键 / 提示文字在暗色下提一级到 --bew-text-2，
+   标题与正文层级不变。 */
+:host-context(.dark) {
+  .bvp-compact__up,
+  .bvp-help__hint,
+  .bvp-help__separator,
+  .bvp-kbd,
+  .bvp-toast,
+  .bvp-comment-expand {
+    color: var(--bew-text-2);
+  }
+}
+
+/* prefers-contrast: more 同样提一级，并给控件边框补可见边界 */
+@media (prefers-contrast: more) {
+  .bvp-compact__up,
+  .bvp-help__hint,
+  .bvp-help__separator,
+  .bvp-kbd,
+  .bvp-toast,
+  .bvp-comment-expand {
+    color: var(--bew-text-2);
+  }
+
+  .bvp-fab,
+  .bvp-icon-btn,
+  .bvp-comment-btn,
+  .bvp-comment-expand,
+  .bvp-kbd {
+    border-color: var(--bew-text-3);
+  }
+}
+
+/* 强制色彩模式：自定义按钮 / 选中态 / 快捷键块必须回落到系统色，否则 High Contrast 下不可见 */
+@media (forced-colors: active) {
+  :host .bvp-fab,
+  :host .bvp-icon-btn,
+  :host .bvp-comment-btn,
+  :host .bvp-comment-toolbar,
+  :host .bvp-comment-expand,
+  :host .bvp-compact,
+  :host .bvp-toast,
+  :host .bvp-help__dialog,
+  :host .bvp-kbd {
+    color: CanvasText;
+    background: Canvas;
+    border: 1px solid CanvasText;
+  }
+
+  :host .bvp-fab[aria-pressed="true"],
+  :host .bvp-fab[data-active="true"],
+  :host .bvp-icon-btn[aria-pressed="true"],
+  :host .bvp-comment-btn[aria-pressed="true"] {
+    color: Highlight;
+    border-color: Highlight;
+  }
+
+  :host :focus-visible {
+    outline: 2px solid Highlight;
+  }
+}
+/* #endregion */

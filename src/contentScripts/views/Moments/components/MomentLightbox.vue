@@ -582,6 +582,36 @@ onBeforeUnmount(() => {
   }
 }
 
+/* #region 高对比度 / 强制色彩（第 26 轮）
+   灯箱是固定深色遮罩（rgba(0,0,0,.82)），自带高对比；但 High Contrast 下
+   自定义的半透明白色按钮可能被系统色吞掉，所以按钮 / 焦点环回落到系统色。 */
+@media (forced-colors: active) {
+  .moment-lightbox {
+    background: Canvas;
+  }
+
+  .moment-lightbox__close,
+  .moment-lightbox__nav,
+  .moment-lightbox__download {
+    color: ButtonText;
+    background: ButtonFace;
+    border: 1px solid ButtonText;
+  }
+
+  .moment-lightbox__close:focus-visible,
+  .moment-lightbox__nav:focus-visible,
+  .moment-lightbox__download:focus-visible {
+    outline: 2px solid Highlight;
+  }
+
+  .moment-lightbox__caption,
+  .moment-lightbox__message,
+  .moment-lightbox__hint {
+    color: CanvasText;
+  }
+}
+/* #endregion */
+
 /* #region 窄屏适配（第 17 轮） */
 @media (max-width: 640px) {
   .moment-lightbox {

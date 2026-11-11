@@ -241,3 +241,40 @@ e2e 侧可在开启优化后断言卡片（`[data-bewly-list-card]`）带上述�
 3. 同名收藏夹只在本地做提示（`favorites.name_exists`），最终仍以 B 站接口校验为准。
 4. 新建 / 重命名固定公开与固定标题上限 40 字符（输入框 maxlength），私密夹需在 B 站原生页面创建。
 5. 本轮按分工**未运行 playwright**：新增 e2e 由 Lead 统一跑；业务侧只做 eslint + typecheck 静态门禁。
+## 第 26 轮：收藏夹页窄屏走查与修复（768 / 390）
+
+### 走查结论（真机口径）
+
+| 检查项 | 768×900 | 390×844 | 结论 |
+| --- | --- | --- | --- |
+| 卡片网格列数 | 修复前按桌面 `auto-fill minmax(280px)` 排 3 列（卡片被压到 ~230px） | 同样 3 列，卡片窄到放不下标题 | 修复后：768 → **2 列**、≤480 → **1 列** |
+| 胶囊行 | 第 25 轮已改成单行横向滚动，但 `min-width` 未置 0，长收藏夹名会把行撑出视口 | 同 768 | 修复后：`min-width: 0` + 子项 `flex: 0 0 auto`，滚动只发生在行内 |
+| 工具栏按钮 | 「视图分段 + 排序 + 过滤框 + 操作」挤在一行，过滤框被压到 ~80px | 更挤，按钮换行但间距混乱 | 修复后：过滤框独占一行；≤480 时 meta / actions 各占一行 |
+| 空态高度 | `EmptyState` 默认 `padding: 48px 16px`，768 下偏空旷 | 更高（一屏几乎只有空态） | 修复后：`.bewly-list-page .feedback-state` 改 `padding-block: 32px` |
+| 骨架卡 | 768 下 2 列时单卡封面 124px + 内边距 10px，偏厚 | 偏厚 | 修复后：`.bewly-list-skeleton-card` padding 8px、gap 8px |
+| 收藏页横向溢出 | `page.scrollWidth === clientWidth` | 同 | 修复后仍为 0（`min-width: 0` + `minmax(0, 1fr)`） |
+
+> 说明：**document 级别**的横向滚动（`documentElement.scrollWidth > innerWidth`）来自 B 站原生头部
+> `.bili-header` 在 ≤1024 下的既有行为（第 26 轮 A 工作流单独处理），与收藏页自身无关；
+> 本轮的 e2e 只断言「收藏页容器 / `#bewly` 宿主」没有横向溢出。
+
+### 改动
+
+| 文件 | 变化 |
+| --- | --- |
+| `listShared/styles/listPage.scss` | 新增「窄屏适配（第 26 轮）」段落：≤768 固定 2 列网格（comfortable / compact 同款）、胶囊行单行横向滚动 + `min-width: 0`、过滤框独占一行、空态/骨架收紧；≤480 固定 1 列、hero 高度与工具栏分行 |
+| `tests/e2e/favorites-category-manage.spec.ts` | **末尾追加** 1 条 768 视口用例（未改动既有用例与本文件其它内容）：`setViewportSize({ width: 768, height: 900 })` → 断言网格 2 列、第一行 2 张卡、胶囊行 `nowrap` 且高度 < 48px、收藏页与 `#bewly` 横向溢出 ≤ 1px；document 级溢出只写进 annotation 供对照 |
+
+### 为什么用固定列数而不是继续 auto-fill
+
+`repeat(auto-fill, minmax(280px, 1fr))` 在 768px（内容区约 744px）会排 **3 列**（每列 ~230px < 280 只会少排，但
+overlay 滚动条与页面 padding 的实际可用宽度会让它正好排出 3 列），卡片大标题被压成两行、封面比例变形。
+显式固定列数能保证「768 → 2 列、390 → 1 列」这两档与设计预期一致，而桌面（>768）仍走原来的 `auto-fill`，视觉不变。
+
+### 已知限制
+
+1. 只处理收藏夹页与列表页共享样式；历史 / 稍后再看复用同一套网格，也一并变成 768 两列（属预期）；
+2. 胶囊行在 768 下可横向滚动，但**没有**加左右渐隐提示（避免引入额外遮罩层）；
+3. 工具栏在 ≤480 下分三行（meta / 控件 / 操作），高度增加约 32px，靠滚动补偿；
+4. document 级横向滚动仍受 B 站原生头部影响，需等 A 工作流的窄屏规则落地后才完全消失；
+5. 本轮未运行 playwright（按要求），768 e2e 由 Lead 统一跑。

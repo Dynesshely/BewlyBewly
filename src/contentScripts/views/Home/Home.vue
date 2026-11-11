@@ -737,6 +737,29 @@ function toggleTabContentLoading(loading: boolean) {
 }
 /* #endregion */
 
+/* #region 强制色彩（第 26 轮）：回到顶部按钮 / 密度与布局胶囊 */
+@media (forced-colors: active) {
+  .home-back-to-top {
+    color: ButtonText;
+    background: ButtonFace;
+    border: 1px solid ButtonText;
+  }
+
+  .home-back-to-top:focus-visible {
+    outline: 2px solid Highlight;
+  }
+
+  .grid-layout-item-activated {
+    color: Highlight;
+    background: Highlight;
+  }
+
+  .grid-layout-item-activated * {
+    color: HighlightText;
+  }
+}
+/* #endregion */
+
 /* #region 窄屏适配（第 17 轮）：标签栏 / 密度胶囊 / 回到顶部 */
 @media (max-width: 900px) {
   .home-tabs-inside {

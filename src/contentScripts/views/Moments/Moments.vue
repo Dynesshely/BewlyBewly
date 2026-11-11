@@ -736,4 +736,70 @@ onUnmounted(() => {
     animation: none;
   }
 }
+
+/* #region 窄屏适配（第 17 轮）：工具条 / 头图 / 键盘提示 */
+@media (max-width: 900px) {
+  .moments-hero {
+    flex-wrap: wrap;
+  }
+
+  .moments-hero__actions {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+  }
+
+  .moments-toolbar {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .moments-toolbar__group {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 640px) {
+  .moments-hero__title {
+    font-size: 20px;
+  }
+
+  .moments-hero__subtitle {
+    font-size: 12px;
+  }
+
+  .moments-toolbar__label {
+    display: none;
+  }
+
+  .moments-chip {
+    padding-inline: 8px;
+  }
+
+  .moments-keys {
+    display: none;
+  }
+}
+/* #endregion */
+
+/* #region 暗色 / 高对比度（第 17 轮） */
+.dark {
+  .moments-hero__subtitle,
+  .moments-hero__count,
+  .moments-toolbar__label,
+  .moments-keys,
+  .moments-more__hint {
+    color: var(--bew-text-2);
+  }
+}
+
+@media (prefers-contrast: more) {
+  .moments-hero__subtitle,
+  .moments-hero__count,
+  .moments-toolbar__label,
+  .moments-keys,
+  .moments-more__hint {
+    color: var(--bew-text-2);
+  }
+}
+/* #endregion */
 </style>

@@ -1081,3 +1081,24 @@ html.userSpacePage.bewly-space-compact {
 }
 // #endregion
 // #endregion
+// #region 暗色 / 高对比度（第 17 轮，只追加）
+// UP 数据卡标签（关注/粉丝/播放）、区块计数、小卡元信息在暗色下用 --bew-text-3，
+// 叠在玻璃数据卡上约 3.8:1；暗色下提到 --bew-text-2，保持与数值的层级差。
+html.bewly-design.userSpacePage.dark {
+  .n .n-data-k,
+  .section .count,
+  .small-item .meta {
+    color: var(--bew-text-2);
+  }
+}
+
+@media (prefers-contrast: more) {
+  html.bewly-design.userSpacePage {
+    .n .n-data-k,
+    .section .count,
+    .small-item .meta {
+      color: var(--bew-text-2);
+    }
+  }
+}
+// #endregion

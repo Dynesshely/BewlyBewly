@@ -668,4 +668,33 @@ function toggleTabContentLoading(loading: boolean) {
   }
 }
 /* #endregion */
+
+/* #region 窄屏适配（第 17 轮）：标签栏 / 密度胶囊 / 回到顶部 */
+@media (max-width: 900px) {
+  .home-tabs-inside {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .home-back-to-top {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 640px) {
+  .home-tabs-inside {
+    justify-content: flex-start;
+    gap: 6px;
+  }
+
+  .home-back-to-top {
+    width: 34px;
+    height: 34px;
+    max-width: calc(100vw - 24px);
+    font-size: 17px;
+  }
+}
+/* #endregion */
 </style>

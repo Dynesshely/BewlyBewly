@@ -67,6 +67,10 @@ export const PLAYER_ATTR = 'data-bewly-live-player'
 export const LAYOUT_ATTR = 'data-bewly-live-layout'
 export const ASIDE_ATTR = 'data-bewly-live-aside'
 export const ANCESTOR_ATTR = 'data-bewly-live-ancestor'
+/** 播放器顶部操作条（真机 `.live-player-handle-bar.expandable`，影院模式要隐藏） */
+export const HANDLE_BAR_ATTR = 'data-bewly-live-handle-bar'
+/** 播放器画面容器（真机 `.live-player-bg`，影院模式要铺满舞台） */
+export const VIDEO_BG_ATTR = 'data-bewly-live-video-bg'
 
 const EDITABLE_SELECTOR = [
   'input',
@@ -99,9 +103,86 @@ export function findPlayer(): HTMLElement | null {
   return firstMatch<HTMLElement>(PLAYER_SELECTORS)
 }
 
-/** 右侧栏（礼物 / 榜单 / 推荐列） */
-export function findAside(): HTMLElement | null {
-  return firstMatch<HTMLElement>(ASIDE_SELECTORS)
+/** 侧栏候选的 class 特征：聊天 / 礼物 / 榜单之类 */
+const ASIDE_CLASS_HINT_RE = /chat|danmu|danmaku|gift|guard|rank|aside/i
+/** 侧栏候选的文案特征（聊天 / 礼物 / 榜单） */
+const ASIDE_TEXT_HINT_RE = /弹幕|聊天|礼物|舰长|榜单|光荣榜|贡献/
+/** 聊天 / 礼物侧栏的宽度区间（真机约 320–420px），用来排除控制条与整页容器 */
+const ASIDE_MIN_WIDTH = 160
+const ASIDE_MAX_WIDTH = 420
+const ASIDE_MIN_HEIGHT = 220
+
+/**
+ * 右侧栏（礼物 / 榜单 / 聊天列）。
+ *
+ * 真机实测（live.bilibili.com/6，2026-11）页面上**没有** `.aside-area` / `#aside-area` /
+ * `.player-and-aside-area`，所以先试旧选择器，再退化为结构化启发式：
+ * 在播放器舞台的祖先（最多 3 层）的同级节点里，找「宽度 < 420px、高度 >= 220px、
+ * class 或文案带聊天/礼物/榜单特征」的容器。找不到就返回 null —— 面板里的开关保持禁用，
+ * 不会给一个按了没用的假开关。
+ */
+/** 启发式结果缓存：避免每 300ms 的 sync 反复读取布局；也防止「我们自己把侧栏 display:none 后」再探测不到 */
+let heuristicAside: HTMLElement | null = null
+
+export function findAside(player: HTMLElement | null = findPlayer()): HTMLElement | null {
+  const matched = firstMatch<HTMLElement>(ASIDE_SELECTORS)
+  if (matched)
+    return matched
+
+  if (heuristicAside?.isConnected)
+    return heuristicAside
+
+  heuristicAside = player
+    ? findAsideByHeuristic(player)
+    : null
+  return heuristicAside
+}
+
+/** 卸载 / 离开页面时清掉启发式缓存 */
+export function resetAsideCache(): void {
+  heuristicAside = null
+}
+
+function isVisibleCandidate(el: HTMLElement): boolean {
+  const style = getComputedStyle(el)
+  return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0'
+}
+
+function findAsideByHeuristic(player: HTMLElement): HTMLElement | null {
+  const candidates = new Set<HTMLElement>()
+  let node: HTMLElement | null = player.parentElement
+  for (let depth = 0; node && depth < 3; depth++, node = node.parentElement) {
+    for (const child of Array.from(node.children)) {
+      if (!(child instanceof HTMLElement))
+        continue
+      if (child === player || child.contains(player))
+        continue
+      candidates.add(child)
+    }
+  }
+
+  let best: HTMLElement | null = null
+  let bestHeight = 0
+  for (const el of candidates) {
+    if (!isVisibleCandidate(el))
+      continue
+
+    const rect = el.getBoundingClientRect()
+    if (rect.width < ASIDE_MIN_WIDTH || rect.width > ASIDE_MAX_WIDTH || rect.height < ASIDE_MIN_HEIGHT)
+      continue
+
+    const className = el.getAttribute('class') ?? ''
+    const text = (el.textContent ?? '').slice(0, 800)
+    if (!ASIDE_CLASS_HINT_RE.test(className) && !ASIDE_TEXT_HINT_RE.test(text))
+      continue
+
+    // 高度越大越可能是聊天 / 礼物侧栏（播放器控制条一般很矮）
+    if (rect.height > bestHeight) {
+      best = el
+      bestHeight = rect.height
+    }
+  }
+  return best
 }
 
 /** 播放器控制条里的弹幕开关 */
@@ -141,8 +222,17 @@ export function markLiveStage(): { player: HTMLElement | null, aside: HTMLElemen
 
   player.setAttribute(PLAYER_ATTR, '')
 
+  // 真机：舞台内是「顶部操作条 + 画面容器」两个子节点；影院模式要隐藏操作条、让画面铺满
+  const handleBar = player.querySelector<HTMLElement>('.live-player-handle-bar, [class*="live-player-handle-bar"], [class*="handle-bar"]')
+  if (handleBar)
+    handleBar.setAttribute(HANDLE_BAR_ATTR, '')
+
+  const videoBg = player.querySelector<HTMLElement>('[class*="live-player-bg"]')
+  if (videoBg)
+    videoBg.setAttribute(VIDEO_BG_ATTR, '')
+
   // 播放器与侧栏的共同祖先：隐藏侧栏后让整个布局撑满
-  const aside = findAside()
+  const aside = findAside(player)
   if (aside) {
     aside.setAttribute(ASIDE_ATTR, '')
     let common: HTMLElement | null = player.parentElement
@@ -167,6 +257,8 @@ export function clearLiveStage(): void {
     LAYOUT_ATTR,
     ASIDE_ATTR,
     ANCESTOR_ATTR,
+    HANDLE_BAR_ATTR,
+    VIDEO_BG_ATTR,
   ]
   for (const attr of attrs) {
     document.querySelectorAll<HTMLElement>(`[${attr}]`).forEach(node => node.removeAttribute(attr))

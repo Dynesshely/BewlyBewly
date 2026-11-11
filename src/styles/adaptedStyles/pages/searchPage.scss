@@ -441,3 +441,26 @@ html.searchPage.bewly-search-compact {
 }
 // #endregion
 // #endregion
+// #region 暗色 / 高对比度（第 17 轮，只追加）
+// 结果卡的日期 / UP 主简介在暗色下用 --bew-text-3，叠在卡片底色上约 3.9–4.2:1；
+// 暗色下提到 --bew-text-2，白天保持原层级（日期本来就该比标题弱一档）。
+html.bewly-design.searchPage.dark {
+  .search-layout {
+    .bili-video-card__info--date,
+    .user-video-desc {
+      color: var(--bew-text-2);
+    }
+  }
+}
+
+@media (prefers-contrast: more) {
+  html.bewly-design.searchPage {
+    .search-layout {
+      .bili-video-card__info--date,
+      .user-video-desc {
+        color: var(--bew-text-2);
+      }
+    }
+  }
+}
+// #endregion

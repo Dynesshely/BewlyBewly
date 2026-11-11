@@ -60,7 +60,7 @@ const CMN_CN: LivePageMessages = {
   hideAside: '隐藏侧栏',
   asideOn: '已隐藏右侧栏',
   asideOff: '已显示右侧栏',
-  asideUnavailable: '当前页没有可隐藏的侧栏',
+  asideUnavailable: '未识别到可隐藏的侧栏（新版直播页结构可能不支持）',
 
   danmaku: '弹幕开关',
   danmakuOn: '弹幕已开启',
@@ -99,7 +99,7 @@ const EN: LivePageMessages = {
   hideAside: 'Hide sidebar',
   asideOn: 'Sidebar hidden',
   asideOff: 'Sidebar shown',
-  asideUnavailable: 'No sidebar to hide on this page',
+  asideUnavailable: 'No hideable sidebar detected (this live layout may not support it)',
 
   danmaku: 'Danmaku',
   danmakuOn: 'Danmaku on',
@@ -138,7 +138,7 @@ const CMN_TW: LivePageMessages = {
   hideAside: '隱藏側欄',
   asideOn: '已隱藏右側欄',
   asideOff: '已顯示右側欄',
-  asideUnavailable: '目前頁面沒有可隱藏的側欄',
+  asideUnavailable: '未識別到可隱藏的側欄（新版直播頁結構可能不支援）',
 
   danmaku: '彈幕開關',
   danmakuOn: '彈幕已開啟',
@@ -169,7 +169,7 @@ const JYUT: LivePageMessages = {
   cinemaUnavailable: '搵唔到直播播放器',
   asideOn: '收埋咗右邊欄',
   asideOff: '顯示返右邊欄',
-  asideUnavailable: '呢頁冇嘢可以收埋',
+  asideUnavailable: '搵唔到可以收埋嘅側欄（新版直播頁或者未支援）',
   danmakuUnavailable: '搵唔到原生彈幕開關',
   fullscreenFailed: '入唔到全螢幕',
   hint: '面板同快速鍵淨係影響呢一頁，狀態喺呢個分頁入面保持',

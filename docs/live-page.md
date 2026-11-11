@@ -95,8 +95,8 @@ Ctrl / Cmd / Alt 组合、Shift + 字母；焦点在 Bewly 或本模块浮层里
 
 | 目标 | 候选（按优先级） |
 | --- | --- |
-| 播放器舞台 | `#live-player` → `.live-player` → `#live-player-ctnr` → `.player-and-aside-area > .player-area` → `[class*="live-player"]` |
-| 右侧栏 | `.aside-area` → `#aside-area` → `.player-and-aside-area > aside` → `[class*="aside-area"]` → `[class*="right-aside"]` |
+| 播放器舞台 | 真机 `.live-non-revenue-player`（主路径，已命中）→ 旧版 `#live-player` / `.live-player` / `#live-player-ctnr` → `[class*="live-player"]` |
+| 右侧栏 | 旧选择器 `.aside-area` → `#aside-area` → `.player-and-aside-area > aside` → `[class*="aside-area"]` → `[class*="right-aside"]`；**真机都没有**，再退化为结构化启发式（见第 8 节） |
 | 弹幕开关 | `#live-player .web-player-icon-danmaku` → `#live-player [class*="danmaku-switch"]` → `#live-player [class*="dm-switch"]` → `#live-player [class*="danmaku"] button` → `#live-player button[aria-label*="弹幕"]` → 页面级同名候选 |
 | 全屏按钮 | `#live-player .web-player-icon-fullscreen` → `#live-player [class*="fullscreen"]` → `#live-player button[aria-label*="全屏"]` → 页面级同名候选 |
 
@@ -145,3 +145,52 @@ B 站改类名不会让样式错位，只可能让某个功能「找不到 → �
 - 本地 `sass@1.108` 编译 `livePage.page.scss`（1.7KB）与 `livePage.shadow.scss`（5.4KB）：通过；
 - 未修改 `App.vue` / `contentScripts/index.ts` / `manifest.ts` / `storage.ts` / `_locales` /
   `nativeOverlay`；未跑 build / playwright；未碰浏览器；未做 git 操作。
+## 8. 第 17 轮：真机适配加固（live.bilibili.com/6，2026-11-11 实测）
+
+### 真机 DOM 证据
+
+- 播放器舞台：`.live-non-revenue-player`（已由 `[data-bewly-live-player]` 正常命中）；
+- 舞台**子节点**：`.live-player-handle-bar.expandable`（顶部操作条，实测约 183px 高）
+  与 `.live-player-bg`（画面容器，实测 1320×734）；
+- 页面上**不存在** `.aside-area` / `#aside-area` / `.player-and-aside-area`；
+  也不存在 `#live-player` / `#live-player-ctnr`（旧版选择器不再作为主路径）。
+
+### 影院模式（修正）
+
+- 舞台改为 `position: fixed; inset: 0; width: 100vw; height: 100vh; max-height: 100vh`，
+  **不再套 16:9**（直播是任意比例，16:9 撑不满或裁切）；
+- 画面用 `object-fit: contain`，高度按 `100vh`，保证完整可见、不裁切；
+- 舞台内顶部操作条 `.live-player-handle-bar` 由 JS 打上 `data-bewly-live-handle-bar` 后
+  `display: none`；画面容器 `.live-player-bg` 打上 `data-bewly-live-video-bg` 后铺满舞台；
+- 舞台铺满视口后，页面其余区块被舞台与遮罩完全覆盖/压暗，不再需要逐个隐藏。
+
+### 隐藏侧栏（降级策略）
+
+- 先按旧选择器找（`.aside-area` / `#aside-area` / `.player-and-aside-area > aside` / …）；
+- 找不到时用结构化启发式：在播放器祖先（最多 3 层）的同级节点里，找「宽度 160–420px、
+  高度 ≥ 220px、class 或文案命中聊天/礼物/榜单特征」的容器（真机聊天/礼物列约 320–420px）；
+- **仍然找不到 → 面板里的「隐藏侧栏」开关保持禁用**（`disabled` + `aria-disabled` 语义来自原生
+  `button:disabled`），并在面板底部显示「当前页没有可隐藏的侧栏」说明 ——
+  不给假开关，不会出现「点了没反应」。
+
+### 窄屏（≤900px）不挡控件
+
+- 直播播放器控件在画面底部；≤900px 时浮动按钮从右下角移到**右上角**，面板改为向下展开；
+- ≤640px 进一步收窄面板宽度（`100vw - 24px`）、限制标签宽度、允许吐司换行；
+- 遮罩 / 播放器舞台不变，缩进都在 shadow root 内，不影响 B 站原生 DOM。
+
+### 本轮改动文件
+
+- `src/contentScripts/livePage/dom.ts`：新增 `HANDLE_BAR_ATTR` / `VIDEO_BG_ATTR`；
+  `markLiveStage()` 标记操作条与画面容器；`findAside()` 增加结构化启发式；
+- `src/contentScripts/livePage/livePage.page.scss`：影院模式改 100vh / contain / 隐藏操作条；
+- `src/contentScripts/livePage/livePage.shadow.scss`：`@media (max-width: 900px/640px)` 窄屏定位；
+- `src/contentScripts/livePage/components/LivePageOverlay.vue`：侧栏不可用时的可见说明；
+- 本文件。
+
+### 已知限制（第 17 轮）
+
+- 侧栏启发式依赖真实的「聊天/礼物列」宽度与文案；若 B 站改成更宽的双栏或纯图标布局，
+  会退化为「找不到 → 开关禁用」，不会误隐藏内容；
+- 影院模式下顶部操作条被隐藏；若某些直播间把必要按钮也放在该条里，退出影院后即恢复；
+- 窄屏定位用 viewport 媒体查询，直播页若被嵌在 iframe 里不会启用模块（入口已排除 iframe）。

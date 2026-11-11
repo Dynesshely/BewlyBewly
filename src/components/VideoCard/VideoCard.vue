@@ -596,4 +596,32 @@ provide('getVideoType', () => props.type!)
 .more-active {
   --uno: "opacity-100";
 }
+
+/* #region 窄屏适配（第 17 轮）：悬停操作条不溢出封面、时长 / 角标让位 */
+@media (max-width: 900px) {
+  :deep(.bewly-card-actions) {
+    right: 2px;
+    bottom: 2px;
+    gap: 3px;
+    max-width: calc(100% - 4px);
+  }
+
+  :deep(.bewly-card-actions__btn) {
+    width: 26px;
+    height: 26px;
+  }
+}
+
+@media (max-width: 640px) {
+  :deep(.bewly-card-actions) {
+    gap: 2px;
+  }
+
+  :deep(.bewly-card-actions__btn) {
+    width: 24px;
+    height: 24px;
+    font-size: 14px;
+  }
+}
+/* #endregion */
 </style>

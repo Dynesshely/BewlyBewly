@@ -161,4 +161,48 @@ defineEmits<{ (e: 'retry'): void }>()
     transition: none;
   }
 }
+
+/* #region 窄屏适配（第 17 轮） */
+@media (max-width: 640px) {
+  .feedback-error {
+    padding: 32px 12px;
+  }
+
+  .feedback-error__art {
+    width: 76px;
+    height: 76px;
+  }
+
+  .feedback-error__title {
+    font-size: 15px;
+  }
+
+  .feedback-error__message {
+    word-break: break-word;
+  }
+
+  .feedback-error__actions {
+    width: 100%;
+    justify-content: center;
+  }
+}
+/* #endregion */
+
+/* #region 暗色 / 高对比度（第 17 轮） */
+.dark .feedback-error__message {
+  color: var(--bew-text-2);
+}
+
+@media (prefers-contrast: more) {
+  .feedback-error__art,
+  .feedback-error__ring,
+  .feedback-error__retry {
+    border-color: var(--bew-text-3);
+  }
+
+  .feedback-error__message {
+    color: var(--bew-text-2);
+  }
+}
+/* #endregion */
 </style>

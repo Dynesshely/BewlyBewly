@@ -400,4 +400,33 @@ onBeforeUnmount(() => {
     transition: none;
   }
 }
+
+/* #region 暗色 / 高对比度（第 17 轮） */
+.dark .bewly-fav-panel__close,
+.dark .bewly-fav-panel__hint,
+.dark .bewly-fav-panel__state,
+.dark .bewly-fav-panel__tag.is-private,
+.dark .bewly-fav-panel__count,
+.dark .bewly-fav-panel__selected,
+.dark .bewly-fav-panel__action {
+  color: var(--bew-text-2);
+}
+
+@media (prefers-contrast: more) {
+  .bewly-fav-panel,
+  .bewly-fav-panel__box,
+  .bewly-fav-panel__action {
+    border-color: var(--bew-text-3);
+  }
+
+  .bewly-fav-panel__close,
+  .bewly-fav-panel__hint,
+  .bewly-fav-panel__state,
+  .bewly-fav-panel__tag.is-private,
+  .bewly-fav-panel__count,
+  .bewly-fav-panel__selected {
+    color: var(--bew-text-2);
+  }
+}
+/* #endregion */
 </style>

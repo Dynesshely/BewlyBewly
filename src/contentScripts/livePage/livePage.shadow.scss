@@ -316,6 +316,57 @@
 }
 /* #endregion */
 
+/* #region 窄屏适配（第 17 轮）
+   直播播放器的控制条在画面底部：窄屏上浮动按钮 / 面板如果仍在右下角会压住全屏、清晰度、
+   弹幕输入等原生控件。这里在 <=900px 时把入口移到右上角，面板向下展开；<=640px 再收窄。 */
+@media (max-width: 900px) {
+  :host {
+    --blp-edge: var(--bew-space-12, 12px);
+  }
+
+  .blp-fab-group {
+    top: calc(var(--blp-edge) + var(--bew-space-8, 8px));
+    right: var(--blp-edge);
+    bottom: auto;
+  }
+
+  .blp-panel {
+    top: calc(var(--blp-edge) + var(--blp-fab-height) + var(--bew-space-12, 12px));
+    right: var(--blp-edge);
+    bottom: auto;
+    max-height: min(64vh, 460px);
+  }
+
+  .blp-live {
+    top: calc(var(--blp-edge) + var(--blp-fab-height) + var(--bew-space-12, 12px));
+    max-width: calc(100vw - var(--blp-edge) * 2);
+  }
+}
+
+@media (max-width: 640px) {
+  .blp-fab {
+    height: 36px;
+    padding: 0 10px;
+  }
+
+  .blp-fab__label {
+    max-width: 84px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .blp-panel {
+    width: calc(100vw - var(--blp-edge) * 2);
+    max-height: min(70vh, 420px);
+    padding: var(--bew-space-12, 12px);
+  }
+
+  .blp-toast {
+    max-width: 100%;
+    white-space: normal;
+  }
+}
+/* #endregion */
 /* #region 过场 */
 .blp-panel-enter-active,
 .blp-panel-leave-active {
@@ -410,6 +461,45 @@
 
   :host :focus-visible {
     outline: 2px solid Highlight;
+  }
+}
+/* #endregion */
+
+/* #region 暗色对比度（第 17 轮）
+   --bew-text-3 在暗色下是 60% 透明度，叠在 elevated-solid（#22232b）上约 4.54:1，
+   刚好压在 4.5:1 的小字号门槛上；叠到 hover/fill 层或半透明玻璃上会跌破，因此暗色下提一级。这里只把这些**次要但可读**的标签 / 提示 / 快捷键文字在暗色下
+   提升到 --bew-text-2（约 10:1），标题与正文层级不变，整体配色不动。 */
+:host(.dark) {
+  .blp-icon-btn,
+  .blp-group__label,
+  .blp-toggle__state,
+  .blp-hint,
+  .blp-foot,
+  .blp-kbd,
+  .blp-shortcuts__label,
+  .blp-toast {
+    color: var(--bew-text-2);
+  }
+}
+
+/* prefers-contrast: more 下两个模式都提一级：文字用 text-2，控件边框用 text-3 补可见边界 */
+@media (prefers-contrast: more) {
+  .blp-icon-btn,
+  .blp-group__label,
+  .blp-toggle__state,
+  .blp-hint,
+  .blp-foot,
+  .blp-kbd,
+  .blp-shortcuts__label,
+  .blp-toast {
+    color: var(--bew-text-2);
+  }
+
+  :host .blp-fab,
+  :host .blp-panel,
+  :host .blp-kbd,
+  :host .blp-toggle {
+    border-color: var(--bew-text-3);
   }
 }
 /* #endregion */

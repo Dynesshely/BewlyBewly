@@ -213,4 +213,22 @@ onBeforeUnmount(() => {
     transition: none;
   }
 }
+
+/* #region 暗色 / 高对比度（第 17 轮） */
+.dark .bewly-card-actions__btn:disabled {
+  /* 0.55 的禁用透明度在暗色下会让图标掉到约 2:1，抬到 0.72 保证仍能辨认「不可点」 */
+  opacity: 0.72;
+}
+
+@media (prefers-contrast: more) {
+  .bewly-card-actions__btn {
+    border-color: var(--bew-text-3);
+    opacity: 1;
+  }
+
+  .bewly-card-actions__btn:disabled {
+    opacity: 0.8;
+  }
+}
+/* #endregion */
 </style>

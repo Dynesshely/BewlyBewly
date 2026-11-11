@@ -200,4 +200,53 @@ withDefaults(defineProps<{
     animation: none;
   }
 }
+
+/* #region 窄屏适配（第 17 轮） */
+@media (max-width: 640px) {
+  .feedback-state {
+    gap: 8px;
+    padding: 32px 12px;
+  }
+
+  .feedback-state__art {
+    width: 76px;
+    height: 76px;
+  }
+
+  .feedback-state__icon {
+    font-size: 28px;
+  }
+
+  .feedback-state__title {
+    font-size: 15px;
+  }
+
+  .feedback-state__actions {
+    width: 100%;
+    justify-content: center;
+  }
+}
+/* #endregion */
+
+/* #region 暗色 / 高对比度（第 17 轮） */
+.dark .feedback-state__compact-icon,
+.dark .feedback-state__desc {
+  color: var(--bew-text-2);
+}
+
+@media (prefers-contrast: more) {
+  .feedback-state__ring {
+    border-color: var(--bew-text-3);
+  }
+
+  .feedback-state__ring--inner {
+    border-color: var(--bew-text-2);
+  }
+
+  .feedback-state__compact-icon,
+  .feedback-state__desc {
+    color: var(--bew-text-2);
+  }
+}
+/* #endregion */
 </style>

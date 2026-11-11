@@ -367,4 +367,21 @@ onUnmounted(() => {
     animation: none;
   }
 }
+
+/* #region 窄屏适配（第 17 轮） */
+@media (max-width: 640px) {
+  .moment-lightbox {
+    padding: 12px;
+  }
+
+  .moment-lightbox__caption {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .moment-lightbox__download {
+    max-width: calc(100vw - 24px);
+  }
+}
+/* #endregion */
 </style>

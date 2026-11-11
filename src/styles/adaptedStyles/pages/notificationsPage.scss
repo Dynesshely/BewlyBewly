@@ -721,3 +721,22 @@ html.bewly-design.notificationsPage.bewly-notif-compact {
   }
 }
 // #endregion
+// #region 暗色 / 高对比度（第 17 轮，只追加）
+// 左栏分类标题与时间右对齐用的 --bew-text-3 在暗色下约 3.9:1，低于小字号 4.5:1；
+// 暗色下提到 --bew-text-2（≈10:1），白天模式保持原值（B 站原生深灰已足够）。
+html.bewly-design.notificationsPage.dark {
+  .space-left .title,
+  .msg-time .time {
+    color: var(--bew-text-2);
+  }
+}
+
+@media (prefers-contrast: more) {
+  html.bewly-design.notificationsPage {
+    .space-left .title,
+    .msg-time .time {
+      color: var(--bew-text-2);
+    }
+  }
+}
+// #endregion

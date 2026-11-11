@@ -461,3 +461,62 @@
   }
 }
 /* #endregion */
+
+/* #region 窄屏适配（第 17 轮） */
+@media (max-width: 640px) {
+  .bcp-fab__label {
+    display: none;
+  }
+
+  .bcp-panel {
+    right: var(--bew-space-12, 12px);
+    left: var(--bew-space-12, 12px);
+    width: auto;
+    max-height: 76vh;
+  }
+
+  .bcp-chip-row {
+    flex-wrap: wrap;
+  }
+}
+/* #endregion */
+
+/* #region 暗色对比度（第 17 轮）
+   --bew-text-3 在暗色下是 60% 透明度，叠在 elevated-solid（#22232b）上约 4.54:1，
+   刚好压在 4.5:1 的小字号门槛上；叠到 hover/fill 层或半透明玻璃上会跌破，因此暗色下提一级。这里只把这些**次要但可读**的标签 / 提示 / 快捷键文字在暗色下
+   提升到 --bew-text-2（约 10:1），标题与正文层级不变，整体配色不动。 */
+:host(.dark) {
+  .bcp-fab__count,
+  .bcp-icon-btn,
+  .bcp-group__label,
+  .bcp-status__meta,
+  .bcp-foot,
+  .bcp-kbd,
+  .bcp-shortcuts__label,
+  .bcp-toast {
+    color: var(--bew-text-2);
+  }
+}
+
+/* prefers-contrast: more 下两个模式都提一级：文字用 text-2，控件边框用 text-3 补可见边界 */
+@media (prefers-contrast: more) {
+  .bcp-fab__count,
+  .bcp-icon-btn,
+  .bcp-group__label,
+  .bcp-status__meta,
+  .bcp-foot,
+  .bcp-kbd,
+  .bcp-shortcuts__label,
+  .bcp-toast {
+    color: var(--bew-text-2);
+  }
+
+  :host .bcp-fab,
+  :host .bcp-panel,
+  :host .bcp-kbd,
+  :host .bcp-seg,
+  :host .bcp-chip {
+    border-color: var(--bew-text-3);
+  }
+}
+/* #endregion */

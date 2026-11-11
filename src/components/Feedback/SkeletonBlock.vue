@@ -103,4 +103,27 @@ const wrapperStyle = computed<Record<string, string>>(() => ({
     opacity: 0.7;
   }
 }
+
+/* #region 窄屏适配（第 17 轮） */
+@media (max-width: 640px) {
+  .feedback-skeleton__row {
+    border-radius: 6px;
+  }
+}
+/* #endregion */
+
+/* #region 暗色 / 高对比度（第 17 轮） */
+.dark .feedback-skeleton__row {
+  /* 暗色下 --bew-skeleton（fill-2 30%）与页面底色只有约 1.52:1，占位块几乎看不见；
+     混入次要文字色后约 1.87:1（prefers-contrast 下约 2.6:1）。骨架是装饰元素，
+     不满足 3:1 也合规，但至少要能辨认出「正在加载」 */
+  background: color-mix(in oklab, var(--bew-skeleton), var(--bew-text-3) 22%);
+}
+
+@media (prefers-contrast: more) {
+  .feedback-skeleton__row {
+    background: color-mix(in oklab, var(--bew-skeleton), var(--bew-text-2) 35%);
+  }
+}
+/* #endregion */
 </style>

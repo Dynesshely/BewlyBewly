@@ -150,6 +150,9 @@ const fullscreenTitle = computed(() => ui.fullscreenAvailable ? t.value.fullscre
         <p v-if="!ui.playerReady" class="blp-hint">
           {{ t.playerNotFound }}
         </p>
+        <p v-else-if="!ui.asideAvailable" class="blp-hint">
+          {{ t.asideUnavailable }}
+        </p>
         <p class="blp-foot">
           {{ t.hint }}
         </p>

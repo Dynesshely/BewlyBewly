@@ -23,6 +23,7 @@ import {
   isLivePage,
   markLiveStage,
   notifyPlayerResize,
+  resetAsideCache,
 } from './dom'
 import { getMessages } from './i18n'
 import {
@@ -252,6 +253,7 @@ export function cleanupDom(): void {
     toastTimer = null
   }
   clearLiveStage()
+  resetAsideCache()
   removePageStyles()
   const html = document.documentElement
   html.classList.remove(ROOT_CLASS_CINEMA, ROOT_CLASS_HIDE_ASIDE)

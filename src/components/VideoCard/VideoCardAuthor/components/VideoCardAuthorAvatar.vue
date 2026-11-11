@@ -83,6 +83,7 @@ const displayedAvatars = computed(() => {
     <!-- More avatars not shown -->
     <span
       v-if="Array.isArray(author) && author.length > maxCount"
+      class="video-card-avatar-more"
       pos="absolute right--4px"
       w="28px" h="28px"
       bg="$bew-skeleton"
@@ -95,6 +96,22 @@ const displayedAvatars = computed(() => {
 </template>
 
 <style scoped lang="scss">
+/* #region 暗色 / 高对比度（第 17 轮）
+   头像未加载时的占位底色在暗色下与卡片底色差太小（约 1.5:1），抬一档便于辨认头像位。 */
+.dark a,
+.dark .video-card-avatar-more {
+  background-color: color-mix(in oklab, var(--bew-skeleton), var(--bew-text-3) 20%);
+}
+
+@media (prefers-contrast: more) {
+  a,
+  .video-card-avatar-more {
+    outline: 1px solid var(--bew-text-3);
+    outline-offset: -1px;
+  }
+}
+/* #endregion */
+
 .live {
   --uno: "p-2px box-border border-2 border-$bew-theme-color-60";
 }

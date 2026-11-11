@@ -662,4 +662,59 @@ watch(() => [props.density, props.compact], async () => {
     transform: none;
   }
 }
+
+/* #region 窄屏适配（第 17 轮）：互动条 / 统计行不挤出卡片 */
+@media (max-width: 900px) {
+  .moment-card__stats {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .moment-card__actions {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+}
+
+@media (max-width: 640px) {
+  .moment-card__meta {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+
+  .moment-card__action-btn {
+    padding-inline: 8px;
+  }
+}
+/* #endregion */
+
+/* #region 暗色 / 高对比度（第 17 轮）
+   互动条（点赞/评论/转发数）与时间、「已删除」提示在暗色下都用 --bew-text-3（60% 透明），
+   叠在卡片底色上约 4.54:1（临界）；暗色下提到 --bew-text-2（约 8.4:1），保证互动数字可读且与正文仍有层级差。 */
+.dark {
+  .moment-card__action,
+  .moment-card__action-btn,
+  .moment-card__stat,
+  .moment-card__type,
+  .moment-card__time,
+  .moment-card__deleted {
+    color: var(--bew-text-2);
+  }
+}
+
+@media (prefers-contrast: more) {
+  .moment-card__action,
+  .moment-card__action-btn,
+  .moment-card__stat,
+  .moment-card__type,
+  .moment-card__time,
+  .moment-card__deleted {
+    color: var(--bew-text-2);
+  }
+
+  .moment-card__action-btn {
+    border-color: var(--bew-text-3);
+  }
+}
+/* #endregion */
 </style>

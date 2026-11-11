@@ -377,3 +377,21 @@ jyut 继承 cmn-TW（与第 24 轮数据类文案一致）。
 - 视频播放页分组的「重置本组」现在会一起重置 6 个字段（影院 / 迷你 / 快捷键 / 评论增强 / 评论分栏 / 推荐轨道）；
 - 窄屏（<1280px）与影院模式下，即使开关打开，布局改造也会自动降级为原生布局（避免两列放不下）；
 - 本次自测仅 eslint + typecheck（按分工未跑 build / playwright、未碰浏览器）。
+## 第 28 轮：视频播放页分组调整（删影院 / 增固定布局）
+
+| 变更 | 字段 | 控件 |
+| --- | --- | --- |
+| **移除** | `videoPageCinemaMode`（影院模式） | 设置页不再展示；字段与默认值保留在 `originalSettings`（导入旧配置不报错），A 工作流标注 deprecated、不再读取 |
+| **新增** | `videoPageFixedLayout`（固定单页布局，默认 `true`） | `PagesSwitch` + `aria-describedby="pages-desc-video-fixed-layout"` |
+
+- **固定单页布局**说明文案（简中）：「页面不再垂直滚动：信息栏压缩成一行，播放器、评论区、推荐视频轨道同屏常显。
+  视口过窄或过矮时自动回退到可滚动的原生布局」；四语言（cmn-CN / cmn-TW / jyut / en）均已补齐；
+- **参与「重置本组」**：`videoPage` 分组重置列表已把 `videoPageCinemaMode` 换成 `videoPageFixedLayout`，
+  重置后 6 个字段（固定布局 / 迷你播放器 / 快捷键 / 评论增强 / 评论分栏 / 推荐轨道）回到默认值；
+- **搜索索引**：`itemSearchText` 同步替换，搜索「固定 / fixed」能命中；「影院 / cinema」不再命中；
+- 快捷键说明里的 `C/M/F/T` 已改为 `C/M/F`（影院删除后的按键清单），四语言一致。
+
+### 诊断联动
+
+设置页「诊断」组的视频页探测项同步更新为四项（详见 `docs/diagnostics.md`）：
+固定布局 / 评论右列 / 推荐轨道 / 广告清理，各自带 `settingKey` 与「去设置里开启」建议文案（四语言）。

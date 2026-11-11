@@ -47,7 +47,7 @@ function openRailNewTab(url: string): void {
 </script>
 
 <template>
-  <div class="bvp-root" :data-ready="ui.ready" :data-mini="ui.mini" :data-cinema="ui.cinema">
+  <div class="bvp-root" :data-ready="ui.ready" :data-mini="ui.mini" :data-fixed="ui.fixedLayout">
     <CompactBar />
     <CommentToolbar />
     <CommentFoldButtons />

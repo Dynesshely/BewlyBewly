@@ -54,7 +54,8 @@ export interface VideoPageUiState {
   commentFoldButtons: CommentFoldButtonView[]
   /** 推荐轨道是否已渲染（第 27 轮；由 recommendRail/index.ts 写入） */
   recommendRailVisible: boolean
-  cinema: boolean
+  /** 固定单页布局是否生效（第 28 轮；由 fixedLayout/index.ts 写入） */
+  fixedLayout: boolean
   mini: boolean
   compact: boolean
   helpOpen: boolean
@@ -89,7 +90,7 @@ function createInitialState(): VideoPageUiState {
     commentToolbarLeft: 0,
     commentFoldButtons: [],
     recommendRailVisible: false,
-    cinema: false,
+    fixedLayout: false,
     mini: false,
     compact: false,
     helpOpen: false,

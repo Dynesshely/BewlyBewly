@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import { restorePlayer, toggleCinema, toggleDanmaku, toggleShortcutsHelp } from '../actions'
+import { restorePlayer, toggleDanmaku, toggleShortcutsHelp } from '../actions'
 import { useMessages } from '../i18n'
 import { ui } from '../state'
 
@@ -47,17 +47,6 @@ const progressPercent = computed(() => {
           @click="toggleDanmaku()"
         >
           {{ t.danmaku }}
-        </button>
-        <button
-          class="bvp-icon-btn"
-          type="button"
-          data-bvp-action="cinema"
-          :aria-pressed="ui.cinema"
-          :title="t.cinema"
-          :aria-label="t.cinema"
-          @click="toggleCinema()"
-        >
-          {{ t.cinema }}
         </button>
         <button
           class="bvp-icon-btn"

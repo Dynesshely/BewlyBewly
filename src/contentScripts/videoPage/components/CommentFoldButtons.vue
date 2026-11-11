@@ -41,29 +41,15 @@ function buttonStyle(button: { top: number, left: number }): Record<string, stri
 </script>
 
 <template>
-  <template v-if="!ui.cinema">
-    <button
-      v-for="button in ui.commentFoldButtons"
-      :key="button.id"
-      class="bvp-comment-expand"
-      type="button"
-      data-bvp-action="expand-comment"
-      :style="buttonStyle(button)"
-      @click="expandComment(button.id)"
-    >
-      {{ t.commentsExpand }}
-    </button>
-  </template>
-
-  <style scoped lang="scss">
-    /* #region 窄屏适配（第 25 轮）：贴右内侧 + 缩小尺寸，避免遮挡正文 */
-    @media (max-width: 768px) {
-    .bvp-comment-expand {
-    width: 76px;
-    height: 30px;
-    font-size: 11px;
-    }
-    }
-    /* #endregion */
-  </style>
+  <button
+    v-for="button in ui.commentFoldButtons"
+    :key="button.id"
+    class="bvp-comment-expand"
+    type="button"
+    data-bvp-action="expand-comment"
+    :style="buttonStyle(button)"
+    @click="expandComment(button.id)"
+  >
+    {{ t.commentsExpand }}
+  </button>
 </template>

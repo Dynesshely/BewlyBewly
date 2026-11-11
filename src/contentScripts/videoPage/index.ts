@@ -20,11 +20,10 @@ import {
   clearToastTimer,
   isMiniRestoreSuppressed,
   readStoredAutoplay,
-  readStoredCinema,
-  setCinema,
   setCompact,
   setMini,
 } from './actions'
+import { setupAdGuard, teardownAdGuard } from './adGuard'
 import { setupCommentColumn, syncCommentColumn } from './commentColumn'
 import { setupComments, syncComments } from './comments'
 import PlaylistPanel from './components/PlaylistPanel.vue'
@@ -45,6 +44,7 @@ import {
   isNativeVideoPage,
   markPlayerStage,
 } from './dom'
+import { setupFixedLayout, syncFixedLayout } from './fixedLayout'
 import selectionPanelCss from './playlistPanel.shadow.scss?inline'
 import { bindRailHost, railState, syncRecommendRail, teardownRecommendRail } from './recommendRail'
 import { setupShortcuts } from './shortcuts'
@@ -76,6 +76,7 @@ let vueApp: App | null = null
 let disposeShortcuts: (() => void) | null = null
 let disposeComments: (() => void) | null = null
 let disposeCommentColumn: (() => void) | null = null
+let disposeFixedLayout: (() => void) | null = null
 let stopSettingsWatch: (() => void) | null = null
 let syncTimer: number | null = null
 let scrollFrame = 0
@@ -130,8 +131,14 @@ function mount(): void {
   // 评论区增强（排序 / 只看 UP / 长评论折叠）：没有评论区时组件自身不渲染
   disposeComments = setupComments()
 
-  // 评论区移到播放器右侧、与播放器同高（第 27 轮）：找不到结构 / 窄屏 / 影院模式会自动回退
+  // 评论区移到播放器右侧、与播放器同高（第 27 轮）：找不到结构 / 窄屏会自动回退
   disposeCommentColumn = setupCommentColumn()
+
+  // 广告清理（第 28 轮）：CSS 清单 + MutationObserver 兜底动态插入
+  setupAdGuard()
+
+  // 固定单页布局（第 28 轮）：窗口太小 / 番剧页 / 迷你态会自动回退到原生可滚动布局
+  disposeFixedLayout = setupFixedLayout()
 
   window.addEventListener('scroll', handleScroll, { passive: true })
   window.addEventListener('resize', handleScroll, { passive: true })
@@ -143,14 +150,14 @@ function mount(): void {
   stopSettingsWatch = watch(
     () => [
       settings.value.videoPageShortcuts,
-      settings.value.videoPageCinemaMode,
       settings.value.videoPageMiniPlayer,
       settings.value.videoPageRecommendRail,
+      settings.value.videoPageFixedLayout,
     ] as const,
-    ([shortcutsEnabled, cinemaEnabled, miniEnabled, recommendRailEnabled]) => {
+    ([shortcutsEnabled, miniEnabled, recommendRailEnabled]) => {
       // 推荐轨道开关：关掉时立刻还原原生列表
       if (!recommendRailEnabled)
-        syncRecommendRail({ enabled: false, cinema: ui.cinema })
+        syncRecommendRail({ enabled: false })
       if (shortcutsEnabled && !disposeShortcuts) {
         disposeShortcuts = setupShortcuts()
       }
@@ -159,20 +166,16 @@ function mount(): void {
         disposeShortcuts = null
       }
 
-      // 关掉影院模式时立刻退出；关掉迷你播放器时立刻还原
-      if (!cinemaEnabled && ui.cinema)
-        setCinema(false, { silent: true })
+      // 关掉迷你播放器时立刻还原
       if (!miniEnabled && ui.mini)
         setMini(false)
 
       updateScrollState()
-      syncRecommendRail({ enabled: settings.value.videoPageRecommendRail, cinema: ui.cinema })
+      syncRecommendRail({ enabled: settings.value.videoPageRecommendRail })
+      // 固定布局开关：立刻生效 / 立刻还原
+      syncFixedLayout()
     },
   )
-
-  // 影院模式在同一标签页内跨页面刷新保持（功能关闭时不恢复）
-  if (settings.value.videoPageCinemaMode && readStoredCinema())
-    setCinema(true, { silent: true })
 
   // 自动连播默认关，只在同一标签页里记忆用户的开启状态
   if (ui.selectionNav)
@@ -210,6 +213,11 @@ function unmount(): void {
     disposeCommentColumn()
     disposeCommentColumn = null
   }
+  if (disposeFixedLayout) {
+    disposeFixedLayout()
+    disposeFixedLayout = null
+  }
+  teardownAdGuard()
 
   window.removeEventListener('scroll', handleScroll)
   window.removeEventListener('resize', handleScroll)
@@ -222,7 +230,7 @@ function unmount(): void {
     endedTimer = null
   }
 
-  document.documentElement.classList.remove('bewly-video-cinema', 'bewly-video-mini')
+  document.documentElement.classList.remove('bewly-video-mini')
   document.documentElement.style.removeProperty('--bvp-mini-placeholder')
   clearStagePlaceholder()
   clearPlayerStage()
@@ -300,13 +308,13 @@ function sync(): void {
   syncComments()
 
   // 推荐视频轨道（第 27 轮）：读不到卡片时内部会保持原生列表不动
-  syncRecommendRail({
-    enabled: settings.value.videoPageRecommendRail,
-    cinema: ui.cinema,
-  })
+  syncRecommendRail({ enabled: settings.value.videoPageRecommendRail })
   const railVisible = Boolean(railState.placement && railState.cards.length)
   if (ui.recommendRailVisible !== railVisible)
     ui.recommendRailVisible = railVisible
+
+  // 固定单页布局：先算播放器高度（评论区右列会跟着播放器高度走），再校正评论列
+  syncFixedLayout()
 
   // 评论区右列布局：B 站可能重渲染 #commentapp / 右栏，每拍校正一次（不满足条件时内部直接还原）
   syncCommentColumn()
@@ -331,8 +339,8 @@ function updateScrollState(): void {
     return
   }
 
-  // 影院模式下不启用迷你播放器（播放器本来就占满视口）
-  if (ui.cinema) {
+  // 固定单页布局下页面不滚动，不需要迷你播放器
+  if (ui.fixedLayout) {
     if (ui.mini)
       setMini(false)
     return

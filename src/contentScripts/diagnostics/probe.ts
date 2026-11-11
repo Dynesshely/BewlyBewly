@@ -177,12 +177,54 @@ export function collectProbeItems(): ProbeItem[] {
       ],
     },
     {
+      name: '视频页固定单页布局',
+      group: 'video',
+      hostId: 'bewly-video-page',
+      applies: /^\/(?:video|list|bangumi\/play)\//.test(location.pathname),
+      // 固定布局落地后的三个硬信号：html 类、播放器、页面级样式
+      selectors: ['html.bewly-video-fixed', '#playerWrap', '#bilibili-player'],
+      enabled: settings.value.videoPageFixedLayout !== false,
+      settingKey: 'videoPageFixedLayout',
+      note: '固定布局在视口 <1280 宽或 <700 高时会主动降级为可滚动原生布局（设置项仍为开启）',
+    },
+    {
+      name: '视频页评论右列',
+      group: 'video',
+      applies: /^\/video\//.test(location.pathname),
+      selectors: ['.bewly-comment-column', '#commentapp', 'bili-comments'],
+      enabled: settings.value.videoPageCommentColumn !== false,
+      settingKey: 'videoPageCommentColumn',
+      note: '评论区是 Web Components；关闭该项时评论区留在左栏下方',
+    },
+    {
+      name: '视频页推荐轨道',
+      group: 'video',
+      applies: /^\/video\//.test(location.pathname),
+      selectors: ['.bvp-rail', '.bvp-rail__viewport', '.bvp-rail__card'],
+      enabled: settings.value.videoPageRecommendRail !== false,
+      settingKey: 'videoPageRecommendRail',
+      note: '推荐轨道在 #bewly-video-page 的 shadow root 内，命中 0 时说明轨道未渲染或已关闭',
+    },
+    {
+      name: '视频页广告清理',
+      group: 'video',
+      applies: /^\/video\//.test(location.pathname),
+      selectors: [
+        '[data-bewly-ad-hidden]',
+        '.ad-report',
+        '.strip-ad',
+        '#slide_ad',
+      ],
+      // 广告清理没有独立开关，随视频页增强一起生效
+      note: '命中 0 且页面上没有广告容器属于正常（B 站未投放广告）',
+    },
+    {
       name: '视频播放页增强',
       group: 'video',
       hostId: 'bewly-video-page',
       applies: /^\/(?:video|list|bangumi\/play)\//.test(location.pathname),
       selectors: videoSelectors,
-      enabled: settings.value.videoPageCinemaMode || settings.value.videoPageMiniPlayer || settings.value.videoPageShortcuts,
+      enabled: settings.value.videoPageMiniPlayer || settings.value.videoPageShortcuts,
       settingKey: 'videoPage',
     },
     {
@@ -403,6 +445,12 @@ export function adviceText(item: ProbeItem, t: import('./i18n').DiagnosticsMessa
         return t.adviceEnableVideoComments
       if (item.settingKey === 'listScrollMemory')
         return t.adviceEnableListScrollMemory
+      if (item.settingKey === 'videoPageFixedLayout')
+        return t.adviceEnableVideoFixedLayout
+      if (item.settingKey === 'videoPageCommentColumn')
+        return t.adviceEnableVideoCommentColumn
+      if (item.settingKey === 'videoPageRecommendRail')
+        return t.adviceEnableVideoRecommendRail
       return t.adviceEnableVideoPage
     case 'login-required':
       return t.adviceLogin

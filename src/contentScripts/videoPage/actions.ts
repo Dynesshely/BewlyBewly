@@ -18,10 +18,6 @@ import {
 import { formatPercent, getMessages } from './i18n'
 import { ui } from './state'
 
-/** 影院模式状态存 sessionStorage：同一标签页刷新后保持，新标签页从关闭开始 */
-const CINEMA_STORAGE_KEY = 'bewly-video-cinema'
-
-const HTML_CLASS_CINEMA = 'bewly-video-cinema'
 const HTML_CLASS_MINI = 'bewly-video-mini'
 
 /** 还原迷你播放器后的短暂抑制窗口，避免平滑滚动途中又被判定为「滚出视口」而重新收缩 */
@@ -52,66 +48,6 @@ export function clearToastTimer(): void {
     toastTimer = null
   }
   ui.toast = ''
-}
-
-export function readStoredCinema(): boolean {
-  try {
-    return sessionStorage.getItem(CINEMA_STORAGE_KEY) === '1'
-  }
-  catch {
-    return false
-  }
-}
-
-function storeCinema(on: boolean): void {
-  try {
-    sessionStorage.setItem(CINEMA_STORAGE_KEY, on ? '1' : '0')
-  }
-  catch {
-    // sessionStorage 可能被隐私设置禁用，忽略即可
-  }
-}
-
-/** 影院模式：播放器铺满视口宽度、隐藏右栏与推荐、页面背景压暗 */
-export function setCinema(on: boolean, options: { silent?: boolean } = {}): void {
-  // 设置页关掉影院模式后，任何入口（快捷键 / 浮动按钮 / 旧 sessionStorage）都不再生效
-  if (on && !settings.value.videoPageCinemaMode) {
-    return
-  }
-
-  if (ui.cinema === on) {
-    return
-  }
-
-  ui.cinema = on
-  document.documentElement.classList.toggle(HTML_CLASS_CINEMA, on)
-  storeCinema(on)
-
-  if (on) {
-    // 进入影院时先复位迷你播放器 / 收起播放列表面板，避免它们挡住铺满视口的播放器
-    setMini(false)
-    closeSelectionPanel()
-    window.scrollTo({
-      top: 0,
-      behavior: prefersReducedMotion()
-        ? 'auto'
-        : 'smooth',
-    })
-  }
-
-  notifyPlayerResize()
-
-  if (!options.silent) {
-    const t = messages()
-    showToast(on ? t.cinemaOn : t.cinemaOff)
-  }
-}
-
-export function toggleCinema(): void {
-  if (!settings.value.videoPageCinemaMode) {
-    return
-  }
-  setCinema(!ui.cinema)
 }
 
 export function setMini(on: boolean): void {

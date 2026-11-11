@@ -293,6 +293,9 @@ export function findMainColumn(): HTMLElement | null {
   return null
 }
 
+/** 固定单页布局下轨道离视口底部的间距 */
+const RAIl_FIXED_BOTTOM_GAP = 12
+
 /**
  * 轨道在视口里的放置位置。
  *
@@ -309,6 +312,18 @@ export function computeRailPlacement(railHeight: number): RailPlacement | null {
   const width = Math.min(rect.width, window.innerWidth - margin * 2)
   if (width < 320)
     return null
+
+  // 固定单页布局（第 28 轮）：页面不滚动，轨道直接贴视口底部，「始终可见」
+  if (document.documentElement.classList.contains('bewly-video-fixed')) {
+    const height = Math.round(railHeight)
+    return {
+      top: Math.max(0, window.innerHeight - height - RAIl_FIXED_BOTTOM_GAP),
+      left: Math.round(rect.left + Math.max(0, (rect.width - width) / 2)),
+      width: Math.round(width),
+      height,
+    }
+  }
+
   return {
     top: Math.round(rect.bottom + margin),
     left: Math.round(rect.left + Math.max(0, (rect.width - width) / 2)),

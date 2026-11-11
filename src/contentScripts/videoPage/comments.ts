@@ -392,12 +392,6 @@ function evaluateFold(thread: HTMLElement, renderer: HTMLElement): void {
 
 /** 展开按钮 fixed 定位：按 thread 矩形算，只保留视口内的 */
 function refreshFoldPositions(): void {
-  if (ui.cinema) {
-    if (ui.commentFoldButtons.length)
-      ui.commentFoldButtons = []
-    return
-  }
-
   const next: { id: number, top: number, left: number }[] = []
   for (const [id, { thread }] of foldTargets) {
     if (!thread.isConnected) {

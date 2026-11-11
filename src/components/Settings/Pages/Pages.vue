@@ -88,7 +88,7 @@ const groups = computed<SettingGroupDef[]>(() => [
     title: t.value.groupVideoPage,
     desc: t.value.groupVideoPageDesc,
     items: [
-      'videoPageCinemaMode',
+      'videoPageFixedLayout',
       'videoPageMiniPlayer',
       'videoPageShortcuts',
       'videoPageComments',
@@ -96,7 +96,7 @@ const groups = computed<SettingGroupDef[]>(() => [
       'videoPageRecommendRail',
     ],
     reset: () => {
-      settings.value.videoPageCinemaMode = originalSettings.videoPageCinemaMode
+      settings.value.videoPageFixedLayout = originalSettings.videoPageFixedLayout
       settings.value.videoPageMiniPlayer = originalSettings.videoPageMiniPlayer
       settings.value.videoPageShortcuts = originalSettings.videoPageShortcuts
       settings.value.videoPageComments = originalSettings.videoPageComments
@@ -215,7 +215,7 @@ const groups = computed<SettingGroupDef[]>(() => [
  * 用 getter 而不是固定字符串：切换语言后搜索索引立刻跟着变。
  */
 const itemSearchText: Record<string, () => string[]> = {
-  videoPageCinemaMode: () => [t.value.videoPageCinemaMode, t.value.videoPageCinemaModeDesc],
+  videoPageFixedLayout: () => [t.value.videoPageFixedLayout, t.value.videoPageFixedLayoutDesc],
   videoPageMiniPlayer: () => [t.value.videoPageMiniPlayer, t.value.videoPageMiniPlayerDesc],
   videoPageShortcuts: () => [t.value.videoPageShortcuts, t.value.videoPageShortcutsDesc],
   videoPageComments: () => [t.value.videoPageComments, t.value.videoPageCommentsDesc],
@@ -796,8 +796,14 @@ onBeforeUnmount(() => {
       :reset-done="resetDoneGroup === 'videoPage'"
       @reset="resetGroup('videoPage')"
     >
-      <SettingsItem v-if="itemVisible('videoPageCinemaMode')" :title="t.videoPageCinemaMode" :desc="t.videoPageCinemaModeDesc">
-        <Radio v-model="settings.videoPageCinemaMode" />
+      <SettingsItem v-if="itemVisible('videoPageFixedLayout')" :title="t.videoPageFixedLayout">
+        <template #desc>
+          <span id="pages-desc-video-fixed-layout">{{ t.videoPageFixedLayoutDesc }}</span>
+        </template>
+        <PagesSwitch
+          v-model="settings.videoPageFixedLayout"
+          describedby="pages-desc-video-fixed-layout"
+        />
       </SettingsItem>
 
       <SettingsItem v-if="itemVisible('videoPageMiniPlayer')" :title="t.videoPageMiniPlayer" :desc="t.videoPageMiniPlayerDesc">

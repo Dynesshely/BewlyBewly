@@ -277,3 +277,24 @@ pnpm test -- --run                                    # 仓库原有单测（src
   （注册表是只读登记表，不执行按键）；
 - 文案校验是「key 存在且非空」，不校验文案语义与长度；嵌套 YAML 只支持本仓库 `_locales` 的「缩进 + key: value」结构；
 - 自定义改键（`settings.keyboardShortcuts`）可能与默认键位冲突，本轮不校验用户配置（改键冲突在设置页由现有逻辑处理）。
+## 第 28 轮：删除影院模式动作
+
+影院模式（第 1 轮引入的视频页能力）在**第 28 轮被整体移除**（用户要求：固定单页布局取代全屏影院）。
+注册表与设置页同步收尾：
+
+- `SHORTCUT_REGISTRY` 删除条目 `video-cinema`（`T` 键），视频页 scope 现在只剩：J/K/L、←/→、C、M、F、Shift+P、P、0–9、Esc；
+- `keyboard_registry.actions.video_cinema` 文案 key 保留在 `_locales` 里（避免旧配置 / 旧文档引用报错），但注册表不再引用它；
+- 帮助面板与命令面板不会再出现「影院模式」一行；
+- `tests/unit/shortcutRegistry.spec.ts` 四条校验（键位唯一 / 规范化唯一 / scope+label+四语言齐全 / 帮助分组顺序）**全绿**
+  （`pnpm test -- --run`：6 个测试文件 / 21 条用例通过）。
+
+### 新增快捷键仍需过的四条校验（不变）
+
+详见本文上一节「新增快捷键必须过的四条校验」；本次删除动作后校验器未做任何放宽：
+键位唯一是「同 scope 内」的，所以移除一条不会让别的 scope 的 `T` 变成冲突。
+
+### 已知限制
+
+- `src/logic/storage.ts` 里仍保留 `videoPageCinemaMode` 字段（A 工作流标注 deprecated、不再读取），
+  设置页已不再展示该开关；导入旧配置时字段仍被接受（类型校验依赖 `originalSettings`，字段未删）。
+- 用户如果之前在 sessionStorage 里存过 `bewly-video-cinema`，第 28 轮起不再恢复（影院相关读写已删）。

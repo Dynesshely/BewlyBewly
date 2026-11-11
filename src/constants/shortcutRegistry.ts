@@ -271,12 +271,6 @@ export const SHORTCUT_REGISTRY: ShortcutRegistryEntry[] = [
     i18nKey: 'keyboard_registry.actions.video_fullscreen',
   },
   {
-    id: 'video-cinema',
-    scope: 'video',
-    keys: ['T'],
-    i18nKey: 'keyboard_registry.actions.video_cinema',
-  },
-  {
     id: 'video-pip',
     scope: 'video',
     keys: ['Shift', 'P'],

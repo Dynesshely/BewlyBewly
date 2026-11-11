@@ -14,7 +14,6 @@ export interface ShortcutLabels {
   danmaku: string
   mute: string
   fullscreen: string
-  cinema: string
   pip: string
   restore: string
   prevEpisode: string
@@ -33,10 +32,6 @@ export type ShortcutLabelKey = keyof ShortcutLabels
 
 export interface VideoPageMessages {
   controls: string
-  cinema: string
-  exitCinema: string
-  cinemaOn: string
-  cinemaOff: string
   restorePlayer: string
   restored: string
   compactBack: string
@@ -87,6 +82,10 @@ export interface VideoPageMessages {
   recommendRailPrev: string
   recommendRailNext: string
   recommendRailClose: string
+  /** 固定单页布局（第 28 轮） */
+  fixedLayoutOn: string
+  fixedLayoutOff: string
+  fixedLayoutUnavailable: string
   collectionHint: string
   /** 形如「已跳到 {percent}%」，用 formatPercent 替换占位符 */
   percent: string
@@ -95,10 +94,6 @@ export interface VideoPageMessages {
 
 const CMN_CN: VideoPageMessages = {
   controls: '播放器增强',
-  cinema: '影院模式',
-  exitCinema: '退出影院',
-  cinemaOn: '已进入影院模式，按 Esc 退出',
-  cinemaOff: '已退出影院模式',
   restorePlayer: '还原播放器',
   restored: '已还原播放器',
   compactBack: '回到播放',
@@ -145,6 +140,9 @@ const CMN_CN: VideoPageMessages = {
   recommendRailPrev: '上一张',
   recommendRailNext: '下一张',
   recommendRailClose: '收起推荐轨道',
+  fixedLayoutOn: '已切换到固定单页布局',
+  fixedLayoutOff: '已恢复可滚动布局',
+  fixedLayoutUnavailable: '当前窗口放不下固定布局（需宽 ≥1280、高 ≥700）',
   percent: '已跳到 {percent}%',
   shortcut: {
     seekBack: '后退 10 秒',
@@ -155,7 +153,6 @@ const CMN_CN: VideoPageMessages = {
     danmaku: '开关弹幕',
     mute: '静音切换',
     fullscreen: '全屏',
-    cinema: '影院模式',
     pip: '画中画',
     restore: '还原迷你播放器',
     prevEpisode: '上一集',
@@ -167,16 +164,12 @@ const CMN_CN: VideoPageMessages = {
     autoplay: '自动连播开关',
     percent: '跳到 0%–90%',
     help: '打开 / 关闭快捷键帮助',
-    escape: '退出影院 / 关闭帮助',
+    escape: '关闭帮助 / 面板或退出全屏',
   },
 }
 
 const EN: VideoPageMessages = {
   controls: 'Player enhancements',
-  cinema: 'Cinema mode',
-  exitCinema: 'Exit cinema',
-  cinemaOn: 'Cinema mode on — press Esc to exit',
-  cinemaOff: 'Cinema mode off',
   restorePlayer: 'Restore player',
   restored: 'Player restored',
   compactBack: 'Back to video',
@@ -223,6 +216,9 @@ const EN: VideoPageMessages = {
   recommendRailPrev: 'Previous',
   recommendRailNext: 'Next',
   recommendRailClose: 'Hide the recommendation rail',
+  fixedLayoutOn: 'Fixed single-page layout on',
+  fixedLayoutOff: 'Back to the scrollable layout',
+  fixedLayoutUnavailable: 'This window is too small for the fixed layout (needs width ≥1280, height ≥700)',
   percent: 'Jumped to {percent}%',
   shortcut: {
     seekBack: 'Back 10 seconds',
@@ -233,7 +229,6 @@ const EN: VideoPageMessages = {
     danmaku: 'Toggle danmaku',
     mute: 'Toggle mute',
     fullscreen: 'Fullscreen',
-    cinema: 'Cinema mode',
     pip: 'Picture-in-picture',
     restore: 'Restore the mini player',
     prevEpisode: 'Previous episode',
@@ -245,16 +240,12 @@ const EN: VideoPageMessages = {
     autoplay: 'Toggle autoplay',
     percent: 'Jump to 0%–90%',
     help: 'Toggle this shortcut help',
-    escape: 'Exit cinema / close this help',
+    escape: 'Close this help or a panel, or exit fullscreen',
   },
 }
 
 const CMN_TW: VideoPageMessages = {
   controls: '播放器增強',
-  cinema: '影院模式',
-  exitCinema: '退出影院',
-  cinemaOn: '已進入影院模式，按 Esc 退出',
-  cinemaOff: '已退出影院模式',
   restorePlayer: '還原播放器',
   restored: '已還原播放器',
   compactBack: '回到播放',
@@ -297,6 +288,9 @@ const CMN_TW: VideoPageMessages = {
   recommendRailPrev: '上一張',
   recommendRailNext: '下一張',
   recommendRailClose: '收起推薦軌道',
+  fixedLayoutOn: '已切換到固定單頁版面',
+  fixedLayoutOff: '已還原可捲動版面',
+  fixedLayoutUnavailable: '目前視窗放不下固定版面（需寬 ≥1280、高 ≥700）',
   autoplay: '自動連播',
   autoplayOn: '已開啟自動連播：播完自動切下一個',
   autoplayOff: '已關閉自動連播',
@@ -311,7 +305,6 @@ const CMN_TW: VideoPageMessages = {
     danmaku: '開關彈幕',
     mute: '靜音切換',
     fullscreen: '全螢幕',
-    cinema: '影院模式',
     pip: '子母畫面',
     restore: '還原迷你播放器',
     prevEpisode: '上一集',
@@ -323,7 +316,7 @@ const CMN_TW: VideoPageMessages = {
     autoplay: '自動連播開關',
     percent: '跳到 0%–90%',
     help: '開啟 / 關閉快速鍵說明',
-    escape: '退出影院 / 關閉說明',
+    escape: '關閉說明 / 面板或者退出全螢幕',
   },
 }
 
@@ -345,8 +338,9 @@ const JYUT: VideoPageMessages = {
   commentsExpand: '打開',
   recommendRailHint: '推薦影片軌道：← → 切換，Enter 喺呢頁預覽，Ctrl/⌘+撳 或 中鍵開新分頁',
   recommendRailClose: '收埋推薦軌道',
-  cinemaOn: '入咗影院模式，撳 Esc 退出',
-  cinemaOff: '已經退出影院模式',
+  fixedLayoutOn: '轉咗做固定單頁',
+  fixedLayoutOff: '還原返可以捲嘅版面',
+  fixedLayoutUnavailable: '而家個窗放唔落固定版面（要闊 ≥1280、高 ≥700）',
   restored: '還原咗播放器',
   danmakuOn: '彈幕開咗',
   danmakuOff: '彈幕熄咗',
@@ -367,7 +361,6 @@ const JYUT: VideoPageMessages = {
     danmaku: '開關彈幕',
     mute: '靜音切換',
     fullscreen: '全螢幕',
-    cinema: '影院模式',
     pip: '子母畫面',
     restore: '還原迷你播放器',
     prevEpisode: '上一集',
@@ -379,7 +372,7 @@ const JYUT: VideoPageMessages = {
     autoplay: '自動連播開關',
     percent: '跳去 0%–90%',
     help: '開 / 關閉快速鍵說明',
-    escape: '退出影院 / 關閉說明',
+    escape: '閂說明 / 面板或者退出全螢幕',
   },
 }
 

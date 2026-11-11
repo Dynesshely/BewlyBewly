@@ -139,6 +139,8 @@ export interface Settings {
   videoPageCommentColumn: boolean
   /** 视频播放页：推荐视频改为页面下部横向聚焦视图（第 27 轮） */
   videoPageRecommendRail: boolean
+  /** 视频播放页：固定单页布局（禁用页面滚动，播放器/评论/推荐三区常驻，第 28 轮） */
+  videoPageFixedLayout: boolean
   /** 列表页默认视图 / 排序 */
   historyViewMode: ListViewMode
   watchLaterViewMode: ListViewMode
@@ -302,6 +304,7 @@ export const originalSettings: Settings = {
   videoPageComments: true,
   videoPageCommentColumn: true,
   videoPageRecommendRail: true,
+  videoPageFixedLayout: true,
   historyViewMode: 'comfortable',
   watchLaterViewMode: 'comfortable',
   favoritesViewMode: 'comfortable',

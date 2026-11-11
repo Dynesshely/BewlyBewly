@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import { clickCommentSort, toggleCommentsOnlyUp } from '../comments'
+import { toggleCommentsOnlyUp } from '../comments'
 import { useMessages } from '../i18n'
 import { ui } from '../state'
 
 const t = useMessages()
 
-/** 影院模式会压暗评论区：增强 UI 跟随隐藏 */
+// 第 28 轮：工具条只承载「只看 UP 主」——排序沿用评论区标题旁的原生控件，
+// 避免同一功能出现两份入口（用户实测反馈「筛选控件出现两个」）。
 const visible = computed(() => ui.commentFound
   && ui.commentToolbarVisible
-  && !ui.cinema
-  && (ui.commentSortAvailable || ui.commentUpAvailable))
+  && ui.commentUpAvailable)
 
 const upTitle = computed(() => ui.commentUpAvailable
   ? t.value.commentsOnlyUp
@@ -31,29 +31,6 @@ const toolbarStyle = computed(() => ({
     :aria-label="t.commentsToolbar"
     :style="toolbarStyle"
   >
-    <template v-if="ui.commentSortAvailable">
-      <button
-        class="bvp-comment-btn"
-        type="button"
-        data-bvp-action="comment-sort-hot"
-        :aria-pressed="ui.commentActiveSort === 'hot'"
-        :title="t.commentsSortHot"
-        @click="clickCommentSort('hot')"
-      >
-        {{ t.commentsSortHot }}
-      </button>
-      <button
-        class="bvp-comment-btn"
-        type="button"
-        data-bvp-action="comment-sort-latest"
-        :aria-pressed="ui.commentActiveSort === 'latest'"
-        :title="t.commentsSortLatest"
-        @click="clickCommentSort('latest')"
-      >
-        {{ t.commentsSortLatest }}
-      </button>
-    </template>
-
     <style scoped lang="scss">
       /* #region 窄屏适配（第 25 轮）
       工具条是 fixed + 内联 left/top 定位（由 comments.ts 计算并已 clamp 到视口内），
@@ -84,12 +61,6 @@ const toolbarStyle = computed(() => ({
       }
       /* #endregion */
     </style>
-
-    <span
-      v-if="ui.commentSortAvailable && ui.commentUpAvailable"
-      class="bvp-comment-toolbar__divider"
-      aria-hidden="true"
-    />
 
     <button
       class="bvp-comment-btn"

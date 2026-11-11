@@ -14,7 +14,13 @@ export type ProbeReasonCode
     | 'covering-overlay'
 
 /** 用户可在设置里开关的模块（用于把「用户关闭」转成具体建议） */
-export type ProbeSettingKey = 'videoPage' | 'videoComments' | 'listScrollMemory'
+export type ProbeSettingKey
+  = | 'videoPage'
+    | 'videoPageFixedLayout'
+    | 'videoPageCommentColumn'
+    | 'videoPageRecommendRail'
+    | 'videoComments'
+    | 'listScrollMemory'
 
 /** 结果分组：正常 / 降级 / 不可用 + 页面类型 */
 export type ProbeGroupName

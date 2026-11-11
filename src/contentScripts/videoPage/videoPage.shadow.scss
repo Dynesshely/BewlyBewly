@@ -749,3 +749,32 @@
     color: CanvasText;
   }
 }
+
+/* #region 广告区域（第 28 轮 B 工作流，只追加）
+   广告容器全部在原生 DOM 里（左栏 .ad-report.strip-ad.left-banner、右栏 #slide_ad 等），
+   它们的隐藏规则写在 src/styles/adaptedStyles/pages/videoPage.scss（页面级样式）。
+   这里只加两条 shadow 内的保险：
+   1. 轨道 / 评论列等我们自己的浮层不吃广告事件（广告若被 B 站动态插入到浮层坐标上，
+      也不会把点击从轨道上抢走）；
+   2. 固定布局（A 工作流）下，若广告被隐藏导致页面高度变化，轨道位置由 500ms 的
+      syncRecommendRail 重新计算，这里不需要额外规则。 */
+.bvp-rail,
+.bvp-comment-toolbar,
+.bvp-comment-expand {
+  /* 广告容器即便被 B 站改成 pointer-events: auto 也不会盖住我们浮层的交互 */
+  isolation: isolate;
+}
+/* #endregion */
+// ===== 第 28 轮：固定单页布局下的浮层适配 =====
+// 页面在固定布局下不滚动（html/body overflow: hidden），因此：
+// - 推荐轨道由 rail 自己按「主列底边」定位（railState.placement），固定布局把主列压到一屏内，
+//   轨道自然落在视口底部；这里只保证它不会被裁切、且不随页面滚动消失；
+// - 评论工具条 / 展开按钮仍按 #navbar / thread 的 rect 定位（评论区变成独立滚动容器后，
+//   rect 仍在视口坐标系里，逻辑不变）。
+:host([data-fixed]) {
+  .bvp-rail {
+    /* 固定布局下轨道必须始终可见：z-index 已足够，这里补一个最大高度上限，
+       避免极端窗口（高 <700 时本来就不启用固定布局）下轨道被裁切 */
+    max-height: 40vh;
+  }
+}

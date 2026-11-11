@@ -7,10 +7,8 @@ import {
   restorePlayer,
   seekBy,
   seekToPercent,
-  setCinema,
   stepEpisode,
   stepSelectionItem,
-  toggleCinema,
   toggleDanmaku,
   toggleFullscreen,
   toggleMute,
@@ -65,10 +63,6 @@ export const VIDEO_PAGE_SHORTCUTS: ShortcutDefinition[] = [
   {
     keys: ['F'],
     labelKey: 'fullscreen',
-  },
-  {
-    keys: ['T'],
-    labelKey: 'cinema',
   },
   {
     keys: ['Shift', 'P'],
@@ -156,10 +150,6 @@ const SHORTCUT_ACTIONS: ShortcutAction[] = [
     run: () => void toggleFullscreen(),
   },
   {
-    match: (_, lower) => lower === 't',
-    run: () => toggleCinema(),
-  },
-  {
     match: (_, lower) => lower === 'p',
     run: () => restorePlayer(),
   },
@@ -233,11 +223,6 @@ function handleKeyDown(event: KeyboardEvent): void {
       closeSelectionPanel()
       return
     }
-    if (ui.cinema) {
-      consume(event)
-      setCinema(false)
-      return
-    }
     // 其它 Esc 交给原生（退出全屏、关闭弹窗等）
     return
   }
@@ -269,9 +254,6 @@ function handleKeyDown(event: KeyboardEvent): void {
   }
 
   // 对应功能被设置页关掉时，这些按键交还给 B 站原生处理
-  if (lower === 't' && !settings.value.videoPageCinemaMode) {
-    return
-  }
   if (lower === 'p' && !settings.value.videoPageMiniPlayer) {
     return
   }
@@ -302,8 +284,6 @@ function handleKeyDown(event: KeyboardEvent): void {
  */
 export function getShortcutDefinitions(): ShortcutDefinition[] {
   return VIDEO_PAGE_SHORTCUTS.filter((item) => {
-    if (item.labelKey === 'cinema')
-      return settings.value.videoPageCinemaMode
     if (item.labelKey === 'restore')
       return settings.value.videoPageMiniPlayer
     if (item.requires === 'episodeNav')

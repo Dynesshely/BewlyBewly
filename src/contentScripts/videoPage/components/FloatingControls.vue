@@ -3,7 +3,7 @@ import { computed } from 'vue'
 
 import { settings } from '~/logic'
 
-import { restorePlayer, toggleCinema, toggleSelectionPanel, toggleShortcutsHelp } from '../actions'
+import { restorePlayer, toggleSelectionPanel, toggleShortcutsHelp } from '../actions'
 import { useMessages } from '../i18n'
 import { ui } from '../state'
 
@@ -21,7 +21,7 @@ const selectionLabel = computed(() => {
 
 <template>
   <div
-    v-if="ui.mini || settings.videoPageCinemaMode || settings.videoPageShortcuts || ui.selectionNav"
+    v-if="ui.mini || settings.videoPageShortcuts || ui.selectionNav"
     class="bvp-fab-group"
     role="toolbar"
     :aria-label="t.controls"
@@ -44,27 +44,6 @@ const selectionLabel = computed(() => {
         />
       </svg>
       <span class="bvp-fab__label">{{ t.restorePlayer }}</span>
-    </button>
-
-    <button
-      v-if="settings.videoPageCinemaMode"
-      class="bvp-fab"
-      type="button"
-      data-bvp-action="cinema"
-      :aria-pressed="ui.cinema"
-      :title="`${t.cinema}（T）`"
-      @click="toggleCinema()"
-    >
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-        <path
-          d="M2 5.5V3h2.5M14 5.5V3h-2.5M2 10.5V13h2.5M14 10.5V13h-2.5"
-          stroke="currentColor"
-          stroke-width="1.4"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
-      </svg>
-      <span class="bvp-fab__label">{{ t.cinema }}</span>
     </button>
 
     <button

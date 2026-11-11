@@ -60,9 +60,9 @@ function sameSequence(a: RailCard[], b: RailCard[]): boolean {
 }
 
 /** 重新采集并更新轨道（渲染状态由 railState.placement 表示） */
-export function syncRecommendRail(options: { enabled: boolean, cinema: boolean }): void {
-  // 关闭开关 / 影院模式 / 用户手动关闭：轨道不渲染，并把原生列表还回去
-  if (!options.enabled || options.cinema || railState.dismissed) {
+export function syncRecommendRail(options: { enabled: boolean }): void {
+  // 关闭开关 / 用户手动关闭：轨道不渲染，并把原生列表还回去
+  if (!options.enabled || railState.dismissed) {
     if (railState.placement)
       railState.placement = null
     if (railState.cards.length)

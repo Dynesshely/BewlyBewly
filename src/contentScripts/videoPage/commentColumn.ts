@@ -81,9 +81,7 @@ function getLayoutParts(): LayoutParts | null {
 function shouldEnable(): boolean {
   if (!settings.value.videoPageCommentColumn)
     return false
-  // 影院模式 / 窄屏放不下两列：保持原生布局
-  if (ui.cinema)
-    return false
+  // 窄屏放不下两列：保持原生布局
   return window.innerWidth >= MIN_COLUMN_WIDTH
 }
 
@@ -212,7 +210,7 @@ export function setupCommentColumn(): () => void {
   window.addEventListener('resize', onResize, { passive: true })
 
   const stopWatch = watch(
-    () => [settings.value.videoPageCommentColumn, ui.cinema] as const,
+    () => [settings.value.videoPageCommentColumn, ui.fixedLayout] as const,
     () => syncCommentColumn(),
   )
 

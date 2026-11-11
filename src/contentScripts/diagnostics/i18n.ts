@@ -57,6 +57,9 @@ export interface DiagnosticsMessages {
   adviceCoveringOverlay: string
   adviceNotApplicable: string
   adviceEnableVideoPage: string
+  adviceEnableVideoFixedLayout: string
+  adviceEnableVideoCommentColumn: string
+  adviceEnableVideoRecommendRail: string
   adviceEnableVideoComments: string
   adviceEnableListScrollMemory: string
   adviceLogin: string
@@ -114,7 +117,10 @@ const CMN_CN: DiagnosticsMessages = {
   adviceLabel: '建议',
   adviceCoveringOverlay: '关闭设置页后重新运行自检；若仍显示覆盖中，请刷新页面',
   adviceNotApplicable: '这是当前页面的正常状态；切换到对应页面后重新运行自检即可看到结果',
-  adviceEnableVideoPage: '在「设置 → 页面增强 → 视频播放页」中开启影院模式 / 迷你播放器 / 快捷键任一开关',
+  adviceEnableVideoPage: '在「设置 → 页面增强 → 视频播放页」中开启迷你播放器 / 快捷键任一开关',
+  adviceEnableVideoFixedLayout: '在「设置 → 页面增强 → 视频播放页」中开启「固定单页布局」；视口需要 ≥1280 宽且 ≥700 高才会生效',
+  adviceEnableVideoCommentColumn: '在「设置 → 页面增强 → 视频播放页」中开启「评论区移到播放器右侧」',
+  adviceEnableVideoRecommendRail: '在「设置 → 页面增强 → 视频播放页」中开启「推荐视频改为下部横向轨道」',
   adviceEnableVideoComments: '在「设置 → 页面增强 → 视频播放页」中开启「视频页评论区增强」',
   adviceEnableListScrollMemory: '在「设置 → 页面增强 → 列表页」中开启「列表页返回恢复滚动位置」',
   adviceLogin: '登录 B 站账号后重新运行自检；未登录时只提示、不发请求',
@@ -185,7 +191,10 @@ const CMN_TW: DiagnosticsMessages = {
   adviceLabel: '建議',
   adviceCoveringOverlay: '關閉設定頁後重新執行自檢；若仍顯示覆蓋中，請重新整理頁面',
   adviceNotApplicable: '這是目前頁面的正常狀態；切換到對應頁面後重新執行自檢即可看到結果',
-  adviceEnableVideoPage: '在「設定 → 頁面增強 → 影片播放頁」中開啟影院模式 / 迷你播放器 / 快速鍵任一開關',
+  adviceEnableVideoPage: '在「設定 → 頁面增強 → 影片播放頁」中開啟迷你播放器 / 快速鍵任一開關',
+  adviceEnableVideoFixedLayout: '在「設定 → 頁面增強 → 影片播放頁」中開啟「固定單頁版面」；視口需要 ≥1280 寬且 ≥700 高才會生效',
+  adviceEnableVideoCommentColumn: '在「設定 → 頁面增強 → 影片播放頁」中開啟「留言區移到播放器右側」',
+  adviceEnableVideoRecommendRail: '在「設定 → 頁面增強 → 影片播放頁」中開啟「推薦影片改為下部橫向軌道」',
   adviceEnableVideoComments: '在「設定 → 頁面增強 → 影片播放頁」中開啟「影片頁留言區增強」',
   adviceEnableListScrollMemory: '在「設定 → 頁面增強 → 清單頁」中開啟「清單頁返回恢復捲動位置」',
   adviceLogin: '登入 B 站帳號後重新執行自檢；未登入時只提示、不發請求',
@@ -248,7 +257,10 @@ const JYUT: DiagnosticsMessages = {
   adviceLabel: '建議',
   adviceCoveringOverlay: '閂咗設定頁再行自檢；如果仲係顯示蓋住中，就重新載入頁面',
   adviceNotApplicable: '呢個係目前頁面嘅正常狀態；轉去對應頁面再行自檢就見到結果',
-  adviceEnableVideoPage: '喺「設定 → 頁面增強 → 影片播放頁」開返影院模式 / 迷你播放器 / 快速鍵其中一個',
+  adviceEnableVideoPage: '喺「設定 → 頁面增強 → 影片播放頁」開返迷你播放器 / 快速鍵其中一個',
+  adviceEnableVideoFixedLayout: '喺「設定 → 頁面增強 → 影片播放頁」開返「固定單頁版面」；視口要 ≥1280 闊而且 ≥700 高先會生效',
+  adviceEnableVideoCommentColumn: '喺「設定 → 頁面增強 → 影片播放頁」開返「留言區移去播放器右邊」',
+  adviceEnableVideoRecommendRail: '喺「設定 → 頁面增強 → 影片播放頁」開返「推薦影片改做下面橫向軌道」',
   adviceEnableVideoComments: '喺「設定 → 頁面增強 → 影片播放頁」開返「影片頁留言區增強」',
   adviceEnableListScrollMemory: '喺「設定 → 頁面增強 → 清單頁」開返「清單頁返回恢復捲動位置」',
   adviceLogin: '登入 B 站帳號再行自檢；未登入淨係提示、唔發請求',
@@ -319,7 +331,10 @@ const EN: DiagnosticsMessages = {
   adviceLabel: 'Advice',
   adviceCoveringOverlay: 'Close Settings and run the self-check again; refresh the page if it still reports “covered”.',
   adviceNotApplicable: 'This is expected on the current page. Switch to the matching page and run the self-check again.',
-  adviceEnableVideoPage: 'Enable any of Cinema mode / Mini player / Enhanced shortcuts in Settings → Page enhancements → Video page.',
+  adviceEnableVideoPage: 'Enable Mini player or Enhanced shortcuts in Settings → Page enhancements → Video page.',
+  adviceEnableVideoFixedLayout: 'Enable “Fixed single-page layout” in Settings → Page enhancements → Video page. It only applies when the viewport is at least 1280×700.',
+  adviceEnableVideoCommentColumn: 'Enable “Move comments to the right of the player” in Settings → Page enhancements → Video page.',
+  adviceEnableVideoRecommendRail: 'Enable “Recommendations as a bottom rail” in Settings → Page enhancements → Video page.',
   adviceEnableVideoComments: 'Enable “Video page comments” in Settings → Page enhancements → Video page.',
   adviceEnableListScrollMemory: 'Enable “Restore scroll position when returning to list pages” in Settings → Page enhancements → List pages.',
   adviceLogin: 'Sign in to Bilibili and run the self-check again. Without signing in it only prompts, no requests are made.',

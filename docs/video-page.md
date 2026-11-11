@@ -371,3 +371,71 @@ header 是推荐类文案，条目指向其它 bvid。
 - 评论区被移动后，原有的评论增强浮层（工具条 / 展开按钮）位置随 `#navbar` / thread 的 rect 重算，
   因此会自动跟着右列布局；
 - 与「推荐下部轨道」工作流的边界：本模块不碰 `.rcmd-tab`；若 B 工作流未接管，推荐列表会留在右栏（原样）。
+## 第 28 轮：广告区域移除
+
+用户需求：移除视频播放页的广告区域，让播放器 / 评论区 / 推荐轨道始终可见。
+
+### 判定依据（Lead 真机实测 2026-11-11，BV1wvWM6RE3Z）
+
+| 选择器 | 命中数 | 说明 |
+| --- | --- | --- |
+| `.ad-report` | 3 | 左栏底部广告位（`.ad-report.strip-ad.left-banner`，128px 高） |
+| `.strip-ad` / `.left-banner` | 1 / 1 | 上面那个广告位的组合类 |
+| `[class*="ad-report"]` | 6 | 含外层包装 |
+| `#slide_ad` | 1 | 右栏侧边广告 |
+| `.video-card-ad-small` | 1 | 右栏推荐里的广告卡 |
+| `.activity-m-v1` | 1 | 活动位 |
+| `.video-page-special-card-small` | 1 | 「特别推荐」广告卡 |
+
+### 白名单（**不是广告，绝不隐藏**）
+
+`.video-pod-above-modules` / `.video-pod` / `.video-pod__list`（选集 / 合集面板）、
+`.right-entry`（右栏入口）、`.rcmd-tab` / `.recommend-list-v1` / `.rec-list` /
+`.video-page-card-small`（推荐列表，由轨道接管）、`.up-panel-container`（UP 卡）、
+`#commentapp` / `bili-comments`（评论区）、`#playerWrap`（播放器）、
+`#arc_toolbar_report`（点赞/收藏/分享）、`#v_desc`（简介）。
+
+JS 侧 `adGuard.ts` 对「元素本身白名单」与「祖先在白名单」都跳过，所以选集面板里即便有
+class 带 `ad` 字样的节点也不会被误标。
+
+### 实现
+
+| 文件 | 内容 |
+| --- | --- |
+| `src/styles/adaptedStyles/pages/videoPage.scss`（只追加） | 页面级 CSS：上面清单全部 `display: none !important`，并对 `[data-bewly-ad-hidden]` 兜一层（即使 JS 只打了标记没跑样式也会隐藏） |
+| `src/contentScripts/videoPage/adGuard.ts`（新建） | `setupAdGuard()` 立即扫描 + `MutationObserver`（500ms 节流）补处理动态插入；命中容器补 `data-bewly-ad-hidden`（记下原 `display`）并加内联 `display:none` 兜底；`teardownAdGuard()` 全部还原；`countHiddenAds()` 供诊断；`notifyAdsHidden()` 广播 `bewly:video-ads-hidden` + `resize` |
+| `src/contentScripts/videoPage/videoPage.shadow.scss`（只追加） | 轨道 / 评论工具条的 `isolation: isolate`，保证动态广告即便插到同一坐标也不会抢我们浮层的交互 |
+
+判定细节：
+- 广告选择器命中后还要过两道闸：**不在白名单（含祖先）** 且 **元素尺寸 ≥ 24px**（宽或高为 0 或小于 24px 的不动，避免误标广告内的角标 / 关闭按钮）；
+- 隐藏用「标记 + 内联 none」双保险，B 站常用内联样式覆盖 `display`，纯 CSS 会被压过；
+- MutationObserver 观察 `document.body` 的 `childList + subtree`，500ms 节流（切视频后 B 站会成批插广告）。
+
+### 与固定布局（A 工作流）的协作
+
+- 广告被隐藏会改变左栏高度，固定布局需要重算播放器高度；
+- `notifyAdsHidden(count)` 会派发 `window` 上的 `bewly:video-ads-hidden`（`detail.count`）**和** 一次 `resize`：
+  - A 的固定布局监听前者可以立刻重排；
+  - 没监听也能靠现有的 `ResizeObserver` / `resize` 逻辑收敛；
+- 推荐轨道本身就是 500ms 同步一次，广告消失后轨道位置会自动上移，不需要额外通知。
+
+### Lead 接线项（index.ts 由 A 工作流持有，本轮未改）
+
+```ts
+// src/contentScripts/videoPage/index.ts
+import { setupAdGuard, teardownAdGuard } from './adGuard'
+
+// mount() 里（setupComments() 之后即可）
+setupAdGuard()
+
+// unmount() 里（disposeComments 之后）
+teardownAdGuard()
+```
+
+### 已知限制
+
+- 判定基于**实测选择器清单 + 结构白名单**，B 站改版新增的广告容器类名（例如新的哈希类）不会被立刻识别；
+  这时靠 `[class*="ad-report"]` 兜一部分，仍漏的话需要补清单；
+- 广告被 `display:none` 后仍留在 DOM 里（不删除节点），因为 B 站会在切视频时复用这些容器；
+- 未在真机验证（本轮不 build / 不 playwright / 不碰浏览器）：e2e 片段已交 Lead 合并，真机需确认左栏高度变化后播放器与轨道位置正常；
+- 广告容器若被 B 站改成 `position: fixed` 全屏浮层，`display:none` 依然有效，但它的关闭按钮等交互也会一起消失（预期）。

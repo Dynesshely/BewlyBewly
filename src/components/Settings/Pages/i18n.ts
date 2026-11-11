@@ -23,8 +23,9 @@ export interface PagesSettingsMessages {
   resetGroupDone: string
   groupVideoPage: string
   groupVideoPageDesc: string
-  videoPageCinemaMode: string
-  videoPageCinemaModeDesc: string
+  /** 第 28 轮：固定单页布局（替代已删除的影院模式） */
+  videoPageFixedLayout: string
+  videoPageFixedLayoutDesc: string
   videoPageMiniPlayer: string
   videoPageMiniPlayerDesc: string
   videoPageShortcuts: string
@@ -135,12 +136,12 @@ const CMN_CN: PagesSettingsMessages = {
   resetGroupDone: '已重置',
   groupVideoPage: '视频播放页',
   groupVideoPageDesc: '针对 B 站原生播放页的增强功能，关闭后对应功能不再接管页面',
-  videoPageCinemaMode: '影院模式',
-  videoPageCinemaModeDesc: '播放器铺满视口、隐藏右栏与推荐。按 T 或点击播放器右下角的浮动按钮切换',
+  videoPageFixedLayout: '固定单页布局',
+  videoPageFixedLayoutDesc: '页面不再垂直滚动：信息栏压缩成一行，播放器、评论区、推荐视频轨道同屏常显。视口过窄或过矮时自动回退到可滚动的原生布局',
   videoPageMiniPlayer: '滚动迷你播放器',
   videoPageMiniPlayerDesc: '播放器滚出视口后收缩到右下角浮窗，按 P 或点击按钮还原',
   videoPageShortcuts: '增强快捷键',
-  videoPageShortcutsDesc: 'J/K/L、←/→、C/M/F/T 等快捷键；关闭后按键完全交还给 B 站原生快捷键',
+  videoPageShortcutsDesc: 'J/K/L、←/→、C/M/F 等快捷键；关闭后按键完全交还给 B 站原生快捷键',
   videoPageComments: '评论区增强',
   videoPageCommentsDesc: '评论排序快捷（最热 / 最新）、只看 UP 主、长评论折叠；关闭后评论区保持 B 站原生样式',
   videoPageCommentColumn: '评论区移到播放器右侧',
@@ -239,12 +240,12 @@ const EN: PagesSettingsMessages = {
   resetGroupDone: 'Reset done',
   groupVideoPage: 'Video page',
   groupVideoPageDesc: 'Enhancements on top of the native Bilibili video page. Turn one off and it stops taking over the page.',
-  videoPageCinemaMode: 'Cinema mode',
-  videoPageCinemaModeDesc: 'Stretch the player to the viewport, hide the right column and recommendations. Toggle with T or the floating button.',
+  videoPageFixedLayout: 'Fixed single-page layout',
+  videoPageFixedLayoutDesc: 'The page no longer scrolls vertically: the info bar collapses to one line, and the player, comment column and recommendation rail stay on screen together. Falls back to the scrollable native layout on narrow or short viewports.',
   videoPageMiniPlayer: 'Scrolling mini player',
   videoPageMiniPlayerDesc: 'Shrink the player into a floating window once it scrolls out of view. Restore with P or the button.',
   videoPageShortcuts: 'Enhanced shortcuts',
-  videoPageShortcutsDesc: 'J/K/L, ←/→, C/M/F/T and more. When off, every key is handed back to the native Bilibili shortcuts.',
+  videoPageShortcutsDesc: 'J/K/L, ←/→, C/M/F and more. When off, every key is handed back to the native Bilibili shortcuts.',
   videoPageComments: 'Comment enhancements',
   videoPageCommentsDesc: 'Quick sort (hot / latest), only-uploader filter and long-comment collapsing. When off, the comment area keeps its native Bilibili style.',
   videoPageCommentColumn: 'Move comments beside the player',
@@ -343,12 +344,12 @@ const CMN_TW: PagesSettingsMessages = {
   resetGroupDone: '已重設',
   groupVideoPage: '影片播放頁',
   groupVideoPageDesc: '針對 B 站原生播放頁的增強功能，關閉後對應功能不再接管頁面',
-  videoPageCinemaMode: '影院模式',
-  videoPageCinemaModeDesc: '播放器鋪滿視口、隱藏右欄與推薦。按 T 或點擊播放器右下角的浮動按鈕切換',
+  videoPageFixedLayout: '固定單頁版面',
+  videoPageFixedLayoutDesc: '頁面不再垂直捲動：資訊列壓成一行，播放器、留言區、推薦影片軌道同框常顯。視口太窄或太矮時自動退回可捲動的原生版面',
   videoPageMiniPlayer: '捲動迷你播放器',
   videoPageMiniPlayerDesc: '播放器滾出視口後收縮到右下角浮窗，按 P 或點擊按鈕還原',
   videoPageShortcuts: '增強快速鍵',
-  videoPageShortcutsDesc: 'J/K/L、←/→、C/M/F/T 等快速鍵；關閉後按鍵完全交還給 B 站原生快速鍵',
+  videoPageShortcutsDesc: 'J/K/L、←/→、C/M/F 等快速鍵；關閉後按鍵完全交還給 B 站原生快速鍵',
   videoPageComments: '留言區增強',
   videoPageCommentsDesc: '留言排序快捷（最熱 / 最新）、只看 UP 主、長留言摺疊；關閉後留言區保持 B 站原生樣式',
   videoPageCommentColumn: '留言區移到播放器右側',
@@ -439,7 +440,7 @@ const CMN_TW: PagesSettingsMessages = {
 const JYUT: PagesSettingsMessages = {
   ...CMN_TW,
   groupVideoPageDesc: '針對 B 站原生播放頁嘅增強功能，閂咗之後對應功能唔會再接管頁面',
-  videoPageCinemaModeDesc: '播放器鋪滿成個視口、收埋右欄同推薦。撳 T 或者播放器右下角嘅浮動掣切換',
+  videoPageFixedLayoutDesc: '頁面唔再垂直捲：資訊列壓成一行，播放器、留言區、推薦影片軌道同框常顯。視口太窄或者太矮就會退回可捲動嘅原生版面',
   videoPageMiniPlayerDesc: '播放器滾出視口之後縮到右下角浮窗，撳 P 或者撳掣還原',
   cardPreviewDesc: '懸停卡片 0.9 秒後靜音播最多 6 秒嘅小片段；觸控、減少動態效果，或者卡片資料冇 cid 就唔會生效',
   cardQuickActionsDesc: '懸停卡片嗰陣喺右下角顯示讚好 / 收藏 / 稍後再看；收藏可以揀多個收藏夾，已收藏再撳就取消。未登入淨係提示唔發請求，失敗會自動回滾',

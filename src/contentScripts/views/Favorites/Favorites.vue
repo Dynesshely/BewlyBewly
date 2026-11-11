@@ -43,6 +43,10 @@ const { haveScrollbar } = useBewlyApp()
 const isLoading = ref<boolean>(false)
 const noMoreContent = ref<boolean>(false)
 const hasLoadedOnce = ref<boolean>(false)
+/** 正在执行重命名 / 删除的收藏夹 id（禁用该胶囊并显示处理中） */
+const categoryPendingId = ref<number | null>(null)
+/** 「+ 新建收藏夹」请求在途 */
+const categoryCreatePending = ref<boolean>(false)
 
 const { viewMode, sortMode, cycleViewMode, cycleSortMode } = useListPreferences('favorites')
 const toolbarRef = ref<{ focusFilter: () => void, toggleHelp: () => void } | null>(null)
@@ -84,14 +88,16 @@ async function initData() {
     changeCategory(favoriteCategories[0])
 }
 
-async function getFavoriteCategories() {
-  await api.favorite.getFavoriteCategories({
+async function getFavoriteCategories(): Promise<CategoryItem[]> {
+  const res: FavoritesCategoryResult = await api.favorite.getFavoriteCategories({
     up_mid: getUserID(),
   })
-    .then((res: FavoritesCategoryResult) => {
-      if (res.code === 0)
-        Object.assign(favoriteCategories, res.data.list)
-    })
+  const list = res?.code === 0 && Array.isArray(res?.data?.list)
+    ? res.data.list
+    : []
+  // 用 splice 整体替换：删除 / 重命名后不能残留旧条目
+  favoriteCategories.splice(0, favoriteCategories.length, ...list)
+  return list
 }
 
 /**
@@ -149,6 +155,178 @@ function handleCategorySelect(id: number) {
   const category = favoriteCategories.find(item => item.id === id)
   if (category)
     changeCategory(category)
+}
+
+/** 写操作统一登录判断：未登录只提示，不发请求 */
+function ensureLoggedInForManage(): boolean {
+  if (loggedIn.value)
+    return true
+  toast.warning(tl('favorites.need_login'))
+  return false
+}
+
+/** 收藏夹列表变化后，尽量保持当前选中：被删 / 不存在时回退到第一个可用夹 */
+async function syncSelectionAfterManage(preferredId?: number) {
+  const list = await getFavoriteCategories()
+  const target = preferredId !== undefined
+    ? list.find(item => item.id === preferredId)
+    : list.find(item => item.id === selectedCategory.value?.id)
+
+  if (target) {
+    if (target.id !== selectedCategory.value?.id)
+      changeCategory(target)
+    else
+      selectedCategory.value = target
+    return
+  }
+
+  const first = list[0]
+  if (first) {
+    changeCategory(first)
+    return
+  }
+
+  // 一个收藏夹都不剩：清空列表与选中，让空态出现（避免一直停在骨架屏）
+  selectedCategory.value = undefined
+  favoriteResources.length = 0
+  noMoreContent.value = true
+  hasLoadedOnce.value = true
+}
+
+/** 新建收藏夹（公开）：成功后刷新胶囊并自动切到新夹 */
+async function handleCategoryCreate(title: string) {
+  if (!ensureLoggedInForManage() || categoryCreatePending.value)
+    return
+
+  const name = title.trim()
+  if (!name)
+    return
+  // 同名收藏夹本地先提示（最终仍以接口校验为准）
+  if (favoriteCategories.some(item => item.title === name)) {
+    toast.warning(tl('favorites.name_exists'))
+    return
+  }
+
+  const beforeIds = new Set(favoriteCategories.map(item => item.id))
+  categoryCreatePending.value = true
+  try {
+    const res = await api.favorite.createFavoriteFolder({
+      title: name,
+      privacy: 0,
+      csrf: getCSRF(),
+    })
+
+    if (res?.code !== 0) {
+      if (res?.code === -101 || res?.code === -111)
+        toast.warning(tl('favorites.need_login'))
+      else
+        toast.error(tl('favorites.create_failed'))
+      return
+    }
+
+    const list = await getFavoriteCategories()
+    const created = list.find(item => !beforeIds.has(item.id))
+      ?? list.find(item => item.title === name)
+    if (created) {
+      changeCategory(created)
+    }
+    else if (list[0]) {
+      changeCategory(list[0])
+    }
+    toast.success(tl('favorites.create_ok'))
+  }
+  catch {
+    toast.error(tl('favorites.create_failed'))
+  }
+  finally {
+    categoryCreatePending.value = false
+  }
+}
+
+/** 重命名收藏夹：成功后就地更新标题（同步更新当前选中夹的标题） */
+async function handleCategoryRename(id: number, title: string) {
+  if (!ensureLoggedInForManage() || categoryPendingId.value !== null)
+    return
+
+  const name = title.trim()
+  if (!name)
+    return
+  if (favoriteCategories.some(item => item.id !== id && item.title === name)) {
+    toast.warning(tl('favorites.name_exists'))
+    return
+  }
+
+  categoryPendingId.value = id
+  try {
+    const res = await api.favorite.editFavoriteFolder({
+      title: name,
+      media_id: id,
+      csrf: getCSRF(),
+    })
+
+    if (res?.code !== 0) {
+      if (res?.code === -101 || res?.code === -111)
+        toast.warning(tl('favorites.need_login'))
+      else
+        toast.error(tl('favorites.rename_failed'))
+      return
+    }
+
+    const target = favoriteCategories.find(item => item.id === id)
+    if (target)
+      target.title = title.trim()
+    if (selectedCategory.value?.id === id) {
+      selectedCategory.value = {
+        ...selectedCategory.value,
+        title: title.trim(),
+      }
+    }
+    toast.success(tl('favorites.rename_ok'))
+  }
+  catch {
+    toast.error(tl('favorites.rename_failed'))
+  }
+  finally {
+    categoryPendingId.value = null
+  }
+}
+
+/** 删除收藏夹：成功后刷新胶囊；删的是当前夹则切到第一个可用夹 */
+async function handleCategoryDelete(id: number) {
+  if (!ensureLoggedInForManage() || categoryPendingId.value !== null)
+    return
+
+  const wasSelected = selectedCategory.value?.id === id
+  categoryPendingId.value = id
+  try {
+    const res = await api.favorite.deleteFavoriteFolder({
+      media_ids: String(id),
+      csrf: getCSRF(),
+    })
+
+    if (res?.code !== 0) {
+      if (res?.code === -101 || res?.code === -111)
+        toast.warning(tl('favorites.need_login'))
+      else
+        toast.error(tl('favorites.delete_failed'))
+      return
+    }
+
+    if (wasSelected) {
+      // 当前夹被删：清掉旧内容，避免刷新期间短暂显示已删除夹的视频
+      favoriteResources.length = 0
+      noMoreContent.value = false
+      hasLoadedOnce.value = false
+    }
+    await syncSelectionAfterManage()
+    toast.success(tl('favorites.delete_ok'))
+  }
+  catch {
+    toast.error(tl('favorites.delete_failed'))
+  }
+  finally {
+    categoryPendingId.value = null
+  }
 }
 
 function handleSearch() {
@@ -400,7 +578,13 @@ function handleCardAction(payload: { id: ListQuickActionId, item: ListCardItem }
       <ListCategoryChips
         :categories="categoryChips"
         :selected-id="selectedCategory?.id"
+        manageable
+        :pending-id="categoryPendingId"
+        :create-pending="categoryCreatePending"
         @select="handleCategorySelect"
+        @rename="handleCategoryRename"
+        @delete="handleCategoryDelete"
+        @create="handleCategoryCreate"
       />
 
       <ListToolbar

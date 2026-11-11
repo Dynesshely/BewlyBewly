@@ -84,6 +84,8 @@ export function useListScrollMemory(options: UseListScrollMemoryOptions) {
 
   let restored = false
   let retryTimer: ReturnType<typeof setTimeout> | null = null
+  /** 二次校正用的定时器（恢复后布局还会变，需要再对一次锚点） */
+  const correctionTimers: Array<ReturnType<typeof setTimeout>> = []
   let saveTimer: ReturnType<typeof setTimeout> | null = null
   let boundScrollRoot: HTMLElement | null = null
   let cancelOnUserInput: (() => void) | null = null
@@ -214,15 +216,65 @@ export function useListScrollMemory(options: UseListScrollMemoryOptions) {
     const delta = card.getBoundingClientRect().top - root.getBoundingClientRect().top - anchor.offset
     if (Math.abs(delta) > 1)
       root.scrollTop = Math.max(0, root.scrollTop + delta)
-    finishRestore(null)
+    finishRestore(null, anchor)
   }
 
-  function finishRestore(rootToReset: HTMLElement | null): void {
+  function finishRestore(rootToReset: HTMLElement | null, anchor?: SavedAnchor): void {
     restored = true
     stopRestore()
     if (rootToReset)
       rootToReset.scrollTop = 0
     clearSaved()
+    if (anchor && !rootToReset)
+      scheduleCorrections(anchor)
+  }
+
+  /**
+   * 恢复落位后再对一次锚点（第 21 轮修复 BUG 2 列表部分）。
+   *
+   * 第一次恢复时卡片高度/封面可能还没落定，之后布局变化会把位置再挪几十像素；
+   * 这里在 rAF×2 与 300ms / 800ms 各再按**同一个锚点 key** 反算一次 scrollTop。
+   * 用户在这期间自己滚动（wheel / touchstart / 滚动位置明显偏离我们的落点）就放弃。
+   */
+  function scheduleCorrections(anchor: SavedAnchor): void {
+    let expectedTop: number | null = null
+    const abort = () => {
+      for (const timer of correctionTimers)
+        clearTimeout(timer)
+      correctionTimers.length = 0
+      for (const eventName of ['wheel', 'touchstart'] as const)
+        window.removeEventListener(eventName, abort)
+    }
+    for (const eventName of ['wheel', 'touchstart'] as const)
+      window.addEventListener(eventName, abort, { passive: true })
+    const correct = () => {
+      const root = getScrollRoot()
+      const listRoot = getListRoot()
+      if (!root || !listRoot)
+        return
+      if (expectedTop !== null && Math.abs(root.scrollTop - expectedTop) > 4)
+        return
+      const card = listRoot.querySelector<HTMLElement>(`[${LIST_CARD_ATTR}="${CSS.escape(anchor.key)}"]`)
+      if (!card)
+        return
+      const delta = card.getBoundingClientRect().top - root.getBoundingClientRect().top - anchor.offset
+      if (Math.abs(delta) > 1) {
+        root.scrollTop = Math.max(0, root.scrollTop + delta)
+        expectedTop = root.scrollTop
+      }
+      else {
+        expectedTop = root.scrollTop
+      }
+    }
+    for (const delay of [2, 300, 800]) {
+      if (delay === 2) {
+        requestAnimationFrame(() => requestAnimationFrame(correct))
+      }
+      else {
+        correctionTimers.push(setTimeout(correct, delay))
+      }
+    }
+    correctionTimers.push(setTimeout(abort, 1200))
   }
 
   /** 卡片数量变化后尝试恢复；卸载 / 用户接管时取消 */
@@ -254,6 +306,9 @@ export function useListScrollMemory(options: UseListScrollMemoryOptions) {
 
   onBeforeUnmount(() => {
     clearInterval(bindTimer)
+    for (const timer of correctionTimers)
+      clearTimeout(timer)
+    correctionTimers.length = 0
     stopRestore()
     if (saveTimer)
       clearTimeout(saveTimer)

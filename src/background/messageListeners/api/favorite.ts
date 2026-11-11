@@ -68,6 +68,37 @@ const API_FAVORITE = {
     },
     afterHandle: AHS.J_D,
   },
+  // 修改收藏夹（重命名）
+  editFavoriteFolder: {
+    url: 'https://api.bilibili.com/x/v3/fav/folder/edit',
+    _fetch: {
+      method: 'post',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+      },
+      body: {
+        title: '',
+        media_id: 0,
+        csrf: '',
+      },
+    },
+    afterHandle: AHS.J_D,
+  },
+  // 删除收藏夹
+  deleteFavoriteFolder: {
+    url: 'https://api.bilibili.com/x/v3/fav/folder/del',
+    _fetch: {
+      method: 'post',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+      },
+      body: {
+        media_ids: '',
+        csrf: '',
+      },
+    },
+    afterHandle: AHS.J_D,
+  },
   patchDelFavoriteResources: {
     url: 'https://api.bilibili.com/x/v3/fav/resource/batch-del',
     _fetch: {

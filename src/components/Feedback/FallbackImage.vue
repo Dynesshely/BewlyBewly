@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useFeedbackMessages } from './i18n'
 /**
  * 统一的图片加载失败占位（第 19 轮）。
  *
@@ -10,7 +11,7 @@
  * - 颜色只用 --bew-*：暗色下自动适配，prefers-contrast / forced-colors 下加深边界；
  * - 可读性：`role="img"` + `aria-label`，读屏能读到「图片加载失败」而不是空白。
  */
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   /** 媒体类型：决定图标与默认无障碍文案 */
   kind?: 'image' | 'video' | 'avatar'
   /** 可选文字（小尺寸场景建议不传，只显示图标） */
@@ -29,11 +30,16 @@ const KIND_ICON: Record<'image' | 'video' | 'avatar', string> = {
   avatar: 'i-mingcute:user-3-line',
 }
 
-const KIND_LABEL: Record<'image' | 'video' | 'avatar', string> = {
-  image: '图片加载失败',
-  video: '视频封面加载失败',
-  avatar: '头像加载失败',
-}
+const messages = useFeedbackMessages()
+
+/** 默认无障碍名称按 module i18n 的四种语言取，调用方传 ariaLabel 时优先用调用方的 */
+const kindLabels = computed<Record<'image' | 'video' | 'avatar', string>>(() => ({
+  image: messages.value.imageFallback,
+  video: messages.value.videoFallback,
+  avatar: messages.value.avatarFallback,
+}))
+
+const fallbackLabel = computed(() => props.ariaLabel || kindLabels.value[props.kind])
 </script>
 
 <template>
@@ -41,7 +47,7 @@ const KIND_LABEL: Record<'image' | 'video' | 'avatar', string> = {
     class="bewly-image-fallback"
     :class="[`is-${kind}`, { 'has-text': Boolean(text) }]"
     role="img"
-    :aria-label="ariaLabel || KIND_LABEL[kind]"
+    :aria-label="fallbackLabel"
   >
     <span class="bewly-image-fallback__icon" :class="KIND_ICON[kind]" aria-hidden="true" />
     <span v-if="text" class="bewly-image-fallback__text">{{ text }}</span>

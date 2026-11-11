@@ -12,7 +12,7 @@ import { useMainStore } from '~/stores/mainStore'
 
 import emitter from '~/utils/mitt'
 import { useHomeMessages } from './i18n'
-import { restoreHomeScroll, saveHomeScroll, takeHomeScroll } from './scrollMemory'
+import { restoreHomeScroll, saveHomeScroll, suppressInitialScrollRestore, takeHomeScroll } from './scrollMemory'
 import { HomeSubPage } from './types'
 
 const mainStore = useMainStore()
@@ -20,6 +20,8 @@ const { handleBackToTop, scrollbarRef } = useBewlyApp()
 
 /** 正在进行的滚动恢复（切标签 / 卸载时取消，避免和用户抢滚动条） */
 let cancelScrollRestore: (() => void) | null = null
+/** 首次挂载时压掉浏览器 scroll restoration 的清理句柄 */
+let cancelInitialReset: (() => void) | null = null
 const handleThrottledBackToTop = useThrottleFn((targetScrollTop: number = 0) => handleBackToTop(targetScrollTop), 1000)
 const t = useHomeMessages()
 
@@ -301,6 +303,17 @@ onMounted(() => {
     focusBrowseActive.value = payload.active
   })
 
+  // 第 21 轮修复（BUG 1）：刷新页面时浏览器会恢复**内层滚动容器**的位置，
+  // 第 20 轮的内存态设计挡不住它。首次挂载且当前标签没有待恢复记录时，主动压回顶部
+  // （同步 + rAF×2 + 120ms + 400ms，用户一滚动就放弃）。
+  if (takeHomeScroll(activatedPage.value) === null) {
+    cancelInitialReset?.()
+    cancelInitialReset = suppressInitialScrollRestore(
+      resolveScrollElement,
+      () => (settings.value.useSearchPageModeOnHomePage ? 510 : 0),
+    )
+  }
+
   // 回到顶部：绑定滚动容器 + 监听 Zen（清屏）模式开关
   bindScrollRoot()
   window.addEventListener('resize', updateViewportHeight)
@@ -320,6 +333,8 @@ watch(scrollbarRef, () => nextTick(bindScrollRoot))
 onUnmounted(() => {
   // 离开首页（切到其它页面）时也记一下当前标签的位置，回来时能接上
   saveHomeScroll(activatedPage.value, currentScrollTop())
+  cancelInitialReset?.()
+  cancelInitialReset = null
   cancelScrollRestore?.()
   cancelScrollRestore = null
   emitter.off(TOP_BAR_VISIBILITY_CHANGE)
@@ -331,9 +346,33 @@ onUnmounted(() => {
   zenObserver = null
 })
 
+/**
+ * 取真正的滚动元素。
+ *
+ * `scrollbarRef` 拿到的是 `OverlayScrollbarsComponent` 的组件实例（不是 HTMLElement），
+ * 直接 `ref.scrollTop = n` 不会真的滚动 —— 第 21 轮恢复落点一直不对的根因就在这里。
+ * 与 App / Home 里其它地方一致，必须走 `osInstance().elements().viewport`。
+ */
+function resolveScrollElement(): HTMLElement | null {
+  const instance = scrollbarRef.value
+  if (!instance)
+    return null
+  try {
+    const viewport = instance.osInstance?.()?.elements?.()?.viewport
+    if (viewport instanceof HTMLElement)
+      return viewport
+  }
+  catch {
+    // 组件还没初始化好，走下面的兜底
+  }
+  return instance instanceof HTMLElement
+    ? instance
+    : null
+}
+
 /** 当前滚动容器位置（首页在搜索页模式下顶部有 510px 的壁纸区） */
 function currentScrollTop(): number {
-  return (scrollbarRef.value?.scrollTop ?? 0) as number
+  return resolveScrollElement()?.scrollTop ?? 0
 }
 
 function handleChangeTab(tab: HomeTab) {
@@ -368,7 +407,7 @@ function handleChangeTab(tab: HomeTab) {
   if (savedTop !== null && !focusBrowseActive.value) {
     // 子标签内容与数据都是异步的：轮询到内容够高再落位，最多等 3s；
     // 期间用户主动滚动会放弃恢复（rollback 到当前最大值）。
-    cancelScrollRestore = restoreHomeScroll(savedTop, () => scrollbarRef.value ?? null)
+    cancelScrollRestore = restoreHomeScroll(savedTop, resolveScrollElement)
   }
   else {
     // 没有记录（首次进入 / 刚从刷新后回来）→ 维持原来的回到顶部行为

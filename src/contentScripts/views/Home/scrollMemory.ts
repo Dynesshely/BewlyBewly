@@ -53,6 +53,8 @@ export interface RestoreOptions {
   maxWaitMs?: number
   /** 内容高度始终不够时是否仍落到当前最大值，默认 true */
   clampToMax?: boolean
+  /** 落位后的二次校正延迟（ms），默认 [2 帧, 300ms] —— 抵消图片/卡片加载造成的布局偏移 */
+  correctionDelays?: number[]
 }
 
 /**
@@ -66,24 +68,32 @@ export function restoreHomeScroll(
 ): () => void {
   const maxWaitMs = options.maxWaitMs ?? 3000
   const clampToMax = options.clampToMax ?? true
+  const correctionDelays = options.correctionDelays ?? [0, 300]
 
   if (!Number.isFinite(targetTop) || targetTop <= 0)
     return () => {}
 
   let stopped = false
+  /** 用户主动接管 / 组件卸载造成的中止（与「落位完成」区分开，后者仍要跑校正） */
+  let cancelled = false
   const startedAt = performance.now()
   const cleanupFns: Array<() => void> = []
+  /** 只属于轮询阶段的清理（落位后还要保留校正定时器与用户输入监听） */
+  const pollingCleanup: Array<() => void> = []
 
   const stop = () => {
-    if (stopped)
-      return
     stopped = true
+    cancelled = true
     for (const fn of cleanupFns)
       fn()
   }
 
   // 用户主动滚动就放弃，交还控制权
-  const cancelOnUserInput = () => stop()
+  const cancelOnUserInput = () => {
+    cancelled = true
+    for (const fn of cleanupFns)
+      fn()
+  }
   for (const eventName of ['wheel', 'touchstart'] as const) {
     window.addEventListener(eventName, cancelOnUserInput, { passive: true })
     cleanupFns.push(() => window.removeEventListener(eventName, cancelOnUserInput))
@@ -102,7 +112,25 @@ export function restoreHomeScroll(
     if (maxTop + 2 >= targetTop) {
       if (Math.abs(root.scrollTop - targetTop) > 1)
         root.scrollTop = targetTop
-      stop()
+      // 首屏图片/卡片高度还会再变，落位后按同样的目标位置校正一两次；
+      // 期间用户主动滚动（上面的 wheel/touchstart 监听）就放弃，不再抢滚动条。
+      for (const delay of correctionDelays) {
+        const timer = setTimeout(() => {
+          if (cancelled)
+            return
+          const currentRoot = getScrollRoot()
+          if (!currentRoot)
+            return
+          const currentMax = Math.max(0, currentRoot.scrollHeight - currentRoot.clientHeight)
+          if (currentMax + 2 >= targetTop && Math.abs(currentRoot.scrollTop - targetTop) > 1)
+            currentRoot.scrollTop = targetTop
+        }, delay)
+        cleanupFns.push(() => clearTimeout(timer))
+      }
+      // 校正定时器保留到最后，这里不能立刻清理监听；只停止轮询
+      stopped = true
+      for (const fn of pollingCleanup)
+        fn()
       return
     }
     if (performance.now() - startedAt >= maxWaitMs) {
@@ -116,4 +144,78 @@ export function restoreHomeScroll(
 
   requestAnimationFrame(tick)
   return stop
+}
+
+/**
+ * 压掉浏览器「刷新后恢复内层滚动容器位置」的行为（第 21 轮修复 BUG 1）。
+ *
+ * 背景：刷新页面时 Chromium 会把 `.bewly-scroll-container` 的 scrollTop 还原到刷新前的位置
+ * （实测 496px），而产品要求「刷新回顶部」。第 20 轮的内存态设计只保证不从 sessionStorage 恢复，
+ * 挡不住浏览器的还原，所以在首页首次挂载时主动把容器压回顶部。
+ *
+ * 只在挂载早期做几次（同步 + rAF×2 + 120ms + 400ms）：浏览器还原发生在首帧之后，
+ * 单次同步置 0 会被覆盖；用户一旦滚动（wheel / touchstart）立即放弃，不再抢滚动条。
+ * 只作用于 Bewly 自己的滚动容器，不改 documentElement，也不碰 B 站原生页面的返回行为。
+ */
+export function suppressInitialScrollRestore(
+  getScrollRoot: () => HTMLElement | null,
+  getTargetTop: () => number,
+): () => void {
+  let cancelled = false
+  const timers: Array<ReturnType<typeof setTimeout>> = []
+
+  const cancel = () => {
+    cancelled = true
+    for (const timer of timers)
+      clearTimeout(timer)
+    timers.length = 0
+  }
+
+  for (const eventName of ['wheel', 'touchstart'] as const)
+    window.addEventListener(eventName, cancel, { passive: true })
+
+  const apply = () => {
+    if (cancelled)
+      return
+    const root = getScrollRoot()
+    if (!root)
+      return
+    const target = getTargetTop()
+    if (Math.abs(root.scrollTop - target) > 1)
+      root.scrollTop = target
+  }
+
+  apply()
+  requestAnimationFrame(() => requestAnimationFrame(apply))
+
+  // 浏览器可能在挂载后几百毫秒才做 scroll restoration（实测有时 >500ms），
+  // 这段时间里用 scroll 监听 + 若干定时点持续压回顶部；用户一滚动就整体放弃。
+  const root = getScrollRoot()
+  const forceTop = () => {
+    if (cancelled)
+      return
+    const currentRoot = getScrollRoot()
+    if (!currentRoot)
+      return
+    const target = getTargetTop()
+    if (Math.abs(currentRoot.scrollTop - target) > 1)
+      currentRoot.scrollTop = target
+  }
+  if (root)
+    root.addEventListener('scroll', forceTop, { passive: true })
+
+  for (const delay of [60, 120, 240, 400, 700, 1100]) {
+    const timer = setTimeout(forceTop, delay)
+    timers.push(timer)
+  }
+  const releaseTimer = setTimeout(() => {
+    root?.removeEventListener('scroll', forceTop)
+    cancel()
+  }, 1600)
+  timers.push(releaseTimer)
+
+  return () => {
+    root?.removeEventListener('scroll', forceTop)
+    cancel()
+  }
 }

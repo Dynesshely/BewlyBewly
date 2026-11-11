@@ -137,3 +137,77 @@ pnpm exec playwright test --repeat-each=1   # 连续执行命令 N 次
 3. **合集 fixture 用页面脚本记录点击**：避免真的导航离开 fixture，断言的是「点第 3 项会触发指向第 3 个 bvid 的链接」。
 4. **反馈态依赖动态页**：动态页需要登录态，用伪造 cookie + SW 桩只验证反馈组件渲染，不验证真实动态数据形态。
 5. 动态页的 ErrorState 只在**首屏加载失败**时出现；已有内容后翻页失败只显示底部「重试」提示（这是产品行为）。
+
+## 八、第 21 轮：滚动记忆 e2e + 首屏 eager 护栏
+
+### 新增 / 修改的 spec
+
+| 文件 | 变更 | 覆盖 |
+| --- | --- | --- |
+| `scroll-memory.spec.ts`（新建） | 3 条用例（1 条 fixme） | 首页子标签切换恢复、首页刷新回顶部（已知缺陷）、历史列表离开再返回的锚点恢复 |
+| `perf.spec.ts` | 基线用例加 2 条断言 | `eager > 0`、`fetchHigh >= 8`（实测 12/12），防止第 14 轮的 eager/high 属性链路再次断掉 |
+| `article-page.spec.ts` | 图片请求桩 | fixture 里的 `i0.hdslb.com` 图片地址在真实网络是 404，第 19 轮图片兜底会把 `<img>` 换成占位，导致 lightbox 断言拿不到原图 src（假红）；现在把图片请求统一 fulfill 成 1×1 PNG，用例确定性通过 |
+
+### 用例要点
+
+1. **首页滚动记忆**：滚到 800px → 点第二个子标签（For you / Following / …）→ 点回原标签 →
+   `poll` 滚动容器 `scrollTop`；同时断言 `sessionStorage` 里出现 `bewly-home-scroll-*` 记录。
+   断言「恢复确实生效（>300px）」+「偏差在已知范围（±400px）」。
+2. **首页刷新回顶部**：目前是 `test.fixme`，因为 Chromium 刷新时会恢复内层滚动容器位置（实测 496px），
+   需要 src 修复（`history.scrollRestoration = 'manual'`）。现象与复现步骤见 `docs/scroll-memory.md` 第 4 节。
+3. **历史列表锚点恢复**：背景服务 worker 给历史接口打桩（与 `list-offscreen.spec.ts` 同一套），
+   滚动后读 `sessionStorage` 里的锚点 key/offset → 回首页再点回历史 → 断言 scrollTop > 100、
+   且该卡片落在记录偏移 ±200px 内；同时断言记录被消费（恢复一次后清空）。
+   不用 `reload` 是因为扩展会记住上次页面，reload 后历史页自己就恢复了，再点 dock 会重置滚动。
+
+### 全量运行结果（`pnpm exec playwright test`，workers=1）
+
+| 运行 | 用例数 | passed | skipped | failed | 耗时 | 说明 |
+| --- | --- | --- | --- | --- | --- | --- |
+| #1 | 54 | 47 | 5 | 2 | 3.3m | 修 article 图片桩之前：`article-page`（图片 404 触发兜底）+ `favorites-category-manage`（A 工作流新 spec）失败 |
+| #2 | 54 | 47 | 5 | 2 | 3.4m | 与 #1 完全一致（同样两条，非 flaky） |
+| #3 | 54 | 48 | 5 | 1 | 3.3m | 修好 article 图片桩：只剩 `favorites-category-manage`（A 工作流未完成，需重建产物后复跑） |
+| #4 | 54 | 48 | 5 | 1 | 3.2m | 与 #3 一致 |
+
+5 个 skipped 是常量集合：
+
+- `background.spec.ts`「getRecommendVideos 返回真实数据」（需要真实登录态）
+- `dom-probe.spec.ts`「线上首页 DOM 结构检测」（在线探测）
+- `perf.spec.ts` 两条 preload 模拟实验（默认需要 `PERF_PRELOAD_EXPERIMENT=1`）
+- `scroll-memory.spec.ts`「首页刷新回顶部」（本轮新增的已知缺陷 fixme）
+
+### 结论与已知限制
+
+- 任一轮改动后连跑 2 次全量（#1/#2 与 #3/#4），**本轮新增的两个用例稳定通过，无 flaky**；
+- `favorites-category-manage.spec.ts` 是并发 A 工作流的新用例，其依赖的「新建收藏夹」UI
+  还没进当前构建产物（`extension/` 构建于 10:58），失败原因是找不到 `.bewly-list-chip.is-create`；
+  重建产物后需要复跑，与本轮改动无关；
+- 首页恢复的偏差与刷新不回顶，都是**产品实现缺陷**而非测试问题，已写进 `docs/scroll-memory.md`。
+
+## 九、第 21 轮 B 工作流：滚动记忆两个 BUG 修复后的验收
+
+### 根因（与最初的判断不同，记录如下）
+
+- **不是 KeepAlive 名字问题**（虽然 `ForYou` 补 `defineOptions({ name: 'ForYou' })` 仍有收益：切回不再重新请求）；
+- 真正根因：`Home.vue` 里的 `scrollbarRef` 是 **OverlayScrollbars 组件实例**，不是 HTMLElement。
+  第 20 轮的 `restoreHomeScroll(savedTop, () => scrollbarRef.value)` 把 `scrollTop` 写到了组件实例上（无效），
+  `currentScrollTop()` 也一直读到 0。所以「恢复」从未真正执行过，496px 只是浏览器滚动锚定的落点。
+- 其它修复：`resolveScrollElement()` 优先查 `#bewly` shadow root 的 `.bewly-scroll-container`；
+  恢复落位后做 rAF×2 + 300ms 二次校正（之前被 `stopped` 提前中止）；
+  列表页恢复后按同一锚点校正 rAF×2 / 300ms / 800ms；
+  首页挂载后 1.6s 内用 scroll 监听 + 多个定时点压过浏览器的 scroll restoration（用户一滚动就放弃）。
+
+### 验收结果
+
+| 项目 | 结果 |
+| --- | --- |
+| `scroll-memory.spec.ts` 连续 3 次 | ✅ 3/3 passed（每次 3 条用例全过，5.7–8.4s/条） |
+| 断言收紧 | 首页 ±80px、列表 ±80px、刷新 `scrollTop < 5`（原 fixme 已改为正式断言） |
+| 全量 1 次 | **51 passed / 4 skipped / 0 failed（3.0m）** |
+| 稳定性 | 3 次连续运行无 flaky；切标签恢复会先出现 496px 中间态（浏览器滚动锚定），约 100–200ms 后落到 800px，用例用「连续两次采样都接近目标」判断稳定，避免读中间态假红 |
+
+### 测试写法要点（给后续用例）
+
+1. **等「稳定」而不是等「一次命中」**：滚动恢复有中间态，`expect.poll` 单次命中后立刻读值可能读到回落值；
+2. **按真实滚动元素断言**：`.bewly-scroll-container` 在 `#bewly` shadow root 内，`document.querySelector` 拿不到；
+3. **首页刷新用例要容错浏览器 restoration 的时机**：轮询到回顶后再断言，不要固定 `waitForTimeout`。

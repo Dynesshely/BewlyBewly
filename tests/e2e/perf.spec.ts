@@ -484,6 +484,10 @@ test.describe('首屏性能基线', () => {
       expect(cardsMs).toBeLessThan(30_000)
       // CLS 代理值：只做粗门槛（首屏不该出现明显跳动）
       expect(metrics.cls).toBeLessThan(0.5)
+      // 第 14 轮：首屏封面改成 loading="eager" 后，重建产物里必须能看到 eager 与 high 封面，
+      // 否则说明属性链路又断了（第 21 轮把这两个数字固定成回归护栏）
+      expect(metrics.eager).toBeGreaterThan(0)
+      expect(metrics.fetchHigh).toBeGreaterThanOrEqual(8)
       // 第 12 轮图片属性在重建后必须生效（覆盖率为 0 说明属性链路断了）
       expect(metrics.decodingAsync).toBeGreaterThan(0)
       expect(metrics.fetchHigh + metrics.fetchLow).toBeGreaterThan(0)

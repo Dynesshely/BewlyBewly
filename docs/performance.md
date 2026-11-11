@@ -327,3 +327,43 @@ unicode-range 拉取实际用到的切片（通常 2–5 片，而非整份 1.81
   每档 2 次样本仍不足以给出统计显著结论；
 - 只验证了 AVIF 候选；不支持 AVIF 的浏览器的 preload 会被跳过（按设计不会重复下载）；
 - 未评估长列表滚动后 preload 标签的生命周期（实现有引用计数与卸载清理，但没有真机验证）。
+
+## 第 21 轮复测：首屏封面 eager 确认（e2e 护栏）
+
+第 14 轮把首屏封面从 `lazy` 改成 `eager + fetchpriority=high`，本轮在**当前构建产物**
+（`extension/` 构建于 2026-11-11 10:58）上复跑 `perf.spec.ts`，确认属性确实进了产物：
+
+| 指标 | 数值 | 说明 |
+| --- | --- | --- |
+| mountMs | 1685 | #bewly 挂载完成 |
+| 首屏卡片 ms | 2214 | 卡片首帧渲染 |
+| 首屏可见（≥8 张） | 2216 | |
+| 卡片 / 图片 | 30 / 62 | |
+| **`loading="eager"`** | **12** | 首屏 12 张封面全部 eager（第 14 轮回归点） |
+| `loading="lazy"` | 48 | 非首屏封面 + 头像 |
+| **`fetchpriority="high"`** | **12** | 与首屏卡数一致 |
+| `fetchpriority="low"` | 48 | |
+| `decoding="async"` | 60 | 全部卡片图 |
+| `coverPreloads` | 0 | 第 18 轮的 preload 方案**未进入当前产物**（该轮结论是建议回退） |
+| CLS | 0 | 限速档位同样为 0 |
+
+限速复测（Fast 3G / Slow 4G，各 2 次，相对首个网络请求）：
+
+| 档位 | 首屏可见 | 封面首次开始 | high 首响应 | high 响应中位 | low 响应中位 | high−low 开始差 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Fast 3G | ~2400ms | ~1400ms | 1849ms | 1901ms | 4596ms | +2575ms |
+| Slow 4G | 2497–2524ms | 1365–1431ms | 1561–1658ms | 1679–1726ms | 2077–2123ms | +292–312ms |
+
+结论：**首屏封面 eager 在产物里稳定生效**（`eager=12`、`fetchHigh=12`，与首屏卡数一致），
+并且 high 封面确实先于 low 开始/完成（第 14 轮之后的 eager 改动起主要作用）。
+
+### 新增的回归护栏
+
+`perf.spec.ts` 的「首屏性能基线」用例新增两条断言，防止属性链路再次断掉：
+
+```ts
+expect(metrics.eager).toBeGreaterThan(0)
+expect(metrics.fetchHigh).toBeGreaterThanOrEqual(8)
+```
+
+阈值取 8（实际 12）而不是 12，避免首屏卡片数因视口/数据微小变化时误报。

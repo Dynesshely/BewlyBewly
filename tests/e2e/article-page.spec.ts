@@ -1,5 +1,7 @@
 import type { BrowserContext, Page } from '@playwright/test'
 
+import { Buffer } from 'node:buffer'
+
 import { expect, test } from '@playwright/test'
 
 import { launchExtension, skipIfExtensionMissing } from './utils'
@@ -54,6 +56,17 @@ async function openOpusPage(): Promise<{ context: BrowserContext, page: Page }> 
     const url = new URL(request.url())
     if (url.hostname === 'www.bilibili.com' && request.resourceType() === 'document') {
       await route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: OPUS_FIXTURE })
+      return
+    }
+    // 正文图片固定用 1×1 PNG 兜住：fixture 里的 i0.hdslb.com 地址在真实网络下是 404，
+    // 第 19 轮的图片失败兜底会在 img error 后把 <img> 换成占位，
+    // 导致 lightbox 里读不到原图 src（用例假红）。这里让图片请求确定性成功。
+    if (url.hostname === 'i0.hdslb.com' && request.resourceType() === 'image') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'),
+      })
       return
     }
     await route.continue()

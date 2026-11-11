@@ -16,6 +16,11 @@ import { TVAppKey } from '~/utils/authProvider'
 
 import { isVerticalVideo } from '~/utils/uriParse'
 
+// 第 21 轮修复（BUG 2）：Home.vue 用 `<KeepAlive include="ForYou">` 缓存推荐流，
+// include 是按组件 name 匹配的；没有 name 时永远不命中 → 切标签会卸载重挂、重新请求，
+// 推荐流高度变化后浏览器滚动锚定把恢复落点拉偏。
+defineOptions({ name: 'ForYou' })
+
 const props = defineProps<{
   gridLayout: GridLayoutType
 }>()

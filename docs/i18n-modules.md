@@ -513,3 +513,79 @@ OK 目标变体词（視頻/快捷鍵/用戶/搵嘢/收睇記錄/陣間至睇/�
 - 术语统一只覆盖「同一个概念的不同写法」；同义但语义不同的词（如「隐藏」vs「关闭」）按语境保留；
 - 模块内 `formatCount` 等数字单位、`_locales` 之外的原生页面文案不在本轮范围；
 - 未在真实浏览器逐页走查：按分工由 Lead 统一构建回归；若发现漏网同义词，下次按本表补即可。
+
+---
+
+## 第 21 轮：全站文案审计（aria-label / title / placeholder / toast）
+
+第 19–20 轮新增了一批交互（焦点陷阱、图片兜底、滚动记忆、右键菜单、收藏夹面板新建表单），
+本轮针对这些新组件的**用户可见文案**做一次审计，重点找硬编码中文。
+
+### 1. 审计范围与 grep 口径
+
+范围：第 19–20 轮涉及与新增的组件目录 —— `components/Feedback/**`、`components/KeyboardShortcutHelp.vue`、
+`components/CommandPalette.vue`、`components/VideoCardQuickActions/**`、`components/VideoCard/**`、
+`views/listShared/**`、`views/Home/**`、`views/Moments/**`、`views/Favorites/**`、`articlePage/**`、
+`components/Settings/Pages/Pages.vue`。
+
+grep 口径（排除注释、console、模块 `i18n.ts`）：
+
+```text
+aria-label="[中文]" / :aria-label="…中文…"
+title="[中文]" / :title="…中文…"
+placeholder="[中文]" / :placeholder="…中文…"
+alt="[中文]" / text="[中文]"
+toast.success/error/warning/info('中文') / showToast('中文')
+模板里直接出现的中文文本节点
+```
+
+### 2. 发现与处理
+
+| 位置 | 发现 | 处理 |
+| --- | --- | --- |
+| `components/Feedback/FallbackImage.vue` | `KIND_LABEL` 三处硬编码中文默认 aria-label（图片 / 视频封面 / 头像加载失败） | **已修**：新建 `components/Feedback/i18n.ts` 模块 i18n（四语言），改为 `useFeedbackMessages()` 取值；调用方传 `ariaLabel` 时仍优先用调用方 |
+| 焦点陷阱 aria（五个模块面板 / 视频页帮助 / 文章目录与大图 / 全局帮助 / 命令面板） | 本轮核对：`aria-label` / `role` / `aria-modal` 全部走 `t()` 或既有 key | 无需改动 |
+| 右键菜单项（`VideoCardContextMenu.vue`） | 菜单项已走 `t('video_card.operation.*')`，含第 19 轮焦点管理 | 无需改动 |
+| 收藏夹面板新建表单（`FavoriteFolderPanel.vue` + `useCardQuickActions.ts`） | 标题 / 按钮 / placeholder / toast 均走 `useQuickActionsMessages()` | 无需改动 |
+| 滚动记忆（`Home/scrollMemory.ts`、`listShared/useListScrollMemory.ts`、`Favorites.vue` 等） | 纯逻辑，无用户可见文案（注释里的「滚动位置」不算） | 无需改动 |
+| `Picture.vue` | `fallbackText` / `fallbackAriaLabel` 由调用方传；未传时用 FallbackImage 的 i18n 默认值 | 无需改动（随 FallbackImage 生效） |
+
+**统计**：审计范围内发现硬编码中文 UI 文案 **3 条**（均在 FallbackImage 的默认 aria-label），
+已全部修复；其余第 19–20 轮交互的 aria / title / placeholder / toast **0 条**硬编码。
+
+### 3. 保留原因（grep 命中但刻意不改）
+
+| 文件 | 内容 | 保留原因 |
+| --- | --- | --- |
+| `contentScripts/livePage/dom.ts` | `button[aria-label*="弹幕"]` / `"全屏"` | 匹配 B 站原生页面元素的 aria-label，翻译后反而找不到元素 |
+| `contentScripts/notificationPage/dom.ts` | `aria-label` 包含「未读」 | 同上，用于识别原生消息页状态 |
+| `views/Home/components/Following.vue` | `badge.text !== '投稿视频'` | 接口返回的中文数据，用于条件判断，不是展示文案 |
+| `views/Home/components/ForYou.vue` | `bottom_rcmd_reason === '已关注'` | 接口数据匹配 |
+| `views/Home/components/Ranking.vue` | `rating.replace('分', '')` | 接口数据清洗 |
+| `views/Moments/utils/format.ts` | `亿/万/億/萬` | 按语言的数字单位符号（第 13 轮已按 locale 选择） |
+| `articlePage/dom.ts` | `document.title.replace(/哔哩哔哩/)` | 从原生标题里去掉站点名 |
+
+### 4. 新增的第 15 个模块 i18n
+
+`src/components/Feedback/i18n.ts`（本轮新建）：
+
+| key | cmn-CN | cmn-TW | jyut | en |
+| --- | --- | --- | --- | --- |
+| `imageFallback` | 图片加载失败 | 圖片載入失敗 | 圖片載入唔到 | Failed to load image |
+| `videoFallback` | 视频封面加载失败 | 影片封面載入失敗 | 影片封面載入唔到 | Failed to load video cover |
+| `avatarFallback` | 头像加载失败 | 頭像載入失敗 | 頭像載入唔到 | Failed to load avatar |
+
+沿用第 12 轮的语言解析（`~/utils/moduleI18n`）与第 16 轮术语表（影片 / 載入）。
+
+### 5. 校验与自测
+
+- 临时脚本校验 `Feedback/i18n.ts` 四语言键集合（CN/TW/EN 3 键、jyut 覆盖 3 键，一致），跑完已删除；
+- `pnpm exec eslint components/Feedback/FallbackImage.vue components/Feedback/i18n.ts`：0 error 0 warning；
+- `pnpm run typecheck`：0 error（期间并发工作流的 `listShared/i18n.ts` 临时报错由对方修复后恢复 0）；
+- 未跑 build / playwright；未碰浏览器；未做 git 操作。
+
+### 6. 已知限制
+
+- 本轮只审「用户可见文案」：错误信息拼接、数字单位、接口数据匹配按保留清单不动；
+- `Feedback/i18n.ts` 目前只有图片兜底 3 条；空态 / 错误态 / 骨架的文案仍由使用方传入（`EmptyState` / `ErrorState` 的 props，调用方已各自 i18n）；
+- 模块内 i18n 现为 15 个（第 12 轮 14 个 + 本轮 Feedback），统一切换语言仍走 `settings.language`，不改 `_locales`。

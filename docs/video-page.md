@@ -154,36 +154,61 @@ B 站原生播放页（`www.bilibili.com/video/*`、`/list/*`）不是 Bewly 接
 | 普通多P 视频 `/video/*` | 现代 `.video-pod`（列表含 `multip`）或旧版 `#multi_page` | 选集 | 上一 P / 下一 P | 不可用（交给 B 站） |
 | 合集视频页 `/video/*` | `.video-pod` + header 合集语义 | 合集 | 上一个 / 下一个视频 | 不可用（交给 B 站） |
 
-### 真机 DOM 证据（2026-11 实测 `/video/BV1wvWM6RE3Z/`，8 个分P）
+### 真机 DOM 证据（2026-11 实测）
+
+**分P**（`/video/BV1wvWM6RE3Z/`，8 个分P）：
 
 - 容器：`.video-pod.video-pod`
 - header：`视频选集 （1/8）`（`[class*="video-pod__header"]` 内）
 - 列表：class 为 `video-pod__list multip list`（**`multip` 是分P 最强信号**）
 - 条目：`simple-base-item video-pod__item active normal`，当前 P 带 `.active`
 - **条目内部没有 `<a>`**：点击条目 DIV 本身即可切换（实测点第 3 项后 URL 变为 `?p=3`）
-- 「相关推荐 / 接下来播放」同样是 `.video-pod`，但列表 class **没有 `multip`**，
-  header 是推荐类文案（相关推荐 / 接下来播放），条目指向其它 bvid
+
+**合集**（`/video/BV14a411n7Rf/`，合集「钩织入门教程」10 集）：
+
+- 同样只有一个 `.video-pod`
+- header：`钩织入门教程 （1/10） 491万播放 暂无简介 简介 订阅合集`
+- 列表：class 为 `video-pod__list section`（**没有 `multip`**）
+- 条目：10 个，指向合集内**不同 bvid**
+- ⚠️ header 里的 `（1/10）` 与分P 的 `（1/8）` 形态相同 —— **`（x/y）` 不能单独作为分P 依据**，
+  否则合集会被误判成「选集」
+
+**相关推荐 / 接下来播放**：同样是 `.video-pod`，列表 class **没有 `multip`**，
+header 是推荐类文案，条目指向其它 bvid。
 
 ### 判定顺序（`src/contentScripts/videoPage/dom.ts` → `getSelectionContext()`）
 
 1. `/list/*` → **playlist**（原有播放列表分支，不受下面规则影响）
 2. 旧版显式分P 容器（`#multi_page` / `.multi-page-v1` / `[class*="multi-page"]`）→ **parts**
-3. 现代 `.video-pod`：列表 class 含 **`multip`**（最强信号），或 pod header 匹配
-   `/视频选集|选集|分P|（\d+/\d+）/` → **parts**
-4. pod header 匹配 `/合集|collection/` 且**不含**推荐文案 → **collection**
-   （合集条目 bvid 各不相同是正常的；能解析出 bvid 时要求 ≥2 个不同 bvid，防止单视频面板误判）
-5. pod header 匹配 `/相关推荐|接下来播放|推荐|猜你喜欢/`，
-   **或拿不到 header 且列表没有 `multip`** → **不是选集，不渲染**（宁缺勿滥）
-6. 兜底：当前 bvid 下存在 2 个以上带 `p=` 的链接（旧版分P 链接特征）→ **parts**
+3. 现代 `.video-pod` 内按以下优先级判定（**合集优先**）：
+   1. pod header 含 **`合集` / `订阅合集` / `共 N 集` / `collection`** → **collection**
+      （即使 header 里同时有 `（x/y）` 也按合集处理）
+   2. 列表 class 含 **`multip`** → **parts**（分P 最强信号）
+   3. header 含 **`视频选集` / `选集` / `分P`** 且带 `（x/y）` 进度 → **parts**
+   4. header 是推荐文案（`相关推荐` / `接下来播放` / `猜你喜欢`）→ **none**
+   5. 都判定不了（例如只有 `（x/y）`、没有选集/合集字样、列表也没有 `multip`）→ **none，不渲染**
+4. 容器 class / data-* 直接标了 `collection` 的旧结构 → **collection**（兜底）
+5. 兜底：当前 bvid 下存在 2 个以上带 `p=` 的链接（旧版分P 链接特征）→ **parts**
 
 补充规则：
 
 - **条目数 < 2 一律不渲染入口**（单 P 视频不显示「选集」）
+- 合集条目 bvid 各不相同是正常的；能解析出 bvid 时要求 ≥2 个不同 bvid（防止单视频面板误判）
 - 当前项：先看原生高亮类（`active` / `on` / `current` / `selected` / `cursor` 或 `aria-current`，
   旧版分P 的高亮可能挂在父级 `li` 上）；再看条目链接的 `p=` / `bvid`；
   现代分P 条目没有链接时按 URL 的 `p=` 序号推导（`index = p - 1`）；判定失败时下标为 -1，面板仍可用
 - **任何一类都探测不到时**，浮动入口、面板 host、快捷键、帮助项全部不渲染，不留空浮层
+### 合集页的原生面板避让（第 15 轮补充）
 
+真实合集页右侧本来就有 B 站自己的「合集 0/10」纵向面板。为了不重复、也不和右下角浮动条挤在一起：
+
+- 我们的合集面板**默认收起**（只有点浮动按钮才出现，状态与其它选集类型一致）
+- 合集页的面板定位改为**左侧中部**（`.bvp-playlist[data-kind="collection"]`：`left: 24px; top: 50%`），
+  避开右侧原生合集面板与右下角浮动条；播放列表 / 分P 页仍保持原来的右上角定位
+- 当前项：优先原生高亮类，其次用「条目链接里的 bvid === 当前页 bvid」匹配（合集条目常见结构是
+  `<a href="/video/BV..."><div class="video-pod__item">…</div></a>`，`<a>` 是条目的**祖先**，
+  所以链接查找同时支持条目自身 / 页面后代 / 祖先包裹三种形态）；两者都拿不到时退化为**第 1 项**（不再返回 -1）
+- 面板里同时写 `aria-current="true"` 与 `.bvp-playlist__item.is-active` 高亮类，样式与无障碍语义一致
 ### 为什么不能只认 `.video-pod`（第 14 轮回归教训）
 
 现代 B 站播放页把「分P 选集」「合集」「相关推荐 / 接下来播放」都渲染成 `.video-pod` 容器 +

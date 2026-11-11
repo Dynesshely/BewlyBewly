@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import type { MomentsDensity } from '../composables/useMomentsDensity'
+import SkeletonBlock from '~/components/Feedback/SkeletonBlock.vue'
 
-withDefaults(defineProps<{
+/**
+ * 动态卡片骨架：用统一 Feedback/SkeletonBlock 拼装。
+ *
+ * 卡片外壳（边框 / 圆角 / 背景 / 密度间距）仍由本组件负责，
+ * 灰块的尺寸 / 圆角 / 脉冲动画全部来自 SkeletonBlock（含 reduced-motion 降级）。
+ */
+const props = withDefaults(defineProps<{
   /** 转发卡片里的骨架更紧凑 */
   compact?: boolean
   /** 卡片密度：紧凑档骨架同步收窄 */
@@ -10,28 +17,52 @@ withDefaults(defineProps<{
   compact: false,
   density: 'comfortable',
 })
+
+const isDense = computed(() => props.density === 'compact' && !props.compact)
+
+const avatarSize = computed(() => {
+  if (props.compact)
+    return 28
+  return isDense.value
+    ? 36
+    : 44
+})
+
+const mediaHeight = computed(() => (isDense.value
+  ? 96
+  : 120))
 </script>
 
 <template>
   <div
     class="moment-skeleton"
-    :class="{ 'is-compact': compact, 'is-density-compact': density === 'compact' && !compact }"
+    :class="{ 'is-compact': compact, 'is-density-compact': isDense }"
     aria-hidden="true"
   >
-    <div class="moment-skeleton__avatar" />
+    <SkeletonBlock
+      class="moment-skeleton__avatar"
+      :width="avatarSize"
+      :height="avatarSize"
+      :gap="0"
+      circle
+    />
+
     <div class="moment-skeleton__body">
       <div class="moment-skeleton__head">
-        <span class="moment-skeleton__line is-name" />
-        <span class="moment-skeleton__line is-time" />
+        <SkeletonBlock :height="10" :radius="5" :width="120" />
+        <SkeletonBlock :height="8" :radius="4" :width="64" />
       </div>
-      <span class="moment-skeleton__line" />
-      <span class="moment-skeleton__line" />
-      <span class="moment-skeleton__line is-short" />
-      <div class="moment-skeleton__media" />
+
+      <SkeletonBlock :height="10" :radius="5" />
+      <SkeletonBlock :height="10" :radius="5" />
+      <SkeletonBlock :height="10" :radius="5" width="62%" />
+
+      <SkeletonBlock :height="mediaHeight" :radius="10" />
+
       <div class="moment-skeleton__stats">
-        <span class="moment-skeleton__pill" />
-        <span class="moment-skeleton__pill" />
-        <span class="moment-skeleton__pill" />
+        <SkeletonBlock :height="16" :radius="8" :width="54" />
+        <SkeletonBlock :height="16" :radius="8" :width="54" />
+        <SkeletonBlock :height="16" :radius="8" :width="54" />
       </div>
     </div>
   </div>
@@ -58,31 +89,8 @@ withDefaults(defineProps<{
   padding: 12px 16px;
 }
 
-.moment-skeleton.is-density-compact .moment-skeleton__avatar {
-  width: 36px;
-  height: 36px;
-}
-
-.moment-skeleton.is-density-compact .moment-skeleton__body {
-  gap: 8px;
-}
-
-.moment-skeleton.is-density-compact .moment-skeleton__media {
-  height: 96px;
-}
-
 .moment-skeleton__avatar {
   flex: none;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: var(--bew-skeleton);
-  animation: moment-skeleton-pulse 1.6s ease-in-out infinite;
-}
-
-.moment-skeleton.is-compact .moment-skeleton__avatar {
-  width: 28px;
-  height: 28px;
 }
 
 .moment-skeleton__body {
@@ -93,6 +101,10 @@ withDefaults(defineProps<{
   min-width: 0;
 }
 
+.moment-skeleton.is-density-compact .moment-skeleton__body {
+  gap: 8px;
+}
+
 .moment-skeleton__head {
   display: flex;
   gap: 12px;
@@ -100,66 +112,8 @@ withDefaults(defineProps<{
   justify-content: space-between;
 }
 
-.moment-skeleton__line {
-  display: block;
-  width: 100%;
-  height: 10px;
-  border-radius: 5px;
-  background: var(--bew-skeleton);
-  animation: moment-skeleton-pulse 1.6s ease-in-out infinite;
-
-  &.is-name {
-    width: 120px;
-  }
-
-  &.is-time {
-    width: 64px;
-    height: 8px;
-  }
-
-  &.is-short {
-    width: 62%;
-  }
-}
-
-.moment-skeleton__media {
-  height: 120px;
-  border-radius: 10px;
-  background: var(--bew-skeleton);
-  animation: moment-skeleton-pulse 1.6s ease-in-out infinite;
-}
-
 .moment-skeleton__stats {
   display: flex;
   gap: 12px;
-}
-
-.moment-skeleton__pill {
-  width: 54px;
-  height: 16px;
-  border-radius: 8px;
-  background: var(--bew-skeleton);
-  animation: moment-skeleton-pulse 1.6s ease-in-out infinite;
-}
-
-@keyframes moment-skeleton-pulse {
-  0%,
-  100% {
-    opacity: 0.55;
-  }
-
-  50% {
-    opacity: 1;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .moment-skeleton__avatar,
-  .moment-skeleton__line,
-  .moment-skeleton__media,
-  .moment-skeleton__pill {
-    animation: none;
-    opacity: 0.7;
-  }
 }
 </style>

@@ -164,7 +164,7 @@ const JYUT: QuickActionsMessages = {
   folderSelectRequired: '最少揀一個收藏夾',
   submitFavorite: '收藏',
   dismiss: '取消',
-  closePanel: '收埋',
+  closePanel: '關閉',
 }
 
 /** 模块自建 i18n：四种语言键集合完全一致（缺键回退简中 / 英文，不会出现空串） */

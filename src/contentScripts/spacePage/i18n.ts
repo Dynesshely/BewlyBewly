@@ -182,7 +182,7 @@ const CMN_TW: SpacePageMessages = {
   densityOff: '已切換為舒適密度',
 
   jumpTitle: '快速跳轉',
-  jumpHome: '主頁',
+  jumpHome: '首頁',
   jumpVideo: '投稿',
   jumpCollection: '合集',
   jumpFavorites: '收藏夾',
@@ -213,6 +213,7 @@ const JYUT: SpacePageMessages = {
   ...CMN_TW,
   filterUnavailable: '呢頁冇呢類內容',
   filterNoMatch: '呢頁冇呢類內容，轉返「全部」喇',
+  jumpHome: '主頁',
   jumpFailed: '頁面搵唔到呢個入口',
   statusIdle: '撳 J / K 開始睇內容',
   hint: '面板同快速鍵淨係影響呢一頁，狀態喺呢個分頁入面保持',
@@ -224,7 +225,7 @@ const JYUT: SpacePageMessages = {
     next: '下一條內容',
     prev: '上一條內容',
     open: '喺新分頁開',
-    cancel: '取消高亮 / 收埋面板',
+    cancel: '取消高亮 / 關閉面板',
   },
 }
 

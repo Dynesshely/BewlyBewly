@@ -264,9 +264,9 @@ const CMN_TW: VideoPageMessages = {
 
 const JYUT: VideoPageMessages = {
   ...CMN_TW,
-  playlistHint: '撳項目切換影片；A 切換自動連播；Esc 收埋面板',
-  partsHint: '撳項目切換分P；Esc 收埋面板',
-  collectionHint: '撳項目切換合集影片；Esc 收埋面板',
+  playlistHint: '撳項目切換影片；A 切換自動連播；Esc 關閉面板',
+  partsHint: '撳項目切換分P；Esc 關閉面板',
+  collectionHint: '撳項目切換合集影片；Esc 關閉面板',
   cinemaOn: '入咗影院模式，撳 Esc 退出',
   cinemaOff: '已經退出影院模式',
   restored: '還原咗播放器',
@@ -275,7 +275,7 @@ const JYUT: VideoPageMessages = {
   muted: '靜咗音',
   unmuted: '取消靜音喇',
   playerNotFound: '搵唔到播放器',
-  shortcutsHint: '撳 ? 開或者收埋說明，Esc 收埋',
+  shortcutsHint: '撳 ? 開或者關閉說明，Esc 關閉',
   autoplayOn: '開咗自動連播：播完自動切下一個',
   autoplayOff: '熄咗自動連播',
   autoplayUnavailable: '呢頁冇「下一個」可以用，連播唔到',
@@ -300,8 +300,8 @@ const JYUT: VideoPageMessages = {
     nextVideo: '下一個影片',
     autoplay: '自動連播開關',
     percent: '跳去 0%–90%',
-    help: '開 / 收埋快速鍵說明',
-    escape: '退出影院 / 收埋說明',
+    help: '開 / 關閉快速鍵說明',
+    escape: '退出影院 / 關閉說明',
   },
 }
 

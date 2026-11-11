@@ -476,7 +476,7 @@ topbar:
   noti_dropdown:
     replys: 回复我的
     mentions: 提到我的
-    likes: 收到的赞
+    likes: 收到的点赞
     messages: 系统消息
     chats: 我的消息
   moments_dropdown:

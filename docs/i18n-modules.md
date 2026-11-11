@@ -376,3 +376,140 @@ OK   占位符一致 ai_filter_status.done_kept (visible)
   或 `_locales` 四语言，避免回退；
 - `docs/i18n-modules.md` 第 12 轮起维护的 14 个模块内 i18n 与 `src/_locales` 仍分属两套体系，
   模块内文案不放 `_locales`（避免大改动），`_locales` 只承载全局/共享文案。
+
+---
+
+## 第 16 轮：术语表 v2 与全站对齐
+
+第 12 轮只统一了 14 个模块内 i18n 的口径，`src/_locales` 仍是旧译（「視頻」「快捷鍵」「用戶」「觀看記錄」「搵嘢」…），
+两者长期并存。本轮产出**术语表 v2**（四列），并按它扫描 `_locales` 与 14 个模块 i18n 的**值**全部对齐；
+**只改值，不改 key 结构**，四语言键集合保持一致。
+
+### 1. 扫描口径
+
+- `src/_locales/{cmn-CN,cmn-TW,jyut,en}.yml`：各 **508** 条字符串值（四语言同 key）；
+- 14 个模块内 `i18n.ts`：共 **563** 个 key × 4 语言（cmn-CN / cmn-TW / jyut / en）；
+- 用 TypeScript AST 读模块词典（含 `...CMN_TW` 展开与 listShared 的内联 `MESSAGES`），避免正则误读；
+- 替换后复核：`_locales` 四语言键集合 0 差异、模块四语言键集合 0 差异。
+
+### 2. 术语表 v2（唯一推荐词）
+
+> 繁中按台湾习惯，粤语按香港习惯；「B 站专有名词」（BV 号 / MID / UP 主 / 大会员 等）不翻译。
+
+| 概念 | 简中 | 繁中（cmn-TW） | 粤语（jyut） | 英文 |
+| --- | --- | --- | --- | --- |
+| 视频 | 视频 | 影片 | 影片 | Video |
+| 视频播放页 | 视频播放页 | 影片播放頁 | 影片播放頁 | Video page |
+| 点赞 / 取消点赞 | 点赞 / 取消点赞 | 按讚 / 取消按讚 | 讚好 / 取消讚好 | Like / Unlike |
+| 评论 | 评论 | 留言 | 留言 | Comment |
+| 转发 | 转发 | 轉發 | 轉發 | Repost |
+| 收藏 / 收藏夹 | 收藏 / 收藏夹 | 收藏 / 收藏夾 | 收藏 / 收藏夾 | Favorite / Folder |
+| 稍后再看 | 稍后再看 | 稍後再看 | 稍後再看 | Watch Later |
+| 观看历史 | 观看历史 | 觀看歷史 | 觀看歷史 | Watch history |
+| 历史（短标签 / 顶栏） | 历史 | 歷史 | 記錄 | History |
+| 动态 | 动态 | 動態 | 動態 | Moment |
+| 直播间 | 直播间 | 直播間 | 直播間 | Live room |
+| 专栏 | 专栏 | 專欄 | 專欄 | Article |
+| 弹幕 | 弹幕 | 彈幕 | 彈幕 | Danmaku |
+| 用户 | 用户 | 使用者 | 用戶 | User |
+| 首页 | 首页 | 首頁 | 主頁 | Home |
+| 设置 | 设置 | 設定 | 設定 | Settings |
+| 搜索 | 搜索 | 搜尋 | 搜尋 | Search |
+| 快捷键 | 快捷键 | 快速鍵 | 快速鍵 | Shortcut |
+| 关闭 | 关闭 | 關閉 | 關閉 | Close |
+| 重试 | 重试 | 重試 | 再試 | Retry |
+| 全屏 | 全屏 | 全螢幕 | 全螢幕 | Fullscreen |
+| 画中画 | 画中画 | 子母畫面 | 子母畫面 | Picture-in-picture |
+| 加载 / 加载中 | 加载 / 加载中… | 載入 / 載入中… | 載入 / 載入緊… | Loading / Loading… |
+| 刷新 | 刷新 | 重新整理 | 重新整理 | Refresh |
+| 复制 | 复制 | 複製 | 複製 | Copy |
+| 番剧 / 动画（内容） | 番剧 | 動畫 | 動畫 | Anime |
+| 关注 | 关注 | 關注 | 關注 | Follow |
+
+> 「番剧」按 B 站分类名在简中保留；繁中/粤语统一用「動畫」（台湾/香港都更常说動畫）。
+> 「历史」短标签是导航栏宽度受限时的显式缩写例外，长文案仍用「觀看歷史」。
+
+### 3. 改动清单（值级替换，每次出现计 1 条）
+
+#### _locales（约 82 处）
+
+| 语言 | 变更前 → 变更后 | 条数 |
+| --- | --- | ---: |
+| cmn-CN | 收到的赞 → 收到的点赞 | 1 |
+| cmn-TW | 視頻 → 影片 | 1 |
+| cmn-TW | 快捷鍵 → 快速鍵 | 6 |
+| cmn-TW | 用戶 → 使用者 | 1 |
+| cmn-TW | 稍後觀看 → 稍後再看 | 7 |
+| cmn-TW | 觀看記錄 → 觀看歷史 | 12 |
+| cmn-TW | 番劇卡片 → 動畫卡片 | 1 |
+| cmn-TW | 動向 → 動態（dock.moments） | 1 |
+| cmn-TW | topbar.history 記錄 → 歷史 | 1 |
+| jyut | 視頻 → 影片 | 1 |
+| jyut | 快捷鍵 → 快速鍵 | 6 |
+| jyut | 搵嘢 → 搜尋（含「搵嘢頁」等） | 10 |
+| jyut | 收睇記錄 → 觀看歷史 | 12 |
+| jyut | 陣間至睇 → 稍後再看 | 7 |
+| jyut | 我嘅至愛 → 收藏 | 2 |
+| jyut | 動向 → 動態 | 3 |
+| jyut | 讚我 → 讚好訊息 | 1 |
+| jyut | 番劇卡片 → 動畫卡片 | 1 |
+| jyut | 「暫停進行觀看歷史」→「暫停記錄觀看歷史」等顺句 | 4 |
+| en | Watch Later 大小写统一（3 处） | 3 |
+
+#### 14 个模块 i18n（约 52 处）
+
+| 模块 | 变更前 → 变更后 | 条数 |
+| --- | --- | ---: |
+| Settings/Pages（TW） | 評論 → 留言 | 1 |
+| Settings/Pages（TW） | 用戶空間 → 使用者空間 | 1 |
+| Settings/Pages（jyut） | 首頁 → 主頁 | 2 |
+| Settings/Pages（jyut） | 使用者 → 用戶 | 2 |
+| Settings/Pages（jyut） | 搵嘢 → 搜尋 | 3 |
+| Settings/Pages（jyut） | 評論 → 留言 | 1 |
+| Moments（TW） | 番劇 → 動畫（含 type_pgc / 筛选提示） | 3 |
+| Moments（TW/jyut） | 收埋「淨係睇影片」→ 關閉…；收埋篩選 → 關閉篩選 | 2 |
+| listShared（TW/jyut） | 「觀看歷史記錄」→「觀看歷史」 | 3 |
+| listShared（jyut） | 收埋 → 關閉（说明 / 快捷键关闭） | 2 |
+| Anime（TW/jyut） | 番劇 → 動畫（时间表 / 文案，共 6 条） | 6 |
+| Search（TW/jyut） | 番劇號 → 動畫號、番劇推薦 → 動畫推薦、label_bangumi 番劇→動畫、Enter 搵嘢→搜尋 | 6 |
+| spacePage / Search | jumpHome / label_space：TW 主頁→首頁、jyut 首頁→主頁（并为 jyut 补 jumpHome 覆蓋） | 5 |
+| VideoCardQuickActions（jyut） | closePanel 收埋 → 關閉 | 1 |
+| articlePage（jyut） | Esc 收埋 → Esc 關閉 | 1 |
+| channelPage / searchPage / spacePage（jyut） | 「取消高亮 / 收埋面板」→「關閉面板」、「打開 / 收埋面板」→「關閉面板」 | 4 |
+| videoPage（jyut） | 收埋 → 關閉（3 处面板提示 + 快捷键说明 3 处） | 6 |
+
+> 合计约 **134 处**值替换；**没有重命名 / 新增 / 删除任何 key**（四语言键集合校验 0 差异）。
+
+### 4. 刻意保留（不是遗漏）
+
+- **jyut 的「收埋」**：只保留「隐藏 / 收起」语义（自动收埋顶栏、收埋侧栏、收埋已读、collapse 等），
+  「关闭面板 / 关闭说明」一律改为「關閉」；
+- **jyut 口语语法**（嘅 / 咗 / 喺 / 唔 / 睇 / 撳 / 剷 / 轉頭 等）全部保留，只统一术语词；
+- **短标签**：`topbar.history` 等窄位置保留「历史 / 歷史 / 記錄 / History」缩写；
+- **B 站专有名词**：BV 号、av 号、MID、UP 主、大会员、充电、硬核会员 等不翻译；
+- **英文大小写**：「Watch Later」按产品名统一大写，其它按句内语境保持自然大小写（`settings` / `Settings` 按标题与正文区分）。
+
+### 5. 校验与自测
+
+临时脚本（`.meta/dynesshely/bewlybewly/check-after-terms.cjs`，运行后已删除）用 TypeScript AST + js-yaml 校验：
+
+```text
+_locales keys cmn-TW: 缺 0 多 0
+_locales keys jyut: 缺 0 多 0
+_locales keys en: 缺 0 多 0
+OK 14 个模块四语言键集合一致（563 个 key）
+OK 目标变体词（視頻/快捷鍵/用戶/搵嘢/收睇記錄/陣間至睇/動向/讚我/觀看記錄/主頁…）已清零
+```
+
+另外：
+
+- `pnpm exec eslint`（14 个模块 i18n）：0 error 0 warning；
+- `pnpm run typecheck`：0 error；
+- 未跑 build / playwright；未碰浏览器；未做 git 操作；未改任何 UI 结构。
+
+### 6. 已知限制
+
+- `_locales` 里仍有个别上下文相关词未强行替换（例如 `replys` 在粤语里是「覆我」，属于通知动作而非「评论」概念）；
+- 术语统一只覆盖「同一个概念的不同写法」；同义但语义不同的词（如「隐藏」vs「关闭」）按语境保留；
+- 模块内 `formatCount` 等数字单位、`_locales` 之外的原生页面文案不在本轮范围；
+- 未在真实浏览器逐页走查：按分工由 Lead 统一构建回归；若发现漏网同义词，下次按本表补即可。

@@ -160,7 +160,7 @@ const JYUT: ArticlePageMessages = {
   imageViewer: '圖片預覽',
   imagePrev: '上一張',
   imageNext: '下一張',
-  imageHint: '撳 Esc 收埋 · ← / → 切換',
+  imageHint: '撳 Esc 關閉 · ← / → 切換',
   codeCopy: '複製',
   codeCopied: '複製咗',
 }

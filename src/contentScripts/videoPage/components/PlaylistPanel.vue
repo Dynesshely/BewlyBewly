@@ -52,6 +52,7 @@ watch(() => ui.selectionPanelOpen, async (open) => {
     <section
       v-if="ui.selectionNav && ui.selectionPanelOpen"
       class="bvp-playlist"
+      :data-kind="ui.selectionKind"
       :aria-label="panelTitle"
     >
       <header class="bvp-playlist__header">
@@ -98,6 +99,7 @@ watch(() => ui.selectionPanelOpen, async (open) => {
         <li v-for="item in ui.selectionItems" :key="item.index">
           <button
             class="bvp-playlist__item"
+            :class="{ 'is-active': item.active }"
             type="button"
             :aria-current="item.active ? 'true' : undefined"
             :title="item.title"

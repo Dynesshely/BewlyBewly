@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { HistoryItem } from '~/components/SearchBar/searchHistoryProvider'
 import { ref } from 'vue'
+import EmptyState from '~/components/Feedback/EmptyState.vue'
 import { clearAllSearchHistory, getSearchHistory, removeSearchHistory } from '~/components/SearchBar/searchHistoryProvider'
 
 import { useDirectPasteSetting } from '../composables/useDirectPasteSetting'
@@ -306,9 +307,12 @@ function handlePaste(event: ClipboardEvent) {
           {{ clearConfirming ? t('recent_clear_confirm') : t('recent_clear') }}
         </button>
       </header>
-      <p v-if="!recentItems.length" class="quick-empty">
-        {{ t('recent_empty') }}
-      </p>
+      <EmptyState
+        v-if="!recentItems.length"
+        compact
+        icon="i-mingcute:history-line"
+        :description="t('recent_empty')"
+      />
       <ul v-else class="chip-list chip-list--recent">
         <li
           v-for="item in recentItems"
@@ -518,7 +522,6 @@ function handlePaste(event: ClipboardEvent) {
   }
 }
 
-.quick-empty,
 .quick-note {
   margin: 0;
   font-size: 12px;

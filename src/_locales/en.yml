@@ -59,7 +59,7 @@ common:
   second: second ago | seconds ago
   please_log_in_first: Please log in first
   login: Login
-  save_to_watch_later: Save to Watch later
+  save_to_watch_later: Save to Watch Later
   added: Added
   performance_impact_warn: This feature may cause performance *DECREASE*!
   no_more_content: No more content now, owari da
@@ -505,7 +505,7 @@ dock:
   anime: Anime
   history: History
   favorites: Favorites
-  watch_later: Watch later
+  watch_later: Watch Later
   moments: Moments
   dark_mode: Dark Mode
   light_mode: Light Mode
@@ -588,9 +588,9 @@ favorites:
 
 watch_later:
   title: Watch Later
-  clear_all: Clear all watch later
+  clear_all: Clear all Watch Later
   clear_all_confirm: |-
-    Clear all watch later?
+    Clear all Watch Later?
     This operation cannot be reversed. Are you sure you want to clear all watch later?
   remove_watched_videos: Remove watched videos
   remove_watched_videos_confirm: |-

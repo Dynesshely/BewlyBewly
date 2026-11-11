@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { MomentCard as MomentCardModel, MomentImage } from './types'
-import Empty from '~/components/Empty.vue'
+import EmptyState from '~/components/Feedback/EmptyState.vue'
+import ErrorState from '~/components/Feedback/ErrorState.vue'
 import { useBewlyApp } from '~/composables/useAppProvider'
 import { settings } from '~/logic'
 
@@ -364,44 +365,38 @@ onUnmounted(() => {
       <MomentSkeleton v-for="index in 3" :key="index" :density="density" />
     </div>
 
-    <div v-else-if="status === 'error'" class="moments-state">
-      <span class="i-tabler:cloud-off moments-state__icon" aria-hidden="true" />
-      <h3 class="moments-state__title">
-        {{ errorTitle }}
-      </h3>
-      <p v-if="errorMessage" class="moments-state__desc">
-        {{ errorMessage }}
-      </p>
-      <button type="button" class="moments-button" @click="loadFirst">
-        <span class="i-tabler:refresh" aria-hidden="true" />
-        <span>{{ t('retry') }}</span>
-      </button>
-    </div>
+    <ErrorState
+      v-else-if="status === 'error'"
+      :title="errorTitle"
+      :message="errorMessage"
+      icon="i-tabler:cloud-off"
+      :retry-label="t('retry')"
+      @retry="loadFirst"
+    />
 
-    <div v-else-if="!cards.length" class="moments-state">
-      <h3 class="moments-state__title">
-        {{ t('empty_title') }}
-      </h3>
-      <Empty :description="t('empty_desc')" />
+    <EmptyState
+      v-else-if="!cards.length"
+      :title="t('empty_title')"
+      :description="t('empty_desc')"
+      icon="i-mingcute:inbox-line"
+    >
       <button type="button" class="moments-button" @click="loadFirst">
         <span class="i-tabler:refresh" aria-hidden="true" />
         <span>{{ t('retry') }}</span>
       </button>
-    </div>
+    </EmptyState>
 
     <div v-else class="moments-feed" role="feed" :aria-busy="loadingMore">
-      <div v-if="videoFilterEmpty" class="moments-filter-empty">
-        <span class="i-tabler:movie moments-filter-empty__icon" aria-hidden="true" />
-        <h3 class="moments-filter-empty__title">
-          {{ t('filter_empty_title') }}
-        </h3>
-        <p class="moments-filter-empty__desc">
-          {{ t('filter_empty_desc') }}
-        </p>
+      <EmptyState
+        v-if="videoFilterEmpty"
+        :title="t('filter_empty_title')"
+        :description="t('filter_empty_desc')"
+        icon="i-tabler:movie"
+      >
         <button type="button" class="moments-button is-ghost" @click="videoOnly = false">
           {{ t('filter_clear') }}
         </button>
-      </div>
+      </EmptyState>
 
       <MomentCardView
         v-for="(card, index) in visibleCards"
@@ -674,39 +669,6 @@ onUnmounted(() => {
 }
 /* #endregion */
 
-.moments-filter-empty {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  align-items: center;
-  padding: 48px 20px;
-  border: 1px dashed var(--bew-border-color);
-  border-radius: var(--bew-radius);
-  background: var(--bew-elevated-alt);
-  text-align: center;
-}
-
-.moments-filter-empty__icon {
-  color: var(--bew-text-3);
-  font-size: 32px;
-}
-
-.moments-filter-empty__title {
-  margin: 0;
-  color: var(--bew-text-1);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.5;
-}
-
-.moments-filter-empty__desc {
-  margin: 0;
-  max-width: 460px;
-  color: var(--bew-text-3);
-  font-size: 12px;
-  line-height: 1.6;
-}
-
 .moments-keys {
   display: flex;
   gap: 8px;
@@ -723,40 +685,6 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-
-.moments-state {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  align-items: center;
-  justify-content: center;
-  padding: 64px 20px;
-  border: 1px dashed var(--bew-border-color);
-  border-radius: var(--bew-radius);
-  background: var(--bew-elevated-alt);
-  text-align: center;
-}
-
-.moments-state__icon {
-  color: var(--bew-text-3);
-  font-size: 36px;
-}
-
-.moments-state__title {
-  margin: 0;
-  color: var(--bew-text-1);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.5;
-}
-
-.moments-state__desc {
-  margin: 0;
-  max-width: 480px;
-  color: var(--bew-text-3);
-  font-size: 12px;
-  line-height: 1.6;
 }
 
 .moments-more {

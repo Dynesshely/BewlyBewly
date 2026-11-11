@@ -10,7 +10,7 @@ command_palette:
   cycle_filter: 切換卡片篩選
   toggle_info: 切換卡片詳細資訊
   focus_search: 聚焦搜尋框
-  show_help: 顯示快捷鍵說明
+  show_help: 顯示快速鍵說明
   open_settings: 開啟設定
   ai_filter: AI 初篩目前頁面
   focus_browse: 進入聚焦瀏覽（封面流）
@@ -22,12 +22,12 @@ command_palette:
   shortcut_unavailable: 呢頁用唔到
 
 keyboard_help:
-  title: 鍵盤快捷鍵
+  title: 鍵盤快速鍵
   hint: 再按 ? 或點擊空白處關閉
   move: 在影片卡片間移動
   jump: 跳到第一張 / 最後一張
   open_new: 在新分頁開啟目前影片
-  open_current: 喺當前頁打開視頻預覽（內嵌播放）
+  open_current: 喺當前頁打開影片預覽（內嵌播放）
   tabs: 切換主頁分頁
   search: 聚焦搜尋框
   help: 顯示 / 隱藏本說明
@@ -59,7 +59,7 @@ common:
   second: 秒前
   please_log_in_first: 唔該登入先
   login: 登入
-  save_to_watch_later: 陣間至睇
+  save_to_watch_later: 稍後再看
   added: 已添加
   performance_impact_warn: 呢個功能可能會降低效能！
   no_more_content: 唔使睇喇，冇嘢喇
@@ -111,10 +111,10 @@ settings:
   menu_appearance: 版面
   menu_bewly_pages: BewlyBewly 頁面
   menu_home: 主頁
-  menu_search_page: 搵嘢頁
+  menu_search_page: 搜尋頁
   menu_compatibility: 相容性
   menu_about: 關於
-  menu_keyboard: 鍵盤與快捷鍵
+  menu_keyboard: 鍵盤與快速鍵
   keyboard_open_opt:
     new_tab: 新分頁
     current_tab: 目前分頁
@@ -123,11 +123,11 @@ settings:
   keyboard_enter_action: Enter 開啟方式
   keyboard_space_action: Space 開啟方式
   keyboard_open_mode_desc: 決定撳對應掣時點樣開啟目前卡片
-  group_keyboard_shortcuts: 自訂快捷鍵
+  group_keyboard_shortcuts: 自訂快速鍵
   keyboard_press_key: 請撳掣…
   keyboard_disabled: 已停用
   keyboard_reset: 恢復預設
-  keyboard_restore_defaults: 恢復全部預設快捷鍵
+  keyboard_restore_defaults: 恢復全部預設快速鍵
   keyboard_conflict: '該按鍵已被「{action}」佔用'
   keyboard_action_open_new_tab: Enter：在新分頁開啟目前影片
   keyboard_action_open_in_page: Space：在目前頁開啟影片（預設頁面內預覽）
@@ -139,7 +139,7 @@ settings:
   keyboard_action_queue_card: 把卡片加入本機待看清單
   keyboard_action_ai_filter: 對目前頁執行 AI 初篩
   keyboard_action_focus_search: 聚焦搜尋框
-  keyboard_action_toggle_help: 顯示 / 隱藏快捷鍵說明
+  keyboard_action_toggle_help: 顯示 / 隱藏快速鍵說明
   keyboard_action_toggle_focus_browse: 進入 / 退出聚焦瀏覽
   keyboard_action_zen_mode: 'Shift + Z: toggle zen mode (content only)'
   keyboard_action_command_palette: 開啟命令面板
@@ -165,7 +165,7 @@ settings:
   group_recommendation_filters_desc: |
     限制嘅數值唔好設太大，唔係嘅話會影響載入時間！
   group_following: 跟緊啲人
-  group_search_page_mode: 搵嘢頁模式
+  group_search_page_mode: 搜尋頁模式
   group_home_tabs: 主頁分頁欄
 
   # Settings buttons
@@ -216,14 +216,14 @@ settings:
     new_tab: 新開分頁
     drawer: 喺櫃桶度開啓
   top_bar_link_opening_behavior: 頂部欄連結開啓行爲
-  video_card_link_opening_behavior: 影片同番劇卡片連結開啓行爲
+  video_card_link_opening_behavior: 影片同動畫卡片連結開啓行爲
   search_bar_link_opening_behavior: 搜尋欄連結開啓行爲
   close_drawer_without_pressing_esc_again: 閂櫃桶嗰陣唔使再撳多次 <kbd>Esc</kbd>
 
   block_ads: 封鎖廣告
-  block_top_search_page_ads: 封鎖 Bilibili 搵嘢頁上方的廣告
+  block_top_search_page_ads: 封鎖 Bilibili 搜尋頁上方的廣告
   block_top_search_page_ads_desc: >
-    有時喺搵嘢結果上高嘅廣告，其實係年結報告抑或週年報告嚟㗎。若然你唔想佢哋唔覺意俾人刪咗，就請你閂咗呢個選項啦。
+    有時喺搜尋結果上高嘅廣告，其實係年結報告抑或週年報告嚟㗎。若然你唔想佢哋唔覺意俾人刪咗，就請你閂咗呢個選項啦。
 
   enable_video_preview: 使用影片預覽功能（若然得嘅話）
   enable_video_ctrl_bar_on_video_card: 喺影片卡片上顯示影片控制欄
@@ -294,7 +294,7 @@ settings:
   bg_darkens_when_the_search_bar_is_focused: 搜尋欄聚焦嗰陣校暗背景
   bg_blurs_when_the_search_bar_is_focused: 搜尋欄聚焦嗰陣校矇背景
   choose_search_bar_focused_character: 揀個喺搜尋欄聚焦嗰陣出現嘅人物
-  individually_set_search_page_wallpaper: 單獨設定搵嘢頁背景
+  individually_set_search_page_wallpaper: 單獨設定搜尋頁背景
 
   # Home
   recommendation_mode: 推介模式
@@ -338,10 +338,10 @@ settings:
 
   following_tab_show_livestreaming_videos: 喺「跟緊啲人」入邊顯示實況直播
 
-  use_search_page_mode: 主頁使用搵嘢頁模式
-  settings_shared_with_the_search_page: 同搵嘢頁共用嘅設定
-  settings_shared_with_the_search_page_desc: 呢啲設定同搵嘢頁嗰度共用。
-  search_page_mode_wallpaper_fixed: 定住搵嘢頁模式嘅背景
+  use_search_page_mode: 主頁使用搜尋頁模式
+  settings_shared_with_the_search_page: 同搜尋頁共用嘅設定
+  settings_shared_with_the_search_page_desc: 呢啲設定同搜尋頁嗰度共用。
+  search_page_mode_wallpaper_fixed: 定住搜尋頁模式嘅背景
   home_tabs_adjustment: 分頁欄調整
   home_tabs_adjustment_desc: 第一個啓用嘅分頁項目會係開始頁面。
   always_show_tabs_on_home_page: 永遠顯示主頁分頁欄
@@ -411,10 +411,10 @@ topbar:
 
   sign_in: 登入
   notifications: 通知
-  moments: 動向
-  favorites: 我嘅至愛
+  moments: 動態
+  favorites: 收藏
   history: 記錄
-  watch_later: 陣間至睇
+  watch_later: 稍後再看
   creative_center: 創作中心
   upload: Po 嘢
   logo_dropdown:
@@ -462,7 +462,7 @@ topbar:
     exp_desc: '而家經驗 {current_exp}，升到 LV {level} 仲要 {need_exp}'
     following: 跟緊
     followers: 擁躉
-    posts: 動向
+    posts: 動態
     bilibili_premium: Bilibili 大會員
     account_settings: 帳戶設定
     uploads_manager: 內容管理
@@ -475,7 +475,7 @@ topbar:
   noti_dropdown:
     replys: 覆我
     mentions: 提我
-    likes: 讚我
+    likes: 讚好訊息
     messages: 系统通知
     chats: 傾偈室
   moments_dropdown:
@@ -494,13 +494,13 @@ topbar:
     manager: 內容管理
 
 dock:
-  search: 搵嘢
+  search: 搜尋
   home: 主頁
   anime: 動畫
-  history: 收睇記錄
-  watch_later: 陣間至睇
-  favorites: 我嘅至愛
-  moments: 動向
+  history: 觀看歷史
+  watch_later: 稍後再看
+  favorites: 收藏
+  moments: 動態
   dark_mode: 深色模式
   light_mode: 淺色模式
   settings: 設定
@@ -561,20 +561,20 @@ anime:
       sun: 週日
 
 history:
-  title: 收睇記錄
-  turn_on_watch_history: 開返收睇記錄
-  pause_watch_history: 暫停進行收睇記錄
-  clear_all_watch_history: 剷晒啲收睇記錄
+  title: 觀看歷史
+  turn_on_watch_history: 開返觀看歷史
+  pause_watch_history: 暫停記錄觀看歷史
+  clear_all_watch_history: 剷晒啲觀看歷史
   clear_all_watch_history_confirm: |-
-    係咪要剷晒啲收睇記錄呀？
-    噉做冇得返轉頭噃，你確定要剷晒啲收睇記錄？
+    係咪要剷晒啲觀看歷史呀？
+    噉做冇得返轉頭噃，你確定要剷晒啲觀看歷史？
   pause_watch_history_confirm: |-
-    係咪要暫停進行收睇記錄呀？
-    你確定要暫停暫停進行收睇記錄？
-  search_watch_history: 搵吓收睇記錄
+    係咪要暫停記錄觀看歷史呀？
+    你確定要暫停記錄觀看歷史？
+  search_watch_history: 搜尋觀看歷史
   turn_on_watch_history_confirm: |-
-    係咪要開返收睇記錄呀？
-    你確定要開返收睇記錄？
+    係咪要開返觀看歷史呀？
+    你確定要開返觀看歷史？
 
 favorites:
   unfavorite: 唔愛喇
@@ -583,11 +583,11 @@ favorites:
     噉做冇得返轉頭噃，你確定要剷走你揀過啲片？
 
 watch_later:
-  title: 陣間至睇
-  clear_all: 剷曬陣間至睇啲片
+  title: 稍後再看
+  clear_all: 剷曬稍後再看啲片
   clear_all_confirm: |-
-    係咪要剷曬陣間至睇啲片呀？
-    噉做冇得返轉頭噃，你確定要剷曬陣間至睇啲片？
+    係咪要剷曬稍後再看啲片呀？
+    噉做冇得返轉頭噃，你確定要剷曬稍後再看啲片？
   remove_watched_videos: 剷走睇過啲片
   remove_watched_videos_confirm: |-
     係咪要剷走你睇過啲片呀？

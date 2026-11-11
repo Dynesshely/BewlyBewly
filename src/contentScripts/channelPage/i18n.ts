@@ -226,7 +226,7 @@ const JYUT: ChannelPageMessages = {
     next: '下一支影片',
     prev: '上一支影片',
     open: '喺新分頁開',
-    cancel: '取消高亮 / 收埋面板',
+    cancel: '取消高亮 / 關閉面板',
   },
 }
 

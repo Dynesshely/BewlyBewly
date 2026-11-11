@@ -911,8 +911,11 @@ test.describe('选集误判回归（普通单 P 视频 + 相关推荐 pod）', (
 })
 
 /**
- * 合集 fixture：`.video-pod` + header「测试合集 · 共 3 集」+ 3 个**不同 bvid** 条目。
- * 合集条目 bvid 各不相同是正常的，靠 header 的合集语义与「相关推荐」区分。
+ * 合集 fixture：按真机形态构造（/video/BV14a411n7Rf/ 合集「钩织入门教程」）。
+ *
+ * 真机 header 是「合集名 （1/10） 491万播放 暂无简介 简介 订阅合集」，
+ * 列表 class 是 `video-pod__list section`（**没有 multip**），条目指向合集内**不同 bvid**。
+ * 这里的 header 走同款形态（`（1/3）` 进度 + 订阅合集），用来确保「合集优先于 （x/y）」。
  */
 const COLLECTION_PAGE_FIXTURE = `<!doctype html>
 <html lang="zh-CN">
@@ -934,6 +937,7 @@ const COLLECTION_PAGE_FIXTURE = `<!doctype html>
       .video-pod__list { display: flex; flex-direction: column; gap: 4px; }
       .video-pod__item { padding: 6px; }
       .video-pod__item.active { background: #ddd; }
+      .pod-link { color: inherit; text-decoration: none; }
     </style>
   </head>
   <body>
@@ -950,21 +954,21 @@ const COLLECTION_PAGE_FIXTURE = `<!doctype html>
         </div>
         <div class="right-container">
           <div class="video-pod video-pod">
-            <div class="video-pod__header">测试合集 · 共 3 集</div>
-            <div class="video-pod__list">
-              <div class="simple-base-item video-pod__item normal"><a href="/video/BV1collect01">合集视频 1</a></div>
-              <div class="simple-base-item video-pod__item active normal"><a href="/video/BV1collect02">合集视频 2</a></div>
-              <div class="simple-base-item video-pod__item normal"><a href="/video/BV1collect03">合集视频 3</a></div>
+            <div class="video-pod__header">测试合集 （1/3） 123万播放 暂无简介 简介 订阅合集</div>
+            <div class="video-pod__list section">
+              <a class="pod-link" href="/video/BV1collect01"><div class="simple-base-item video-pod__item normal">合集视频 1</div></a>
+              <a class="pod-link" href="/video/BV1collect02"><div class="simple-base-item video-pod__item active normal">合集视频 2</div></a>
+              <a class="pod-link" href="/video/BV1collect03"><div class="simple-base-item video-pod__item normal">合集视频 3</div></a>
             </div>
           </div>
         </div>
       </div>
     </div>
     <script>
-      document.querySelectorAll('.video-pod__item > a').forEach((anchor) => {
+      document.querySelectorAll('a.pod-link').forEach((anchor) => {
         anchor.addEventListener('click', (event) => {
           event.preventDefault()
-          const item = anchor.parentElement
+          const item = anchor.querySelector('.video-pod__item')
           document.querySelectorAll('.video-pod__item').forEach((el) => el.classList.remove('active'))
           item.classList.add('active')
           document.body.dataset.clickedCollection = new URL(anchor.href).pathname.split('/').pop()
@@ -1010,16 +1014,31 @@ test.describe('合集（collection）选集面板', () => {
 
       const selectionFab = page.locator('[data-bvp-action="selection"]')
       await expect(selectionFab).toHaveCount(1)
+      // header 里同时有 （1/3） 时仍应判成合集，按钮文案不能是「选集 / Parts」
+      const fabText = (await selectionFab.textContent())?.trim() ?? ''
+      expect(fabText).toMatch(/合集|collection/i)
+      expect(fabText).not.toMatch(/选集|parts/i)
       await selectionFab.click()
 
       const panel = page.locator('.bvp-playlist')
       await expect(panel).toBeVisible()
       const panelTitle = (await panel.locator('.bvp-playlist__title').textContent())?.trim() ?? ''
       expect(panelTitle).toMatch(/合集|collection/i)
+      expect(panelTitle).not.toMatch(/选集|parts/i)
       await expect(panel.locator('.bvp-playlist__item')).toHaveCount(3)
-      // 当前视频 = 合集里的第 2 条（按当前 bvid 匹配）
+
+      // 合集页存在 B 站原生右侧面板：我们的面板改到左侧中部避让（不与原生面板/右下角浮动条重叠）
+      expect(await panel.getAttribute('data-kind')).toBe('collection')
+      const panelBox = await panel.boundingBox()
+      expect(panelBox).not.toBeNull()
+      expect(panelBox!.x).toBeLessThan(720)
+      expect(panelBox!.y).toBeGreaterThan(0)
+
+      // 当前视频 = 合集里的第 2 条（按当前 bvid 匹配；条目是 <a> 包裹 <div class="video-pod__item">）
       await expect(panel.locator('[aria-current="true"]')).toHaveCount(1)
       await expect(panel.locator('[aria-current="true"]')).toContainText('合集视频 2')
+      // aria-current 与高亮类同时存在
+      await expect(panel.locator('.bvp-playlist__item.is-active')).toHaveCount(1)
 
       await panel.locator('.bvp-playlist__item').nth(2).click()
       await expect.poll(() => clickedCollection(page), { timeout: 5_000 }).toBe('BV1collect03')
@@ -1066,6 +1085,110 @@ test.describe('合集（collection）选集面板', () => {
 
       expect(labels.some(label => /上一个视频|previous video/i.test(label))).toBe(true)
       expect(labels.some(label => /自动连播|autoplay/i.test(label))).toBe(false)
+    }
+    finally {
+      await context.close()
+    }
+  })
+})
+/**
+ * 反例 fixture：pod header 只有 `（x/y）` 进度，没有任何「选集 / 分P / 合集」字样，
+ * 列表也没有 `multip` 类。`（x/y）` 不是分P 独有（合集 header 同样带进度），
+ * 因此这种情况必须判定为「不是选集」，不渲染入口。
+ */
+const PROGRESS_ONLY_POD_FIXTURE = `<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>只有进度文案的 pod_哔哩哔哩_bilibili</title>
+    <style>
+      body { margin: 0; font-family: system-ui, sans-serif; }
+      #mirror-vdcon { display: flex; gap: 16px; padding: 16px; margin: 0 auto; max-width: 1600px; }
+      .left-container { flex: 1 1 70%; min-width: 0; }
+      #playerWrap { background: #000; }
+      #bilibili-player { position: relative; height: 420px; overflow: hidden; }
+      .bpx-player-container { width: 100%; height: 100%; }
+      video { display: block; width: 100%; height: 100%; object-fit: contain; }
+      .right-container { flex: 0 0 28%; }
+      .video-title { margin: 16px 0; font-size: 20px; }
+      .video-desc { min-height: 1600px; }
+      .video-pod__header { padding: 8px; font-weight: 600; }
+      .video-pod__list { display: flex; flex-direction: column; gap: 4px; }
+      .video-pod__item { padding: 6px; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="video-container-v1" id="mirror-vdcon">
+        <div class="left-container scroll-sticky">
+          <div id="playerWrap">
+            <div id="bilibili-player">
+              <div class="bpx-player-container"><video preload="metadata"></video></div>
+            </div>
+          </div>
+          <h1 class="video-title">只有进度文案的视频</h1>
+          <div class="video-desc">正文</div>
+        </div>
+        <div class="right-container">
+          <div class="video-pod video-pod">
+            <div class="video-pod__header">（1/5） 123万播放</div>
+            <div class="video-pod__list section">
+              <div class="simple-base-item video-pod__item normal"><a href="/video/BV1progress01">视频 1</a></div>
+              <div class="simple-base-item video-pod__item normal"><a href="/video/BV1progress02">视频 2</a></div>
+              <div class="simple-base-item video-pod__item normal"><a href="/video/BV1progress03">视频 3</a></div>
+              <div class="simple-base-item video-pod__item normal"><a href="/video/BV1progress04">视频 4</a></div>
+              <div class="simple-base-item video-pod__item normal"><a href="/video/BV1progress05">视频 5</a></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>`
+
+async function openProgressOnlyPodPage(): Promise<{ context: BrowserContext, page: Page }> {
+  const context = await launchExtension({ allowPopups: true })
+
+  const page = await context.newPage()
+  await page.route('**/*', async (route) => {
+    const request = route.request()
+    const url = new URL(request.url())
+    if (url.hostname === 'www.bilibili.com' && request.resourceType() === 'document') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/html; charset=utf-8',
+        body: PROGRESS_ONLY_POD_FIXTURE,
+      })
+      return
+    }
+    await route.continue()
+  })
+
+  await page.goto('https://www.bilibili.com/video/BV1progress01', { waitUntil: 'domcontentloaded' })
+  return { context, page }
+}
+
+test.describe('选集判定：只有 （x/y） 进度文案的 pod', () => {
+  skipIfExtensionMissing()
+
+  test('header 只有 （x/y）、列表无 multip 时不会误判成分P 或合集', async () => {
+    const { context, page } = await openProgressOnlyPodPage()
+
+    try {
+      await ensureOverlay(page)
+
+      expect(await page.locator('.video-pod__item').count()).toBe(5)
+      expect(await page.locator('.video-pod__list.multip').count()).toBe(0)
+      const headerText = (await page.locator('.video-pod__header').textContent())?.trim() ?? ''
+      expect(headerText).toMatch(/（1\/5）/)
+
+      await expect(page.locator('[data-bvp-action="selection"]')).toHaveCount(0)
+      await expect(page.locator('#bewly-video-selection')).toHaveCount(0)
+      await expect(page.locator('.bvp-playlist')).toHaveCount(0)
+
+      await page.keyboard.press(']')
+      await page.waitForTimeout(300)
+      await expect(page.locator('.bvp-playlist')).toHaveCount(0)
     }
     finally {
       await context.close()

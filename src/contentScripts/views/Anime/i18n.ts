@@ -55,8 +55,8 @@ export type AnimeMessageKey = keyof typeof CMN_CN
 type AnimeDict = Record<AnimeMessageKey, string>
 
 const CMN_TW: AnimeDict = {
-  timetable_title: '一週番劇時間表',
-  timetable_subtitle: '按更新日瀏覽當季番劇，←/→ 切換日期',
+  timetable_title: '一週動畫時間表',
+  timetable_subtitle: '按更新日瀏覽當季動畫，←/→ 切換日期',
   today: '今天',
   back_to_today: '回到今天',
   n_episodes: '{n} 部',
@@ -74,11 +74,11 @@ const CMN_TW: AnimeDict = {
   key_next_day: '後一天',
   key_first_day: '週一（首日）',
   key_last_day: '週日（末日）',
-  key_open: '打開當日主推番劇',
+  key_open: '打開當日主推動畫',
   key_switch_day: '在日期條內切換日期',
   follows: '{count} 人追番',
   airs_at: '{time} 更新',
-  loading: '正在載入番劇時間表…',
+  loading: '正在載入動畫時間表…',
   load_failed: '時間表載入失敗，可稍後重試',
   retry: '重試',
   empty: '本週暫無排期資料',
@@ -95,9 +95,9 @@ const CMN_TW: AnimeDict = {
 
 const JYUT: AnimeDict = {
   ...CMN_TW,
-  timetable_subtitle: '按更新日睇當季番劇，←/→ 切換日期',
+  timetable_subtitle: '按更新日睇當季動畫，←/→ 切換日期',
   other_days_hint: '揀日期就可以切換上面主推',
-  loading: '載入緊番劇時間表…',
+  loading: '載入緊動畫時間表…',
   load_failed: '時間表載入失敗，轉頭再試',
   empty: '今個星期暫時冇排期資料',
   empty_day: '呢日冇更新',

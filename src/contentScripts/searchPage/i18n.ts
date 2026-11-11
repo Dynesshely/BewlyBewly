@@ -150,9 +150,9 @@ const CMN_TW: SearchPageMessages = {
 
 const JYUT: SearchPageMessages = {
   ...CMN_TW,
-  controls: '搵嘢結果增強',
-  openPanel: '打開搵嘢增強面板',
-  panelTitle: '搵嘢結果增強',
+  controls: '搜尋結果增強',
+  openPanel: '打開搜尋增強面板',
+  panelTitle: '搜尋結果增強',
   filterUnavailable: '呢頁冇呢類結果',
   filterNoMatch: '呢頁冇呢類結果，轉返「全部」喇',
   statusIdle: '撳 J / K 開始睇結果',
@@ -160,15 +160,15 @@ const JYUT: SearchPageMessages = {
   opened: '喺新分頁開咗',
   openFailed: '開唔到條連結（可能畀瀏覽器攔咗）',
   noUrl: '呢條結果冇連結可以開',
-  noCards: '頁面仲未有搵嘢結果',
+  noCards: '頁面仲未有搜尋結果',
   densityOn: '轉咗做緊湊密度',
   densityOff: '轉咗做舒適密度',
   shortcut: {
     next: '下一張卡片',
     prev: '上一張卡片',
     open: '喺新分頁開',
-    cancel: '取消高亮 / 收埋面板',
-    panel: '打開 / 收埋面板',
+    cancel: '取消高亮 / 關閉面板',
+    panel: '打開 / 關閉面板',
   },
 }
 

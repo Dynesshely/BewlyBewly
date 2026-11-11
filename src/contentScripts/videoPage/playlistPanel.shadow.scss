@@ -146,7 +146,16 @@
   background: var(--bew-fill-1);
 }
 
-.bvp-playlist__item[aria-current="true"] {
+/* 合集页：B 站右侧本来就有原生「合集 x/y」面板，我们的面板改到左侧中部避让，避免同屏重复 */
+.bvp-playlist[data-kind="collection"] {
+  top: 50%;
+  right: auto;
+  left: var(--bvp-edge);
+  max-height: min(72vh, 640px);
+  transform: translateY(-50%);
+}
+.bvp-playlist__item[aria-current="true"],
+.bvp-playlist__item.is-active {
   color: var(--bew-theme-color);
   background: color-mix(in oklab, var(--bew-theme-color), transparent 90%);
 }
@@ -159,7 +168,8 @@
   text-align: right;
 }
 
-.bvp-playlist__item[aria-current="true"] .bvp-playlist__index {
+.bvp-playlist__item[aria-current="true"] .bvp-playlist__index,
+.bvp-playlist__item.is-active .bvp-playlist__index {
   color: var(--bew-theme-color);
 }
 

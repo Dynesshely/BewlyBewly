@@ -179,3 +179,78 @@ setupArticlePage()
   （下一次同步或页面重载）才更新，按钮上的「复制」二字不会即时切换；
 - 按钮注入不区分阅读模式：普通文章页 hover 代码块也会出现复制按钮（同一套页面样式）；
 - 复制失败静默是刻意的：文章页不引入 toast 噪声，用户可重试或手动选择。
+
+---
+
+## 第 18 轮收尾：opus / 旧专栏 / ?jump_opus=1 过渡页
+
+依据 Lead 真机数据（2026-11-11）：`/opus/<id>` 正文是 `.opus-detail`（`.bili-opus-view`），
+`/read/cv<id>/?jump_opus=1` 是**没有任何正文容器**的过渡页，B 站会自行跳到 `/opus/<id>`。
+
+### 1. 三种 URL 的行为矩阵
+
+| URL 形态 | 判定 | 行为 |
+| --- | --- | --- |
+| `bilibili.com/opus/<id>` | `kind = opus` | 正常挂载浮层；正文容器优先 `.opus-detail .opus-module-content`，其次 `.opus-module-content`、`.bili-opus-view`、`.opus-detail`；图片 / 代码块按「文章范围」收集 |
+| `bilibili.com/read/cv<id>`（正常专栏） | `kind = read` | 正常挂载；正文容器 `.normal-article-holder` / `.read-article-holder` / `.article-container__content` 等候选 |
+| `bilibili.com/read/<id>`（数字 ID） | `kind = read` | 同上（正则同时接受 `/read/cv123` 与 `/read/123`） |
+| `bilibili.com/read/mobile?id=<id>` | `kind = read` | 同上（只做页面判定与正文兜底） |
+| `bilibili.com/read/cv<id>/?jump_opus=1` | 过渡页 | **不挂载任何 UI**，每 500ms 轮询；检测到 URL 变成 `/opus/*` 后停止轮询并正常初始化 |
+| 过渡页 5 秒内仍未跳转 | 过渡页（超时） | 停止轮询，保持静默：不渲染浮层、不报错、不写入任何页面类名 |
+| 过渡页期间跳到非文章页 | 非文章页 | 停止轮询，保持静默 |
+| 其它页面 | 非文章页 | `setupArticlePage()` 为空操作 |
+
+实现说明（`index.ts` → `watchJumpOpusRoute()`）：
+
+- 只在 `setupArticlePage()` 判定为过渡页时启动轮询，**不会先挂一个空浮层**；
+- 立即检查一次 + 每 500ms 检查：`getArticlePageKind()` 变成 `'opus'` 就 `mount()`（挂载前仍会走原有的 `hasNativeOverlay` 去重）；
+- 5 秒（`JUMP_WAIT_TIMEOUT`）后仍无跳转就 `stopJumpWatch()`，页面保持原样；
+- `teardownArticlePage()` / `unmount()` 都会清理轮询计时器，SPA 切页不会留下 timer；
+- 过渡页期间不做任何 DOM 标记、不注入页面样式、不注册快捷键。
+
+### 2. 宽屏（≥2000px 视口）正文限宽 720
+
+此前只有运行时标记的 `[data-bewly-article-content]` 带 `max-width: 720px`；
+真机上 `.opus-detail` 在 1600px 视口下约 708px，看不出差异，但在 ≥2000px 宽屏下外层容器可能被页面样式放宽。
+本轮在 `articlePage.page.scss` 补齐三类容器的兜底：
+
+```scss
+html.bewly-article-reading :is(.opus-detail, .bili-opus-view, .opus-module-content) {
+  max-width: var(--bap-content-width) !important; /* 720px */
+  min-width: 0 !important;
+  margin-inline: auto !important;
+}
+html.bewly-article-reading :is(.normal-article-holder, .read-article-holder, .article-container__content) {
+  max-width: var(--bap-content-width) !important;
+  min-width: 0 !important;
+  margin-inline: auto !important;
+}
+```
+
+同时给 `.opus-detail` / `.bili-opus-view` 下的 `img` 加 `cursor: zoom-in`，`pre` 加 `position: relative`。
+所有规则仍挂在 `html.bewly-article-reading` 下，退出阅读模式即恢复 B 站原样。
+
+### 3. opus 图片放大与代码块复制覆盖
+
+- **图片点击**：`lightbox.ts` 原本只在最内层正文容器里找图片；本轮改成按**文章范围**收集：
+  `getContentScope(content)` = `content.closest('.opus-detail, .bili-opus-view, .article-container__content, .article-container') ?? content`。
+  这样 `.opus-detail img`（包括模块内容容器外的图）全部可点，`←/→` 序列也是整篇文章的图片顺序；
+- **代码块复制**：`codeBlocks.ts` 同样按文章范围扫描 `pre`，`.opus-detail pre` / `.bili-opus-view pre` 都能注入按钮；
+  复制按钮样式选择器从 `[data-bewly-article-content] pre[data-bewly-code-block]` 放宽为 `pre[data-bewly-code-block]`，
+  因为按钮只会在本模块注入的代码块上出现，放宽后外层容器的代码块也能正确显示/隐藏。
+
+### 4. 本轮自测
+
+- `pnpm exec eslint`（`index.ts` / `dom.ts` / `lightbox.ts` / `codeBlocks.ts`）：0 error 0 warning；
+- `pnpm run typecheck`：0 error；
+- `articlePage.page.scss` 用 `pnpm exec sass` 单文件编译通过；
+- 未跑 build / playwright；未碰浏览器；未做 git 操作。
+
+### 5. 已知限制
+
+- 过渡页轮询是**轻量轮询**（500ms 查一次 `location.href` + 文章类型），没有额外 MutationObserver；
+  B 站若把跳转延迟到 5 秒之后，本次会保持静默（用户刷新或重新进入会重新开始等待）；
+- 宽屏 720 是静态 CSS 保证：未在 ≥2000px 真机/截图验证，最终观感由 Lead 统一构建走查；
+- 若 B 站把 opus 外层类名从 `.opus-detail` / `.bili-opus-view` 改掉，需要同步更新 `dom.ts` 的候选列表；
+- 文章范围内的「所有图片」都会进入 lightbox 序列（包括正文里的表情/二维码等小图）；
+  只有 `naturalWidth >= 200` 的图可点击，序列里可能存在点击不到的图（顺序仍与 DOM 一致）。

@@ -1,4 +1,6 @@
 import type { CDPSession, Page } from '@playwright/test'
+import { readFileSync } from 'node:fs'
+
 import { expect, test } from '@playwright/test'
 
 import { HOME_FIXTURE, launchExtension, routeBilibiliDocument, skipIfExtensionMissing, waitForExtensionReady, waitForStableCardCount } from './utils'
@@ -16,6 +18,24 @@ import { HOME_FIXTURE, launchExtension, routeBilibiliDocument, skipIfExtensionMi
  *
  * 所有测量都是**只读**的：不修改扩展源码、不改页面，只挂 CDP 监听。
  */
+
+/** 从 fixture HTML 里按出现顺序抽前 N 个封面 URL（协议相对地址，追加 .avif 与组件逻辑一致） */
+function extractFixtureCovers(count = 4): string[] {
+  try {
+    const html = readFileSync(HOME_FIXTURE, 'utf-8')
+    const found = new Set<string>()
+    const re = /(\/\/i\d\.hdslb\.com\/bfs\/(?:archive|face)\/[a-z0-9]+\.(?:jpg|png|webp))@672w_378h_1c_!web-home-common-cover/g
+    for (const match of html.matchAll(re)) {
+      found.add(`${match[1]}@672w_378h_1c_!web-home-common-cover`)
+      if (found.size >= count)
+        break
+    }
+    return Array.from(found)
+  }
+  catch {
+    return []
+  }
+}
 
 interface ImageAttrs {
   src: string
@@ -88,6 +108,36 @@ async function readImageAttrs(page: Page): Promise<ImageAttrs[]> {
         }
       })
   })
+}
+
+/** 统计本轮注入的首屏封面 preload 数量 */
+async function countCoverPreloads(page: Page): Promise<number> {
+  return page.evaluate(() =>
+    document.head.querySelectorAll('link[rel="preload"][as="image"][data-bewly-cover-preload]').length,
+  )
+}
+
+/**
+ * 等首屏出现至少 `min` 张可见卡片，返回耗时（ms，从调用处开始）。
+ * 用来测量「首屏卡片可见时间」，比等全部卡片稳定更贴近用户感知。
+ */
+async function waitForFirstScreenCards(page: Page, min = 8, timeoutMs = 10_000): Promise<number> {
+  const start = Date.now()
+  const deadline = start + timeoutMs
+  while (Date.now() < deadline) {
+    const count = await page.evaluate(() => {
+      const root = document.querySelector('#bewly')?.shadowRoot
+      const cards = Array.from(root?.querySelectorAll('[data-video-card]') ?? []) as HTMLElement[]
+      return cards.filter((card) => {
+        const rect = card.getBoundingClientRect()
+        return rect.top < window.innerHeight && rect.bottom > 0 && rect.height > 0
+      }).length
+    })
+    if (count >= min)
+      return Date.now() - start
+    await page.waitForTimeout(50)
+  }
+  return -1
 }
 
 /** 首屏可见卡片数量 + CLS 代理值 */
@@ -253,10 +303,26 @@ async function measureUnderThrottle(options: {
   latency: number
   downloadThroughput: number
   uploadThroughput: number
+  /** 模拟实验：在文档开始时注入与组件相同的前 4 张封面 preload（用于在没有重建产物时评估收益） */
+  simulatePreload?: string[]
 }) {
   const context = await launchExtension()
   try {
     const page = await context.newPage()
+    if (options.simulatePreload?.length) {
+      const hrefs = options.simulatePreload.map(url => `${url}.avif`)
+      await page.addInitScript((list: string[]) => {
+        for (const href of list) {
+          const link = document.createElement('link')
+          link.setAttribute('rel', 'preload')
+          link.setAttribute('as', 'image')
+          link.setAttribute('type', 'image/avif')
+          link.setAttribute('href', new URL(href, location.href).href)
+          link.setAttribute('data-bewly-cover-preload', '')
+          document.head.appendChild(link)
+        }
+      }, hrefs)
+    }
     await routeBilibiliDocument(page, HOME_FIXTURE)
 
     const cdp: CDPSession = await context.newCDPSession(page)
@@ -317,8 +383,11 @@ async function measureUnderThrottle(options: {
     await waitForStableCardCount(page, 1)
     const cardsMs = Date.now() - navStart
 
+    const firstScreenVisibleMs = (Date.now() - navStart) + Math.max(0, await waitForFirstScreenCards(page, 8))
+
     // 给限速下的图片请求一段时间开始（不等待全部加载完成，避免慢网下超时）
     await page.waitForTimeout(2500)
+    const coverPreloads = await countCoverPreloads(page)
 
     const pageMetrics = await readPageMetrics(page)
     const attrs = await readImageAttrs(page)
@@ -327,6 +396,8 @@ async function measureUnderThrottle(options: {
     return {
       mountMs,
       cardsMs,
+      firstScreenVisibleMs,
+      coverPreloads,
       ...pageMetrics,
       ...requestSummary,
       totalImageRequests: requests.length,
@@ -357,8 +428,10 @@ test.describe('首屏性能基线', () => {
       await waitForStableCardCount(page, 1)
       const cardsMs = Date.now() - start
 
+      const firstScreenVisibleMs = (Date.now() - start) + Math.max(0, await waitForFirstScreenCards(page, 8))
       // 给布局稳定一点时间：CLS 代理值取扩展就绪 + 1s 内累计的 layout-shift
       await page.waitForTimeout(1000)
+      const coverPreloads = await countCoverPreloads(page)
 
       const metrics = await page.evaluate(() => {
         const root = document.querySelector('#bewly')?.shadowRoot
@@ -393,13 +466,15 @@ test.describe('首屏性能基线', () => {
       const summary = {
         mountMs,
         cardsMs,
+        firstScreenVisibleMs,
+        coverPreloads,
         ...metrics,
       }
       // eslint-disable-next-line no-console
       console.log(`[perf] ${JSON.stringify(summary)}`)
       test.info().annotations.push({
         type: 'perf',
-        description: `mount: ${mountMs}ms, first cards: ${cardsMs}ms, cards: ${metrics.cards}, imgs: ${metrics.images}, lazy: ${metrics.lazy}, decodingAsync: ${metrics.decodingAsync}, fetchHigh: ${metrics.fetchHigh}, fetchLow: ${metrics.fetchLow}, CLS: ${metrics.cls}`,
+        description: `mount: ${mountMs}ms, first cards: ${cardsMs}ms, firstScreenVisible: ${firstScreenVisibleMs}ms, coverPreloads: ${coverPreloads}, cards: ${metrics.cards}, imgs: ${metrics.images}, lazy: ${metrics.lazy}, decodingAsync: ${metrics.decodingAsync}, fetchHigh: ${metrics.fetchHigh}, fetchLow: ${metrics.fetchLow}, CLS: ${metrics.cls}`,
       })
 
       expect(metrics.cards).toBeGreaterThan(0)
@@ -417,6 +492,51 @@ test.describe('首屏性能基线', () => {
       await context.close()
     }
   })
+})
+
+test.describe('首屏封面 preload 模拟实验', () => {
+  skipIfExtensionMissing()
+  // 默认跳过：只有显式设置 PERF_PRELOAD_EXPERIMENT=1 才跑（用于评估 preload 收益）
+  test.skip(!process.env.PERF_PRELOAD_EXPERIMENT, '设置 PERF_PRELOAD_EXPERIMENT=1 才运行模拟实验')
+
+  for (const profile of NET_PROFILES) {
+    test(`模拟 preload · ${profile.label}`, async () => {
+      const covers = extractFixtureCovers(4)
+      test.info().annotations.push({ type: 'preload-experiment', description: `注入 preload：${covers.length} 张` })
+
+      // 对照组（不注入）
+      const baseline = await measureUnderThrottle(profile)
+      // 实验组（文档开始就注入与组件一致的前 4 张 preload）
+      const withPreload = await measureUnderThrottle({ ...profile, simulatePreload: covers })
+
+      const summary = {
+        profile: profile.id,
+        inserted: covers.length,
+        baseline: {
+          firstScreenVisibleMs: baseline.firstScreenVisibleMs,
+          coverFirstStartMs: baseline.coverFirstStartMs,
+          coverHighMedianResponseMs: baseline.coverHighMedianResponseMs,
+          coverLowMedianResponseMs: baseline.coverLowMedianResponseMs,
+          cardsMs: baseline.cardsMs,
+        },
+        withPreload: {
+          firstScreenVisibleMs: withPreload.firstScreenVisibleMs,
+          coverFirstStartMs: withPreload.coverFirstStartMs,
+          coverHighMedianResponseMs: withPreload.coverHighMedianResponseMs,
+          coverLowMedianResponseMs: withPreload.coverLowMedianResponseMs,
+          cardsMs: withPreload.cardsMs,
+        },
+      }
+      // eslint-disable-next-line no-console
+      console.log(`[perf:preload] ${JSON.stringify(summary)}`)
+      test.info().annotations.push({
+        type: 'preload-experiment-result',
+        description: JSON.stringify(summary),
+      })
+
+      expect(withPreload.cards).toBeGreaterThan(0)
+    })
+  }
 })
 
 test.describe('限速下的图片加载收益', () => {

@@ -11,7 +11,7 @@
  * 保持最小实现，避免和 B 站页面的滚动手势冲突。
  */
 import { ROOT_CLASS_LIGHTBOX } from './constants'
-import { getContentEl, getContentImages, getImageSrc } from './dom'
+import { getContentEl, getContentImages, getContentScope, getImageSrc } from './dom'
 import { ui } from './state'
 
 /** 点击图片时用来定位「同文图片」的正文容器 */
@@ -55,7 +55,9 @@ export function setupImageLightbox(): () => void {
 }
 
 export function openLightbox(content: HTMLElement, src: string): void {
-  const images = getContentImages(content).map(getImageSrc)
+  // opus 的图可能挂在 .opus-detail 下而不是最内层正文容器里，按「文章范围」收集整组图
+  const scope = getContentScope(content) ?? content
+  const images = getContentImages(scope).map(getImageSrc)
   const index = images.indexOf(src)
 
   ui.lightbox.images = images.length > 0

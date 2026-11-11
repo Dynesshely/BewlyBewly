@@ -12,6 +12,8 @@
  *   4. 注册快捷键 R / [ ] / T / Esc。
  *
  * 找不到正文容器时整块 UI 降级隐藏（ui.ready = false），不会在非文章页留下空浮层。
+ * 旧专栏 `/read/cv*?jump_opus=1` 是「跳到 opus」的过渡页：此时不渲染任何 UI，
+ * 只轮询等待 B 站跳转到 `/opus/*` 后再初始化；5 秒内没跳转就保持静默。
  * 非文章页是空操作；重复调用幂等（nativeOverlay 按 hostId 去重）。
  */
 import { watch } from 'vue'
@@ -34,7 +36,7 @@ import shadowCss from './articlePage.shadow.scss?inline'
 import { cleanupCodeBlocks, setupCodeCopy, syncCodeBlocks } from './codeBlocks'
 import ArticlePageOverlay from './components/ArticlePageOverlay.vue'
 import { HOST_ID, PAGE_STYLE_ID } from './constants'
-import { getArticlePageKind, getContentEl, isArticlePage, markContentEl } from './dom'
+import { getArticlePageKind, getContentEl, isArticlePage, isJumpOpusTransitionPage, markContentEl } from './dom'
 import { cleanupLightbox, setupImageLightbox } from './lightbox'
 import { readStoredReading, readStoredTocOpen } from './preferences'
 import { setupShortcuts } from './shortcuts'
@@ -45,6 +47,10 @@ import { clearToc, syncToc, updateActiveToc } from './toc'
 const SYNC_DEBOUNCE = 250
 /** 兜底轮询：进度与目录高亮需要跟着滚动更新，但滚动事件已经覆盖大部分场景 */
 const SYNC_INTERVAL = 1500
+/** 过渡页（?jump_opus=1）跳转轮询间隔 */
+const JUMP_POLL_INTERVAL = 500
+/** 过渡页等待上限：超过就保持静默，不再等待 */
+const JUMP_WAIT_TIMEOUT = 5000
 
 let pageStyleEl: HTMLStyleElement | null = null
 let disposeShortcuts: (() => void) | null = null
@@ -58,6 +64,8 @@ let lastContentEl: HTMLElement | null = null
 let tocRestored = false
 let readingRestored = false
 let stopSettingsWatch: (() => void) | null = null
+/** 过渡页轮询计时器（/read/*?jump_opus=1 → /opus/*） */
+let jumpPollTimer: number | null = null
 
 export function setupArticlePage(): void {
   if (!isArticlePage())
@@ -68,10 +76,63 @@ export function setupArticlePage(): void {
     document.addEventListener('DOMContentLoaded', () => setupArticlePage(), { once: true })
     return
   }
+
+  // 旧专栏跳 opus 的过渡页：先不挂 UI，等 B 站自己跳到 /opus/* 再初始化
+  if (isJumpOpusTransitionPage()) {
+    watchJumpOpusRoute()
+    return
+  }
+
   mount()
 }
 
+/**
+ * 过渡页（`/read/cv*?jump_opus=1`）等待逻辑。
+ *
+ * 每 500ms 检查一次：
+ *   - 已经变成 `/opus/*` → 停止轮询并正常初始化；
+ *   - 已经不是文章页（用户离开 / 站内跳到别处）→ 停止等待，保持静默；
+ *   - 超过 5 秒仍未跳转 → 停止等待，保持静默（不渲染、不报错）。
+ *
+ * 过渡页本身没有任何正文容器，所以这里不调用 mount()，避免出现空浮层。
+ */
+function watchJumpOpusRoute(): void {
+  if (jumpPollTimer !== null)
+    return
+
+  const startedAt = Date.now()
+  const check = () => {
+    if (getArticlePageKind() === 'opus') {
+      stopJumpWatch()
+      // 跳转后可能已有其它入口先完成挂载，避免重复注册监听
+      if (!hasNativeOverlay(HOST_ID))
+        mount()
+      return
+    }
+    // 页面已经彻底不是文章页（例如 SPA 跳去首页）：停止等待
+    if (!isArticlePage()) {
+      stopJumpWatch()
+      return
+    }
+    // 超时：保持静默，不渲染任何 UI
+    if (Date.now() - startedAt >= JUMP_WAIT_TIMEOUT)
+      stopJumpWatch()
+  }
+
+  jumpPollTimer = window.setInterval(check, JUMP_POLL_INTERVAL)
+  // 立即查一次：极端情况下 DOMContentLoaded 时已经跳完了
+  check()
+}
+
+function stopJumpWatch(): void {
+  if (jumpPollTimer !== null) {
+    window.clearInterval(jumpPollTimer)
+    jumpPollTimer = null
+  }
+}
+
 export function teardownArticlePage(): void {
+  stopJumpWatch()
   unmount()
 }
 
@@ -125,6 +186,7 @@ function unmount(): void {
     window.clearInterval(intervalTimer)
     intervalTimer = null
   }
+  stopJumpWatch()
   if (debounceTimer !== null) {
     window.clearTimeout(debounceTimer)
     debounceTimer = null

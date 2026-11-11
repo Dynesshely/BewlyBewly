@@ -100,7 +100,7 @@ html.bewly-article-reading [data-bewly-article-content] h3 {
 }
 
 /* 代码块保持等宽小字号，不跟随正文档位放大 */
-html.bewly-article-reading [data-bewly-article-content] :is(pre, code, kbd) {
+html.bewly-article-reading :is([data-bewly-article-content], .opus-detail, .bili-opus-view) :is(pre, code, kbd) {
   font-size: calc(var(--bap-font-size) * 0.85) !important;
 }
 
@@ -125,6 +125,36 @@ html.bewly-article-reading .opus-module-title {
   margin-right: auto;
   margin-left: auto;
 }
+
+/* 第 18 轮补齐：三类正文容器在宽屏（≥2000px）下都要收敛到 720px 并居中。
+   [data-bewly-article-content] 只标记运行时选中的那一层，而 opus / 旧专栏的外层容器
+   （.opus-detail / .bili-opus-view / .article-container__content）本身可能更宽，
+   这里按文章容器逐类兜底；max-width 不允许被页面内联样式覆盖，所以带 !important。 */
+html.bewly-article-reading :is(.opus-detail, .bili-opus-view, .opus-module-content) {
+  box-sizing: border-box;
+  max-width: var(--bap-content-width) !important;
+  min-width: 0 !important;
+  margin-right: auto !important;
+  margin-left: auto !important;
+}
+
+html.bewly-article-reading :is(.normal-article-holder, .read-article-holder, .article-container__content) {
+  box-sizing: border-box;
+  max-width: var(--bap-content-width) !important;
+  min-width: 0 !important;
+  margin-right: auto !important;
+  margin-left: auto !important;
+}
+
+/* opus 的图片可能挂在 .opus-detail / .bili-opus-view 外层，同样给放大指针 */
+html.bewly-article-reading :is(.opus-detail, .bili-opus-view) img {
+  cursor: zoom-in;
+}
+
+/* opus / 旧专栏的代码块同样需要相对定位（复制按钮绝对定位在右上角） */
+html.bewly-article-reading :is(.opus-detail, .bili-opus-view) pre {
+  position: relative;
+}
 /* #endregion */
 
 /* #region 代码块复制按钮（第 15 轮）
@@ -132,7 +162,7 @@ html.bewly-article-reading .opus-module-title {
    - 默认透明且 pointer-events: none，不挡正文选择 / 复制；
    - hover、focus-within 或按钮自身获得焦点时才显示；
    - 给代码块右侧留出按钮空间，避免按钮压住代码文字。 */
-[data-bewly-article-content] pre[data-bewly-code-block] {
+pre[data-bewly-code-block] {
   position: relative;
   padding-right: 64px;
 }
@@ -162,8 +192,8 @@ html.bewly-article-reading .opus-module-title {
     background-color var(--bew-motion-fast, 140ms) var(--bew-ease-out, ease-out);
 }
 
-[data-bewly-article-content] pre:hover .bap-code-copy,
-[data-bewly-article-content] pre:focus-within .bap-code-copy,
+pre:hover .bap-code-copy,
+pre:focus-within .bap-code-copy,
 .bap-code-copy:focus-visible {
   pointer-events: auto;
   opacity: 1;

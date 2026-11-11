@@ -11,7 +11,7 @@
  * 在下一次 sync 注入新按钮前保持原样（见 docs/article-page.md 已知限制）。
  */
 import { CODE_BLOCK_ATTR, CODE_COPY_ATTR } from './constants'
-import { getPreBlocks } from './dom'
+import { getContentScope, getPreBlocks } from './dom'
 import { getMessages } from './i18n'
 
 /** 每个按钮的「已复制」回退计时器，避免多次点击叠计时 */
@@ -23,7 +23,8 @@ let clickHandler: ((event: MouseEvent) => void) | null = null
 
 /** 给正文里所有 <pre> 补复制按钮（幂等：已有按钮的代码块直接跳过） */
 export function syncCodeBlocks(content: HTMLElement | null): void {
-  const preBlocks = getPreBlocks(content)
+  // 与图片一致：按文章范围扫描，覆盖 .opus-detail / .article-container__content 外层的代码块
+  const preBlocks = getPreBlocks(getContentScope(content) ?? content)
   if (!preBlocks.length)
     return
 

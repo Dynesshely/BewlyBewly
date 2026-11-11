@@ -21,6 +21,9 @@ const READ_MOBILE_URL_RE = /^https?:\/\/(?:www\.)?bilibili\.com\/read\/mobile/i
 /** 图文详情页：/opus/123456789 */
 const OPUS_URL_RE = /^https?:\/\/(?:www\.)?bilibili\.com\/opus\/\d+/i
 
+/** 旧专栏跳 opus 的过渡页：/read/cv123456/?jump_opus=1（没有正文，等 B 站自己跳走） */
+const JUMP_OPUS_PARAM = 'jump_opus'
+
 export type ArticlePageKind = 'read' | 'opus'
 
 /** 正文容器的候选选择器（从最具体的正文容器逐级退化到外层卡片） */
@@ -35,6 +38,7 @@ const CONTENT_SELECTORS = [
   // opus 图文详情
   '.opus-detail .opus-module-content',
   '.opus-module-content',
+  '.bili-opus-view',
   '.opus-detail',
 ]
 
@@ -65,6 +69,24 @@ export function getArticlePageKind(url: string = location.href): ArticlePageKind
 
 export function isArticlePage(url: string = location.href): boolean {
   return getArticlePageKind(url) !== null
+}
+
+/**
+ * 是否是「旧专栏 → opus」的过渡页（`?jump_opus=1`）。
+ *
+ * 这种页面没有任何正文容器，B 站会自行跳到 `/opus/<id>`；
+ * 在跳转完成前不应该判定为失败、也不应该渲染浮层（见 index.ts 的 watchJumpOpusRoute）。
+ */
+export function isJumpOpusTransitionPage(url: string = location.href): boolean {
+  if (getArticlePageKind(url) === null)
+    return false
+  try {
+    const params = new URL(url, location.origin).searchParams
+    return params.get(JUMP_OPUS_PARAM) === '1'
+  }
+  catch {
+    return false
+  }
 }
 
 /**
@@ -129,6 +151,20 @@ export function getHeadingEls(content: HTMLElement | null): HTMLElement[] {
     seen.add(text)
     return true
   })
+}
+
+/**
+ * 正文的「图文范围」：图片 / 代码块可能不在最内层正文容器里。
+ *
+ * - opus：部分图片挂在 `.opus-detail` 下而不是 `.opus-module-content` 内；
+ * - 专栏：正文容器外面还有 `.article-container__content` 之类的同文章容器。
+ *
+ * 读取图片序列与注入代码块按钮时用这个范围，目录仍以正文容器为准。
+ */
+export function getContentScope(content: HTMLElement | null): HTMLElement | null {
+  if (!content)
+    return null
+  return content.closest<HTMLElement>('.opus-detail, .bili-opus-view, .article-container__content, .article-container') ?? content
 }
 
 /** 正文里可放大的图片（跳过没有地址 / 过小的表情与占位图） */

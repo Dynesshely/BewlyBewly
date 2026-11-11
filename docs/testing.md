@@ -105,3 +105,35 @@ pnpm exec playwright test --repeat-each=1   # 连续执行命令 N 次
    `.b-settings-item` 结构；改文案或换组件需要同步更新选择器。
 6. **按键组合**：`Shift+/` 不等于 `?`（见第四节），新增快捷键用例请用 `press('?')` 这类「按键字符」写法。
 7. **视频页 / 番剧页用例** 依赖自带的内联 fixture（`video-page.spec.ts`），与首页快照相互独立。
+## 七、第 18 轮：E2E 覆盖补齐（文章 / 直播 / 合集 / 反馈态）
+
+本轮新增 4 组 spec，全部用**本地 fixture 或 background service worker 桩**，不依赖线上页面：
+
+| 文件 | 覆盖能力 | 断言要点 |
+| --- | --- | --- |
+| `article-page.spec.ts` | 文章 / opus 阅读模式 | fixture 用真机形态 `.bili-opus-view > .opus-detail > .opus-module-content`（正文 ≥ 200 字 + 2 张图 + 1 个 `pre`）；断言 `#bewly-article-page` 浮层就绪、5 个按钮、点「沉浸阅读」后 `html.bewly-article-reading` 生效、正文 `max-width: 720px` 且实测正文宽（去掉内边距）≤ 720、`pre` 注入 `[data-bewly-code-copy]`、点图片打开 `.bap-lightbox`（同文图片可切换）、Esc 关闭、再点退出阅读模式 |
+| `live-page.spec.ts` | 直播页影院模式 | fixture 复刻 `.live-non-revenue-player` + `.live-player-handle-bar` + `.live-player-bg`；断言 `#bewly-live-page` 挂载、`html.bewly-live-page` 接管标记、按 T 后 `html.bewly-live-cinema` 生效、操作条 `display:none`、舞台 `position:fixed` 且高度 ≈ 视口高；Esc 与再按 T 都能退出 |
+| `collection-panel.spec.ts` | 合集选集面板 | fixture header「测试合集 （1/3）…订阅合集」+ `video-pod__list section`（无 multip）+ 3 个不同 bvid 的 `<a>` 条目；断言入口文案是「合集」（不是「选集」）、面板 `data-kind="collection"`、3 项、唯一 `aria-current="true"` 指向第 2 项、点第 3 项触发 `BV1collect03` |
+| `feedback-states.spec.ts` | 反馈态组件 | 伪造登录 cookie + SW 桩动态接口：`code=-500` 时 `.feedback-error` 可见且 `role="alert"`、含接口 message 与重试按钮；把桩切成空列表后点重试，变成 `.feedback-state` 且 `role="status"` |
+
+### 本轮全量运行结果（`pnpm exec playwright test --retries=0`）
+
+| 运行 | 用例数 | passed | skipped | failed | 耗时 |
+| --- | --- | --- | --- | --- | --- |
+| 第 1 次 | 48 | 44 | 4 | 0 | 2.2m |
+| 第 2 次 | 48 | 44 | 4 | 0 | 2.3m |
+
+> 48 个用例里包含前几轮积累的全部 spec；4 个 skipped 是既有的在线探测 / 需要额外环境变量的用例，
+> 本轮新增的 4 个 spec 全部执行并通过。
+
+两次全量运行均无新增 flaky；`article-page / live-page / collection-panel / feedback-states` 四个新 spec 也各自单独复跑通过。
+
+### 新增已知限制
+
+1. **文章页 fixture 的宽度语义**：`max-width: 720px` 作用在内容盒上，用例测量的是「去左右内边距后的正文宽度」，
+   因此 fixture 里给正文加 padding 不会让断言假红；真实页面同样适用。
+2. **直播 fixture 没有真实控制条**：因此只覆盖影院模式的页面级标记 / 布局，不覆盖弹幕开关与全屏按钮
+   （找不到原生控件时模块会正确禁用对应项）。
+3. **合集 fixture 用页面脚本记录点击**：避免真的导航离开 fixture，断言的是「点第 3 项会触发指向第 3 个 bvid 的链接」。
+4. **反馈态依赖动态页**：动态页需要登录态，用伪造 cookie + SW 桩只验证反馈组件渲染，不验证真实动态数据形态。
+5. 动态页的 ErrorState 只在**首屏加载失败**时出现；已有内容后翻页失败只显示底部「重试」提示（这是产品行为）。

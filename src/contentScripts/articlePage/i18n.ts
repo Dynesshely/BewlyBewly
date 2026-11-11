@@ -34,6 +34,14 @@ export interface ArticlePageMessages {
   noContent: string
   /** 形如「阅读进度 {percent}%」 */
   progressLabel: string
+  /** 图片大图 */
+  imageViewer: string
+  imagePrev: string
+  imageNext: string
+  imageHint: string
+  /** 代码块复制 */
+  codeCopy: string
+  codeCopied: string
 }
 
 const CMN_CN: ArticlePageMessages = {
@@ -62,6 +70,12 @@ const CMN_CN: ArticlePageMessages = {
   close: '关闭',
   noContent: '暂时没有找到正文容器，阅读增强已降级',
   progressLabel: '阅读进度 {percent}%',
+  imageViewer: '图片预览',
+  imagePrev: '上一张',
+  imageNext: '下一张',
+  imageHint: 'Esc 关闭 · ← / → 切换',
+  codeCopy: '复制',
+  codeCopied: '已复制',
 }
 
 const EN: ArticlePageMessages = {
@@ -90,6 +104,12 @@ const EN: ArticlePageMessages = {
   close: 'Close',
   noContent: 'Article body not found yet — reading enhancements are degraded',
   progressLabel: 'Reading progress {percent}%',
+  imageViewer: 'Image preview',
+  imagePrev: 'Previous image',
+  imageNext: 'Next image',
+  imageHint: 'Esc to close · ← / → to switch',
+  codeCopy: 'Copy',
+  codeCopied: 'Copied',
 }
 
 const CMN_TW: ArticlePageMessages = {
@@ -118,6 +138,12 @@ const CMN_TW: ArticlePageMessages = {
   close: '關閉',
   noContent: '暫時找不到正文容器，閱讀增強已降級',
   progressLabel: '閱讀進度 {percent}%',
+  imageViewer: '圖片預覽',
+  imagePrev: '上一張',
+  imageNext: '下一張',
+  imageHint: 'Esc 關閉 · ← / → 切換',
+  codeCopy: '複製',
+  codeCopied: '已複製',
 }
 
 const JYUT: ArticlePageMessages = {
@@ -131,6 +157,12 @@ const JYUT: ArticlePageMessages = {
   shortcutsHint: 'R 閱讀 · [ ] 字號 · T 頂部 · Esc 退出',
   noContent: '暫時搵唔到正文容器，閱讀增強降咗級',
   progressLabel: '閱讀進度 {percent}%',
+  imageViewer: '圖片預覽',
+  imagePrev: '上一張',
+  imageNext: '下一張',
+  imageHint: '撳 Esc 收埋 · ← / → 切換',
+  codeCopy: '複製',
+  codeCopied: '複製咗',
 }
 
 /** 模块自建 i18n：四种语言键集合完全一致（缺键回退简中 / 英文，不会出现空串） */

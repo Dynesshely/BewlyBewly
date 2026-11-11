@@ -21,6 +21,7 @@ import {
 } from './actions'
 import { HOST_ID } from './constants'
 import { isArticlePage, isEditableEvent, isFromBewlyUi } from './dom'
+import { closeLightbox, stepLightboxImage } from './lightbox'
 import { ui } from './state'
 
 function consume(event: KeyboardEvent): void {
@@ -37,6 +38,23 @@ function handleKeyDown(event: KeyboardEvent): void {
     return
 
   const key = event.key
+
+  // 大图打开时独占键盘：Esc 关闭、←/→ 切换，其它快捷键不生效
+  if (ui.lightbox.open) {
+    if (key === 'Escape') {
+      consume(event)
+      closeLightbox()
+      return
+    }
+    if (key === 'ArrowLeft' || key === 'ArrowRight') {
+      consume(event)
+      stepLightboxImage(key === 'ArrowLeft'
+        ? -1
+        : 1)
+      return
+    }
+    return
+  }
 
   // Esc 优先处理：目录展开时先收起目录，再按一次才退出阅读模式
   if (key === 'Escape') {

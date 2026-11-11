@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { HistoryItem } from '~/components/SearchBar/searchHistoryProvider'
 import { ref } from 'vue'
-import { clearAllSearchHistory, getSearchHistory } from '~/components/SearchBar/searchHistoryProvider'
+import { clearAllSearchHistory, getSearchHistory, removeSearchHistory } from '~/components/SearchBar/searchHistoryProvider'
 
 import { useDirectPasteSetting } from '../composables/useDirectPasteSetting'
 import { useHotSearch } from '../composables/useHotSearch'
@@ -25,8 +25,76 @@ const directError = ref<string>('')
 const HISTORY_VISIBLE = 8
 const HOT_VISIBLE = 8
 
-const recentKeywords = computed<string[]>(() => history.value.slice(0, HISTORY_VISIBLE).map(item => item.value))
+/**
+ * 最近搜索的本地增强：置顶（最多 3 条）。
+ *
+ * 置顶只存在本地 localStorage（key `bewly-search-pinned`），因为 B 站搜索历史接口
+ * 没有「置顶」概念；居前的顺序只影响本面板的展示，不写回 B 站历史。
+ */
+const PINNED_STORAGE_KEY = 'bewly-search-pinned'
+const PINNED_LIMIT = 3
+/** 删 / 清后给 B 站 iframe 的写入留一点时间，超时就只做本地删除 */
+const HISTORY_WRITE_TIMEOUT = 800
+
+function readPinned(): string[] {
+  try {
+    const raw = window.localStorage.getItem(PINNED_STORAGE_KEY)
+    if (!raw)
+      return []
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed))
+      return []
+    return parsed
+      .filter((value): value is string => typeof value === 'string')
+      .slice(0, PINNED_LIMIT)
+  }
+  catch {
+    return []
+  }
+}
+
+const pinned = ref<string[]>(readPinned())
+
+function persistPinned() {
+  try {
+    window.localStorage.setItem(PINNED_STORAGE_KEY, JSON.stringify(pinned.value))
+  }
+  catch {
+    // 隐私模式 / 存储被禁用：本次会话内仍然生效，只是刷新不保持
+  }
+}
+
+interface RecentItem extends HistoryItem {
+  pinned: boolean
+}
+
+/**
+ * 最近搜索展示列表：置顶项按置顶顺序排最前，其余按原历史顺序补齐；
+ * 置顶项即使不在前 8 条里也会被拉出来显示（总条数仍受 HISTORY_VISIBLE 限制）。
+ */
+const recentItems = computed<RecentItem[]>(() => {
+  const pinnedItems = pinned.value
+    .map(value => history.value.find(item => item.value === value))
+    .filter((item): item is HistoryItem => Boolean(item))
+
+  const pinnedValues = new Set(pinnedItems.map(item => item.value))
+  const rest = history.value
+    .filter(item => !pinnedValues.has(item.value))
+    .slice(0, Math.max(0, HISTORY_VISIBLE - pinnedItems.length))
+
+  return [
+    ...pinnedItems.map(item => ({ ...item, pinned: true })),
+    ...rest.map(item => ({ ...item, pinned: false })),
+  ]
+})
+
 const directPreview = computed(() => parseDirectLink(directInput.value))
+
+// 清空二次确认 / 置顶提示的状态与计时器（在 refreshHistory 的卸载清理里也会用到）
+const clearConfirming = ref(false)
+const recentStatus = ref('')
+let clearConfirmTimer: number | null = null
+let statusTimer: number | null = null
 
 /**
  * 热门搜索：优先真实热搜（接口一次取 12 条），失败/未登录回落到内置词表。
@@ -71,16 +139,115 @@ async function refreshHistory() {
   catch {
     history.value = []
   }
+  // 历史来源可能已经在别处删过条目：把失效的置顶清掉（历史为空时不清理，避免读取失败误删）
+  if (history.value.length)
+    prunePinned()
+}
+
+onBeforeUnmount(() => {
+  resetClearConfirm()
+  if (statusTimer !== null) {
+    window.clearTimeout(statusTimer)
+    statusTimer = null
+  }
+})
+
+function resetClearConfirm() {
+  clearConfirming.value = false
+  if (clearConfirmTimer !== null) {
+    window.clearTimeout(clearConfirmTimer)
+    clearConfirmTimer = null
+  }
+}
+
+function showRecentStatus(message: string) {
+  recentStatus.value = message
+  if (statusTimer !== null)
+    window.clearTimeout(statusTimer)
+  statusTimer = window.setTimeout(() => {
+    statusTimer = null
+    recentStatus.value = ''
+  }, 2200)
+}
+
+/** 清空按钮：第一次点进入「确认清空」（3 秒有效），3 秒内再点才真正执行 */
+function requestClearHistory() {
+  if (!clearConfirming.value) {
+    clearConfirming.value = true
+    if (clearConfirmTimer !== null)
+      window.clearTimeout(clearConfirmTimer)
+    clearConfirmTimer = window.setTimeout(() => {
+      clearConfirmTimer = null
+      clearConfirming.value = false
+    }, 3000)
+    return
+  }
+
+  resetClearConfirm()
+  void clearHistory()
 }
 
 async function clearHistory() {
+  // 置顶也一起清掉：记录都没了，留着置顶只会得到一堆无效引用
+  pinned.value = []
+  persistPinned()
+  recentStatus.value = ''
   try {
-    await clearAllSearchHistory()
+    await Promise.race([
+      clearAllSearchHistory(),
+      new Promise<void>(resolve => window.setTimeout(resolve, HISTORY_WRITE_TIMEOUT)),
+    ])
   }
   catch {
     // 清空失败时仍然把本地视图清掉，避免按钮看起来没反应
   }
   history.value = []
+}
+
+/** 置顶 / 取消置顶（最多 3 条）；超出上限时给一条提示 */
+function togglePin(keyword: string) {
+  const index = pinned.value.indexOf(keyword)
+  if (index >= 0) {
+    pinned.value = pinned.value.filter(value => value !== keyword)
+  }
+  else {
+    if (pinned.value.length >= PINNED_LIMIT) {
+      showRecentStatus(t('recent_pin_limit'))
+      return
+    }
+    pinned.value = [...pinned.value, keyword]
+  }
+  persistPinned()
+}
+
+/**
+ * 单条删除：先改本地视图（即时反馈），再尽力从 B 站搜索历史里删；
+ * iframe 不存在 / 不回应时超时后只保留本地删除（文档已说明）。
+ */
+async function deleteRecent(keyword: string) {
+  history.value = history.value.filter(item => item.value !== keyword)
+  if (pinned.value.includes(keyword)) {
+    pinned.value = pinned.value.filter(value => value !== keyword)
+    persistPinned()
+  }
+  try {
+    await Promise.race([
+      removeSearchHistory(keyword),
+      new Promise<void>(resolve => window.setTimeout(resolve, HISTORY_WRITE_TIMEOUT)),
+    ])
+  }
+  catch {
+    // 只删本地记录即可，不打扰用户
+  }
+}
+
+/** 历史变了（含在搜索栏那边删过）时把失效的置顶清掉 */
+function prunePinned() {
+  const next = pinned.value.filter(value => history.value.some(item => item.value === value))
+  if (next.length === pinned.value.length)
+    return
+  pinned.value = next
+  persistPinned()
 }
 
 /** 换一批：在 12 条热词池里把展示窗口后移 8 条（并循环），序号仍是真实排名 */
@@ -126,21 +293,60 @@ function handlePaste(event: ClipboardEvent) {
         <h2 id="bewly-search-recent-title" class="quick-title">
           {{ t('recent_title') }}
         </h2>
-        <button v-if="recentKeywords.length" type="button" class="quick-action" @click="clearHistory">
-          {{ t('recent_clear') }}
+        <button
+          v-if="recentItems.length"
+          type="button"
+          class="quick-action"
+          :class="{ 'is-confirming': clearConfirming }"
+          :aria-label="clearConfirming ? t('recent_clear_hint') : t('recent_clear')"
+          :title="clearConfirming ? t('recent_clear_hint') : t('recent_clear')"
+          @click="requestClearHistory"
+          @keydown.esc.stop.prevent="resetClearConfirm"
+        >
+          {{ clearConfirming ? t('recent_clear_confirm') : t('recent_clear') }}
         </button>
       </header>
-      <p v-if="!recentKeywords.length" class="quick-empty">
+      <p v-if="!recentItems.length" class="quick-empty">
         {{ t('recent_empty') }}
       </p>
-      <ul v-else class="chip-list">
-        <li v-for="keyword in recentKeywords" :key="keyword">
-          <button type="button" class="chip" @click="searchKeyword(keyword)">
-            <span class="i-tabler:history" aria-hidden="true" />
-            <span class="chip-text">{{ keyword }}</span>
+      <ul v-else class="chip-list chip-list--recent">
+        <li
+          v-for="item in recentItems"
+          :key="item.value"
+          class="recent-item"
+          :class="{ 'is-pinned': item.pinned }"
+        >
+          <button type="button" class="chip chip--recent" @click="searchKeyword(item.value)">
+            <span :class="item.pinned ? 'i-tabler:pin-filled' : 'i-tabler:history'" aria-hidden="true" />
+            <span class="chip-text">{{ item.value }}</span>
           </button>
+          <span class="recent-item__actions">
+            <button
+              type="button"
+              class="chip-action"
+              :class="{ 'is-active': item.pinned }"
+              :aria-label="item.pinned ? t('recent_unpin_named', { keyword: item.value }) : t('recent_pin_named', { keyword: item.value })"
+              :aria-pressed="item.pinned"
+              :title="item.pinned ? t('recent_unpin') : t('recent_pin')"
+              @click="togglePin(item.value)"
+            >
+              <span :class="item.pinned ? 'i-tabler:pin-filled' : 'i-tabler:pin'" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              class="chip-action chip-action--danger"
+              :aria-label="t('recent_delete_named', { keyword: item.value })"
+              :title="t('recent_delete')"
+              @click="deleteRecent(item.value)"
+            >
+              <span class="i-tabler:x" aria-hidden="true" />
+            </button>
+          </span>
         </li>
       </ul>
+      <p v-if="recentStatus" class="quick-note quick-status" role="status">
+        {{ recentStatus }}
+      </p>
     </section>
 
     <!-- 热门搜索（真实热搜，失败回落内置词表） -->
@@ -370,6 +576,95 @@ function handlePaste(event: ClipboardEvent) {
   white-space: nowrap;
 }
 
+/* 最近搜索：每条 = 主按钮（点词直接搜索）+ 置顶 / 删除两个小动作 */
+.chip-list--recent {
+  gap: 8px;
+}
+
+.recent-item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+}
+
+.chip--recent {
+  max-width: 220px;
+}
+
+.recent-item.is-pinned .chip--recent {
+  border-color: var(--bew-theme-color-40);
+  color: var(--bew-theme-color);
+}
+
+/* 动作按钮默认隐藏在 hover / focus-within 时出现；触屏设备常显 */
+.recent-item__actions {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  margin-left: 2px;
+  opacity: 0;
+  transition: opacity var(--quick-duration) var(--quick-ease);
+}
+
+.recent-item:hover .recent-item__actions,
+.recent-item:focus-within .recent-item__actions {
+  opacity: 1;
+}
+
+.chip-action {
+  display: inline-flex;
+  flex: none;
+  justify-content: center;
+  align-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--bew-text-3);
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    background var(--quick-duration) var(--quick-ease),
+    color var(--quick-duration) var(--quick-ease);
+
+  &:hover {
+    background: var(--bew-fill-2);
+    color: var(--bew-text-1);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--bew-theme-color);
+    outline-offset: 1px;
+  }
+
+  &.is-active {
+    color: var(--bew-theme-color);
+  }
+
+  &--danger:hover {
+    color: var(--bew-error-color);
+  }
+}
+
+.quick-action.is-confirming {
+  color: var(--bew-error-color);
+  background: var(--bew-fill-2);
+}
+
+.quick-status {
+  color: var(--bew-theme-color);
+}
+
+@media (hover: none) {
+  .recent-item__actions {
+    opacity: 1;
+  }
+}
+
 /* 热搜序号徽标：前三名用主题色 */
 .chip-rank {
   display: inline-flex;
@@ -554,6 +849,22 @@ function handlePaste(event: ClipboardEvent) {
   .quick-panel {
     max-width: 100%;
     padding: 16px;
+  }
+
+  .chip-list--recent {
+    gap: 6px;
+  }
+
+  .recent-item {
+    max-width: 100%;
+  }
+
+  .chip--recent {
+    max-width: 100%;
+  }
+
+  .recent-item__actions {
+    opacity: 1;
   }
 
   .quick-head {

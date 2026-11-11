@@ -612,9 +612,14 @@ test.describe('播放列表页增强', () => {
     }
   })
 })
+
 /**
- * 分P 视频快照：普通视频页 + `#multi_page` 分P 列表（`.list-box li`，当前项 `.on`）。
- * 点条目时不真正路由，只记录点击并搬移 `.on` 类。
+ * 分P 视频快照：完全按真机实测的现代 B 站 DOM 构造。
+ *
+ * - 容器：`.video-pod.video-pod`
+ * - header：`视频选集 （1/8）`
+ * - 列表：`video-pod__list multip list`（`multip` 是分P 最强信号）
+ * - 条目：`simple-base-item video-pod__item active normal`，**内部没有 <a>**，点条目 DIV 切换
  */
 const PARTS_PAGE_FIXTURE = `<!doctype html>
 <html lang="zh-CN">
@@ -632,9 +637,10 @@ const PARTS_PAGE_FIXTURE = `<!doctype html>
       .right-container { flex: 0 0 28%; }
       .video-title { margin: 16px 0; font-size: 20px; }
       .video-desc { min-height: 1600px; }
-      #multi_page .list-box { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-      #multi_page .list-box li { padding: 6px; }
-      #multi_page .list-box li.on { background: #ddd; }
+      .video-pod__header { padding: 8px; font-weight: 600; }
+      .video-pod__list { display: flex; flex-direction: column; gap: 4px; }
+      .video-pod__item { padding: 6px; cursor: pointer; }
+      .video-pod__item.active { background: #ddd; }
     </style>
   </head>
   <body>
@@ -650,26 +656,28 @@ const PARTS_PAGE_FIXTURE = `<!doctype html>
           <div class="video-desc">正文</div>
         </div>
         <div class="right-container">
-          <div id="multi_page">
-            <div class="cur-list">
-              <ul class="list-box">
-                <li class="on"><a href="/video/BV1xx411c7mD?p=1">P1 第一集</a></li>
-                <li><a href="/video/BV1xx411c7mD?p=2">P2 第二集</a></li>
-                <li><a href="/video/BV1xx411c7mD?p=3">P3 第三集</a></li>
-              </ul>
+          <div class="video-pod video-pod">
+            <div class="video-pod__header">视频选集 （1/8）</div>
+            <div class="video-pod__list multip list" id="part-list">
+              <div class="simple-base-item video-pod__item active normal" data-p="1">P1 第一集</div>
+              <div class="simple-base-item video-pod__item normal" data-p="2">P2 第二集</div>
+              <div class="simple-base-item video-pod__item normal" data-p="3">P3 第三集</div>
+              <div class="simple-base-item video-pod__item normal" data-p="4">P4 第四集</div>
+              <div class="simple-base-item video-pod__item normal" data-p="5">P5 第五集</div>
+              <div class="simple-base-item video-pod__item normal" data-p="6">P6 第六集</div>
+              <div class="simple-base-item video-pod__item normal" data-p="7">P7 第七集</div>
+              <div class="simple-base-item video-pod__item normal" data-p="8">P8 第八集</div>
             </div>
           </div>
         </div>
       </div>
     </div>
     <script>
-      document.querySelectorAll('#multi_page .list-box > li > a').forEach((anchor) => {
-        anchor.addEventListener('click', (event) => {
-          event.preventDefault()
-          const item = anchor.parentElement
-          document.querySelectorAll('#multi_page .list-box > li').forEach((el) => el.classList.remove('on'))
-          item.classList.add('on')
-          document.body.dataset.clickedPart = new URL(anchor.href).searchParams.get('p')
+      document.querySelectorAll('#part-list > .video-pod__item').forEach((item) => {
+        item.addEventListener('click', () => {
+          document.querySelectorAll('#part-list > .video-pod__item').forEach((el) => el.classList.remove('active'))
+          item.classList.add('active')
+          document.body.dataset.clickedPart = item.dataset.p
         })
       })
     </script>
@@ -694,7 +702,8 @@ async function openPartsPage(): Promise<{ context: BrowserContext, page: Page }>
     await route.continue()
   })
 
-  await page.goto('https://www.bilibili.com/video/BV1xx411c7mD?p=1', { waitUntil: 'domcontentloaded' })
+  // 真机实测的多P 页面（8 个分P）
+  await page.goto('https://www.bilibili.com/video/BV1wvWM6RE3Z?p=1', { waitUntil: 'domcontentloaded' })
   return { context, page }
 }
 
@@ -703,7 +712,7 @@ test.describe('分P 选集面板', () => {
 
   const clickedPart = (page: Page) => page.evaluate(() => document.body.dataset.clickedPart ?? '')
 
-  test('多P 视频出现「选集」入口：面板标题区分、当前 P 高亮、点条目切 P', async () => {
+  test('现代分P 结构（multip 列表 + 无 <a> 条目）出现「选集」入口，点条目切 P', async () => {
     const { context, page } = await openPartsPage()
 
     try {
@@ -715,14 +724,14 @@ test.describe('分P 选集面板', () => {
 
       const panel = page.locator('.bvp-playlist')
       await expect(panel).toBeVisible()
-      // 普通多P 视频的面板标题是「选集 / Parts」，不是播放列表
       const panelTitle = (await panel.locator('.bvp-playlist__title').textContent())?.trim() ?? ''
       expect(panelTitle).toMatch(/选集|parts/i)
-      await expect(panel.locator('.bvp-playlist__item')).toHaveCount(3)
-      // 当前 P = 第 1 P（fixture 里 li.on 在第一项）
+      await expect(panel.locator('.bvp-playlist__item')).toHaveCount(8)
+      // 当前 P = 第 1 P（条目带 .active）
       await expect(panel.locator('[aria-current="true"]')).toHaveCount(1)
-      await expect(panel.locator('[aria-current="true"]')).toContainText('第一集')
+      await expect(panel.locator('[aria-current="true"]')).toContainText('P1 第一集')
 
+      // 条目内部没有 <a>：组件会点条目本身，fixture 用点击事件切换
       await panel.locator('.bvp-playlist__item').nth(2).click()
       await expect.poll(() => clickedPart(page), { timeout: 5_000 }).toBe('3')
     }
@@ -792,11 +801,11 @@ test.describe('分P 选集面板', () => {
   })
 })
 /**
- * 回归 fixture：普通**单 P** 视频页 + 现代 B 站的「相关推荐 / 接下来播放」列表。
+ * 回归 fixture：普通**单 P** 视频页 + 现代 B 站的「相关推荐」列表。
  *
- * 真实页面里这个推荐列表的容器是 `video-pod video-pod`、条目是
- * `pod-item video-pod__item simple`，和分P 复用同一套类名，但条目链接指向的是**别的视频**。
- * 这里复刻这个结构（8 条不同 bvid、都没有 p=），用来确保不会被误判成多P。
+ * 真机实测：相关推荐同样是 `.video-pod`，但列表 class **没有 multip**，
+ * header 文案是「相关推荐 / 接下来播放」；条目链接指向别的视频。
+ * 这类结构不能被当成选集（分P / 合集）。
  */
 const RECOMMEND_POD_FIXTURE = `<!doctype html>
 <html lang="zh-CN">
@@ -814,6 +823,7 @@ const RECOMMEND_POD_FIXTURE = `<!doctype html>
       .right-container { flex: 0 0 28%; }
       .video-title { margin: 16px 0; font-size: 20px; }
       .video-desc { min-height: 1600px; }
+      .video-pod__header { padding: 8px; font-weight: 600; }
       .video-pod__list { display: flex; flex-direction: column; gap: 4px; }
       .video-pod__item { padding: 6px; }
     </style>
@@ -832,6 +842,7 @@ const RECOMMEND_POD_FIXTURE = `<!doctype html>
         </div>
         <div class="right-container">
           <div class="video-pod video-pod">
+            <div class="video-pod__header">相关推荐</div>
             <div class="video-pod__list">
               <div class="pod-item video-pod__item simple"><a href="/video/BV1reco0001">推荐视频 1</a></div>
               <div class="pod-item video-pod__item simple"><a href="/video/BV1reco0002">推荐视频 2</a></div>
@@ -871,31 +882,190 @@ async function openRecommendPodPage(): Promise<{ context: BrowserContext, page: 
   return { context, page }
 }
 
-test.describe('选集误判回归（普通单 P 视频）', () => {
+test.describe('选集误判回归（普通单 P 视频 + 相关推荐 pod）', () => {
   skipIfExtensionMissing()
 
-  test('相关推荐里的 .video-pod 条目（不同 bvid、无 p=）不会被当成分P', async () => {
+  test('相关推荐 pod（无 multip、header 是推荐文案）不会被当成分P/合集', async () => {
     const { context, page } = await openRecommendPodPage()
 
     try {
       await ensureOverlay(page)
 
-      // fixture 确实复刻了误判结构：8 个 .video-pod__item 条目
+      // fixture 确实复刻了误判结构：8 个 .video-pod__item 条目、列表没有 multip
       expect(await page.locator('.video-pod__item').count()).toBe(8)
-
-      // 没有 p= 链接、没有 #multi_page / .multi-page-v1
+      expect(await page.locator('.video-pod__list.multip').count()).toBe(0)
       expect(await page.locator('a[href*="p="]').count()).toBe(0)
-      expect(await page.locator('#multi_page, .multi-page-v1').count()).toBe(0)
 
-      // 因此不应出现「选集」入口与面板 host
       await expect(page.locator('[data-bvp-action="selection"]')).toHaveCount(0)
       await expect(page.locator('#bewly-video-selection')).toHaveCount(0)
       await expect(page.locator('.bvp-playlist')).toHaveCount(0)
 
-      // [ / ] 也不应被接管：面板不出现
       await page.keyboard.press(']')
       await page.waitForTimeout(300)
       await expect(page.locator('.bvp-playlist')).toHaveCount(0)
+    }
+    finally {
+      await context.close()
+    }
+  })
+})
+
+/**
+ * 合集 fixture：`.video-pod` + header「测试合集 · 共 3 集」+ 3 个**不同 bvid** 条目。
+ * 合集条目 bvid 各不相同是正常的，靠 header 的合集语义与「相关推荐」区分。
+ */
+const COLLECTION_PAGE_FIXTURE = `<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>合集视频 2_哔哩哔哩_bilibili</title>
+    <style>
+      body { margin: 0; font-family: system-ui, sans-serif; }
+      #mirror-vdcon { display: flex; gap: 16px; padding: 16px; margin: 0 auto; max-width: 1600px; }
+      .left-container { flex: 1 1 70%; min-width: 0; }
+      #playerWrap { background: #000; }
+      #bilibili-player { position: relative; height: 420px; overflow: hidden; }
+      .bpx-player-container { width: 100%; height: 100%; }
+      video { display: block; width: 100%; height: 100%; object-fit: contain; }
+      .right-container { flex: 0 0 28%; }
+      .video-title { margin: 16px 0; font-size: 20px; }
+      .video-desc { min-height: 1600px; }
+      .video-pod__header { padding: 8px; font-weight: 600; }
+      .video-pod__list { display: flex; flex-direction: column; gap: 4px; }
+      .video-pod__item { padding: 6px; }
+      .video-pod__item.active { background: #ddd; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="video-container-v1" id="mirror-vdcon">
+        <div class="left-container scroll-sticky">
+          <div id="playerWrap">
+            <div id="bilibili-player">
+              <div class="bpx-player-container"><video preload="metadata"></video></div>
+            </div>
+          </div>
+          <h1 class="video-title">合集视频 2</h1>
+          <div class="video-desc">正文</div>
+        </div>
+        <div class="right-container">
+          <div class="video-pod video-pod">
+            <div class="video-pod__header">测试合集 · 共 3 集</div>
+            <div class="video-pod__list">
+              <div class="simple-base-item video-pod__item normal"><a href="/video/BV1collect01">合集视频 1</a></div>
+              <div class="simple-base-item video-pod__item active normal"><a href="/video/BV1collect02">合集视频 2</a></div>
+              <div class="simple-base-item video-pod__item normal"><a href="/video/BV1collect03">合集视频 3</a></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      document.querySelectorAll('.video-pod__item > a').forEach((anchor) => {
+        anchor.addEventListener('click', (event) => {
+          event.preventDefault()
+          const item = anchor.parentElement
+          document.querySelectorAll('.video-pod__item').forEach((el) => el.classList.remove('active'))
+          item.classList.add('active')
+          document.body.dataset.clickedCollection = new URL(anchor.href).pathname.split('/').pop()
+        })
+      })
+    </script>
+  </body>
+</html>`
+
+async function openCollectionPage(): Promise<{ context: BrowserContext, page: Page }> {
+  const context = await launchExtension({ allowPopups: true })
+
+  const page = await context.newPage()
+  await page.route('**/*', async (route) => {
+    const request = route.request()
+    const url = new URL(request.url())
+    if (url.hostname === 'www.bilibili.com' && request.resourceType() === 'document') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/html; charset=utf-8',
+        body: COLLECTION_PAGE_FIXTURE,
+      })
+      return
+    }
+    await route.continue()
+  })
+
+  // 当前视频是合集里的第 2 个条目
+  await page.goto('https://www.bilibili.com/video/BV1collect02', { waitUntil: 'domcontentloaded' })
+  return { context, page }
+}
+
+test.describe('合集（collection）选集面板', () => {
+  skipIfExtensionMissing()
+
+  const clickedCollection = (page: Page) => page.evaluate(() => document.body.dataset.clickedCollection ?? '')
+
+  test('合集页出现「合集」入口：标题区分、当前视频高亮、点条目切换', async () => {
+    const { context, page } = await openCollectionPage()
+
+    try {
+      await ensureOverlay(page)
+
+      const selectionFab = page.locator('[data-bvp-action="selection"]')
+      await expect(selectionFab).toHaveCount(1)
+      await selectionFab.click()
+
+      const panel = page.locator('.bvp-playlist')
+      await expect(panel).toBeVisible()
+      const panelTitle = (await panel.locator('.bvp-playlist__title').textContent())?.trim() ?? ''
+      expect(panelTitle).toMatch(/合集|collection/i)
+      await expect(panel.locator('.bvp-playlist__item')).toHaveCount(3)
+      // 当前视频 = 合集里的第 2 条（按当前 bvid 匹配）
+      await expect(panel.locator('[aria-current="true"]')).toHaveCount(1)
+      await expect(panel.locator('[aria-current="true"]')).toContainText('合集视频 2')
+
+      await panel.locator('.bvp-playlist__item').nth(2).click()
+      await expect.poll(() => clickedCollection(page), { timeout: 5_000 }).toBe('BV1collect03')
+    }
+    finally {
+      await context.close()
+    }
+  })
+
+  test('] / [ 切合集里的上一个 / 下一个视频', async () => {
+    const { context, page } = await openCollectionPage()
+
+    try {
+      await ensureOverlay(page)
+
+      await page.keyboard.press(']')
+      await expect.poll(() => clickedCollection(page), { timeout: 5_000 }).toBe('BV1collect03')
+
+      await page.keyboard.press('[')
+      await expect.poll(() => clickedCollection(page), { timeout: 5_000 }).toBe('BV1collect02')
+    }
+    finally {
+      await context.close()
+    }
+  })
+
+  test('合集页帮助面板用「上一个 / 下一个视频」文案，且不列自动连播', async () => {
+    const { context, page } = await openCollectionPage()
+
+    try {
+      await ensureOverlay(page)
+
+      await page.evaluate(() => {
+        document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '?', bubbles: true, cancelable: true }))
+      })
+      await expect(page.locator('.bvp-help__dialog')).toBeVisible()
+
+      const labels = await page.evaluate(() => Array.from(
+        document
+          .querySelector('#bewly-video-page')
+          ?.shadowRoot
+          ?.querySelectorAll('.bvp-help__label') ?? [],
+      ).map(el => el.textContent?.trim() ?? ''))
+
+      expect(labels.some(label => /上一个视频|previous video/i.test(label))).toBe(true)
+      expect(labels.some(label => /自动连播|autoplay/i.test(label))).toBe(false)
     }
     finally {
       await context.close()

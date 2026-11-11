@@ -252,3 +252,60 @@ teardownSearchEnhance()
 - `pnpm exec eslint src/contentScripts/views/Search`：0 error 0 warning；
 - `pnpm run typecheck`（`vue-tsc`）：**0 error**；
 - 未跑 build / playwright；未碰浏览器；未做 git 操作。
+## 最近搜索管理（第 15 轮 C）
+
+> 第 12–14 轮的搜索起始页只有一个「清空记录」；本轮补完最近搜索的单条管理：删除、置顶、二次确认清空。
+
+### 1. 单条删除
+
+- 每条最近搜索右侧有 `×` 按钮（`hover` / `focus-within` 时出现；触屏设备与 ≤640px 窄屏常显）；
+- 点击后**先本地移除并立即刷新列表**（即时反馈），再尽力调用 `removeSearchHistory(keyword)`
+  （`src/components/SearchBar/searchHistoryProvider.ts`，通过 B 站 search_history iframe 回写）；
+- B 站 iframe 不存在 / 不回应时，写入最多等 800ms，超时后**只删本地记录**，不弹错误、不打断用户；
+- 若被删条目处于置顶状态，会同时从置顶列表移除并持久化；
+- 点击胶囊本身（不带 ×）仍然是「点词直接搜索」主流程，行为不变。
+
+### 2. 置顶 / 取消置顶
+
+- 每条右侧的图钉按钮切换置顶状态：未置顶显示 `pin`，已置顶显示 `pin-filled` + 主题色；
+- 置顶**最多 3 条**（`PINNED_LIMIT`）；超出时底部显示一条 2.2 秒提示「最多置顶 3 条最近搜索」，不改变现有置顶；
+- 置顶项按置顶顺序排在最近搜索最前，其余按原有历史顺序（时间倒序）补齐；
+- 置顶项即使不在前 8 条历史里也会被拉出来展示，总条数仍限制为 8 条；
+- 存储：`localStorage['bewly-search-pinned']`，值为检索词字符串数组（最多 3 个）；读取时会过滤非字符串、截断到 3 条，
+  JSON 损坏 / 隐私模式写入失败都按「无置顶」处理（本次会话内仍生效）；
+- 历史刷新后会把**已不存在的**置顶项清掉并持久化（历史为空时不清理，避免读取失败误删）。
+
+### 3. 清空全部（二次确认）
+
+- 「清空记录」第一次点击只把按钮变成「确认清空」（错误色），并启动 **3 秒**计时；
+- 3 秒内再点一次才真正执行：清空 B 站历史（最多等 800ms，超时也清本地视图）+ 清空本地置顶；
+- 3 秒内没有第二次点击则自动恢复为「清空记录」；
+- 确认态下按 `Esc`（按钮聚焦时）立即取消确认；按钮 `title` / `aria-label` 会提示「再点一次…3 秒内有效；按 Esc 取消」。
+
+### 4. 交互与可达性
+
+- 主按钮、置顶、删除都是原生 `<button type="button">`，Tab 可依次遍历；`focus-within` 会让动作按钮显形，键盘操作不会摸不到按钮；
+- 动作按钮带 `aria-label`（含具体检索词，如「置顶「xxx」」）与 `aria-pressed`（置顶态）；
+- 删除后焦点会落回文档（条目被移除），置顶 / 删除不改变「点词搜索」的主按钮结构；
+- 窄屏（≤640px）：`.recent-item` / `.chip--recent` 限制 `max-width: 100%`，文本继续省略号截断；动作按钮常显，不依赖 hover；
+- `prefers-reduced-motion` 下相关过渡由既有面板规则统一压缩到 0.01ms。
+
+### 5. 文件与文案
+
+- `src/contentScripts/views/Search/components/SearchQuickPanel.vue`：置顶存储与排序、单条删除、二次确认清空、动作按钮、样式；
+- `src/contentScripts/views/Search/i18n.ts`（四语言）：新增 `recent_pin` / `recent_unpin` / `recent_delete` /
+  `recent_pin_named` / `recent_unpin_named` / `recent_delete_named` / `recent_pin_limit` / `recent_clear_confirm` / `recent_clear_hint`；
+- 未改 `_locales`、`storage.ts`、`App.vue`、`contentScripts/index.ts`、`nativeOverlay`；未新增依赖。
+
+### 6. 已知限制
+
+- B 站搜索历史接口没有「置顶」概念：置顶只影响本面板展示，不改变搜索栏下拉历史 / B 站其它位置的顺序；
+- 删除依赖 B 站 search_history iframe 回写；iframe 缺失（例如非原生搜索页宿主）时只删本地视图，刷新后可能从 B 站历史里重新出现；
+- 清空同样依赖该 iframe；超时只清本地视图与置顶；
+- 置顶按「检索词字符串」记录，不做大小写不敏感归一；同一词被 B 站历史以不同大小写存储时会视为两条；
+- 本次自测仅 eslint + typecheck（按分工未跑 build / playwright、未碰浏览器）。
+
+### 7. 自测记录
+
+- `pnpm exec eslint src/contentScripts/views/Search/components/SearchQuickPanel.vue src/contentScripts/views/Search/i18n.ts`：0 error 0 warning；
+- `pnpm run typecheck`：0 error。

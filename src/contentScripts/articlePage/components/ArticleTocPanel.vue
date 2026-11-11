@@ -86,7 +86,8 @@ function selectHeading(index: number) {
             :title="item.text"
             @click="selectHeading(item.index)"
           >
-            {{ item.text }}
+            <span class="bap-toc__dot" aria-hidden="true" />
+            <span class="bap-toc__text">{{ item.text }}</span>
           </button>
         </li>
       </ul>

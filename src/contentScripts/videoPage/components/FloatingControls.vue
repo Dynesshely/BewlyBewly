@@ -9,10 +9,14 @@ import { ui } from '../state'
 
 const t = useMessages()
 
-/** 面板名跟随页面能力：/list/* 是「播放列表」，普通多P 视频是「选集」 */
-const selectionLabel = computed(() => ui.selectionKind === 'parts'
-  ? t.value.partsPanel
-  : t.value.playlistPanel)
+/** 面板名跟随页面能力：/list/* 是「播放列表」，普通多P 视频是「选集」，合集视频页是「合集」 */
+const selectionLabel = computed(() => {
+  if (ui.selectionKind === 'parts')
+    return t.value.partsPanel
+  if (ui.selectionKind === 'collection')
+    return t.value.collectionPanel
+  return t.value.playlistPanel
+})
 </script>
 
 <template>

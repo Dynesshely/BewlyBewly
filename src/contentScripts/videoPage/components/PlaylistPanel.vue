@@ -9,12 +9,20 @@ const t = useMessages()
 const listEl = ref<HTMLElement | null>(null)
 
 /** 面板名跟随选集来源：播放列表 / 分P 选集 */
-const panelTitle = computed(() => ui.selectionKind === 'parts'
-  ? t.value.partsPanel
-  : t.value.playlistPanel)
-const panelHint = computed(() => ui.selectionKind === 'parts'
-  ? t.value.partsHint
-  : t.value.playlistHint)
+const panelTitle = computed(() => {
+  if (ui.selectionKind === 'parts')
+    return t.value.partsPanel
+  if (ui.selectionKind === 'collection')
+    return t.value.collectionPanel
+  return t.value.playlistPanel
+})
+const panelHint = computed(() => {
+  if (ui.selectionKind === 'parts')
+    return t.value.partsHint
+  if (ui.selectionKind === 'collection')
+    return t.value.collectionHint
+  return t.value.playlistHint
+})
 
 const positionText = computed(() => {
   const total = ui.selectionItems.length

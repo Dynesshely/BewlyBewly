@@ -216,19 +216,46 @@
 }
 
 .bap-toc__item {
-  display: block;
+  display: flex;
+  gap: var(--bew-space-8, 8px);
+  align-items: center;
   width: 100%;
   padding: 6px var(--bew-space-8, 8px);
   overflow: hidden;
   font-size: 13px;
   color: var(--bew-text-2);
   text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   border-radius: var(--bew-radius-sm, 8px);
   transition:
     color var(--bap-duration) var(--bap-ease),
     background-color var(--bap-duration) var(--bap-ease);
+}
+
+/* 当前章节前的进度圆点：默认空心，当前章节实心主题色 */
+.bap-toc__dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  background: transparent;
+  border: 1px solid var(--bew-text-4);
+  border-radius: 50%;
+  transition:
+    background-color var(--bap-duration) var(--bap-ease),
+    border-color var(--bap-duration) var(--bap-ease),
+    box-shadow var(--bap-duration) var(--bap-ease);
+}
+
+.bap-toc__item[data-active="true"] .bap-toc__dot {
+  background: var(--bew-theme-color);
+  border-color: var(--bew-theme-color);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--bew-theme-color), transparent 82%);
+}
+
+.bap-toc__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .bap-toc__item[data-level="3"] {
@@ -260,6 +287,95 @@
   line-height: 1.5;
   color: var(--bew-text-4);
   border-top: 1px solid var(--bew-border-color);
+}
+/* #endregion */
+
+/* #region 图片大图 */
+.bap-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(16px, 4vh, 48px) clamp(16px, 4vw, 64px);
+  pointer-events: auto;
+  background: color-mix(in oklab, #000, transparent 18%);
+  cursor: zoom-out;
+}
+
+.bap-lightbox__image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  cursor: default;
+  border-radius: var(--bew-radius-sm, 8px);
+  box-shadow: var(--bew-shadow-4);
+  user-select: none;
+}
+
+.bap-lightbox__btn {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  color: #fff;
+  pointer-events: auto;
+  background: rgb(0 0 0 / 45%);
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 50%;
+  backdrop-filter: var(--bew-filter-glass-1);
+  transition:
+    background-color var(--bap-duration) var(--bap-ease),
+    opacity var(--bap-duration) var(--bap-ease);
+
+  &:hover {
+    background: rgb(0 0 0 / 62%);
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.3;
+  }
+}
+
+.bap-lightbox__close {
+  top: var(--bap-edge);
+  right: var(--bap-edge);
+}
+
+.bap-lightbox__nav {
+  top: 50%;
+  transform: translateY(-50%);
+
+  &.is-prev {
+    left: clamp(8px, 2vw, 24px);
+  }
+
+  &.is-next {
+    right: clamp(8px, 2vw, 24px);
+  }
+}
+
+.bap-lightbox__hint {
+  position: absolute;
+  bottom: var(--bap-edge);
+  display: flex;
+  gap: var(--bew-space-8, 8px);
+  align-items: center;
+  padding: 4px var(--bew-space-12, 12px);
+  font-size: 12px;
+  color: rgb(255 255 255 / 82%);
+  pointer-events: none;
+  background: rgb(0 0 0 / 45%);
+  border-radius: 999px;
+}
+
+.bap-lightbox__counter {
+  font-variant-numeric: tabular-nums;
+  color: #fff;
 }
 /* #endregion */
 
@@ -360,7 +476,8 @@
   :host .bap-jump,
   :host .bap-toggle,
   :host .bap-icon-btn,
-  :host .bap-status {
+  :host .bap-status,
+  :host .bap-lightbox__btn {
     border-color: var(--bew-text-3);
   }
 
@@ -381,7 +498,8 @@
   :host .bap-jump,
   :host .bap-toggle,
   :host .bap-icon-btn,
-  :host .bap-status {
+  :host .bap-status,
+  :host .bap-lightbox__btn {
     color: CanvasText;
     background: Canvas;
     border: 1px solid CanvasText;

@@ -14,6 +14,17 @@ const closeButton = ref<HTMLButtonElement | null>(null)
 /** 设置开关 + 页面能力（番剧切集）共同决定帮助里列哪些快捷键 */
 const shortcuts = computed(() => getShortcutDefinitions())
 
+/** 快捷键文案按页面能力微调：合集页把「播放项」说成「视频」 */
+function labelOf(item: ShortcutDefinition): string {
+  if (ui.selectionKind === 'collection') {
+    if (item.labelKey === 'prevItem')
+      return t.value.shortcut.prevVideo
+    if (item.labelKey === 'nextItem')
+      return t.value.shortcut.nextVideo
+  }
+  return t.value.shortcut[item.labelKey]
+}
+
 function isSeparator(key: string): boolean {
   return key === '–'
 }
@@ -76,7 +87,7 @@ watch(() => ui.helpOpen, async (open) => {
         </p>
         <ul class="bvp-help__list">
           <li v-for="item in shortcuts" :key="item.labelKey" class="bvp-help__row">
-            <span class="bvp-help__label">{{ t.shortcut[item.labelKey] }}</span>
+            <span class="bvp-help__label">{{ labelOf(item) }}</span>
             <span class="bvp-help__keys">
               <template v-for="(key, index) in item.keys" :key="`${item.labelKey}-${index}`">
                 <span v-if="isSeparator(key)" class="bvp-help__separator">{{ key }}</span>

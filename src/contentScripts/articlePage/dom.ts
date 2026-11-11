@@ -131,6 +131,32 @@ export function getHeadingEls(content: HTMLElement | null): HTMLElement[] {
   })
 }
 
+/** 正文里可放大的图片（跳过没有地址 / 过小的表情与占位图） */
+export function getContentImages(content: HTMLElement | null): HTMLImageElement[] {
+  if (!content)
+    return []
+  return Array.from(content.querySelectorAll<HTMLImageElement>('img'))
+    .filter((img) => {
+      const src = img.currentSrc || img.src
+      if (!src)
+        return false
+      // 懒加载还没真正加载完的图没有 naturalWidth，点击前一般已经加载，这里再兜一层
+      return img.naturalWidth === 0 || img.naturalWidth >= 200
+    })
+}
+
+/** 图片地址（优先 currentSrc，兼容 srcset） */
+export function getImageSrc(img: HTMLImageElement): string {
+  return img.currentSrc || img.src
+}
+
+/** 正文里的代码块 */
+export function getPreBlocks(content: HTMLElement | null): HTMLElement[] {
+  if (!content)
+    return []
+  return Array.from(content.querySelectorAll<HTMLElement>('pre'))
+}
+
 /** 事件是否发生在输入框 / 可编辑区域里 */
 export function isEditableEvent(event: KeyboardEvent): boolean {
   for (const node of event.composedPath()) {

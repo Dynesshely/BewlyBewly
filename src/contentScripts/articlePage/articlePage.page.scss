@@ -109,11 +109,99 @@ html.bewly-article-reading [data-bewly-article-content] :is(img, video, iframe) 
   height: auto !important;
 }
 
+/* 阅读模式下正文图片可点击放大（lightbox），给一个不改变布局的指针提示 */
+html.bewly-article-reading [data-bewly-article-content] img {
+  cursor: zoom-in;
+}
+
+/* 大图打开时锁页面滚动；关闭时由 lightbox.ts 恢复原 scrollY */
+html.bewly-article-lightbox-open {
+  overflow: hidden !important;
+}
+
 html.bewly-article-reading .article-container .title-container,
 html.bewly-article-reading .opus-module-title {
   max-width: var(--bap-content-width);
   margin-right: auto;
   margin-left: auto;
+}
+/* #endregion */
+
+/* #region 代码块复制按钮（第 15 轮）
+   按钮由 codeBlocks.ts 注入到原生 <pre> 里，这里只负责定位与显隐：
+   - 默认透明且 pointer-events: none，不挡正文选择 / 复制；
+   - hover、focus-within 或按钮自身获得焦点时才显示；
+   - 给代码块右侧留出按钮空间，避免按钮压住代码文字。 */
+[data-bewly-article-content] pre[data-bewly-code-block] {
+  position: relative;
+  padding-right: 64px;
+}
+
+.bap-code-copy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--bew-text-2);
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: none;
+  background: var(--bew-elevated);
+  border: 1px solid var(--bew-border-color);
+  border-radius: 6px;
+  opacity: 0;
+  transition:
+    opacity var(--bew-motion-fast, 140ms) var(--bew-ease-out, ease-out),
+    color var(--bew-motion-fast, 140ms) var(--bew-ease-out, ease-out),
+    background-color var(--bew-motion-fast, 140ms) var(--bew-ease-out, ease-out);
+}
+
+[data-bewly-article-content] pre:hover .bap-code-copy,
+[data-bewly-article-content] pre:focus-within .bap-code-copy,
+.bap-code-copy:focus-visible {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+.bap-code-copy:hover {
+  color: var(--bew-text-1);
+  background: var(--bew-elevated-hover);
+}
+
+.bap-code-copy:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+
+.bap-code-copy[data-copied="true"] {
+  color: var(--bew-success-color);
+  border-color: color-mix(in oklab, var(--bew-success-color), transparent 55%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bap-code-copy {
+    transition: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .bap-code-copy {
+    border-color: var(--bew-text-3);
+  }
+}
+
+@media (forced-colors: active) {
+  .bap-code-copy {
+    color: CanvasText;
+    background: Canvas;
+    border: 1px solid CanvasText;
+  }
 }
 /* #endregion */
 

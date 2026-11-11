@@ -439,18 +439,18 @@ export function canAdvanceToNextItem(): boolean {
 // #endregion
 // #region 选集（播放列表 / 分P）
 
-/** 选集来源：播放列表（/list/*）或普通视频页的分P list，二者互斥 */
-export type SelectionKind = 'none' | 'playlist' | 'parts'
+/** 选集来源：播放列表（/list/*）、普通视频页分P，或合集（collection） */
+export type SelectionKind = 'none' | 'playlist' | 'parts' | 'collection'
 
 export interface SelectionContext {
-  kind: 'playlist' | 'parts'
+  kind: 'playlist' | 'parts' | 'collection'
   items: HTMLElement[]
   /** 当前项下标，-1 表示判定失败 */
   index: number
 }
 
 /**
- * 显式分P 容器：命中即可基本确定是分P 列表。
+ * 旧版分P 容器（`#multi_page` / `.multi-page-v1`）：命中即可基本确定是分P 列表。
  *
  * 类名证据来自仓库内的 `videoPage.scss`：
  * `.multi-page-v1 .cur-list .list-box li.on` 是当前 P；`#multi_page` / `.list-box` 是旧版分P 列表。
@@ -462,19 +462,6 @@ const EXPLICIT_PART_ITEM_SELECTORS = [
   '[class*="multi-page"] .list-box li',
   '#multi_page li',
   '[class*="multi-page"] li',
-]
-
-/**
- * `.video-pod` 系列：**不能只看容器**。
- *
- * 现代 B 站播放页把「相关推荐 / 接下来播放」也渲染成 `video-pod video-pod` 容器 +
- * `pod-item video-pod__item simple` 条目（条目标题是别的视频），
- * 与分P 复用同一套样式类。这里必须逐条校验「链接指向当前视频 + 带/可推导 p=」，
- * 否则任何普通视频页都会被误判成多P。
- */
-const VIDEOPOD_PART_ITEM_SELECTORS = [
-  '.video-pod__list .simple-base-item',
-  '.video-pod__item',
 ]
 
 const ACTIVE_SELECTION_TOKEN_RE = /(?:^|[-_])(?:active|current|selected)(?:[-_]|$)/i
@@ -551,7 +538,16 @@ function parsePartLink(anchor: HTMLAnchorElement): ParsedPartLink | null {
   }
 }
 
-/** 条目里有没有指向「当前视频」的链接 */
+/** 条目里有没有指向「某个 bvid」的链接 */
+function getItemBvid(item: HTMLElement): string {
+  for (const anchor of getItemAnchors(item)) {
+    const parsed = parsePartLink(anchor)
+    if (parsed?.bvid)
+      return parsed.bvid
+  }
+  return ''
+}
+
 function hasCurrentVideoLink(item: HTMLElement, bvid: string): boolean {
   if (!bvid)
     return false
@@ -561,15 +557,7 @@ function hasCurrentVideoLink(item: HTMLElement, bvid: string): boolean {
   })
 }
 
-/** 条目是否带可推导的分P 信息：链接带 `p=`，或条目自身带 data-p / data-index / data-page */
-function hasPartHint(item: HTMLElement): boolean {
-  return getItemAnchors(item).some(anchor => parsePartLink(anchor)?.part != null)
-    || item.hasAttribute('data-p')
-    || item.hasAttribute('data-index')
-    || item.hasAttribute('data-page')
-}
-
-/** 条目里是否明确链接到别的视频（相关推荐的特征） */
+/** 条目里是否明确链接到别的视频（旧版相关推荐的特征，用于旧容器兜底过滤） */
 function isForeignVideoItem(item: HTMLElement, bvid: string): boolean {
   return getItemAnchors(item).some((anchor) => {
     const parsed = parsePartLink(anchor)
@@ -586,14 +574,85 @@ function getItemPartNumber(item: HTMLElement): number | null {
   return null
 }
 
+// #region 现代播放页的 .video-pod（分P / 合集 / 相关推荐 共用）
+
+/**
+ * 真机实测（2026-11，/video/BV1wvWM6RE3Z/ 多P 视频）：
+ *
+ * 分P：`.video-pod.video-pod` > header「视频选集 （1/8）」+ 列表 `video-pod__list multip list`
+ *      + 条目 `simple-base-item video-pod__item active normal`（**条目内部没有 <a>**，点条目 DIV 切换）
+ * 相关推荐：同样是 `.video-pod`，但列表 class **没有 multip**，header 是「相关推荐 / 接下来播放」
+ *
+ * 所以判定顺序必须是：列表 multip → header「视频选集/分P/（x/y）」→ header「合集」→ 其余一律不算。
+ */
+const POD_CONTAINER_SELECTOR = '[class*="video-pod"]'
+const POD_HEADER_SELECTOR = '[class*="video-pod__header"], [class*="video-pod"][class*="header"]'
+
+/** 分P 语义：`视频选集 （1/8）` 等 */
+const PARTS_HEADER_RE = /视频选集|选集|分P|（\d+\/\d+）|\(\d+\/\d+\)/
+/** 合集语义：合集标题 / collection / 「共 N 集」进度文案 */
+const COLLECTION_HEADER_RE = /合集|collection|共\s*\d+\s*[集个]/i
+/** 推荐语义：出现即不是选集 */
+const RECOMMEND_HEADER_RE = /相关推荐|接下来播放|推荐|猜你喜欢/
+
+/** 只认 class 里带独立 `video-pod` 标记的容器（排除 `video-pod__list` / `video-pod__item` 等子元素） */
+function getPodContainers(): HTMLElement[] {
+  return Array.from(document.querySelectorAll<HTMLElement>(POD_CONTAINER_SELECTOR))
+    .filter(el => /(?:^|\s)video-pod(?:\s|$)/.test(el.className))
+}
+
+function getPodItems(container: HTMLElement): HTMLElement[] {
+  const items = Array.from(container.querySelectorAll<HTMLElement>('.video-pod__item'))
+  if (items.length > 1)
+    return items
+  return Array.from(container.querySelectorAll<HTMLElement>('.simple-base-item'))
+}
+
+/** pod 头部文案；拿不到就返回空串（空 header 不是选集信号） */
+function getPodHeaderText(container: HTMLElement): string {
+  const header = container.querySelector<HTMLElement>(POD_HEADER_SELECTOR)
+  const headerText = header?.textContent?.trim()
+  if (headerText)
+    return headerText
+
+  const headingNodes = Array.from(
+    container.querySelectorAll<HTMLElement>('h1, h2, h3, h4, [class*="header"], [class*="title"]'),
+  )
+  for (const node of headingNodes) {
+    if (node.closest('.video-pod__item, .simple-base-item'))
+      continue
+    const text = node.textContent?.trim()
+    if (text)
+      return text
+  }
+  return ''
+}
+
+/** 列表 class 里是否有独立的 `multip` 标记（分P 最强信号） */
+function podListHasMultip(container: HTMLElement): boolean {
+  const lists = Array.from(container.querySelectorAll<HTMLElement>('[class*="video-pod__list"]'))
+  return lists.some(list => /(?:^|\s)multip(?:\s|$)/.test(list.className))
+}
+
+// #endregion
+
 function getPartCurrentIndex(items: HTMLElement[]): number {
+  // 当前 P 通常带 .active（真机实测）
   const activeIndex = items.findIndex(isActivePartItem)
   if (activeIndex >= 0)
     return activeIndex
 
-  // 兜底：按 URL 里的 p= 匹配条目链接
-  const current = getCurrentPartNumber()
-  return items.findIndex(item => getItemPartNumber(item) === current)
+  // 旧版：条目链接带 p=
+  const currentPart = getCurrentPartNumber()
+  const byLink = items.findIndex(item => getItemPartNumber(item) === currentPart)
+  if (byLink >= 0)
+    return byLink
+
+  // 现代：条目是 div、没有链接，只能按 URL 的 p= 序号推导
+  if (currentPart > 0 && currentPart <= items.length)
+    return currentPart - 1
+
+  return -1
 }
 
 /** 兜底启发式：当前视频下 2 个以上带 p= 的链接（分P 链接的通用特征） */
@@ -615,7 +674,7 @@ function findPartAnchors(bvid: string): HTMLElement[] {
 function findPartItems(): HTMLElement[] {
   const bvid = getCurrentBvid()
 
-  // 1) 显式分P 容器优先：容器本身就是分P 列表，只剔除明确指向其它视频的条目
+  // 1) 旧版显式分P 容器优先：容器本身就是分P 列表，只剔除明确指向其它视频的条目
   for (const selector of EXPLICIT_PART_ITEM_SELECTORS) {
     const items = Array.from(document.querySelectorAll<HTMLElement>(selector))
     if (items.length < 2)
@@ -628,24 +687,147 @@ function findPartItems(): HTMLElement[] {
       return filtered
   }
 
-  // 2) `.video-pod` 系列：逐条校验链接指向当前 bvid，且同组内至少有一条带 `p=`
-  //    （P1 条目常常省略 p=，只要同组有 p= 就能按顺序推导）
-  for (const selector of VIDEOPOD_PART_ITEM_SELECTORS) {
-    const items = Array.from(document.querySelectorAll<HTMLElement>(selector))
-    const sameVideoItems = items.filter(item => hasCurrentVideoLink(item, bvid))
-    if (sameVideoItems.length > 1 && sameVideoItems.some(hasPartHint))
-      return sameVideoItems
+  // 2) 现代 .video-pod：列表 class 含 multip（最强信号）或 header 是「视频选集 （x/y）」→ 分P
+  for (const container of getPodContainers()) {
+    const items = getPodItems(container)
+    if (items.length < 2)
+      continue
+
+    const headerText = getPodHeaderText(container)
+    const hasMultip = podListHasMultip(container)
+
+    // 有推荐文案且没有 multip：是相关推荐，不是分P
+    if (!hasMultip && RECOMMEND_HEADER_RE.test(headerText))
+      continue
+
+    if (hasMultip || PARTS_HEADER_RE.test(headerText))
+      return items
   }
 
   // 3) 兜底：当前视频下 2 个以上带 p= 的链接
   return findPartAnchors(bvid)
 }
 
+// #region 合集（collection）
+
+/** 兼容：容器 class / 属性直接标了 collection 的旧结构 */
+const COLLECTION_CONTAINER_SELECTORS = [
+  '[class*="collection"]',
+  '[class*="Collection"]',
+  '[data-collection-id]',
+  '[data-collectionid]',
+  '[data-season-id]',
+]
+
+const COLLECTION_ITEM_SELECTORS = [
+  '.video-pod__item',
+  '.video-pod__list .simple-base-item',
+  '.simple-base-item',
+]
+
+const COLLECTION_ID_ATTRS = ['data-collection-id', 'data-collectionid', 'data-season-id']
+
+function hasCollectionClassOrAttr(node: HTMLElement): boolean {
+  if (/collection/i.test(node.className))
+    return true
+  return COLLECTION_ID_ATTRS.some(attr => Boolean(node.getAttribute(attr)))
+}
+
+function getCollectionItems(container: HTMLElement): HTMLElement[] {
+  for (const selector of COLLECTION_ITEM_SELECTORS) {
+    const items = Array.from(container.querySelectorAll<HTMLElement>(selector))
+    if (items.length > 1)
+      return items
+  }
+
+  const anchors = Array.from(container.querySelectorAll<HTMLAnchorElement>('a[href*="/video/"]'))
+  return anchors.length > 1
+    ? anchors
+    : []
+}
+
+function getCollectionCurrentIndex(items: HTMLElement[], bvid: string): number {
+  // 先信原生高亮（切集后 B 站会立即改 active 类），再用当前 bvid 匹配
+  const activeIndex = items.findIndex(isActivePartItem)
+  if (activeIndex >= 0)
+    return activeIndex
+
+  return bvid
+    ? items.findIndex(item => hasCurrentVideoLink(item, bvid))
+    : -1
+}
+
 /**
- * 当前页面的「选集」上下文：`/list/*` 优先取播放列表，其余页面取分P。
+ * 探测合集上下文。
  *
- * 三类页面按能力互斥：番剧页走集数列表（不进入本函数），播放列表页走 playlist，
- * 普通多P 视频走 parts；都探测不到时返回 null，面板整体不渲染。
+ * 合集条目 bvid 各不相同是**正常**的（同一合集里的不同视频），所以不能按「同 bvid」排除；
+ * 与「相关推荐」的唯一可靠区分是**容器语义**：
+ *   1. `.video-pod` 的 header 文案含「合集 / collection」，且不含推荐类文案；
+ *   2. 或容器 class / data-* 属性直接标了 collection；
+ * 另外仍要求条目 ≥2；能解析出 bvid 时要求 ≥2 个不同 bvid（防止单视频面板误判）。
+ * 拿不到 header、列表也没有 multip 的 `.video-pod` 一律不当作选集（宁缺勿滥）。
+ */
+function findCollectionContext(): SelectionContext | null {
+  const bvid = getCurrentBvid()
+
+  // 1) 现代 .video-pod：header 说「合集」
+  for (const container of getPodContainers()) {
+    const items = getPodItems(container)
+    if (items.length < 2)
+      continue
+
+    const headerText = getPodHeaderText(container)
+    if (RECOMMEND_HEADER_RE.test(headerText))
+      continue
+    if (!COLLECTION_HEADER_RE.test(headerText))
+      continue
+
+    const bvids = new Set(items.map(getItemBvid).filter(Boolean))
+    if (bvids.size === 1)
+      continue
+
+    return {
+      kind: 'collection',
+      items,
+      index: getCollectionCurrentIndex(items, bvid),
+    }
+  }
+
+  // 2) 兼容：容器 class / 属性直接标了 collection（没有 pod header 的旧结构）
+  const candidates = new Set<HTMLElement>()
+  for (const selector of COLLECTION_CONTAINER_SELECTORS)
+    document.querySelectorAll<HTMLElement>(selector).forEach(el => candidates.add(el))
+
+  for (const container of candidates) {
+    if (!hasCollectionClassOrAttr(container))
+      continue
+
+    const items = getCollectionItems(container)
+    if (items.length < 2)
+      continue
+
+    const bvids = new Set(items.map(getItemBvid).filter(Boolean))
+    if (bvids.size === 1)
+      continue
+
+    return {
+      kind: 'collection',
+      items,
+      index: getCollectionCurrentIndex(items, bvid),
+    }
+  }
+
+  return null
+}
+
+// #endregion
+
+/**
+ * 当前页面的「选集」上下文：`/list/*` 优先取播放列表，其次显式分P / 同 bvid 的 `.video-pod` 分P，
+ * 最后才是合集；都探测不到时返回 null，面板整体不渲染。
+ *
+ * 四类页面按能力互斥：番剧页走集数列表（不进入本函数），播放列表页走 playlist，
+ * 普通多P 视频走 parts，合集视频页走 collection。
  */
 export function getSelectionContext(): SelectionContext | null {
   if (isPlaylistPage()) {
@@ -668,7 +850,7 @@ export function getSelectionContext(): SelectionContext | null {
     }
   }
 
-  return null
+  return findCollectionContext()
 }
 
 export function hasSelectionNavigation(): boolean {

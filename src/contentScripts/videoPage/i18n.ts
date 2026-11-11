@@ -21,6 +21,8 @@ export interface ShortcutLabels {
   nextEpisode: string
   prevItem: string
   nextItem: string
+  prevVideo: string
+  nextVideo: string
   autoplay: string
   percent: string
   help: string
@@ -58,6 +60,8 @@ export interface VideoPageMessages {
   playlistPanel: string
   /** 分P 选集的标题（普通多P 视频） */
   partsPanel: string
+  /** 合集的标题（合集视频页） */
+  collectionPanel: string
   /** 形如「3 / 12」，用 formatPlaylistPosition 替换占位符 */
   playlistPosition: string
   autoplay: string
@@ -66,6 +70,7 @@ export interface VideoPageMessages {
   autoplayUnavailable: string
   playlistHint: string
   partsHint: string
+  collectionHint: string
   /** 形如「已跳到 {percent}%」，用 formatPercent 替换占位符 */
   percent: string
   shortcut: ShortcutLabels
@@ -98,6 +103,7 @@ const CMN_CN: VideoPageMessages = {
   close: '关闭',
   playlistPanel: '播放列表',
   partsPanel: '选集',
+  collectionPanel: '合集',
   playlistPosition: '{current} / {total}',
   autoplay: '自动连播',
   autoplayOn: '已开启自动连播：播完自动切下一个',
@@ -105,6 +111,7 @@ const CMN_CN: VideoPageMessages = {
   autoplayUnavailable: '当前页面没有可用的「下一个」，无法自动连播',
   playlistHint: '点条目切换视频；A 切自动连播；Esc 关闭面板',
   partsHint: '点条目切换分P；Esc 关闭面板',
+  collectionHint: '点条目切换合集视频；Esc 关闭面板',
   percent: '已跳到 {percent}%',
   shortcut: {
     seekBack: '后退 10 秒',
@@ -122,6 +129,8 @@ const CMN_CN: VideoPageMessages = {
     nextEpisode: '下一集',
     prevItem: '上一个播放项',
     nextItem: '下一个播放项',
+    prevVideo: '上一个视频',
+    nextVideo: '下一个视频',
     autoplay: '自动连播开关',
     percent: '跳到 0%–90%',
     help: '打开 / 关闭快捷键帮助',
@@ -156,6 +165,7 @@ const EN: VideoPageMessages = {
   close: 'Close',
   playlistPanel: 'Playlist',
   partsPanel: 'Parts',
+  collectionPanel: 'Collection',
   playlistPosition: '{current} / {total}',
   autoplay: 'Autoplay',
   autoplayOn: 'Autoplay on — play the next item automatically',
@@ -163,6 +173,7 @@ const EN: VideoPageMessages = {
   autoplayUnavailable: 'No next item is available on this page, so autoplay cannot be enabled',
   playlistHint: 'Click an item to switch, A toggles autoplay, Esc closes',
   partsHint: 'Click an item to switch part, Esc closes',
+  collectionHint: 'Click an item to switch video in this collection, Esc closes',
   percent: 'Jumped to {percent}%',
   shortcut: {
     seekBack: 'Back 10 seconds',
@@ -180,6 +191,8 @@ const EN: VideoPageMessages = {
     nextEpisode: 'Next episode',
     prevItem: 'Previous playlist item',
     nextItem: 'Next playlist item',
+    prevVideo: 'Previous video',
+    nextVideo: 'Next video',
     autoplay: 'Toggle autoplay',
     percent: 'Jump to 0%–90%',
     help: 'Toggle this shortcut help',
@@ -214,9 +227,11 @@ const CMN_TW: VideoPageMessages = {
   close: '關閉',
   playlistPanel: '播放清單',
   partsPanel: '選集',
+  collectionPanel: '合集',
   playlistPosition: '{current} / {total}',
   playlistHint: '點項目切換影片；A 切換自動連播；Esc 關閉面板',
   partsHint: '點項目切換分P；Esc 關閉面板',
+  collectionHint: '點項目切換合集影片；Esc 關閉面板',
   autoplay: '自動連播',
   autoplayOn: '已開啟自動連播：播完自動切下一個',
   autoplayOff: '已關閉自動連播',
@@ -238,6 +253,8 @@ const CMN_TW: VideoPageMessages = {
     nextEpisode: '下一集',
     prevItem: '上一個播放項目',
     nextItem: '下一個播放項目',
+    prevVideo: '上一個影片',
+    nextVideo: '下一個影片',
     autoplay: '自動連播開關',
     percent: '跳到 0%–90%',
     help: '開啟 / 關閉快速鍵說明',
@@ -249,6 +266,7 @@ const JYUT: VideoPageMessages = {
   ...CMN_TW,
   playlistHint: '撳項目切換影片；A 切換自動連播；Esc 收埋面板',
   partsHint: '撳項目切換分P；Esc 收埋面板',
+  collectionHint: '撳項目切換合集影片；Esc 收埋面板',
   cinemaOn: '入咗影院模式，撳 Esc 退出',
   cinemaOff: '已經退出影院模式',
   restored: '還原咗播放器',
@@ -278,6 +296,8 @@ const JYUT: VideoPageMessages = {
     nextEpisode: '下一集',
     prevItem: '上一個播放項目',
     nextItem: '下一個播放項目',
+    prevVideo: '上一個影片',
+    nextVideo: '下一個影片',
     autoplay: '自動連播開關',
     percent: '跳去 0%–90%',
     help: '開 / 收埋快速鍵說明',

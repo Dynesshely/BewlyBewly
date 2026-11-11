@@ -31,9 +31,11 @@ import {
 } from './actions'
 import pageCss from './articlePage.page.scss?inline'
 import shadowCss from './articlePage.shadow.scss?inline'
+import { cleanupCodeBlocks, setupCodeCopy, syncCodeBlocks } from './codeBlocks'
 import ArticlePageOverlay from './components/ArticlePageOverlay.vue'
 import { HOST_ID, PAGE_STYLE_ID } from './constants'
 import { getArticlePageKind, getContentEl, isArticlePage, markContentEl } from './dom'
+import { cleanupLightbox, setupImageLightbox } from './lightbox'
 import { readStoredReading, readStoredTocOpen } from './preferences'
 import { setupShortcuts } from './shortcuts'
 import { resetUiState, ui } from './state'
@@ -46,6 +48,8 @@ const SYNC_INTERVAL = 1500
 
 let pageStyleEl: HTMLStyleElement | null = null
 let disposeShortcuts: (() => void) | null = null
+let disposeImageLightbox: (() => void) | null = null
+let disposeCodeCopy: (() => void) | null = null
 let observer: MutationObserver | null = null
 let intervalTimer: number | null = null
 let debounceTimer: number | null = null
@@ -84,6 +88,9 @@ function mount(): void {
   })
 
   disposeShortcuts = setupShortcuts()
+  // 正文交互：图片点击放大 / 代码块复制按钮（按钮在 sync 时注入）
+  disposeImageLightbox = setupImageLightbox()
+  disposeCodeCopy = setupCodeCopy()
 
   // 设置页改动实时生效：字号立即换算，阅读模式按需切换（正文没就绪时由 sync 补进）
   stopSettingsWatch = watch(
@@ -134,12 +141,22 @@ function unmount(): void {
     disposeShortcuts()
     disposeShortcuts = null
   }
+  if (disposeImageLightbox) {
+    disposeImageLightbox()
+    disposeImageLightbox = null
+  }
+  if (disposeCodeCopy) {
+    disposeCodeCopy()
+    disposeCodeCopy = null
+  }
 
   window.removeEventListener('scroll', handleScroll)
   window.removeEventListener('resize', handleScroll)
 
   unmountNativeOverlay(HOST_ID)
   removePageStyle()
+  cleanupCodeBlocks()
+  cleanupLightbox()
   cleanupPageHooks()
   clearToc()
   resetUiState()
@@ -213,6 +230,8 @@ function sync(): void {
   }
 
   syncToc(content)
+  // 代码块复制按钮：正文异步渲染 / 懒加载后可能持续出现新的 <pre>，这里补注入
+  syncCodeBlocks(content)
 
   // 正文确认存在后才恢复沉浸阅读（只恢复一次；避免先把页面藏空）
   if (!readingRestored) {

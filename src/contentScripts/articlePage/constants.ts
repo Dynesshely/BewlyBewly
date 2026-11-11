@@ -20,6 +20,13 @@ export const TOC_INDEX_ATTR = 'data-bewly-article-toc-index'
 /** 字号档位属性（s / m / l），只在阅读模式下存在 */
 export const FONT_STEP_ATTR = 'data-bewly-font-step'
 
+/** 代码块复制按钮标记（按钮本身与所在 pre 都打） */
+export const CODE_COPY_ATTR = 'data-bewly-code-copy'
+/** 已注入复制按钮的代码块标记，避免重复注入 */
+export const CODE_BLOCK_ATTR = 'data-bewly-code-block'
+/** 图片大图打开时给 <html> 加的类名（锁定页面滚动，关闭时恢复滚动位置） */
+export const ROOT_CLASS_LIGHTBOX = 'bewly-article-lightbox-open'
+
 /** sessionStorage key（`bewly-` 前缀，不新增全局设置项） */
 export const STORAGE_READING = 'bewly-article-reading'
 export const STORAGE_FONT_STEP = 'bewly-article-font'

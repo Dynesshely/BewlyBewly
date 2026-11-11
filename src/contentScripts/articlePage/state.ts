@@ -14,6 +14,17 @@ export interface TocItem {
   text: string
 }
 
+/** 正文图片大图（lightbox）状态 */
+export interface ArticleLightboxState {
+  open: boolean
+  /** 当前正文里的所有图片地址（顺序即 ←/→ 顺序） */
+  images: string[]
+  /** 当前展示的下标 */
+  index: number
+  /** 打开前的滚动位置，关闭时恢复 */
+  scrollY: number
+}
+
 /** 覆盖层 UI 状态；整个模块共用一个实例，生命周期与页面入口一致 */
 export interface ArticlePageUiState {
   /** 已经找到正文容器，UI 可以交互 */
@@ -34,6 +45,8 @@ export interface ArticlePageUiState {
   tocOpen: boolean
   /** 短暂提示 */
   toast: string
+  /** 正文图片大图 */
+  lightbox: ArticleLightboxState
 }
 
 function createInitialState(): ArticlePageUiState {
@@ -47,6 +60,12 @@ function createInitialState(): ArticlePageUiState {
     activeTocIndex: -1,
     tocOpen: false,
     toast: '',
+    lightbox: {
+      open: false,
+      images: [],
+      index: 0,
+      scrollY: 0,
+    },
   }
 }
 

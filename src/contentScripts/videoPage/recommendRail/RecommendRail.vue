@@ -128,20 +128,56 @@ function handleKeydown(event: KeyboardEvent): void {
  *
  * 只有「轨道本身已经能横向滚动」时才拦截，避免把正常的页面滚动吃掉。
  */
+/**
+ * 滚轮切换（第 29 轮用户反馈）。
+ *
+ * 用户要求：鼠标在轨道里时，**普通垂直滚轮也要横向切卡**，不再需要 Shift 或横向滚轮。
+ * - 垂直滚轮：deltaY 走累计阈值（触控板一次滑动会连发很多小 delta，逐帧切换会「刷屏」）；
+ * - Shift+滚轮 / 横向滚轮：保持可用，阈值更小（意图更明确）；
+ * - 只有轨道**能继续切换**时才 `preventDefault`，否则把滚动让回页面（轨道外页面行为不变）。
+ */
+const WHEEL_STEP_THRESHOLD = 40
+const WHEEL_SWIPE_RESET_MS = 200
+let wheelAccumulator = 0
+let lastWheelAt = 0
+
 function handleWheel(event: WheelEvent): void {
-  const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY)
-    ? event.deltaX
-    : (event.shiftKey
-        ? event.deltaY
-        : 0)
-  if (!delta)
+  // 横向滚轮（触控板左右滑）/ Shift+滚轮：意图明确，小阈值
+  const isHorizontalIntent = Math.abs(event.deltaX) > Math.abs(event.deltaY) || event.shiftKey
+  const raw = isHorizontalIntent
+    ? (Math.abs(event.deltaX) > Math.abs(event.deltaY)
+        ? event.deltaX
+        : event.deltaY)
+    : event.deltaY
+  if (!raw)
     return
+
+  // 已经到头了：不拦滚动，交还页面（避免轨道边缘「吃掉」滚轮）
+  const goingNext = raw > 0
+  if ((goingNext && !canNext.value) || (!goingNext && !canPrev.value)) {
+    wheelAccumulator = 0
+    return
+  }
+
+  // 轨道内滚轮一律阻止页面滚动（页面固定布局下本来也不该滚）
   event.preventDefault()
-  if (Math.abs(delta) < 12)
+
+  const now = performance.now()
+  // 两次滚动间隔较长 → 视为新的一次手势，不累计
+  if (now - lastWheelAt > WHEEL_SWIPE_RESET_MS)
+    wheelAccumulator = 0
+  lastWheelAt = now
+
+  wheelAccumulator += raw
+  const threshold = isHorizontalIntent ? 12 : WHEEL_STEP_THRESHOLD
+  if (Math.abs(wheelAccumulator) < threshold)
     return
-  stepBy(delta > 0
+
+  const direction = wheelAccumulator > 0
     ? 1
-    : -1)
+    : -1
+  wheelAccumulator = 0
+  stepBy(direction)
 }
 
 function setCardRef(el: unknown, index: number): void {
@@ -156,6 +192,7 @@ watch(() => props.cards, () => {
 // 焦点在轨道里时拦截左右键（不在轨道里不劫持，避免影响播放器快捷键）
 onMounted(() => {
   trackRef.value?.addEventListener('keydown', handleKeydown)
+  installWindowCaptureGuards()
 })
 
 /**
@@ -171,6 +208,7 @@ function onRailFocusIn(): void {
 
 onBeforeUnmount(() => {
   trackRef.value?.removeEventListener('keydown', handleKeydown)
+  uninstallWindowCaptureGuards()
 })
 
 /**
@@ -203,15 +241,15 @@ function onCaptureClick(event: Event): void {
     return
 
   if (event.type === 'auxclick' || event.button === 1) {
-    emit('openNewTab', card.url)
+    openExternal(card.url)
     return
   }
   if (event.button !== 0)
     return
   if (event.ctrlKey || event.metaKey || event.shiftKey)
-    emit('openNewTab', card.url)
+    openExternal(card.url)
   else
-    emit('preview', card.url)
+    openPreview(card.url)
 }
 
 /** 按下阶段只做拦截，不激活（避免中键滚动 / 拖拽链接）；激活统一放在 click / auxclick */
@@ -220,6 +258,108 @@ function onCapturePointerDown(event: Event): void {
   if (event instanceof MouseEvent && event.button === 1)
     event.preventDefault()
 }
+
+// #region 第 29 轮：点击绝不改 URL（三步递进 + 兜底自愈）
+//
+// 真机现象（第 27 轮遗留）：点卡片后 iframe 抽屉打开，但 location.href 变成推荐视频地址。
+// 已排除：卡片不在 <a> 内、elementFromPoint 命中正确、click 冒泡被拦。剩下唯一没试的方向是
+// **B 站的路由跳转来自 pointerdown / mousedown 阶段的委托，或来自它注册在先的 capture 监听**。
+//
+// 因此按三步递进（哪一步生效见 docs 与汇报）：
+//   a. 卡片 pointerdown/mousedown：preventDefault + stopPropagation + stopImmediatePropagation
+//      —— 阻止 click 合成与按下阶段的 B 站处理；
+//   b. window 上的 capture 监听（window 捕获早于 document）：命中轨道矩形就整链拦掉；
+//   c. 兜底：记录 emit 前的 URL，setTimeout(0) 与 50ms 后用 history.replaceState 改回
+//      （抽屉已打开，URL 变化对用户不可见），保证「用户看到的行为」一定正确。
+
+/** 记录预览前的 URL，用于兜底自愈 */
+let previewReturnUrl = ''
+
+/** 轨道矩形（视口坐标，含一点内边距，覆盖卡片 hover 浮起的高度） */
+function railRectContains(x: number, y: number): boolean {
+  const root = trackRef.value?.closest('.bvp-rail') as HTMLElement | null
+  if (!root)
+    return false
+  const rect = root.getBoundingClientRect()
+  const pad = 8
+  return x >= rect.left - pad && x <= rect.right + pad && y >= rect.top - pad && y <= rect.bottom + pad
+}
+
+/**
+ * b) window 捕获阶段：命中轨道就拦掉「外层」的委托，早于 document 上 B 站的监听。
+ *
+ * ⚠️ 关键：**不能 stopImmediatePropagation / stopPropagation 到「拦死自己」**。
+ * window 捕获早于所有元素，一旦在这里停掉传播，轨道自己的 section 捕获（激活逻辑）就永远收不到，
+ * 表现会和第 27 轮一样「既不跳转也不开预览」。
+ * 这里只做 `preventDefault()`（阻止 B 站跳转的默认行为与中键自动滚动），**不阻断传播**，
+ * 因此轨道自己的 section 捕获（激活逻辑）照常执行。
+ */
+function onWindowCapturePointer(event: Event): void {
+  if (!(event instanceof MouseEvent))
+    return
+  if (!railRectContains(event.clientX, event.clientY))
+    return
+  event.preventDefault()
+}
+
+/**
+ * a) 卡片按下阶段：阻止默认行为与后续 click 合成。
+ *
+ * 只对左键/中键生效；右键放行（contextmenu 不在本轮范围）。
+ */
+function onCardPointerDown(event: Event): void {
+  if (!(event instanceof MouseEvent))
+    return
+  if (event.button !== 0 && event.button !== 1)
+    return
+  event.preventDefault()
+  event.stopPropagation()
+  if ('stopImmediatePropagation' in event)
+    (event as Event).stopImmediatePropagation()
+}
+
+/** c) 兜底：把 URL 改回预览前（抽屉已打开，用户看不到） */
+function restoreUrlAfterPreview(): void {
+  for (const delay of [0, 50, 200]) {
+    window.setTimeout(() => {
+      const expected = previewReturnUrl
+      if (!expected || location.href === expected)
+        return
+      try {
+        history.replaceState(history.state, '', expected)
+      }
+      catch {
+        // 跨域 / 受限环境：忽略
+      }
+    }, delay)
+  }
+}
+
+/** 统一入口：预览（当前标签页内嵌抽屉）+ 记录 URL 供兜底还原 */
+function openPreview(url: string): void {
+  previewReturnUrl = location.href
+  emit('preview', url)
+  restoreUrlAfterPreview()
+}
+
+/** 统一入口：新标签页（不改变当前页 URL） */
+function openExternal(url: string): void {
+  previewReturnUrl = location.href
+  emit('openNewTab', url)
+  restoreUrlAfterPreview()
+}
+
+/** 安装 window 捕获监听（组件挂载时） */
+function installWindowCaptureGuards(): void {
+  for (const type of ['pointerdown', 'mousedown', 'click'] as const)
+    window.addEventListener(type, onWindowCapturePointer, true)
+}
+
+function uninstallWindowCaptureGuards(): void {
+  for (const type of ['pointerdown', 'mousedown', 'click'] as const)
+    window.removeEventListener(type, onWindowCapturePointer, true)
+}
+// #endregion
 
 /** 从事件路径里找最近的轨道卡片（composedPath 已穿透 shadow 边界） */
 function findCardFromEvent(event: Event): RailCard | null {
@@ -316,6 +456,8 @@ function findCardFromEvent(event: Event): RailCard | null {
           :aria-label="`${card.title} ${card.upName}`"
           :data-bvid="card.bvid"
           :data-active="index === activeIndex ? '1' : '0'"
+          @pointerdown="onCardPointerDown"
+          @mousedown="onCardPointerDown"
           @focus="activeIndex = Math.min(maxIndex, index)"
         >
           <span class="bvp-rail__cover">

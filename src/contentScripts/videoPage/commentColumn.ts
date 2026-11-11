@@ -17,8 +17,12 @@
  *
  * 做法：
  * - 把 `#commentapp` 移动进一个我们创建的 `.bewly-comment-column` 容器，容器插在右栏顶部；
- * - 容器高度 = `#playerWrap` 高度（CSS 变量，随窗口 / 播放器尺寸变化更新），内部 `overflow-y: auto`；
- * - 顶部偏移 = 播放器顶边 - 右栏顶边（让评论与播放器顶边对齐）；
+ * - **固定单页布局下（html.bewly-video-fixed）本模块不参与任何尺寸计算**：
+ *   高度来自 `fixedLayout.ts` 写的 `--bvp-fixed-player-height`，顶部对齐由页面级 CSS 的
+ *   `padding-top: calc(信息栏 + gutter)` 保证。第 29 轮之前这里每拍读 rect 反算 margin-top，
+ *   与 fixedLayout 互相驱动导致评论区 y 在 120 ↔ 64 之间震荡（真机实测差 56px），现已移除；
+ * - 非固定布局（原生可滚动页面）下容器高度仍按 `#playerWrap` 实测高度设置，
+ *   但只在值变化时写入，避免无意义的重排；
  * - 记录 `#commentapp` 原来的 parent / nextSibling，关闭开关、窄屏、影院模式、卸载时**原样放回**；
  * - 找不到 `#mirror-vdcon` / `#commentapp` / `#playerWrap` / 右栏容器任一 → 完全不生效（原生布局）。
  */
@@ -91,12 +95,37 @@ function clearColumnVars(): void {
   document.documentElement.style.removeProperty(OFFSET_VAR)
 }
 
-/** 容器高度 = 播放器高度；margin-top = 播放器顶边与容器自然顶边的差（向上对齐） */
+/** 固定布局是否正在接管页面（此时高度 / 对齐全部由页面级 CSS 决定） */
+function isFixedLayoutActive(): boolean {
+  return document.documentElement.classList.contains('bewly-video-fixed')
+}
+
+/** 值相同就不写：重复写 CSS 变量会让浏览器重算样式，也容易唤醒别的观察器 */
+function setVarIfChanged(name: string, value: string): void {
+  const root = document.documentElement
+  if (root.style.getPropertyValue(name) === value)
+    return
+  root.style.setProperty(name, value)
+}
+
+/**
+ * 非固定布局：容器高度 = 播放器实测高度，margin-top = 播放器顶边 − 右栏顶边。
+ *
+ * ⚠️ 固定布局下**必须直接返回**：那时播放器高度由 fixedLayout.ts 写，
+ * 这里再读 rect 反算会和它互相驱动（第 29 轮修掉的震荡环）。
+ */
 function applyColumnMetrics(parts: LayoutParts): void {
+  if (isFixedLayoutActive()) {
+    // 固定布局接管时把本模块的变量清掉：尺寸完全交给 fixedLayout 的 CSS 变量
+    document.documentElement.style.removeProperty(HEIGHT_VAR)
+    document.documentElement.style.removeProperty(OFFSET_VAR)
+    return
+  }
+
   const playerRect = parts.playerWrap.getBoundingClientRect()
   const height = Math.round(playerRect.height)
   if (height > 0)
-    document.documentElement.style.setProperty(HEIGHT_VAR, `${height}px`)
+    setVarIfChanged(HEIGHT_VAR, `${height}px`)
 
   const wrapper = moved?.wrapper
   if (!wrapper)
@@ -105,7 +134,7 @@ function applyColumnMetrics(parts: LayoutParts): void {
   // 容器是右栏第一个子节点：用右栏顶边作为自然顶边，偏移 = 播放器顶边 - 右栏顶边
   const rightRect = parts.rightInner.getBoundingClientRect()
   const offset = Math.max(0, Math.round(playerRect.top - rightRect.top))
-  document.documentElement.style.setProperty(OFFSET_VAR, `${offset}px`)
+  setVarIfChanged(OFFSET_VAR, `${offset}px`)
 }
 
 function moveCommentApp(parts: LayoutParts): void {
@@ -193,9 +222,17 @@ export function syncCommentColumn(): void {
   moveCommentApp(parts)
 }
 
-/** 播放器尺寸变化（窗口缩放 / 全屏 / 迷你播放器）时同步重算评论列高度 */
+/**
+ * 播放器尺寸变化（窗口缩放 / 全屏 / 迷你播放器）时同步重算评论列高度。
+ *
+ * 固定布局下播放器高度是本模块之外的 `fixedLayout.ts` 写的，观察它只会形成
+ * 「自己写高度 → 观察器回调 → 再写高度」的回环，所以那时不观察。
+ */
 function observePlayer(playerWrap: HTMLElement): void {
   playerObserver?.disconnect()
+  playerObserver = null
+  if (isFixedLayoutActive())
+    return
   playerObserver = new ResizeObserver(() => syncCommentColumn())
   playerObserver.observe(playerWrap)
 }

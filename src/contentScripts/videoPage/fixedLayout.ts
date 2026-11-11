@@ -1,41 +1,46 @@
 /**
- * 固定单页布局（第 28 轮，用户点名需求）。
+ * 固定单页布局（第 28 轮引入，第 29 轮改为「单次布局事务」）。
  *
- * 用户要求：``视频播放区域、评论区域、推荐视频 flip 区域始终可见``，页面不滚动。
+ * 用户要求：视频区 / 评论区 / 推荐轨道三块**互不重叠**，以 dock 形式分隔整个视图，页面不滚动。
  *
- * 真机实测（2026-11-11 23:45，1600×1000，BV1wvWM6RE3Z）：
- * ```
- * document.documentElement.scrollHeight = 1520 > innerHeight = 1000   ← 页面在滚
- * #mirror-vdcon                  y=64
- *   ├─ #viewbox_report           y=64   h=108
- *   ├─ #playerWrap               y=172  h=919（宽度溢出左栏）
- *   ├─ #arc_toolbar_report       y=1091 h=67
- *   ├─ #v_desc                   y=1176 h=26
- *   ├─ .video-tag-container      y=1220 h=51
- *   ├─ .video-resource-list      y=1294 h=101
- *   └─ .ad-report.strip-ad       y=1420 h=128   ← 广告（B 工作流负责隐藏）
- *   .bewly-comment-column        y=168  h=919   ← 第 27 轮的评论右列
- *   .bvp-rail                    y=1298 h=222   ← 第 27 轮的推荐轨道（fixed）
- * ```
+ * ## 为什么要重写（第 29 轮真机诊断）
  *
- * 布局目标（自上而下占满一屏，不产生页面滚动）：
- * ```
- * ┌ B 站顶栏 64px ────────────────────────────┐
- * ├ 信息栏（压缩成一行，≤56px）──────────────┤
- * ├ 播放器（= 剩余高度）│ 评论区（严格等高）──┤
- * ├ 推荐轨道（固定高度，始终可见）───────────┤
- * └──────────────────────────────────────────┘
- * ```
+ * 第 28 轮有两个模块同时在改布局：
+ * - `fixedLayout.ts` 改 `#playerWrap` 的高度；
+ * - `commentColumn.ts` 每 500ms 读「播放器顶边 − 右栏顶边」反算 `margin-top`。
  *
- * 做法：
- * - `html.bewly-video-fixed` 打开：`html` / `body` 都是 `overflow: hidden; height: 100%`；
- * - 播放器高度 = 视口高 − 顶部偏移 − 信息栏 − 轨道高 − 间隙，写到 CSS 变量
- *   `--bvp-fixed-player-height`（页面级样式在 adaptedStyles/pages/videoPage.scss）；
- * - 左栏的工具栏 / 简介 / 标签由同一份页面级 CSS 压成单行并 `overflow: hidden`，不产生内部滚动；
- * - 评论列（第 27 轮）靠自己挂在 `#playerWrap` 上的 ResizeObserver 跟随，自动等高；
- * - 轨道高度从 `railState.placement` 反算（rail 不可见时不留空间，播放器可以更高）；
- * - 降级：视口高 <700 或宽 <1280、番剧页、迷你播放器态 → 关闭固定布局，回到原生可滚动布局；
- * - 卸载 / 关开关：移除类、清 CSS 变量、恢复 `#playerWrap` 原来的行内高度。
+ * 两者互相读对方的 rect 再写样式，形成震荡环：真机采样到评论列 `y` 在 120 ↔ 64 之间来回跳
+ * （差 56px）、评论工具条 `top` 跟着 98 ↔ 154 跳。用户看到的就是「评论区有规律鬼畜」。
+ *
+ * ## 现在的约定：布局只有这一个所有者
+ *
+ * 本模块一次算出三区的全部尺寸，**只写 CSS 变量**（写到 `<html>` 上），由页面级 CSS 消费：
+ *
+ * | 变量 | 含义 |
+ * | --- | --- |
+ * | `--bvp-fixed-top` | `#mirror-vdcon` 距视口顶部的距离 |
+ * | `--bvp-fixed-info` | 压缩后的信息栏高度 |
+ * | `--bvp-fixed-gap` | 三个 dock 之间统一的 gutter |
+ * | `--bvp-fixed-player-height` | 播放器高度（= 评论列高度） |
+ * | `--bvp-fixed-rail-space` | 轨道预留高度（没渲染时为 0） |
+ *
+ * `commentColumn.ts` 在固定布局下**不再读任何 rect**，只用 `height: var(--bvp-fixed-player-height)`，
+ * 因此不可能再和本模块互相驱动。
+ *
+ * ## 16:9 约束
+ *
+ * 用户要求「缩放比例正确、播放器不能侵入推荐区」：
+ * ```
+ * 可用高 = 视口高 − 顶部偏移 − 信息栏 − 详情 dock − 3 × gutter − 轨道预留
+ * 播放器高 = clamp(320, min(可用高, 播放器宽 × 9 / 16), 1200)
+ * ```
+ * 即**先按宽度定高**，再按可用高度上限回落，最后做一次「播放器底边不得越过轨道顶边 − gutter」的自检。
+ *
+ * ## 写入纪律
+ *
+ * - 每次写入前比较当前值，相同则跳过（避免每拍触发 style 重算 / 观察器回调）；
+ * - 只读「本模块不修改的量」（`#mirror-vdcon` 的顶边、左列宽度、视口尺寸），
+ *   不读自己写过的高度，因此没有反馈路径。
  */
 import { watch } from 'vue'
 
@@ -48,19 +53,28 @@ import { ui } from './state'
 /** 固定布局生效时挂在 <html> 上的类（页面级样式与 e2e 都靠它） */
 export const FIXED_LAYOUT_CLASS = 'bewly-video-fixed'
 
-const PLAYER_HEIGHT_VAR = '--bvp-fixed-player-height'
-const RAIL_SPACE_VAR = '--bvp-fixed-rail-space'
+const TOP_VAR = '--bvp-fixed-top'
+const INFO_VAR = '--bvp-fixed-info'
+const GAP_VAR = '--bvp-fixed-gap'
+const DETAILS_VAR = '--bvp-fixed-details'
+const PLAYER_VAR = '--bvp-fixed-player-height'
+const RAIL_VAR = '--bvp-fixed-rail-space'
 
 /** 视口小于这个尺寸就放不下三块区域，自动回退原生可滚动布局 */
 const MIN_VIEWPORT_WIDTH = 1280
 const MIN_VIEWPORT_HEIGHT = 700
+
 /** 压缩后的信息栏高度（与 videoPage.scss 里的 max-height 保持一致） */
-const INFO_BAR_HEIGHT = 56
+export const INFO_BAR_HEIGHT = 56
+/** 三个 dock 之间统一的 gutter（页面级 CSS 用同一个变量，保证分隔感一致） */
+export const DOCK_GAP = 8
+/** 播放器下方「详情 dock」的固定高度：工具栏 / 简介 / 标签压成三行，不产生内部滚动 */
+export const DETAILS_HEIGHT = 104
 /** 播放器最小 / 最大高度：避免极端窗口下压成一条或撑破 */
 const MIN_PLAYER_HEIGHT = 320
 const MAX_PLAYER_HEIGHT = 1200
-/** 区域之间的呼吸间隙（上下各一份） */
-const REGION_GAP = 12
+/** 轨道离视口底部的间距（与 recommendRail/rail.ts 的 RAIl_FIXED_BOTTOM_GAP 保持一致） */
+const RAIL_BOTTOM_GAP = 12
 
 /** 播放器原来的行内高度（卸载时恢复） */
 let originalPlayerHeight = ''
@@ -71,6 +85,10 @@ function getMirror(): HTMLElement | null {
   return document.querySelector<HTMLElement>('#mirror-vdcon')
 }
 
+function getLeftColumn(): HTMLElement | null {
+  return document.querySelector<HTMLElement>('#mirror-vdcon .left-container')
+}
+
 /** 轨道当前占的高度：没渲染就是 0（播放器可以把这块空间吃掉） */
 function getRailSpace(): number {
   const placement = railState.placement
@@ -79,40 +97,84 @@ function getRailSpace(): number {
   return Math.max(0, Math.round(computeRailHeight(placement.width)))
 }
 
+/** 只在值变化时写 CSS 变量：相同值重复写会触发样式重算并可能唤醒 ResizeObserver */
+function setVar(name: string, value: string): void {
+  const root = document.documentElement
+  if (root.style.getPropertyValue(name) === value)
+    return
+  root.style.setProperty(name, value)
+}
+
 function shouldEnable(): boolean {
   if (!settings.value.videoPageFixedLayout)
     return false
-  // 固定布局只服务普通视频页：番剧页结构不同，迷你播放器态本身就是「播放器浮起来」
+  // 固定布局只服务普通视频页；迷你态本身就是「播放器浮起来」
   if (ui.isBangumi || ui.mini)
-    return false
-  if (!ui.ready)
     return false
   return window.innerWidth >= MIN_VIEWPORT_WIDTH && window.innerHeight >= MIN_VIEWPORT_HEIGHT
 }
 
-function applyPlayerHeight(playerWrap: HTMLElement, mirrorTop: number, railSpace: number): void {
-  const topOffset = Math.max(0, Math.round(mirrorTop))
+/**
+ * 一次算完全部尺寸并写变量。
+ *
+ * 只读三类「本模块不修改」的量：`#mirror-vdcon` 顶边、左列宽度、视口尺寸。
+ * 写出的高度不会回头影响这三者，因此不存在反馈环。
+ */
+function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
+  const topOffset = Math.max(0, Math.round(mirror.getBoundingClientRect().top))
+  const playerWidth = Math.max(0, Math.round(getLeftColumn()?.clientWidth ?? playerWrap.clientWidth))
+  const railSpace = getRailSpace()
+
+  // 可用高：视口 − 顶部 − 信息栏 − 详情 dock − 3 个 gutter − 轨道预留
+  // （dock 依次为：信息栏 / 播放器+评论区 / 详情 / 轨道，相邻之间各留一个 gutter）
   const available = window.innerHeight
     - topOffset
     - INFO_BAR_HEIGHT
+    - DETAILS_HEIGHT
+    - DOCK_GAP * 3
     - railSpace
-    - REGION_GAP * 2
-  const height = Math.min(MAX_PLAYER_HEIGHT, Math.max(MIN_PLAYER_HEIGHT, Math.round(available)))
 
-  document.documentElement.style.setProperty(PLAYER_HEIGHT_VAR, `${height}px`)
+  // 16:9：先按宽度定高，再按可用高回落
+  const byWidth = playerWidth > 0
+    ? Math.round(playerWidth * 9 / 16)
+    : available
+  let height = Math.min(available, byWidth)
+  height = Math.max(MIN_PLAYER_HEIGHT, Math.min(MAX_PLAYER_HEIGHT, height))
+
+  // 自检：播放器底边不得越过「轨道顶边 − gutter − 详情 dock」。
+  // 这是用户明确要求的三区互不重叠（player.bottom <= rail.top - 8）的最终兜底。
+  if (railSpace > 0) {
+    const railTop = window.innerHeight - railSpace - RAIL_BOTTOM_GAP
+    const playerBottom = topOffset + INFO_BAR_HEIGHT + DOCK_GAP + height + DOCK_GAP + DETAILS_HEIGHT
+    if (playerBottom > railTop - DOCK_GAP) {
+      const allowed = railTop - DOCK_GAP - DETAILS_HEIGHT - DOCK_GAP - topOffset - INFO_BAR_HEIGHT - DOCK_GAP
+      height = Math.max(MIN_PLAYER_HEIGHT, allowed)
+    }
+  }
+
+  setVar(TOP_VAR, `${topOffset}px`)
+  setVar(INFO_VAR, `${INFO_BAR_HEIGHT}px`)
+  setVar(GAP_VAR, `${DOCK_GAP}px`)
+  setVar(DETAILS_VAR, `${DETAILS_HEIGHT}px`)
+  setVar(PLAYER_VAR, `${height}px`)
+  setVar(RAIL_VAR, `${railSpace}px`)
+
   if (playerWrap.style.height !== `${height}px`)
     playerWrap.style.height = `${height}px`
-  if (railSpace > 0)
-    document.documentElement.style.setProperty(RAIL_SPACE_VAR, `${railSpace}px`)
-  else
-    document.documentElement.style.removeProperty(RAIL_SPACE_VAR)
 }
 
 /** 清掉固定布局留下的全部痕迹（类 / CSS 变量 / 播放器行内高度） */
 export function clearFixedLayout(): void {
   document.documentElement.classList.remove(FIXED_LAYOUT_CLASS)
-  document.documentElement.style.removeProperty(PLAYER_HEIGHT_VAR)
-  document.documentElement.style.removeProperty(RAIL_SPACE_VAR)
+  for (const name of [
+    TOP_VAR,
+    INFO_VAR,
+    GAP_VAR,
+    DETAILS_VAR,
+    PLAYER_VAR,
+    RAIL_VAR,
+  ])
+    document.documentElement.style.removeProperty(name)
 
   const playerWrap = getPlayerWrapEl()
   if (playerWrap) {
@@ -126,10 +188,10 @@ export function clearFixedLayout(): void {
 }
 
 /**
- * 每次状态同步调用：满足条件就应用（并刷新高度），不满足就还原。
+ * 每次状态同步调用：满足条件就应用（并刷新尺寸），不满足就还原。
  *
- * 高度每拍都重算：窗口缩放、轨道出现 / 收起、评论区让位都会改变可用高度，
- * 靠 ResizeObserver 反而会因为「我们自己改了高度」自激。
+ * 顺序固定为「先读、后写」：所有 rect 读取都在写变量之前完成，
+ * 写完之后不再读任何自己改动过的量。
  */
 export function syncFixedLayout(): void {
   const mirror = getMirror()
@@ -149,7 +211,7 @@ export function syncFixedLayout(): void {
     applied = true
   }
 
-  applyPlayerHeight(playerWrap, mirror.getBoundingClientRect().top, getRailSpace())
+  applyLayout(mirror, playerWrap)
   if (!ui.fixedLayout)
     ui.fixedLayout = true
 }
@@ -159,12 +221,7 @@ export function setupFixedLayout(): () => void {
   window.addEventListener('resize', onResize, { passive: true })
 
   const stopWatch = watch(
-    () => [
-      settings.value.videoPageFixedLayout,
-      ui.mini,
-      ui.isBangumi,
-      ui.ready,
-    ] as const,
+    () => [settings.value.videoPageFixedLayout, ui.mini, ui.isBangumi] as const,
     () => syncFixedLayout(),
   )
 

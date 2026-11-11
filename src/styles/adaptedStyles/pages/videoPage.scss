@@ -538,19 +538,29 @@
 }
 /* #endregion */
 
-// #region 固定单页布局（第 28 轮：去掉影院模式后，页面禁用滚动、三块区域常驻）
+// #region 固定单页布局（第 28 轮引入，第 29 轮改成单次布局事务）
 //
-// 由 src/contentScripts/videoPage/fixedLayout.ts 在 <html> 上切换 .bewly-video-fixed，
-// 并写入两个 CSS 变量：
-//   --bvp-fixed-player-height —— 播放器高度（视口高 - 顶部偏移 - 信息栏 - 轨道 - 间隙）
-//   --bvp-fixed-rail-space    —— 推荐轨道占的高度（没渲染时不写，播放器吃掉这块）
+// 所有者：src/contentScripts/videoPage/fixedLayout.ts
+// 它一次算出全部尺寸，只写 CSS 变量（写在 <html> 的行内样式上）：
+//   --bvp-fixed-top              #mirror-vdcon 距视口顶部
+//   --bvp-fixed-info             信息栏 dock 高度（≤56）
+//   --bvp-fixed-gap              三个 dock 之间的 gutter（8）
+//   --bvp-fixed-details          详情 dock 高度（104）
+//   --bvp-fixed-player-height    播放器 / 评论列高度（先按 16:9 再按可用高回落）
+//   --bvp-fixed-rail-space       轨道预留高度（未渲染为 0）
 //
-// 布局目标（自上而下占满一屏）：
-//   顶部原生信息栏（压缩成一行 ≤56px） / 播放器（剩余高度） + 评论区（等高） / 推荐轨道（固定高）
-// 页面本身不滚动：html + body 都是 overflow: hidden；评论区与轨道各自是独立滚动容器。
+// 结构：两列 × 纵向三段 dock
+//   ┌ 信息栏（56）──────────────────────────────┐
+//   ├ 播放器（= --bvp-fixed-player-height）│ 评论列（严格等高）┤
+//   ├ 详情 dock（104）                        │（右栏其余内容裁掉）┤
+//   └ 推荐轨道（fixed 贴底，rail 自己定位）─────┘
+//
+// 关键约束（用户要求）：三区互不重叠、任何一区尺寸变化都不得让另一区越界。
+// 所有尺寸都来自同一个变量，且 commentColumn.ts 在固定布局下不再读 rect、不再写 margin-top，
+// 因此不会再有「两个模块互相读 rect」的震荡环（第 29 轮真机抖动根因）。
 .bewly-design.videoPage {
   &.bewly-video-fixed {
-    /* 页面禁止垂直滚动（评论区 / 轨道内部滚动不受影响） */
+    /* 页面禁止垂直滚动；评论区 / 轨道各自是独立滚动容器 */
     &,
     body {
       height: 100% !important;
@@ -558,15 +568,42 @@
       overscroll-behavior: none;
     }
 
+    /* 两列 dock 容器：高度固定到「视口 − 顶部 − 轨道预留 − 底距 − gutter」 */
     #mirror-vdcon,
     .video-container-v1 {
-      height: auto !important;
-      overflow: visible !important;
+      display: grid !important;
+      grid-template-rows: 1fr;
+      grid-template-columns: minmax(0, 1fr) min(350px, 26vw);
+      column-gap: var(--bvp-fixed-gap, 8px);
+      align-content: start;
+      align-items: start;
+      max-width: 100% !important;
+      height: calc(
+        100vh - var(--bvp-fixed-top, 0px) - var(--bvp-fixed-rail-space, 0px) - 12px - var(--bvp-fixed-gap, 8px)
+      ) !important;
+      padding-bottom: 0 !important;
+      overflow: hidden !important;
     }
 
-    /* 顶部信息栏压成一行：标题 + UP + 播放量，超出部分裁掉而不是换行撑高 */
+    /* 左列：信息栏 / 播放器 / 详情 三段固定高度，超出直接裁掉（不产生内部滚动条） */
+    .left-container,
+    .left-container.scroll-sticky {
+      position: static !important;
+      display: flex !important;
+      flex-direction: column !important;
+      gap: var(--bvp-fixed-gap, 8px);
+      width: 100% !important;
+      max-width: none !important;
+      height: 100% !important;
+      max-height: 100% !important;
+      min-height: 0 !important;
+      overflow: hidden !important;
+    }
+
+    /* 信息栏压成一行：标题 + UP + 播放量，超出裁掉而不是换行撑高 */
     #viewbox_report {
-      max-height: 56px !important;
+      flex: 0 0 auto;
+      max-height: var(--bvp-fixed-info, 56px) !important;
       padding-top: 6px !important;
       padding-bottom: 6px !important;
       overflow: hidden !important;
@@ -582,11 +619,12 @@
       -webkit-line-clamp: 1;
     }
 
-    /* 播放器：高度由 JS 写到 CSS 变量，宽度铺满左栏，保持 16:9 内容不裁切 */
+    /* 播放器：高度只认变量，宽度铺满左列 */
     #playerWrap {
+      flex: 0 0 var(--bvp-fixed-player-height, 420px);
       height: var(--bvp-fixed-player-height, 420px) !important;
       min-height: 0 !important;
-      margin-bottom: 0 !important;
+      margin: 0 !important;
       overflow: hidden !important;
     }
 
@@ -602,22 +640,20 @@
       height: 100% !important;
     }
 
-    /* 左栏里播放器以下的元素：工具栏 / 简介 / 标签 / 资源列表统一收成紧凑单行，不产生内部滚动条 */
-    #arc_toolbar_report,
-    .video-toolbar-left,
-    .video-toolbar-right {
-      min-height: 0 !important;
+    /* 详情 dock：工具栏 / 简介 / 标签压缩，资源列表直接隐藏 —— 不产生内部滚动 */
+    #arc_toolbar_report {
+      flex: 0 0 auto;
+      max-height: 44px !important;
       padding-top: 4px !important;
       padding-bottom: 4px !important;
+      overflow: hidden !important;
     }
 
     #v_desc,
-    .video-desc-container,
-    .video-tag-container,
-    .video-resource-list {
-      max-height: 34px !important;
-      margin-top: 4px !important;
-      margin-bottom: 0 !important;
+    .video-desc-container {
+      flex: 0 0 auto;
+      max-height: 24px !important;
+      margin: 0 !important;
       overflow: hidden !important;
     }
 
@@ -630,27 +666,39 @@
       -webkit-line-clamp: 1;
     }
 
-    /* 左栏整体不滚动：内容超出就被裁掉（下面还有评论区 / 轨道，它们是独立的滚动容器） */
-    .left-container,
-    .left-container.scroll-sticky {
-      position: static !important;
-      max-height: none !important;
-      overflow: visible !important;
+    .video-tag-container {
+      flex: 0 0 auto;
+      max-height: 28px !important;
+      margin: 0 !important;
+      overflow: hidden !important;
     }
 
-    /* 右栏：评论区自己滚，右栏不要整列滚 */
+    .video-resource-list {
+      display: none !important;
+    }
+
+    /* 右列：隐藏滚动条容器，评论列顶边对齐播放器顶边（= 信息栏 + gutter） */
     .right-container,
     .right-container-inner,
     .right-container-inner.scroll-sticky {
       position: static !important;
+      width: 100% !important;
       height: 100% !important;
-      max-height: none !important;
-      overflow: visible !important;
+      max-height: 100% !important;
+      min-height: 0 !important;
+      overflow: hidden !important;
     }
 
-    /* 评论列与播放器等高（高度变量由 commentColumn.ts 写，这里只保证不被右栏压扁） */
+    .right-container-inner,
+    .right-container-inner.scroll-sticky {
+      padding-top: calc(var(--bvp-fixed-info, 56px) + var(--bvp-fixed-gap, 8px)) !important;
+    }
+
+    /* 评论列：高度只认变量，不再由 commentColumn.ts 反算 margin-top */
     .bewly-comment-column {
-      max-height: var(--bvp-fixed-player-height, 480px);
+      height: var(--bvp-fixed-player-height, 480px) !important;
+      max-height: var(--bvp-fixed-player-height, 480px) !important;
+      margin-top: 0 !important;
     }
   }
 }

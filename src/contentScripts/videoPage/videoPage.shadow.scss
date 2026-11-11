@@ -778,3 +778,16 @@
     max-height: 40vh;
   }
 }
+
+/* #region 滚轮接管（第 29 轮 B 工作流，只追加）
+   用户要求：鼠标在轨道里时，普通垂直滚轮也要横向切卡，且不要带动页面滚动。
+   滚轮事件由 RecommendRail.vue 的 handleWheel 处理（垂直 deltaY 累计阈值 40、
+   Shift/横向滚动阈值 12），这里只补两条 CSS 保险：
+   1. overscroll-behavior: contain —— 触控板/滚轮到轨道边缘时不把滚动「传给」页面；
+   2. touch-action: pan-x —— 触屏横向手势交给轨道，纵向手势仍交给页面。 */
+.bvp-rail,
+.bvp-rail__viewport {
+  overscroll-behavior: contain;
+  touch-action: pan-x;
+}
+/* #endregion */

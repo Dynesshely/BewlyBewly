@@ -313,7 +313,9 @@ function sync(): void {
   if (ui.recommendRailVisible !== railVisible)
     ui.recommendRailVisible = railVisible
 
-  // 固定单页布局：先算播放器高度（评论区右列会跟着播放器高度走），再校正评论列
+  // 固定单页布局（第 29 轮）：**唯一**的布局所有者，先算三区尺寸再让评论列校正。
+  // 顺序很重要：fixedLayout 只读「轨道高度 / 左列宽 / 视口尺寸」这些自己不改的量，
+  // commentColumn 在固定布局下不再读 rect，两者不会互相驱动。
   syncFixedLayout()
 
   // 评论区右列布局：B 站可能重渲染 #commentapp / 右栏，每拍校正一次（不满足条件时内部直接还原）

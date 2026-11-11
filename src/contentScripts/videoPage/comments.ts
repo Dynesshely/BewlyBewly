@@ -443,22 +443,46 @@ export function expandComment(id: number): void {
 // #endregion
 
 // #region 同步 / 生命周期
+/**
+ * 评论工具条定位。
+ *
+ * 第 29 轮修正：**锚定评论列容器**（`[data-bewly-comment-column]`）而不是视口里的 #navbar。
+ *
+ * 为什么改：评论区搬到右列后是独立滚动容器，内部 #navbar 会随评论列表滚动而移动，
+ * 按它算 top 会让工具条（连同「只看 UP 主」按钮）跟着上下滑动，看起来像在「鬼畜」。
+ * 锚定容器后，工具条固定在评论列顶部，只有评论列本身改变位置时才会移动。
+ *
+ * 工具条本身是 fixed 浮层，写它的 top 不会回流到页面布局，因此不存在反馈环；
+ * 这里仍对 top / left 做 0.5px 内的抖动抑制，避免亚像素误差导致每拍重渲染。
+ */
+function getCommentColumnEl(): HTMLElement | null {
+  return document.querySelector<HTMLElement>('[data-bewly-comment-column]')
+    ?? document.querySelector<HTMLElement>('#bewly-comment-column')
+}
+
 function updateToolbarPosition(): void {
+  const column = getCommentColumnEl()
   const navbar = getNavbarEl()
-  if (!navbar) {
+  const anchor = column ?? navbar
+  if (!anchor) {
     ui.commentToolbarVisible = false
     return
   }
 
-  const rect = navbar.getBoundingClientRect()
+  const rect = anchor.getBoundingClientRect()
   const inView = rect.bottom > 0 && rect.top < window.innerHeight - 40
   ui.commentToolbarVisible = inView
   if (!inView)
     return
 
-  // 贴在 #navbar 下方、左对齐：不遮挡原生排序按钮与标题
-  ui.commentToolbarTop = Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - 56))
-  ui.commentToolbarLeft = Math.max(8, Math.min(rect.left, window.innerWidth - 340))
+  // 贴评论列左上角（原生排序 tab 在上方，不遮挡）
+  const top = Math.max(8, Math.min(Math.round(rect.top) + 8, window.innerHeight - 56))
+  const left = Math.max(8, Math.min(Math.round(rect.left) + 8, window.innerWidth - 340))
+
+  if (Math.abs(ui.commentToolbarTop - top) > 0.5)
+    ui.commentToolbarTop = top
+  if (Math.abs(ui.commentToolbarLeft - left) > 0.5)
+    ui.commentToolbarLeft = left
 }
 
 /**

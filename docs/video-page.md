@@ -439,3 +439,144 @@ teardownAdGuard()
 - 广告被 `display:none` 后仍留在 DOM 里（不删除节点），因为 B 站会在切视频时复用这些容器；
 - 未在真机验证（本轮不 build / 不 playwright / 不碰浏览器）：e2e 片段已交 Lead 合并，真机需确认左栏高度变化后播放器与轨道位置正常；
 - 广告容器若被 B 站改成 `position: fixed` 全屏浮层，`display:none` 依然有效，但它的关闭按钮等交互也会一起消失（预期）。
+## 第 29 轮：推荐轨道滚轮接管 + 点击不改 URL
+
+### 1. 普通垂直滚轮也横向切换
+
+用户反馈：之前只有 `Shift+滚轮` / 横向滚轮能切卡，普通滚轮没反应。
+
+现在的 `handleWheel`（`recommendRail/RecommendRail.vue`）：
+
+| 输入 | 行为 |
+| --- | --- |
+| 普通垂直滚轮（deltaY） | 累计到 **40** 才切一张（触控板一次滑动会连发多个小 delta，逐帧切会「刷屏」） |
+| Shift + 滚轮 / 横向滚轮（deltaX） | 累计到 **12** 就切（意图更明确，响应更快） |
+| 两次滚动间隔 > 200ms | 视为新手势，累计值清零 |
+| 已经到首张 / 末张 | 不 `preventDefault`，滚轮交还页面（不在轨道边缘「吃掉」滚动） |
+| 鼠标不在轨道内 | 完全不干预（页面/评论区滚动正常） |
+
+CSS 保险（`videoPage.shadow.scss`，只追加）：`.bvp-rail` / `.bvp-rail__viewport` 加
+`overscroll-behavior: contain`（到边缘不把滚动传给页面）与 `touch-action: pan-x`（触屏横向手势归轨道）。
+
+### 2. 点击绝不改 URL（第 27 轮遗留的三步递进）
+
+真机现象：点卡片后 iframe 抽屉打开，但 `location.href` 变成推荐视频地址。已排除「卡片在 `<a>` 内 /
+`elementFromPoint` 命中错误 / click 冒泡未拦」，剩下唯一没试的方向是 **B 站的路由跳转来自
+`pointerdown`/`mousedown` 阶段的委托，或它注册在先的 capture 监听**。
+
+实现按顺序叠加三层（**都保留**，后一层是前一层失效时的保险）：
+
+| 步骤 | 做法 | 说明 |
+| --- | --- | --- |
+| **a** | 卡片 `@pointerdown` / `@mousedown` → `preventDefault + stopPropagation + stopImmediatePropagation` | 阻止按下阶段的 B 站委托与后续 click 合成 |
+| **b** | `window` 上注册 **capture** 的 `pointerdown` / `mousedown` / `click`（`window` 捕获早于 `document`），命中轨道矩形就 `preventDefault` | 关键：**不能 stopPropagation** —— 否则轨道自己的 section 捕获（激活逻辑）也收不到，会退化成「既不跳转也不开预览」（第 27 轮踩过） |
+| **c** | **兜底自愈**：`openPreview()` 先记录 `location.href`，`emit('preview')` 后在 `0 / 50 / 200ms` 用 `history.replaceState` 把 URL 改回 | 抽屉已打开，URL 变化对用户不可见；只要 B 站改了 URL 就一定会被拉回 |
+
+另外：第 27 轮的「宿主 `pointer-events` 空间受限开关」（`setHostHitOpen`）仍然生效，
+指针在轨道内时宿主才 `pointer-events: auto`，离开即恢复 `none`。
+
+### 3. 生效顺序（真机结论，Lead 复测后回填）
+
+- 代码里三层同时生效，无法静态判断「哪一层真正阻止了 B 站跳转」；
+- 复测方法：在 `onWindowCapturePointer`（b）与 `restoreUrlAfterPreview`（c）里各加一句
+  `console.count`，点击一次后看哪个计数增加：
+  - b 计数增加且 URL 未变 → **b 生效**（B 站的委托在 document 捕获阶段）；
+  - b 计数不增加但 URL 未变 → **a 生效**（按下阶段就拦住了跳转）；
+  - a/b 都没拦住、只有 c 的 `replaceState` 把 URL 拉回 → **c 兜底生效**；
+- 当前实现已按「三层都留」交付，真机只要看到 **URL 不变 + 抽屉打开** 即符合需求。
+
+### 4. 已知限制
+
+- `history.replaceState` 改回的是**同一页面内**的 URL：如果 B 站用 `location.assign` 真的发起了导航，
+  替换时代码可能已经卸载，兜底来不及生效（这种情况下靠 a/b 提前拦）；
+- `window` 捕获只对「鼠标指针在轨道矩形内」的事件生效：键盘 Enter 路径走的是组件自己的 `handleKeydown`，不经过指针链；
+- 滚轮阈值（40 / 12）与重置窗口（200ms）是经验值，触控板手感若偏钝/偏灵可直接调这两个常量；
+- 未在真机验证（本轮不 build / 不 playwright / 不碰浏览器）：请构建后确认
+  「普通滚轮能横向切卡」「点击后 URL 不变 + 抽屉打开」「轨道外滚轮仍能滚动页面」。
+## 删除影院模式（第 28 轮）
+
+用户点名要求去掉影院模式。已删除的内容：
+
+- `T` 快捷键、`Esc` 退出影院分支、`FloatingControls` / `CompactBar` 里的影院按钮；
+- `ui.cinema` 状态、`html.bewly-video-cinema` 类、`sessionStorage` 里的 `bewly-video-cinema`；
+- `actions.ts` 的 `setCinema` / `toggleCinema` / `readStoredCinema`，`i18n.ts` 的四语言影院文案，
+- `videoPage.scss` 与 `animePlayback&MoviePage.scss` 里影院模式的布局 / 压暗规则。
+
+`settings.videoPageCinemaMode` 字段**保留但不再被读取**（避免导入旧配置时报字段缺失），
+也不再出现在设置页与快捷键注册表里 —— 注册表与设置页由 list-pages 工作流负责移除。
+
+## 固定单页布局（第 28 轮引入，第 29 轮重写为「单次布局事务」）
+
+### 目标
+
+页面不滚动，视频区 / 评论区 / 推荐轨道三块**始终可见且互不重叠**，以 dock 形式分隔整个视口。
+
+### 第 29 轮修掉的真实缺陷
+
+第 28 轮有两个模块同时改布局：`fixedLayout.ts` 改播放器高度，`commentColumn.ts` 每 500ms 读
+「播放器顶边 − 右栏顶边」反算 `margin-top`。两者互相读对方的 rect 再写样式，形成**震荡环**：
+真机采样到评论列 `y` 在 120 ↔ 64 之间来回跳（差 56px），评论工具条 `top` 跟着 98 ↔ 154 跳，
+用户看到的就是「评论区的 UI 有规律鬼畜」，连「只看 UP 主」按钮一起抖。
+
+### 现在的约定：布局只有一个所有者
+
+`src/contentScripts/videoPage/fixedLayout.ts` 一次算出全部尺寸，**只写 CSS 变量**（写在 `<html>` 行内样式）：
+
+| 变量 | 含义 |
+| --- | --- |
+| `--bvp-fixed-top` | `#mirror-vdcon` 距视口顶部 |
+| `--bvp-fixed-info` | 信息栏 dock 高度（≤56） |
+| `--bvp-fixed-gap` | dock 之间的 gutter（8） |
+| `--bvp-fixed-details` | 详情 dock 高度（104） |
+| `--bvp-fixed-player-height` | 播放器 / 评论列高度 |
+| `--bvp-fixed-rail-space` | 轨道预留高度（未渲染为 0） |
+
+`commentColumn.ts` 在固定布局下**不再读任何 rect、不再写 `margin-top`**，高度直接用
+`height: var(--bvp-fixed-player-height)`；它也不再对 `#playerWrap` 挂 `ResizeObserver`（避免回环）。
+非固定布局（原生可滚动页面）才回落实测高度，且写入前做值比较。
+
+### 16:9 约束
+
+```
+可用高 = 视口高 − 顶部偏移 − 信息栏 − 详情 dock − 3 × gutter − 轨道预留
+播放器高 = clamp(320, min(可用高, 播放器宽 × 9 / 16), 1200)
+```
+
+即**先按宽度定高**，再按可用高度上限回落，最后做一次自检：
+`player.bottom + gutter + 详情 dock <= rail.top - gutter`，保证播放器不会侵入推荐区。
+
+### 三区 dock 布局（页面级 CSS）
+
+`#mirror-vdcon` 变成「两列 × 纵向三段」的 dock 容器（`grid-template-columns: minmax(0,1fr) min(350px,26vw)`）：
+
+| 区域 | 高度来源 |
+| --- | --- |
+| 信息栏 `#viewbox_report` | `--bvp-fixed-info`，标题单行 `-webkit-line-clamp: 1` |
+| 播放器 `#playerWrap` + 评论列 | `--bvp-fixed-player-height`（严格等高） |
+| 详情 dock（工具栏 / 简介 / 标签） | `--bvp-fixed-details`，逐项压缩、`overflow: hidden`，资源列表隐藏 |
+| 推荐轨道 | `fixed` 贴视口底部（`rail.ts` 在固定布局下按 `innerHeight` 定位） |
+
+`html` / `body` 在 `html.bewly-video-fixed` 下都是 `overflow: hidden`；
+评论区与轨道各自是独立滚动容器，互不影响。
+
+### 评论工具条定位（第 29 轮修正）
+
+工具条从「跟随视口内 `#navbar`」改为**锚定评论列容器** `[data-bewly-comment-column]`：
+评论区搬到右列后是独立滚动容器，内部 `#navbar` 会随评论列表滚动而移动，按它算 `top` 会让工具条
+（连带「只看 UP 主」按钮）跟着滑动。锚定容器后工具条固定在评论列顶部，
+并对 `top` / `left` 做 0.5px 内的抖动抑制。
+
+### 降级与还原
+
+- 视口 `<1280px` 宽或 `<700px` 高、番剧页、迷你播放器态、开关关闭 → 不启用固定布局，回到原生可滚动布局；
+- 卸载：移除 `html.bewly-video-fixed`、清掉全部 `--bvp-fixed-*` 变量、恢复 `#playerWrap` 原来的行内高度，
+  评论列由 `commentColumn.ts` 放回原位；
+- 评论区自身的降级不变：缺失锚点 / 窄屏 / 开关关闭时原样还原。
+
+### 已知限制
+
+- 左栏「详情 dock」是把工具栏 / 简介 / 标签压缩成固定高度后**裁切**，不是可折叠抽屉：
+  超高内容会被裁掉（用户要求「不产生内部滚动」）；
+- 播放器高度上限 1200px、下限 320px；极端窗口下按 320 计算可能略溢出，此时以自检结果为准；
+- 广告位由 native-style 工作流负责隐藏，隐藏后左栏高度变化不需要再通知本模块
+  （尺寸只依赖视口 / 信息栏 / 轨道，不依赖左栏实际内容高度）。

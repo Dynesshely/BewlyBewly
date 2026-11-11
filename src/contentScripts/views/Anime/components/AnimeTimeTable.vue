@@ -2,8 +2,10 @@
 import type { ComponentPublicInstance } from 'vue'
 import type { Episode, Result as TimetableItem, TimetableResult } from '~/models/anime/timeTable'
 import { ref } from 'vue'
+import Picture from '~/components/Picture.vue'
 import api from '~/utils/api'
 import { numFormatter } from '~/utils/dataFormatter'
+
 import { openLinkToNewTab, removeHttpFromUrl } from '~/utils/main'
 
 import { useAnimeI18n } from '../i18n'
@@ -339,13 +341,16 @@ function episodeThumb(episode: Episode) {
           tabindex="-1"
           :aria-label="`${heroEpisode.title} ${t('open_in_new_tab')}`"
         >
-          <img
+          <Picture
             :src="`${episodeCover(heroEpisode)}@672w_378h_1c.webp`"
             :alt="heroEpisode.title"
             loading="lazy"
             decoding="async"
             fetchpriority="high"
-          >
+            fallback-kind="video"
+            aspect="16 / 9"
+            class="block w-full"
+          />
           <span class="hero-badge">
             {{ activeIsToday ? t('today_pick') : t('day_pick') }}
           </span>
@@ -393,14 +398,15 @@ function episodeThumb(episode: Episode) {
                   :title="episode.title"
                 >
                   <span class="hero-more-time">{{ episode.pub_time }}</span>
-                  <img
+                  <Picture
                     class="hero-more-thumb"
                     :src="`${episodeThumb(episode)}@96w_96h_1c.webp`"
                     :alt="episode.title"
                     loading="lazy"
                     decoding="async"
                     fetchpriority="low"
-                  >
+                    fallback-kind="video"
+                  />
                   <span class="hero-more-title">{{ episode.title }}</span>
                 </a>
               </li>
@@ -948,9 +954,11 @@ function episodeThumb(episode: Episode) {
 }
 
 .hero-more-thumb {
+  display: block;
   flex: none;
   width: 28px;
   height: 28px;
+  overflow: hidden;
   border-radius: 6px;
   object-fit: cover;
 }

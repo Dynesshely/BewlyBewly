@@ -19,6 +19,13 @@ import {
   setLocalLikeStatus,
 } from './interactionStatus'
 import { migrateLegacyCardQuickActionsSetting } from './preferences'
+import {
+  getWatchLaterStatus,
+  isWatchLaterPending,
+  markWatchLaterPending,
+  resetWatchLaterState,
+  setWatchLaterStatus,
+} from './watchLaterState'
 
 /** aid → 已收藏的收藏夹 id 列表（只记录本扩展本次会话成功提交的结果） */
 const favoriteMemberships = ref<Map<number, number[]>>(new Map())
@@ -110,6 +117,8 @@ function readErrorCode(result: { code?: number } | undefined): number | undefine
  * - 点赞：再点即取消；失败回滚；
  * - 收藏：未收藏时打开可多选的收藏夹面板（`add_media_ids` 逗号分隔）；
  *   已收藏（会话记录或服务端查询）时再点直接取消（`del_media_ids`，未知收藏夹时从全部已知收藏夹移除）；
+ * - 稍后再看：本会话 Set + 5 分钟缓存记录状态，再点即移除（toggle）；
+ * - 收藏夹面板支持「+ 新建收藏夹」（创建成功后刷新列表并自动勾选新夹）；
  * - 收藏夹列表缓存 5 分钟；
  * - 未登录时只 toast，不发送任何请求；
  * - 所有请求都有 try/catch，任何异常都不会冒泡到卡片点击逻辑。
@@ -129,6 +138,10 @@ export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefi
   const favoriteFolderLoading = ref<boolean>(false)
   const favoriteFolderFailed = ref<boolean>(false)
   const selectedFolderIds = ref<number[]>([])
+  /** 「+ 新建收藏夹」请求在途 */
+  const favoriteCreatePending = ref<boolean>(false)
+  /** 最近一次成功创建的收藏夹 id（面板据此收起输入框并高亮新夹） */
+  const createdFolderId = ref<number | null>(null)
 
   const video = computed(() => toValue(videoSource))
   const aid = computed(() => {
@@ -163,6 +176,20 @@ export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefi
     if ((favoriteMemberships.value.get(currentAid)?.length ?? 0) > 0)
       return true
     return getCachedFavoriteStatus(currentAid) === true
+  })
+
+  /** 稍后再看状态：本会话记录优先；没有记录时返回 undefined（调用方回落到父组件传入的初始值） */
+  const isInWatchLater = computed<boolean | undefined>(() => {
+    const currentAid = aid.value
+    if (currentAid === null)
+      return undefined
+    return getWatchLaterStatus(currentAid)
+  })
+
+  /** 稍后再看请求在途（同一视频的多张卡片共享） */
+  const watchLaterPending = computed(() => {
+    const currentAid = aid.value
+    return currentAid !== null && isWatchLaterPending(currentAid)
   })
 
   function toastNeedLogin() {
@@ -400,6 +427,158 @@ export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefi
     await openFavoritePanel()
   }
 
+  /**
+   * 稍后再看开关（第 19 轮）：
+   *
+   * - 未加入 / 无记录 → `saveToWatchLater` 加入；
+   * - 已加入（本会话加入过，或缓存记为已加入）→ `removeFromWatchLater` 移除；
+   * - 先乐观更新状态，失败回滚并 toast；同一 aid 请求在途时直接忽略；
+   * - 未登录只 toast，不发请求。
+   */
+  async function toggleWatchLater() {
+    const current = video.value
+    if (!current)
+      return
+
+    if (!isLoggedIn()) {
+      toastNeedLogin()
+      return
+    }
+
+    // 卡片数据只有 bvid 时需要先把 aid 解析出来（与点赞 / 收藏同一条路径）
+    let resolvedAid: number | null = resolveAidFromVideo(current)
+    if (resolvedAid === null) {
+      try {
+        resolvedAid = await resolveVideoAid(current)
+      }
+      catch {
+        resolvedAid = null
+      }
+    }
+    if (resolvedAid === null) {
+      toast.error(messages.value.watchLaterFail)
+      return
+    }
+    if (isWatchLaterPending(resolvedAid))
+      return
+
+    const previous = getWatchLaterStatus(resolvedAid)
+    const target = !(previous ?? false)
+
+    markWatchLaterPending(resolvedAid, true)
+    setWatchLaterStatus(resolvedAid, target)
+
+    try {
+      const result = target
+        ? await api.watchlater.saveToWatchLater({
+            aid: resolvedAid,
+            csrf: getCSRF(),
+          })
+        : await api.watchlater.removeFromWatchLater({
+            aid: resolvedAid,
+            csrf: getCSRF(),
+          })
+
+      const code = readErrorCode(result)
+      if (code !== 0) {
+        setWatchLaterStatus(resolvedAid, previous ?? false)
+        if (code === -101 || code === -111)
+          toastNeedLogin()
+        else
+          toast.error(messages.value.watchLaterFail)
+        return
+      }
+
+      toast.success(target ? messages.value.watchLaterOk : messages.value.watchLaterRemoved)
+    }
+    catch {
+      setWatchLaterStatus(resolvedAid, previous ?? false)
+      toast.error(messages.value.watchLaterFail)
+    }
+    finally {
+      markWatchLaterPending(resolvedAid, false)
+    }
+  }
+
+  /** 从接口返回值里防御式解析新建收藏夹的 id（不同接口版本字段可能是 id / fid / media_id） */
+  function readCreatedFolderId(result: { code?: number, data?: unknown } | undefined): number | null {
+    const data = result?.data as Record<string, unknown> | undefined
+    if (!data)
+      return null
+    for (const key of ['id', 'fid', 'media_id', 'folder_id']) {
+      const value = Number(data[key])
+      if (Number.isFinite(value) && value > 0)
+        return value
+    }
+    return null
+  }
+
+  /**
+   * 新建收藏夹（第 19 轮）：成功后强制刷新收藏夹列表，并把新夹加入当前勾选。
+   *
+   * - 空标题不提交（面板侧也会禁用提交按钮）；
+   * - 失败 toast，输入内容由面板保留，便于重试；
+   * - 未登录只 toast，不发请求。
+   */
+  async function createFavoriteFolder(title: string): Promise<boolean> {
+    const name = title.trim()
+    if (!name)
+      return false
+    if (favoriteCreatePending.value)
+      return false
+    if (!isLoggedIn()) {
+      toastNeedLogin()
+      return false
+    }
+
+    favoriteCreatePending.value = true
+    try {
+      const result = await api.favorite.createFavoriteFolder({
+        title: name,
+        privacy: 0,
+        csrf: getCSRF(),
+      })
+
+      const code = readErrorCode(result)
+      if (code !== 0) {
+        if (code === -101 || code === -111)
+          toastNeedLogin()
+        else
+          toast.error(messages.value.createFolderFail)
+        return false
+      }
+
+      invalidateFavoriteFolders()
+      const folders = await getFavoriteFolders()
+      favoriteFolderOptions.value = folders
+      favoriteFolderFailed.value = folders.length === 0
+
+      // 接口没返回 id 时按标题在刷新后的列表里兜底匹配（同名时取第一个）
+      const newId = readCreatedFolderId(result)
+        ?? folders.find(folder => folder.title === name)?.id
+        ?? null
+
+      if (newId === null) {
+        // 接口成功但既没返回 id 也匹配不到：列表已刷新，提示用户手动勾选新夹
+        toast.success(messages.value.createFolderOk)
+        return true
+      }
+
+      createdFolderId.value = newId
+      if (!selectedFolderIds.value.includes(newId))
+        selectedFolderIds.value = [...selectedFolderIds.value, newId]
+      toast.success(messages.value.createFolderOk)
+      return true
+    }
+    catch {
+      toast.error(messages.value.createFolderFail)
+      return false
+    }
+    finally {
+      favoriteCreatePending.value = false
+    }
+  }
+
   async function toggleLike() {
     if (likePending.value)
       return
@@ -468,6 +647,12 @@ export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefi
     favoriteFolderLoading,
     favoriteFolderFailed,
     selectedFolderIds,
+    favoriteCreatePending,
+    createdFolderId,
+    isInWatchLater,
+    watchLaterPending,
+    toggleWatchLater,
+    createFavoriteFolder,
     toggleLike,
     handleFavoriteButton,
     closeFavoritePanel,
@@ -480,6 +665,7 @@ export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefi
 /** 调试 / 测试用：重置模块级状态 */
 export function resetCardQuickActionsState() {
   favoriteMemberships.value = new Map()
+  resetWatchLaterState()
   aidByBvid.clear()
   aidInflight.clear()
   resetInteractionStatusCache()

@@ -51,6 +51,23 @@ const API_FAVORITE = {
     },
     afterHandle: AHS.J_D,
   },
+  // 新建收藏夹
+  // https://socialsisteryi.github.io/bilibili-API-collect/docs/video/collection.html
+  createFavoriteFolder: {
+    url: 'https://api.bilibili.com/x/v3/fav/folder/add',
+    _fetch: {
+      method: 'post',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+      },
+      body: {
+        title: '',
+        privacy: 0,
+        csrf: '',
+      },
+    },
+    afterHandle: AHS.J_D,
+  },
   patchDelFavoriteResources: {
     url: 'https://api.bilibili.com/x/v3/fav/resource/batch-del',
     _fetch: {

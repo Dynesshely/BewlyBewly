@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 
+import FallbackImage from '~/components/Feedback/FallbackImage.vue'
+
 import { useMessages } from '../i18n'
 import { closeLightbox, stepLightboxImage } from '../lightbox'
 import { ui } from '../state'
@@ -15,17 +17,107 @@ import { ui } from '../state'
 const t = useMessages()
 
 const closeRef = ref<HTMLButtonElement | null>(null)
+/** 当前大图是否加载失败：失败后不再重试、不发新请求；切换图片时重置 */
+const imageFailed = ref(false)
+
+// #region 键盘可达性（第 19 轮）：打开聚焦 / shadowRoot capture 焦点陷阱 / 关闭恢复
+const rootRef = ref<HTMLElement | null>(null)
+let restoreFocusTo: HTMLElement | null = null
+let trappedRoot: ShadowRoot | Document | null = null
+
+/** 穿透 shadow root 找真正获得焦点的元素（document.activeElement 只会返回 host） */
+function activeElementDeep(): HTMLElement | null {
+  let el = document.activeElement as HTMLElement | null
+  while (el?.shadowRoot?.activeElement)
+    el = el.shadowRoot.activeElement as HTMLElement
+  return el
+}
+
+/** 面板内真实可聚焦元素（排除隐藏 / 禁用 / tabindex=-1） */
+function panelFocusables(): HTMLElement[] {
+  const root = rootRef.value
+  if (!root)
+    return []
+  return Array.from(root.querySelectorAll<HTMLElement>('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'))
+    .filter(el => el.getClientRects().length > 0)
+}
+
+/** 焦点在面板内循环；没有可聚焦元素时聚焦面板容器本身（tabindex=-1） */
+function moveFocusInPanel(backward: boolean): void {
+  const items = panelFocusables()
+  if (!items.length) {
+    rootRef.value?.focus({ preventScroll: true })
+    return
+  }
+  const active = activeElementDeep()
+  const current = active
+    ? items.indexOf(active)
+    : -1
+  const next = current < 0
+    ? (backward
+        ? items.length - 1
+        : 0)
+    : (current + (backward
+        ? -1
+        : 1) + items.length) % items.length
+  items[next]?.focus({ preventScroll: true })
+}
+
+/** 捕获阶段拦下 Tab：必须 preventDefault，否则浏览器默认行为会把焦点移出面板 */
+function onTabCapture(event: Event): void {
+  if (!(event instanceof KeyboardEvent) || event.key !== 'Tab')
+    return
+  event.preventDefault()
+  event.stopPropagation()
+  moveFocusInPanel(event.shiftKey)
+}
+
+/** 事件发生在 shadow root 内：监听挂到面板所在的 root（ShadowRoot / Document） */
+function bindTabTrap(): void {
+  unbindTabTrap()
+  const node = rootRef.value?.getRootNode()
+  if (node instanceof ShadowRoot || node instanceof Document) {
+    trappedRoot = node
+    node.addEventListener('keydown', onTabCapture, true)
+  }
+}
+
+function unbindTabTrap(): void {
+  if (trappedRoot) {
+    trappedRoot.removeEventListener('keydown', onTabCapture, true)
+    trappedRoot = null
+  }
+}
+
+watch(() => ui.lightbox.open, async (open) => {
+  if (!open) {
+    unbindTabTrap()
+    restoreFocusTo?.focus?.({ preventScroll: true })
+    restoreFocusTo = null
+    return
+  }
+  restoreFocusTo = activeElementDeep()
+  await nextTick()
+  bindTabTrap()
+  imageFailed.value = false
+  const items = panelFocusables()
+  if (items.length)
+    items[0]?.focus({ preventScroll: true })
+  else
+    rootRef.value?.focus({ preventScroll: true })
+})
+
+onBeforeUnmount(unbindTabTrap)
+// #endregion
 
 const current = computed(() => ui.lightbox.images[ui.lightbox.index] ?? '')
 const canPrev = computed(() => ui.lightbox.index > 0)
 const canNext = computed(() => ui.lightbox.index < ui.lightbox.images.length - 1)
 const hasMultiple = computed(() => ui.lightbox.images.length > 1)
 
-watch(() => ui.lightbox.open, async (open) => {
-  if (!open)
-    return
-  await nextTick()
-  closeRef.value?.focus({ preventScroll: true })
+/** 同一张图只失败一次；切换图片（current 变化）时重置，给新图重新尝试的机会 */
+watch(current, () => {
+  imageFailed.value = false
 })
 </script>
 
@@ -33,10 +125,13 @@ watch(() => ui.lightbox.open, async (open) => {
   <Transition name="bap-fade">
     <div
       v-if="ui.lightbox.open"
+      ref="rootRef"
       class="bap-lightbox"
       role="dialog"
       aria-modal="true"
       :aria-label="t.imageViewer"
+      tabindex="-1"
+
       @click.self="closeLightbox()"
     >
       <button
@@ -67,13 +162,20 @@ watch(() => ui.lightbox.open, async (open) => {
       </button>
 
       <img
-        v-if="current"
+        v-if="current && !imageFailed"
         class="bap-lightbox__image"
         :src="current"
         alt=""
         draggable="false"
         @click.stop
+        @error="imageFailed = true"
       >
+      <FallbackImage
+        v-else-if="current"
+        class="bap-lightbox__fallback"
+        kind="image"
+        :text="t.imageFallback"
+      />
 
       <button
         v-if="hasMultiple"

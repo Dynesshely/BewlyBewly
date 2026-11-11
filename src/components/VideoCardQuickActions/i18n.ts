@@ -41,6 +41,17 @@ export interface QuickActionsMessages {
   submitFavorite: string
   dismiss: string
   closePanel: string
+  /** 「+ 新建收藏夹」入口 */
+  createFolder: string
+  createFolderPlaceholder: string
+  createFolderSubmit: string
+  createFolderCancel: string
+  createFolderOk: string
+  createFolderFail: string
+  /** 稍后再看 toggle 反馈 */
+  watchLaterOk: string
+  watchLaterRemoved: string
+  watchLaterFail: string
 }
 
 const CMN_CN: QuickActionsMessages = {
@@ -74,6 +85,15 @@ const CMN_CN: QuickActionsMessages = {
   submitFavorite: '收藏',
   dismiss: '取消',
   closePanel: '关闭',
+  createFolder: '+ 新建收藏夹',
+  createFolderPlaceholder: '收藏夹名称',
+  createFolderSubmit: '创建',
+  createFolderCancel: '取消',
+  createFolderOk: '收藏夹已创建',
+  createFolderFail: '创建收藏夹失败，请稍后重试',
+  watchLaterOk: '已加入稍后再看',
+  watchLaterRemoved: '已从稍后再看移除',
+  watchLaterFail: '操作失败，请稍后重试',
 }
 
 const EN: QuickActionsMessages = {
@@ -107,6 +127,15 @@ const EN: QuickActionsMessages = {
   submitFavorite: 'Save',
   dismiss: 'Cancel',
   closePanel: 'Close',
+  createFolder: '+ New folder',
+  createFolderPlaceholder: 'Folder name',
+  createFolderSubmit: 'Create',
+  createFolderCancel: 'Cancel',
+  createFolderOk: 'Folder created',
+  createFolderFail: 'Failed to create folder, please try again',
+  watchLaterOk: 'Added to Watch Later',
+  watchLaterRemoved: 'Removed from Watch Later',
+  watchLaterFail: 'Action failed, please try again',
 }
 
 const CMN_TW: QuickActionsMessages = {
@@ -140,6 +169,15 @@ const CMN_TW: QuickActionsMessages = {
   submitFavorite: '收藏',
   dismiss: '取消',
   closePanel: '關閉',
+  createFolder: '+ 新增收藏夾',
+  createFolderPlaceholder: '收藏夾名稱',
+  createFolderSubmit: '建立',
+  createFolderCancel: '取消',
+  createFolderOk: '收藏夾已建立',
+  createFolderFail: '建立收藏夾失敗，請稍後重試',
+  watchLaterOk: '已加入稍後再看',
+  watchLaterRemoved: '已從稍後再看移除',
+  watchLaterFail: '操作失敗，請稍後重試',
 }
 
 const JYUT: QuickActionsMessages = {
@@ -165,6 +203,15 @@ const JYUT: QuickActionsMessages = {
   submitFavorite: '收藏',
   dismiss: '取消',
   closePanel: '關閉',
+  createFolder: '+ 開個新收藏夾',
+  createFolderPlaceholder: '收藏夾名',
+  createFolderSubmit: '開',
+  createFolderCancel: '取消',
+  createFolderOk: '收藏夾開好咗',
+  createFolderFail: '開收藏夾失敗，轉頭再試',
+  watchLaterOk: '加咗去稍後再看',
+  watchLaterRemoved: '喺稍後再看移除咗',
+  watchLaterFail: '操作失敗，轉頭再試',
 }
 
 /** 模块自建 i18n：四种语言键集合完全一致（缺键回退简中 / 英文，不会出现空串） */

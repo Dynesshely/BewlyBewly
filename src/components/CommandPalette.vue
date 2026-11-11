@@ -52,6 +52,93 @@ function formatKeyTokens(tokens: string[], chord: boolean): string {
 const query = ref('')
 const selected = ref(0)
 const inputRef = ref<HTMLInputElement | null>(null)
+const rootRef = ref<HTMLElement | null>(null)
+/** 打开命令面板前的焦点，关闭时还回去（在 setup 阶段捕获，此时还没抢焦点） */
+const restoreFocusTo = activeElementDeep()
+let trappedRoot: ShadowRoot | Document | null = null
+
+/** 穿透 shadow root 找真正获得焦点的元素（document.activeElement 只会返回 host） */
+function activeElementDeep(): HTMLElement | null {
+  let el = document.activeElement as HTMLElement | null
+  while (el?.shadowRoot?.activeElement)
+    el = el.shadowRoot.activeElement as HTMLElement
+  return el
+}
+
+/** 面板内真实可聚焦元素（排除隐藏 / 禁用 / tabindex=-1） */
+function panelFocusables(): HTMLElement[] {
+  const root = rootRef.value
+  if (!root)
+    return []
+  return Array.from(root.querySelectorAll<HTMLElement>('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'))
+    .filter(el => el.getClientRects().length > 0)
+}
+
+/**
+ * 焦点在面板内循环。
+ * 命令面板的条目不参与 Tab（键盘导航走输入框上的 ↑/↓/Enter），
+ * 所以正常只有输入框一个可聚焦元素；仍然按通用规则首尾循环。
+ */
+function moveFocusInPanel(backward: boolean): void {
+  const items = panelFocusables()
+  if (!items.length) {
+    rootRef.value?.focus({ preventScroll: true })
+    return
+  }
+  const active = activeElementDeep()
+  const current = active
+    ? items.indexOf(active)
+    : -1
+  const next = current < 0
+    ? (backward
+        ? items.length - 1
+        : 0)
+    : (current + (backward
+        ? -1
+        : 1) + items.length) % items.length
+  items[next]?.focus({ preventScroll: true })
+}
+
+/** 捕获阶段拦下 Tab：必须 preventDefault，否则浏览器默认行为会把焦点移出面板 */
+function onTabCapture(event: Event): void {
+  if (!(event instanceof KeyboardEvent) || event.key !== 'Tab')
+    return
+  event.preventDefault()
+  event.stopPropagation()
+  moveFocusInPanel(event.shiftKey)
+}
+
+/** 命令面板在 shadow root 里：监听挂到面板所在的 ShadowRoot（没有则 Document） */
+function bindTabTrap(): void {
+  unbindTabTrap()
+  const node = rootRef.value?.getRootNode()
+  if (node instanceof ShadowRoot || node instanceof Document) {
+    trappedRoot = node
+    node.addEventListener('keydown', onTabCapture, true)
+  }
+}
+
+function unbindTabTrap(): void {
+  if (trappedRoot) {
+    trappedRoot.removeEventListener('keydown', onTabCapture, true)
+    trappedRoot = null
+  }
+}
+
+onMounted(async () => {
+  await nextTick()
+  bindTabTrap()
+  const items = panelFocusables()
+  if (items.length)
+    items[0]?.focus({ preventScroll: true })
+  else
+    rootRef.value?.focus({ preventScroll: true })
+})
+
+onBeforeUnmount(() => {
+  unbindTabTrap()
+  restoreFocusTo?.focus?.({ preventScroll: true })
+})
 
 const commands = computed<Command[]>(() => [
   {
@@ -412,6 +499,8 @@ function isRunnable(cmd: Command | undefined): boolean {
 function onKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') {
     event.preventDefault()
+    // 第 19 轮：Esc 关闭命令面板时不把事件继续传给页面级快捷键
+    event.stopPropagation()
     emit('close')
     return
   }
@@ -434,7 +523,15 @@ function onKeydown(event: KeyboardEvent) {
 
 <template>
   <div class="command-palette-mask" @click.self="$emit('close')">
-    <div class="command-palette" @keydown="onKeydown">
+    <div
+      ref="rootRef"
+      class="command-palette"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="t('command_palette.placeholder')"
+      tabindex="-1"
+      @keydown="onKeydown"
+    >
       <input
         ref="inputRef"
         v-model="query"

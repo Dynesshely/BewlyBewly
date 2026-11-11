@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { MomentsDensity } from '../composables/useMomentsDensity'
 import type { MomentCard, MomentImage } from '../types'
+import Picture from '~/components/Picture.vue'
 import { useMomentLike } from '../composables/useMomentLike'
 import { useMomentsOpen } from '../composables/useMomentsOpen'
 import { useMomentsI18n } from '../i18n'
+
 import { copyTextToClipboard } from '../utils/clipboard'
 
 import MomentMedia from './MomentMedia.vue'
@@ -137,10 +139,15 @@ watch(() => [props.density, props.compact], async () => {
   >
     <div class="moment-card__rail">
       <button type="button" class="moment-card__avatar" @click.stop="handleAuthorClick">
-        <img
-          v-if="card.author.face" :src="card.author.face" :alt="t('avatar_alt', { name: card.author.name })" loading="lazy" decoding="async"
-          fetchpriority="low"
-        >
+        <Picture
+          v-if="card.author.face"
+          :src="card.author.face"
+          :alt="t('avatar_alt', { name: card.author.name })"
+          loading="lazy" decoding="async" fetchpriority="low"
+          fallback-kind="avatar"
+          :fallback-text="card.author.name.slice(0, 1)"
+          class="block w-full h-full"
+        />
         <span v-else class="moment-card__avatar-fallback">{{ card.author.name.slice(0, 1) }}</span>
       </button>
     </div>

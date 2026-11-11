@@ -306,6 +306,7 @@ provide('getVideoType', () => props.type!)
               :loading="coverLoading"
               decoding="async"
               :fetchpriority="coverFetchPriority"
+              fallback-kind="video"
               w="full" max-w-full align-middle aspect-video object-cover
               rounded="$bew-radius"
             />

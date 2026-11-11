@@ -315,6 +315,15 @@
   user-select: none;
 }
 
+.bap-lightbox__fallback {
+  width: min(70vw, 900px);
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--bew-radius-sm, 8px);
+  color: var(--bew-text-2);
+  box-shadow: var(--bew-shadow-4);
+}
+
 .bap-lightbox__btn {
   position: absolute;
   display: inline-flex;

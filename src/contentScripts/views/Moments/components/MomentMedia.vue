@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { MomentsDensity } from '../composables/useMomentsDensity'
 import type { MomentCard } from '../types'
+import Picture from '~/components/Picture.vue'
+
 import { useMomentsI18n } from '../i18n'
 
 const props = withDefaults(defineProps<{
@@ -62,7 +64,7 @@ function handleLinkKeydown(event: KeyboardEvent) {
       @keydown="handleLinkKeydown"
     >
       <div class="moment-media__video-cover">
-        <img :src="card.video.cover" alt="" loading="lazy" decoding="async">
+        <Picture :src="card.video.cover" alt="" fallback-kind="video" class="block w-full h-full" />
         <span v-if="card.video.duration" class="moment-media__duration">{{ card.video.duration }}</span>
         <span class="moment-media__play" aria-hidden="true">
           <span class="i-tabler:player-play-filled" />
@@ -91,7 +93,7 @@ function handleLinkKeydown(event: KeyboardEvent) {
       @keydown="handleLinkKeydown"
     >
       <div class="moment-media__article-cover">
-        <img v-if="card.article.cover" :src="card.article.cover" alt="" loading="lazy" decoding="async">
+        <Picture v-if="card.article.cover" :src="card.article.cover" alt="" fallback-kind="image" class="block w-full h-full" />
         <span v-else class="moment-media__article-placeholder" aria-hidden="true">
           <span class="i-tabler:file-text" />
         </span>
@@ -120,7 +122,7 @@ function handleLinkKeydown(event: KeyboardEvent) {
       @keydown="handleLinkKeydown"
     >
       <div class="moment-media__live-cover">
-        <img :src="card.live.cover" alt="" loading="lazy" decoding="async">
+        <Picture :src="card.live.cover" alt="" fallback-kind="video" class="block w-full h-full" />
         <span class="moment-media__live-badge">
           <span class="i-fluent:live-24-filled" aria-hidden="true" />
           {{ card.live.liveStatus === 1
@@ -151,7 +153,7 @@ function handleLinkKeydown(event: KeyboardEvent) {
         :aria-label="t('image_alt', { n: index + 1 })"
         @click="emit('openImages', index)"
       >
-        <img :src="image.url" alt="" loading="lazy" decoding="async">
+        <Picture :src="image.url" alt="" fallback-kind="image" class="block w-full h-full" />
       </button>
     </div>
   </div>

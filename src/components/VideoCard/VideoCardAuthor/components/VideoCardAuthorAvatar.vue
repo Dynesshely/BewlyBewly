@@ -53,6 +53,7 @@ const displayedAvatars = computed(() => {
         loading="lazy"
         decoding="async"
         fetchpriority="low"
+        fallback-kind="avatar"
         w-inherit h-inherit
         rounded="1/2"
       />

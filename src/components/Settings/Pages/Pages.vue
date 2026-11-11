@@ -865,4 +865,11 @@ function resetGroup(key: GroupKey) {
     transition: none;
   }
 }
+
+/* 第 19 轮：设置页搜索框 / 分组导航的键盘焦点可见性（暗色同样使用主题色描边） */
+.pages-search :deep(input:focus-visible) {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
 </style>

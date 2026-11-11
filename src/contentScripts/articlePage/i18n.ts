@@ -39,6 +39,8 @@ export interface ArticlePageMessages {
   imagePrev: string
   imageNext: string
   imageHint: string
+  /** 大图加载失败时的占位文字 */
+  imageFallback: string
   /** 代码块复制 */
   codeCopy: string
   codeCopied: string
@@ -74,6 +76,7 @@ const CMN_CN: ArticlePageMessages = {
   imagePrev: '上一张',
   imageNext: '下一张',
   imageHint: 'Esc 关闭 · ← / → 切换',
+  imageFallback: '图片加载失败',
   codeCopy: '复制',
   codeCopied: '已复制',
 }
@@ -108,6 +111,7 @@ const EN: ArticlePageMessages = {
   imagePrev: 'Previous image',
   imageNext: 'Next image',
   imageHint: 'Esc to close · ← / → to switch',
+  imageFallback: 'Image failed to load',
   codeCopy: 'Copy',
   codeCopied: 'Copied',
 }
@@ -142,6 +146,7 @@ const CMN_TW: ArticlePageMessages = {
   imagePrev: '上一張',
   imageNext: '下一張',
   imageHint: 'Esc 關閉 · ← / → 切換',
+  imageFallback: '圖片載入失敗',
   codeCopy: '複製',
   codeCopied: '已複製',
 }
@@ -161,6 +166,7 @@ const JYUT: ArticlePageMessages = {
   imagePrev: '上一張',
   imageNext: '下一張',
   imageHint: '撳 Esc 關閉 · ← / → 切換',
+  imageFallback: '圖片載入失敗',
   codeCopy: '複製',
   codeCopied: '複製咗',
 }

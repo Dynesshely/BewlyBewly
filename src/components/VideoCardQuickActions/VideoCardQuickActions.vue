@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Video } from '~/components/VideoCard/types'
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 import FavoriteFolderPanel from './FavoriteFolderPanel.vue'
 import { cancelQueuedInteractionStatus, ensureInteractionStatus } from './interactionStatus'
@@ -15,7 +15,12 @@ const props = withDefaults(defineProps<{
   watchLaterActive: false,
 })
 
-const emit = defineEmits<{
+/**
+ * 保留事件声明（不再触发）：`VideoCard` 仍传 `@toggle-watch-later`，
+ * 声明后该监听不会再作为 fallthrough attr 落到根节点上。
+ * 稍后再看的开关逻辑已完全在本组件内处理。
+ */
+defineEmits<{
   (e: 'toggleWatchLater'): void
 }>()
 
@@ -32,6 +37,12 @@ const {
   favoriteFolderLoading,
   favoriteFolderFailed,
   selectedFolderIds,
+  favoriteCreatePending,
+  createdFolderId,
+  isInWatchLater,
+  watchLaterPending,
+  toggleWatchLater,
+  createFavoriteFolder,
   toggleLike,
   handleFavoriteButton,
   closeFavoritePanel,
@@ -45,9 +56,20 @@ function handleLike() {
   void toggleLike()
 }
 
+/**
+ * 稍后再看改为开关（第 19 轮）：已加入则移除，未加入则加入；状态与回滚都在组合式函数里。
+ *
+ * 状态优先级：本会话记录（含 5 分钟缓存）→ 父组件传入的初始值。
+ * 父组件只在「快捷操作条关闭、回退渲染单独按钮」时才持有该状态，两边不会互相覆盖。
+ */
+const watchLaterActiveResolved = computed<boolean>(() => {
+  const local = isInWatchLater.value
+  return local ?? props.watchLaterActive
+})
+
 function handleWatchLater() {
   closeFavoritePanel()
-  emit('toggleWatchLater')
+  void toggleWatchLater()
 }
 
 const barRef = ref<HTMLElement | null>(null)
@@ -116,13 +138,14 @@ onBeforeUnmount(() => {
       v-if="showWatchLater"
       type="button"
       class="bewly-card-actions__btn"
-      :class="{ 'is-active': watchLaterActive }"
-      :aria-pressed="watchLaterActive"
+      :class="{ 'is-active': watchLaterActiveResolved, 'is-busy': watchLaterPending }"
+      :aria-pressed="watchLaterActiveResolved"
       :aria-label="$t('common.save_to_watch_later')"
-      :title="watchLaterActive ? $t('common.added') : $t('common.save_to_watch_later')"
+      :title="watchLaterActiveResolved ? $t('common.added') : $t('common.save_to_watch_later')"
+      :disabled="watchLaterPending"
       @click.stop.prevent="handleWatchLater"
     >
-      <span :class="watchLaterActive ? 'i-mingcute:check-line' : 'i-mingcute:carplay-line'" aria-hidden="true" />
+      <span :class="watchLaterActiveResolved ? 'i-mingcute:check-line' : 'i-mingcute:carplay-line'" aria-hidden="true" />
     </button>
 
     <FavoriteFolderPanel
@@ -133,6 +156,9 @@ onBeforeUnmount(() => {
       :loading="favoriteFolderLoading"
       :failed="favoriteFolderFailed"
       :pending="favoritePending"
+      :create-pending="favoriteCreatePending"
+      :created-folder-id="createdFolderId"
+      @create="createFavoriteFolder"
       @toggle-folder="toggleFolderSelection"
       @submit="submitFavoriteSelection"
       @retry="reloadFavoriteFolders"

@@ -124,3 +124,112 @@ text-4 从可读文字中移除**；边框 / 图标在 `prefers-contrast: more` 
 - 改动的 SCSS / SFC 样式块全部通过 `sass` 编译（10 个文件）；
 - `pnpm exec eslint`（含改动文件）`--fix` 后裸跑：0 error 0 warning；
 - `pnpm run typecheck`：0 error（本轮只改样式，未动 TS）。
+
+---
+
+## 第 19 轮：键盘可达性与焦点管理收尾
+
+第 1–18 轮陆续加了 7 个增强浮层 + 3 个全局面板，但焦点管理不统一：
+有的打开后不聚焦、有的 Tab 会跑出面板、关闭后焦点丢到 body。本轮逐个核对并补齐（只改可聚焦性与焦点管理，不改业务逻辑 / 视觉布局）。
+
+### 1. 核对清单（逐面板）
+
+| 面板 / 组件 | 打开聚焦 | Tab / Shift+Tab 陷阱 | Esc 关闭 | 关闭恢复焦点 | aria
+| --- | --- | --- | --- | --- | --- |
+| 通知页面板 `bnp-panel` | ✅ 第一个可交互元素 | ✅ 循环 | ✅ 模块 shortcuts（stopPropagation） | ✅ 回到触发 FAB | role=dialog + aria-modal=false |
+| 搜索页面板 `bse-panel` | ✅ | ✅ | ✅ | ✅ | role=dialog + aria-modal=false |
+| 空间页面板 `bsp-panel` | ✅ | ✅ | ✅ | ✅ | role=dialog + aria-modal=false |
+| 分区页面板 `bcp-panel` | ✅ | ✅ | ✅ | ✅ | role=dialog + aria-modal=false |
+| 直播页面板 `blp-panel` | ✅ | ✅ | ✅ | ✅ | role=dialog + aria-modal=false |
+| 播放页快捷键帮助 `bvp-help` | ✅ 关闭按钮 | ✅ | ✅（原有） | ✅ | role=dialog + aria-modal=true（原有） |
+| 文章目录面板 `bap-toc` | ✅ 当前章节 / 第一条 | ✅ | ✅（原有） | ✅ | role=dialog + aria-modal=false（本轮补） |
+| 文章大图 `bap-lightbox` | ✅ 关闭按钮 | ✅ | ✅（原有） | ✅ | role=dialog + aria-modal=true（原有） |
+| 全局快捷键帮助 `KeyboardShortcutHelp` | ✅ 关闭按钮 | ✅ | ✅（原有） | ✅ | role=dialog + aria-modal=true（原有） |
+| 命令面板 `CommandPalette` | ✅ 输入框（原有） | ✅ 只留在面板内 | ✅（原有，stopPropagation） | ✅ | 本轮补 role=dialog + aria-modal=true + aria-label |
+| 设置「页面增强」`Pages.vue` | —（不是浮层） | — | — | — | 搜索框补 `:focus-visible` 描边；导航药丸、清空按钮已有 |
+
+### 2. 实现方式（真机修复后：shadowRoot capture + preventDefault + 手动聚焦）
+
+第一版实现把 `@keydown` 挂在面板根元素上、只在「焦点在最后一个元素」时 `preventDefault`。
+真机实测（Lead，2026-11-11）命令面板打开后连按 Tab，焦点**跑出面板落到 Dock 按钮**（`activeElement = BUTTON.dock-item`），说明拦截没有生效。
+根因有两条：
+
+1. 面板 UI 在独立 **shadow root** 里，`document.activeElement` 只返回 shadow host，拿它判断「是否最后一个元素」永远对不上；
+2. 只对「最后一个元素」做 `preventDefault` 不够：Tab 的落点判断稍偏，浏览器默认行为就会把焦点移到面板外，必须**无条件拦截 Tab**。
+
+修复后的统一实现（五个增强模块面板 + 播放页帮助 + 文章目录 / 大图 + 全局快捷键帮助 + 命令面板）：
+
+```ts
+// 面板打开时，把捕获阶段的 keydown 挂到面板所在 root（ShadowRoot / Document）
+function bindTabTrap(): void {
+  const node = rootRef.value?.getRootNode()
+  if (node instanceof ShadowRoot || node instanceof Document)
+    node.addEventListener('keydown', onTabCapture, true)
+}
+
+function onTabCapture(event: Event): void {
+  if (!(event instanceof KeyboardEvent) || event.key !== 'Tab')
+    return
+  event.preventDefault() // 必须拦掉浏览器默认的 Tab 移动
+  event.stopPropagation()
+  moveFocusInPanel(event.shiftKey)
+}
+
+function moveFocusInPanel(backward: boolean): void {
+  const items = panelFocusables() // 面板内可见的 button / input / select / a / [tabindex]
+  if (!items.length) {
+    rootRef.value?.focus({ preventScroll: true }) // 没有可聚焦元素时聚焦面板容器（tabindex=-1）
+    return
+  }
+  const active = activeElementDeep() // 穿透 shadow root 的真实焦点
+  const current = active
+    ? items.indexOf(active)
+    : -1
+  const next = current < 0
+    ? (backward
+        ? items.length - 1
+        : 0)
+    : (current + (backward
+        ? -1
+        : 1) + items.length) % items.length
+  items[next]?.focus({ preventScroll: true })
+}
+```
+
+- **为什么是 capture**：Tab 事件的默认行为发生在冒泡阶段之后；只在冒泡里 `preventDefault` 有时机差异，
+  而挂到 shadow root 的 capture 阶段能保证「面板内任意元素按下 Tab」都先被我们处理；
+- **为什么用 getRootNode()**：增强模块 UI 在自己独立的 shadow root 里，事件只在该 root 内派发，
+  `document` 上的监听收不到；`getRootNode()` 返回面板所在的 `ShadowRoot`（非 shadow 场景回退 `Document`）后挂 capture 监听，
+  关闭 / 卸载时 `removeEventListener` 清理；
+- **activeElementDeep()**：`document.activeElement` 在 shadow 里只能拿到 host，循环遍历 `shadowRoot.activeElement` 才能拿到真正的按钮；
+- **无元素兜底**：面板内没有可聚焦元素（或全部 disabled）时 `preventDefault` 后聚焦面板容器（`tabindex="-1"`），
+  保证焦点不会掉回页面；
+- **打开聚焦**：watch 打开状态 → `nextTick` → 绑定 capture + 聚焦第一个可聚焦元素（目录面板优先当前章节）；
+- **关闭恢复**：打开时记录 `activeElementDeep()`（触发按钮），关闭 / 卸载时 `focus({ preventScroll: true })` 还回去；
+- **Esc**：沿用各模块键盘层已有逻辑（面板开着时 `preventDefault + stopPropagation` 后关闭），本轮未改；
+- **aria**：五个浮动面板 `role="dialog" + aria-modal="false"`（非模态工具面板）；
+  真正模态的全局帮助 / 命令面板 / 文章大图用 `aria-modal="true"`。
+### 3. focus-visible 可见性
+
+- 各模块 shadow scss 早就有统一的 `:host :focus-visible { outline: 2px solid var(--bew-theme-color); outline-offset: 2px; }`；
+  暗色模式下主题色仍是高对比色，`outline-offset` 保证描边不被圆角/背景吞掉；
+- 本轮补充 `Pages.vue` 搜索输入框的 `:focus-visible`（此前依赖组件默认样式，暗色下不够明显）；
+  导航药丸、`清空` 按钮、空态按钮已有同款描边；
+- 所有新增规则只用 `outline`，不改盒模型与布局。
+
+### 4. 未改动 / 已知限制
+
+- **不引入焦点陷阱库**：仓库没有现成的 `useFocusTrap`，本轮按「最小代码」原则在需要的组件内各写约 40 行（含 capture 绑定 / activeElementDeep）；
+- **非模态面板不做遮罩**：通知 / 搜索 / 空间 / 分区 / 直播面板是 `aria-modal="false"` 的浮动工具面板，
+  Tab 循环只保证「不跑丢」，页面其它区域仍可点击（符合非模态语义）；
+- **视频卡右键菜单 / 收藏夹面板 / 列表快捷键帮助** 不在本轮写入范围（分别属于 VideoCardQuickActions、listShared 组件），
+  其 `aria-modal="false"` 与焦点表现沿用原状，后续如需要可套用同一套路；
+- **命令面板列表项不是 DOM 可聚焦元素**：键盘操作依赖输入框上的 ↑/↓/Enter（既有设计），
+  因此 Tab 陷阱实际上把焦点固定在输入框（唯一可聚焦元素）；若将来要求列表项可 Tab，需要改 DOM 结构（超出「只改焦点管理」范围）；
+- 未做真实键盘走查（按分工由 Lead 统一构建回归）；本轮只做静态实现 + eslint + typecheck。
+
+### 5. 自测
+
+- `pnpm exec eslint`（11 个改动文件）：0 error 0 warning；
+- `pnpm run typecheck`：0 error；
+- 未跑 build / playwright；未碰浏览器；未做 git 操作。

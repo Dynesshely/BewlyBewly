@@ -11,6 +11,10 @@ const props = defineProps<{
   loading: boolean
   failed: boolean
   pending: boolean
+  /** 「+ 新建收藏夹」请求在途 */
+  createPending?: boolean
+  /** 最近一次成功创建的收藏夹 id（变化时收起输入框） */
+  createdFolderId?: number | null
 }>()
 
 const emit = defineEmits<{
@@ -18,13 +22,41 @@ const emit = defineEmits<{
   (e: 'submit'): void
   (e: 'close'): void
   (e: 'retry'): void
+  (e: 'create', title: string): void
 }>()
 
 const messages = useQuickActionsMessages()
 const panelRef = ref<HTMLElement | null>(null)
 
+/** 行内新建收藏夹表单是否展开 */
+const creating = ref<boolean>(false)
+const draftTitle = ref<string>('')
+const titleInputRef = ref<HTMLInputElement | null>(null)
+
 const selectedCountText = computed(() => messages.value.selectedCount.replace('{count}', String(props.selectedIds.length)))
 const submitText = computed(() => (props.pending ? messages.value.pending : messages.value.submitFavorite))
+
+const canSubmitCreate = computed(() => !props.createPending && draftTitle.value.trim().length > 0)
+
+function startCreate(): void {
+  creating.value = true
+  draftTitle.value = ''
+  void nextTick(() => titleInputRef.value?.focus())
+}
+
+function cancelCreate(): void {
+  if (props.createPending)
+    return
+  creating.value = false
+  draftTitle.value = ''
+}
+
+function submitCreate(): void {
+  const title = draftTitle.value.trim()
+  if (!title || props.createPending)
+    return
+  emit('create', title)
+}
 
 function isSelected(id: number): boolean {
   return props.selectedIds.includes(id)
@@ -54,6 +86,10 @@ function handleWindowKeydown(event: KeyboardEvent) {
     return
   if (event.key === 'Escape') {
     event.preventDefault()
+    if (creating.value) {
+      cancelCreate()
+      return
+    }
     emit('close')
   }
 }
@@ -69,6 +105,10 @@ function detachDocumentClick() {
 }
 
 watch(() => props.open, async (open) => {
+  if (!open) {
+    creating.value = false
+    draftTitle.value = ''
+  }
   if (open) {
     await nextTick()
     focusFirstElement()
@@ -80,6 +120,14 @@ watch(() => props.open, async (open) => {
   }
   else {
     detachDocumentClick()
+  }
+})
+
+// 创建成功（父级刷新列表并回传新夹 id）后收起输入框；失败时保留输入内容便于重试
+watch(() => props.createdFolderId, (id, previous) => {
+  if (typeof id === 'number' && id > 0 && id !== previous && creating.value) {
+    creating.value = false
+    draftTitle.value = ''
   }
 })
 
@@ -156,6 +204,48 @@ onBeforeUnmount(() => {
             </button>
           </li>
         </ul>
+      </div>
+
+      <div class="bewly-fav-panel__create-row">
+        <template v-if="creating">
+          <input
+            ref="titleInputRef"
+            v-model="draftTitle"
+            class="bewly-fav-panel__input"
+            type="text"
+            maxlength="40"
+            :placeholder="messages.createFolderPlaceholder"
+            :aria-label="messages.createFolderPlaceholder"
+            :disabled="createPending"
+            @keydown.enter.prevent="submitCreate"
+            @keydown.esc.prevent.stop="cancelCreate"
+          >
+          <button
+            type="button"
+            class="bewly-fav-panel__action is-primary"
+            :disabled="!canSubmitCreate"
+            @click="submitCreate"
+          >
+            {{ createPending ? messages.pending : messages.createFolderSubmit }}
+          </button>
+          <button
+            type="button"
+            class="bewly-fav-panel__action"
+            :disabled="createPending"
+            @click="cancelCreate"
+          >
+            {{ messages.createFolderCancel }}
+          </button>
+        </template>
+        <button
+          v-else
+          type="button"
+          class="bewly-fav-panel__action is-create"
+          :disabled="loading || failed"
+          @click="startCreate"
+        >
+          {{ messages.createFolder }}
+        </button>
       </div>
 
       <div class="bewly-fav-panel__footer">
@@ -334,6 +424,54 @@ onBeforeUnmount(() => {
   font-variant-numeric: tabular-nums;
 }
 
+.bewly-fav-panel__create-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.bewly-fav-panel__create-row > .bewly-fav-panel__action.is-create {
+  width: 100%;
+  padding: 5px 10px;
+  text-align: left;
+  border: 1px dashed var(--bew-border-color);
+  border-radius: 8px;
+  background: transparent;
+}
+
+.bewly-fav-panel__create-row > .bewly-fav-panel__action.is-create:hover {
+  color: var(--bew-theme-color);
+  border-color: var(--bew-theme-color-40);
+  background: var(--bew-theme-color-20);
+}
+
+.bewly-fav-panel__input {
+  flex: 1 1 100px;
+  min-width: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--bew-text-1);
+  background: var(--bew-fill-1);
+  border: 1px solid var(--bew-border-color);
+  border-radius: 8px;
+}
+
+.bewly-fav-panel__input::placeholder {
+  color: var(--bew-text-3);
+}
+
+.bewly-fav-panel__input:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 1px;
+}
+
+.bewly-fav-panel__input:disabled {
+  opacity: 0.72;
+}
+
 .bewly-fav-panel__footer {
   display: flex;
   flex-wrap: wrap;
@@ -415,7 +553,8 @@ onBeforeUnmount(() => {
 @media (prefers-contrast: more) {
   .bewly-fav-panel,
   .bewly-fav-panel__box,
-  .bewly-fav-panel__action {
+  .bewly-fav-panel__action,
+  .bewly-fav-panel__input {
     border-color: var(--bew-text-3);
   }
 

@@ -15,6 +15,97 @@ import { getTocHeadings } from '../toc'
  */
 const t = useMessages()
 const listRef = ref<HTMLElement | null>(null)
+// #region 键盘可达性（第 19 轮）：打开聚焦 / shadowRoot capture 焦点陷阱 / 关闭恢复
+const rootRef = ref<HTMLElement | null>(null)
+let restoreFocusTo: HTMLElement | null = null
+let trappedRoot: ShadowRoot | Document | null = null
+
+/** 穿透 shadow root 找真正获得焦点的元素（document.activeElement 只会返回 host） */
+function activeElementDeep(): HTMLElement | null {
+  let el = document.activeElement as HTMLElement | null
+  while (el?.shadowRoot?.activeElement)
+    el = el.shadowRoot.activeElement as HTMLElement
+  return el
+}
+
+/** 面板内真实可聚焦元素（排除隐藏 / 禁用 / tabindex=-1） */
+function panelFocusables(): HTMLElement[] {
+  const root = rootRef.value
+  if (!root)
+    return []
+  return Array.from(root.querySelectorAll<HTMLElement>('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'))
+    .filter(el => el.getClientRects().length > 0)
+}
+
+/** 焦点在面板内循环；没有可聚焦元素时聚焦面板容器本身（tabindex=-1） */
+function moveFocusInPanel(backward: boolean): void {
+  const items = panelFocusables()
+  if (!items.length) {
+    rootRef.value?.focus({ preventScroll: true })
+    return
+  }
+  const active = activeElementDeep()
+  const current = active
+    ? items.indexOf(active)
+    : -1
+  const next = current < 0
+    ? (backward
+        ? items.length - 1
+        : 0)
+    : (current + (backward
+        ? -1
+        : 1) + items.length) % items.length
+  items[next]?.focus({ preventScroll: true })
+}
+
+/** 捕获阶段拦下 Tab：必须 preventDefault，否则浏览器默认行为会把焦点移出面板 */
+function onTabCapture(event: Event): void {
+  if (!(event instanceof KeyboardEvent) || event.key !== 'Tab')
+    return
+  event.preventDefault()
+  event.stopPropagation()
+  moveFocusInPanel(event.shiftKey)
+}
+
+/** 事件发生在 shadow root 内：监听挂到面板所在的 root（ShadowRoot / Document） */
+function bindTabTrap(): void {
+  unbindTabTrap()
+  const node = rootRef.value?.getRootNode()
+  if (node instanceof ShadowRoot || node instanceof Document) {
+    trappedRoot = node
+    node.addEventListener('keydown', onTabCapture, true)
+  }
+}
+
+function unbindTabTrap(): void {
+  if (trappedRoot) {
+    trappedRoot.removeEventListener('keydown', onTabCapture, true)
+    trappedRoot = null
+  }
+}
+
+watch(() => ui.tocOpen, async (open) => {
+  if (!open) {
+    unbindTabTrap()
+    restoreFocusTo?.focus?.({ preventScroll: true })
+    restoreFocusTo = null
+    return
+  }
+  restoreFocusTo = activeElementDeep()
+  await nextTick()
+  bindTabTrap()
+  // 打开后把焦点送进目录：优先当前章节，没有则第一个条目
+  const activeItem = rootRef.value?.querySelector<HTMLElement>('[data-active="true"]')
+  const first = panelFocusables()[0]
+  const target = activeItem ?? first
+  if (target)
+    target.focus({ preventScroll: true })
+  else
+    rootRef.value?.focus({ preventScroll: true })
+})
+
+onBeforeUnmount(unbindTabTrap)
+// #endregion
 
 // 面板展开时跟随滚动：当前章节始终保持在目录可视范围内
 watch(() => ui.activeTocIndex, (index) => {
@@ -29,17 +120,6 @@ watch(() => ui.activeTocIndex, (index) => {
   })
 })
 
-watch(() => ui.tocOpen, async (open) => {
-  if (!open)
-    return
-  await nextTick()
-  // 打开后把焦点送进目录：优先当前章节，没有则第一个条目
-  const active = listRef.value?.querySelector<HTMLElement>('[data-active="true"]')
-  const first = listRef.value?.querySelector<HTMLElement>('button')
-  const target = active ?? first
-  target?.focus()
-})
-
 function selectHeading(index: number) {
   jumpToHeading(index, getTocHeadings())
 }
@@ -49,8 +129,13 @@ function selectHeading(index: number) {
   <Transition name="bap-slide">
     <section
       v-if="ui.tocOpen"
+      ref="rootRef"
       class="bap-toc"
+      role="dialog"
+      :aria-modal="false"
       :aria-label="t.tocTitle"
+
+      tabindex="-1"
     >
       <header class="bap-toc__header">
         <div>

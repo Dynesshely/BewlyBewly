@@ -13,6 +13,96 @@ import { ui } from '../state'
 
 const t = useMessages()
 
+// #region 键盘可达性（第 19 轮）：打开聚焦 / shadowRoot capture 焦点陷阱 / 关闭恢复
+const rootRef = ref<HTMLElement | null>(null)
+const panelRef = ref<HTMLElement | null>(null)
+let restoreFocusTo: HTMLElement | null = null
+let trappedRoot: ShadowRoot | Document | null = null
+
+/** 穿透 shadow root 找真正获得焦点的元素（document.activeElement 只会返回 host） */
+function activeElementDeep(): HTMLElement | null {
+  let el = document.activeElement as HTMLElement | null
+  while (el?.shadowRoot?.activeElement)
+    el = el.shadowRoot.activeElement as HTMLElement
+  return el
+}
+
+/** 面板内真实可聚焦元素（排除隐藏 / 禁用 / tabindex=-1） */
+function panelFocusables(): HTMLElement[] {
+  const root = panelRef.value
+  if (!root)
+    return []
+  return Array.from(root.querySelectorAll<HTMLElement>('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'))
+    .filter(el => el.getClientRects().length > 0)
+}
+
+/** 焦点在面板内循环；没有可聚焦元素时聚焦面板容器本身（tabindex=-1） */
+function moveFocusInPanel(backward: boolean): void {
+  const items = panelFocusables()
+  if (!items.length) {
+    panelRef.value?.focus({ preventScroll: true })
+    return
+  }
+  const active = activeElementDeep()
+  const current = active
+    ? items.indexOf(active)
+    : -1
+  const next = current < 0
+    ? (backward
+        ? items.length - 1
+        : 0)
+    : (current + (backward
+        ? -1
+        : 1) + items.length) % items.length
+  items[next]?.focus({ preventScroll: true })
+}
+
+/** 捕获阶段拦下 Tab：必须 preventDefault，否则浏览器默认行为会把焦点移出面板 */
+function onTabCapture(event: Event): void {
+  if (!(event instanceof KeyboardEvent) || event.key !== 'Tab')
+    return
+  event.preventDefault()
+  event.stopPropagation()
+  moveFocusInPanel(event.shiftKey)
+}
+
+/** 事件发生在 shadow root 内：监听挂到面板所在的 root（ShadowRoot / Document） */
+function bindTabTrap(): void {
+  unbindTabTrap()
+  const node = panelRef.value?.getRootNode()
+  if (node instanceof ShadowRoot || node instanceof Document) {
+    trappedRoot = node
+    node.addEventListener('keydown', onTabCapture, true)
+  }
+}
+
+function unbindTabTrap(): void {
+  if (trappedRoot) {
+    trappedRoot.removeEventListener('keydown', onTabCapture, true)
+    trappedRoot = null
+  }
+}
+
+watch(() => ui.panelOpen, async (open) => {
+  if (!open) {
+    unbindTabTrap()
+    restoreFocusTo?.focus?.({ preventScroll: true })
+    restoreFocusTo = null
+    return
+  }
+  restoreFocusTo = activeElementDeep()
+  await nextTick()
+  bindTabTrap()
+  const items = panelFocusables()
+  if (items.length)
+    items[0]?.focus({ preventScroll: true })
+  else
+    panelRef.value?.focus({ preventScroll: true })
+})
+
+onBeforeUnmount(unbindTabTrap)
+// #endregion
+
 /** 面板里的快捷键说明（行为见 keyboard.ts） */
 const shortcutRows = computed(() => [
   { keys: 'T', label: t.value.shortcut.cinema },
@@ -30,7 +120,7 @@ const fullscreenTitle = computed(() => ui.fullscreenAvailable ? t.value.fullscre
 </script>
 
 <template>
-  <div class="blp-root" :data-panel="ui.panelOpen">
+  <div ref="rootRef" class="blp-root" :data-panel="ui.panelOpen">
     <div class="blp-live" role="status" aria-live="polite">
       <span v-if="ui.toast" class="blp-toast">{{ ui.toast }}</span>
     </div>
@@ -62,8 +152,11 @@ const fullscreenTitle = computed(() => ui.fullscreenAvailable ? t.value.fullscre
     <Transition name="blp-panel">
       <section
         v-if="ui.panelOpen"
+        ref="panelRef"
         class="blp-panel"
+        tabindex="-1"
         role="dialog"
+        aria-modal="false"
         :aria-label="t.panelTitle"
       >
         <header class="blp-panel__header">

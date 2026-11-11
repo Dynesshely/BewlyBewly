@@ -6,3 +6,4 @@ export { cancelQueuedInteractionStatus, ensureInteractionStatus, getCachedFavori
 export { cardQuickActionsEnabled, isCardQuickActionsEnabled, LEGACY_CARD_QUICK_ACTIONS_STORAGE_KEY, migrateLegacyCardQuickActionsSetting, setCardQuickActionsEnabled, toggleCardQuickActions } from './preferences'
 export { resetCardQuickActionsState, resolveVideoAid, useCardQuickActions } from './useCardQuickActions'
 export { default as VideoCardQuickActions } from './VideoCardQuickActions.vue'
+export { getWatchLaterStatus, isWatchLaterPending, resetWatchLaterState, setWatchLaterStatus } from './watchLaterState'

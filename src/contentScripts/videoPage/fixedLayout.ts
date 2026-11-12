@@ -114,6 +114,18 @@ const MAX_PLAYER_HEIGHT = 1200
  * （`--bvp-col-comment-w: 400px`）。播放器的宽度预算必须先扣掉它，否则两列会挤出容器。
  */
 const MIN_COMMENT_WIDTH = 400
+/**
+ * 评论区**相对视口宽**的下限比例（第 44 轮微调，用户看到的是视觉比例）。
+ *
+ * - 分母用 `window.innerWidth`（视口宽），不是内容宽：
+ *   高位视口（如 1600×1300）时播放器会被允许更宽，若按内容宽算评论区能到 40%，
+ *   但按视口宽只有 38.8%，用户看到的就是不足 40%；
+ * - 只有「评论区 / 视口宽 < 40%」时才收窄播放器，收窄后保证
+ *   `colW >= ceil(innerWidth × 0.4)`，播放器保持 16:9（变矮可接受）。
+ */
+const MIN_COMMENT_WIDTH_RATIO = 0.4
+/** 触发 40% 兜底时，播放器宽度占视口宽的比例（0.6 = 1 − 0.4，与评论区 40% 对称） */
+const MAX_PLAYER_WIDTH_RATIO = 0.6
 /** 主区左右两列之间的横向 gutter（第 34 轮 `--bvp-gutter: 24px`） */
 const COLUMN_GUTTER = 24
 
@@ -285,6 +297,28 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
     }
   }
 
+  // 第 44 轮：评论区至少占内容宽 40%（单列模式——网页全屏 / 宽屏——评论区已隐藏，不适用）。
+  // 玩家按 16:9 反算后如果评论区不足 40%，就把播放器收窄到 60%（含 gutter 修正），
+  // 收窄后播放器高度按 16:9 回算（会变矮，用户明确接受）。
+  // 口径按**视口宽**（用户看到的是视觉比例）：colW / innerWidth < 40% 时收窄播放器，
+  // 使 colW 至少达到 ceil(innerWidth × 0.4)；ceil 保证边界（如 1601 宽）也不低于 40%。
+  // 播放器可用宽上限 = 内容宽 − gutter − 评论最小宽（内容宽 = 视口宽 − 左右 padding）。
+  const minCommentWidth = Math.ceil(window.innerWidth * MIN_COMMENT_WIDTH_RATIO)
+  if (!singleColumn && totalWidth > 0) {
+    const colWidth = totalWidth - width - COLUMN_GUTTER
+    if (colWidth < minCommentWidth) {
+      // 两个等价上限取小，保证边界（如 1601 宽）也不会低于 40%：
+      // 1) 按视口宽比例：innerWidth × 0.6 − gutter − 左右 padding；
+      // 2) 按评论最小宽反推：contentW − gutter − ceil(innerWidth × 0.4)。
+      const pagePadding = Math.max(0, window.innerWidth - totalWidth)
+      const maxPlayerByRatio = Math.round(window.innerWidth * MAX_PLAYER_WIDTH_RATIO)
+        - COLUMN_GUTTER - pagePadding
+      const maxPlayerByMinCol = totalWidth - COLUMN_GUTTER - minCommentWidth
+      width = Math.max(0, Math.min(width, maxPlayerByRatio, maxPlayerByMinCol))
+      height = Math.round(width * 9 / 16)
+    }
+  }
+
   // 右列至少要拿到 MIN_COMMENT_WIDTH（单列模式下不需要让位）
   width = Math.max(0, Math.min(width, singleColumn
     ? totalWidth
@@ -305,7 +339,13 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
 
   // 真机诊断（第 36 轮回归排查）：把布局关键值写到 DOM 属性，页面控制台可直接读：
   //   document.documentElement.dataset.bewlyFixedMetrics
-  const metrics = `dock=${dockHeight};player=${height}x${width};rail=${railSpace};top=${topOffset};mode=${mode}`
+  const commentWidth = singleColumn
+    ? totalWidth
+    : Math.max(0, totalWidth - width - COLUMN_GUTTER)
+  const commentPct = totalWidth > 0
+    ? (commentWidth / totalWidth * 100).toFixed(2)
+    : '0.00'
+  const metrics = `dock=${dockHeight};player=${height}x${width};rail=${railSpace};top=${topOffset};mode=${mode};colPct=${commentPct}`
   if (document.documentElement.getAttribute('data-bewly-fixed-metrics') !== metrics)
     document.documentElement.setAttribute('data-bewly-fixed-metrics', metrics)
 }

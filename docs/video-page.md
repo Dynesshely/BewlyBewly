@@ -960,3 +960,79 @@ document.querySelector('#commentapp').querySelector('bili-comments').shadowRoot.
 - `.bvp-rail` 为 null（不 setup 轨道 + `teardownRecommendRail()` 清 `railState`，Vue 不渲染）；
 - 原生 `#commentapp` 留在原位、原生推荐列表正常显示；
 - 关闭抽屉 / 非 iframe 页面：所有功能照常（`bewly-video-fixed` 存在、轨道存在）。
+
+## 第 44 轮：评论区至少占内容宽 40%
+
+用户要求：评论区默认宽度至少占内容宽的 2/5（40%）。
+
+### 实现（`fixedLayout.ts`）
+
+- 新增常量：
+  - `MIN_COMMENT_WIDTH_RATIO = 0.4`（评论列相对内容宽下限）；
+  - `MAX_PLAYER_WIDTH_RATIO = 0.6`（触发兜底时播放器占内容宽的比例）；
+- 播放器宽度按「16:9 反算 + 左列可用宽夹住」算完后，加一道兜底：
+
+  ```ts
+  const colWidth = totalWidth - width - COLUMN_GUTTER
+  if (colWidth / totalWidth < MIN_COMMENT_WIDTH_RATIO) {
+    width = Math.round(totalWidth * MAX_PLAYER_WIDTH_RATIO - COLUMN_GUTTER)
+    height = Math.round(width * 9 / 16) // 仍严格 16:9
+  }
+  ```
+
+- 只在**非单列**（普通模式）生效：网页全屏 / 宽屏时评论区已隐藏，不能把播放器压到 60%；
+- 收窄后播放器变矮是预期（用户明确优先保证评论比例）；`player.bottom ≤ rail.top − 24` 不受影响，
+  因为 dock 高度不变、播放器只会更矮；
+- 原有 `MIN_COMMENT_WIDTH = 400` 的绝对下限仍然保留在后（极窄视口由它兜底）。
+
+### 诊断
+
+`document.documentElement.dataset.bewlyFixedMetrics` 增加 `colPct=`（评论区占内容宽百分比，两位小数）：
+
+```
+dock=662;player=488x868;rail=238;top=64;mode=normal;colPct=42.53
+```
+
+### 预期数值（与代码同套公式）
+
+| 视口 | 内容宽 | 播放器 | 比例 | 评论列 | colPct | 兜底触发 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1600×1000 | 1552 | 868×488 | 1.7787 | 660 | 42.53% | 否 |
+| 1920×1000 | 1872 | 850×478 | 1.7782 | 998 | 53.31% | 否 |
+| 2200×1000 | 2152 | 811×456 | 1.7785 | 1317 | 61.20% | 否 |
+| 2560×1000 | 2512 | 759×427 | 1.7775 | 1729 | 68.83% | 否 |
+| 1600×1200 | 1552 | 907×510 | 1.7784 | 621 | 40.01% | **是** |
+| 1600×1440 | 1552 | 907×510 | 1.7784 | 621 | 40.01% | **是** |
+| 1280×1000 | 1232 | 715×402 | 1.7786 | 493 | 40.02% | **是** |
+
+所有行 `colPct ≥ 40.00`、比例在 1.7775~1.7787（±0.01 内）、`rail.top − dock.bottom = 24`。
+
+### 第 44 轮微调：40% 的分母改为**视口宽**
+
+真机反馈：1600×1300 时按内容宽算 `colPct=40.01`，但 `colW/innerWidth = 621/1600 = 38.81%`，
+用户看到的是**视觉比例**，所以分母必须用 `window.innerWidth`。
+
+改动（`fixedLayout.ts`）：
+
+- 兜底判断从 `colW / contentW < 0.4` 改为 `colW / innerWidth < 0.4`；
+- 收窄时取两个等价上限中的较小值：
+  - 按视口比例：`round(innerWidth × 0.6) − gutter − 左右 padding`；
+  - 按评论最小宽反推：`contentW − gutter − ceil(innerWidth × 0.4)`；
+  - `ceil` 保证奇数宽（如 1601）边界也不会低于 40%；
+- 收窄后 `height = round(width × 9 / 16)`，仍严格 16:9；
+- `data-bewly-fixed-metrics` 的 `colPct` 同步改为**按视口宽**计算（与兜底口径一致），
+  单列模式（网页全屏 / 宽屏，评论区隐藏）记 `0.00`。
+
+验收数值（与代码同套公式）：
+
+| 视口 | 播放器 | 比例 | 评论列 | colPct（/innerWidth） | 兜底 |
+| --- | --- | --- | --- | --- | --- |
+| 1600×1000 | 868×488 | 1.7787 | 660 | 41.25% | 否 |
+| 2200×1000 | 811×456 | 1.7785 | 1317 | 59.86% | 否 |
+| 1600×1300 | 888×500 | 1.7760 | **640** | **40.00%** | **是** |
+| 1600×1200 | 888×500 | 1.7760 | 640 | 40.00% | 是 |
+| 1920×1000 | 850×478 | 1.7782 | 998 | 51.98% | 否 |
+| 1280×1000 | 696×392 | 1.7755 | 512 | 40.00% | 是 |
+| 1601×1300 | 888×500 | 1.7760 | 641 | 40.04% | 是 |
+
+所有行 `colW / innerWidth ≥ 0.40`、比例在 1.7778 ± 0.01、`rail.top − dock.bottom = 24`、评论列高 = dock 高。

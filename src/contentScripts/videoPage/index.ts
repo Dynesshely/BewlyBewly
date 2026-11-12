@@ -50,6 +50,7 @@ import selectionPanelCss from './playlistPanel.shadow.scss?inline'
 import { bindRailHost, railState, syncRecommendRail, teardownRecommendRail } from './recommendRail'
 import { setupShortcuts } from './shortcuts'
 import { resetUiState, ui } from './state'
+import { refreshToolbarActions, setupToolbarActions, teardownToolbarActions } from './toolbarActions'
 import shadowCss from './videoPage.shadow.scss?inline'
 
 const HOST_ID = 'bewly-video-page'
@@ -135,15 +136,14 @@ function mount(): void {
   // 简介收拢为工具栏按钮 + 自绘 tooltip（第 32 轮）：没有简介时自身不注入
   setupDescPopover()
 
+  // 工具栏原生入口「选集 / 快捷键」（第 33 轮）：把右下角浮动按钮挪进原生工具栏
+  setupToolbarActions()
+
   // 评论区移到播放器右侧、与播放器同高（第 27 轮）：找不到结构 / 窄屏会自动回退
   disposeCommentColumn = setupCommentColumn()
 
   // 广告清理（第 28 轮）：CSS 清单 + MutationObserver 兜底动态插入
   setupAdGuard()
-
-  // TODO(第 32 轮 B 工作流)：简介按钮 + 自绘 tooltip（components/DescPopover 或 descPopover.ts）
-  // native-style 会提供 setupDescPopover()/teardownDescPopover() 之类的导出，
-  // 拿到导出名后在这里挂载、在 unmount() 里卸载（index.ts 由 A 工作流独占）。
 
   // 固定单页布局（第 28 轮）：窗口太小 / 番剧页 / 迷你态会自动回退到原生可滚动布局
   disposeFixedLayout = setupFixedLayout()
@@ -217,6 +217,10 @@ function unmount(): void {
     disposeComments()
     disposeComments = null
   }
+  // 第 33 轮 wrap 版本：简介按钮被移进 #bewly-toolbar-actions wrapper，
+  // 所以先拆 toolbar（它会把简介按钮放回 wrapper 原位、再整体移除 wrapper），
+  // 然后再拆 descPopover（移除按钮本身）。顺序反过来也不会漏清理，但会少一次「放回原位」。
+  teardownToolbarActions()
   teardownDescPopover()
   if (disposeCommentColumn) {
     disposeCommentColumn()
@@ -317,6 +321,9 @@ function sync(): void {
   syncComments()
   // 简介按钮（第 32 轮）：切视频 / 切分P 后重读文本，变空则撤掉自己
   refreshDescPopover()
+
+  // 工具栏入口（第 33 轮）：切视频 / 切分P 后工具栏会被 B 站重建，这里每拍补齐
+  refreshToolbarActions()
 
   // 推荐视频轨道（第 27 轮）：读不到卡片时内部会保持原生列表不动
   syncRecommendRail({ enabled: settings.value.videoPageRecommendRail })

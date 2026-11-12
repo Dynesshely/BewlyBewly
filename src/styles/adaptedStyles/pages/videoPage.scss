@@ -1130,3 +1130,172 @@
   }
 }
 /* #endregion */
+
+/* #region 工具栏动作按钮（第 33 轮，只追加）
+   用户要求：把「选集」「快捷键」两个按钮从页面右下角浮层移到 B 站原生工具栏，
+   紧跟「简介」按钮之后（`#bewly-desc-trigger`）。
+
+   JS 侧（src/contentScripts/videoPage/toolbarActions.ts）负责注入与状态同步；
+   这里只给按钮视觉，口径与「简介」按钮一致：
+   - 固定布局（html.bewly-video-fixed）下 26px 高 / 12px 字号 / 6px 圆角；
+   - hover 底色、`:focus-visible` 主题色描边、`aria-pressed="true"` 时主题色高亮；
+   - `flex: 0 0 auto; white-space: nowrap` 保证不被压缩，也不会把工具栏撑高。 */
+.bewly-design.videoPage {
+  .bewly-toolbar-action {
+    display: inline-flex;
+    flex: 0 0 auto;
+    gap: 4px;
+    align-items: center;
+    justify-content: center;
+    height: 28px;
+    padding: 0 10px;
+    margin-inline-start: 8px;
+    font-size: 13px;
+    line-height: 1;
+    color: var(--bew-text-2);
+    white-space: nowrap;
+    cursor: pointer;
+    background: var(--bew-fill-1);
+    border: 1px solid var(--bew-border-color);
+    border-radius: 8px;
+    transition:
+      color 160ms ease,
+      background-color 160ms ease,
+      border-color 160ms ease;
+  }
+
+  .bewly-toolbar-action:hover {
+    color: var(--bew-theme-color);
+    background: var(--bew-fill-2);
+    border-color: var(--bew-theme-color-40);
+  }
+
+  .bewly-toolbar-action:focus-visible {
+    outline: 2px solid var(--bew-theme-color);
+    outline-offset: 2px;
+  }
+
+  /* 面板已展开：保持高亮（与浮层里的 aria-pressed 语义一致） */
+  .bewly-toolbar-action[aria-pressed="true"] {
+    color: var(--bew-theme-color);
+    background: var(--bew-theme-color-20);
+    border-color: var(--bew-theme-color-40);
+  }
+
+  .bewly-toolbar-action[hidden] {
+    display: none !important;
+  }
+
+  /* 固定布局：工具栏只有 44px 高，按钮跟着缩，别把 dock 撑高 */
+  &.bewly-video-fixed .bewly-toolbar-action {
+    height: 26px;
+    padding-inline: 8px;
+    margin-inline-start: 6px;
+    font-size: 12px;
+    border-radius: 6px;
+  }
+
+  /* 极窄屏：只保留文字，内边距再收一点（不换行、不省略，避免看不懂） */
+  @media (max-width: 1024px) {
+    .bewly-toolbar-action {
+      padding-inline: 6px;
+      margin-inline-start: 4px;
+      font-size: 11px;
+    }
+  }
+
+  /* 暗色：与简介按钮同一套（颜色已全部走变量，这里只抬高 hover 对比） */
+  &.dark .bewly-toolbar-action:hover {
+    background: var(--bew-fill-2);
+  }
+
+  @media (prefers-contrast: more) {
+    .bewly-toolbar-action {
+      border-color: var(--bew-text-3);
+    }
+
+    .bewly-toolbar-action[aria-pressed="true"] {
+      border-color: var(--bew-text-2);
+    }
+  }
+
+  @media (forced-colors: active) {
+    .bewly-toolbar-action {
+      color: ButtonText;
+      background: ButtonFace;
+      border: 1px solid ButtonText;
+    }
+
+    .bewly-toolbar-action[aria-pressed="true"] {
+      color: HighlightText;
+      background: Highlight;
+      border-color: Highlight;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bewly-toolbar-action {
+      transition: none;
+    }
+  }
+}
+/* #endregion */
+
+/* #region 工具栏按钮组 wrapper（第 33 轮真机修复，只追加）
+   真机现象：三个按钮顺序与位置都对，但彼此被拉开 104px / 92px ——
+   父容器（.video-toolbar-left）用 space-between 分布，剩余空间摊到了子元素之间。
+   修法：JS（toolbarActions.ts）把「简介 + 选集 + 快捷键」包进 #bewly-toolbar-actions，
+   这里让它以「一个整体」参与父容器分布，内部用 gap 固定 8px。
+
+   注意：wrapper 内部的按钮要去掉自己的 margin（间距统一由 gap 控制），
+   否则 8px gap + 6px margin 会变成 14px。 */
+.bewly-design.videoPage {
+  #bewly-toolbar-actions,
+  .bewly-toolbar-actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 8px;
+    align-items: center;
+    /* 与前面的原生工具按钮保持 8px，不再依赖子按钮自己的 margin */
+    margin-inline-start: 8px;
+    white-space: nowrap;
+  }
+
+  #bewly-toolbar-actions > .bewly-toolbar-action,
+  .bewly-toolbar-actions > .bewly-toolbar-action,
+  #bewly-toolbar-actions > .bewly-desc-trigger,
+  .bewly-toolbar-actions > .bewly-desc-trigger {
+    /* 间距统一由 wrapper 的 gap / margin-inline-start 控制 */
+    margin-inline-start: 0;
+  }
+
+  /* 隐藏态不占位（选集/快捷键不可用时由 JS 设 hidden） */
+  #bewly-toolbar-actions > [hidden] {
+    display: none !important;
+  }
+
+  /* 窄屏：gap 收到 6px，wrapper 外边距也略收 */
+  @media (max-width: 1024px) {
+    #bewly-toolbar-actions,
+    .bewly-toolbar-actions {
+      gap: 6px;
+      margin-inline-start: 6px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #bewly-toolbar-actions > .bewly-toolbar-action {
+      transition: none;
+    }
+  }
+}
+/* #endregion */
+
+/* wrapper 空态防御（第 33 轮 e2e 修复）：能力不可用时 JS 不再插入按钮 / wrapper，
+   这里只兜「运行中能力被关掉、wrapper 短暂只剩简介按钮」的一帧，避免留出多余 gap。 */
+.bewly-design.videoPage {
+  #bewly-toolbar-actions:empty,
+  .bewly-toolbar-actions:empty {
+    display: none !important;
+  }
+}

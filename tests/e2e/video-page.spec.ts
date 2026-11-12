@@ -38,6 +38,7 @@ const VIDEO_PAGE_FIXTURE = `<!doctype html>
             </div>
           </div>
           <h1 class="video-title">这是一个测试视频</h1>
+          <div id="arc_toolbar_report"><button type="button">分享</button></div>
           <input id="test-input" placeholder="评论" />
           <div class="video-desc">正文</div>
         </div>
@@ -78,9 +79,14 @@ async function ensureOverlay(page: Page): Promise<void> {
     .waitForSelector('#bewly-video-page', { state: 'attached', timeout: 15_000 })
     .catch(() => null)
 
+  // 第 33 轮：浮动控件只剩迷你态「还原播放器」，非迷你态没有 .bvp-fab，
+  // 判定改为「增强层里有任意一块主播 UI」——轨道 / 根节点 / 任意动作按钮都算已挂载。
   const mounted = await page.evaluate(() => {
     const host = document.querySelector('#bewly-video-page')
-    return Boolean(host?.shadowRoot?.querySelector('.bvp-fab'))
+    const root = host?.shadowRoot
+    if (!root)
+      return false
+    return Boolean(root.querySelector('.bvp-root, .bvp-rail, .bvp-fab, .bvp-comment-toolbar, [data-bvp-action]'))
   })
 
   if (!mounted)
@@ -428,6 +434,7 @@ const PLAYLIST_PAGE_FIXTURE = `<!doctype html>
             </div>
           </div>
           <h1 class="video-title">列表视频 2</h1>
+          <div id="arc_toolbar_report"><button type="button">分享</button></div>
           <div class="video-desc">正文</div>
         </div>
         <div class="right-container">
@@ -648,6 +655,7 @@ const PARTS_PAGE_FIXTURE = `<!doctype html>
             </div>
           </div>
           <h1 class="video-title">多P 测试视频</h1>
+          <div id="arc_toolbar_report"><button type="button">分享</button></div>
           <div class="video-desc">正文</div>
         </div>
         <div class="right-container">
@@ -833,6 +841,7 @@ const RECOMMEND_POD_FIXTURE = `<!doctype html>
             </div>
           </div>
           <h1 class="video-title">单P 测试视频</h1>
+          <div id="arc_toolbar_report"><button type="button">分享</button></div>
           <div class="video-desc">正文</div>
         </div>
         <div class="right-container">
@@ -945,6 +954,7 @@ const COLLECTION_PAGE_FIXTURE = `<!doctype html>
             </div>
           </div>
           <h1 class="video-title">合集视频 2</h1>
+          <div id="arc_toolbar_report"><button type="button">分享</button></div>
           <div class="video-desc">正文</div>
         </div>
         <div class="right-container">
@@ -1122,6 +1132,7 @@ const PROGRESS_ONLY_POD_FIXTURE = `<!doctype html>
             </div>
           </div>
           <h1 class="video-title">只有进度文案的视频</h1>
+          <div id="arc_toolbar_report"><button type="button">分享</button></div>
           <div class="video-desc">正文</div>
         </div>
         <div class="right-container">
@@ -1233,6 +1244,7 @@ const COMMENT_PAGE_FIXTURE = `<!doctype html>
             </div>
           </div>
           <h1 class="video-title">评论区测试视频</h1>
+          <div id="arc_toolbar_report"><button type="button">分享</button></div>
           <div id="commentapp"></div>
         </div>
       </div>
@@ -1502,6 +1514,7 @@ const COMMENT_LAZY_FIXTURE = `<!doctype html>
             </div>
           </div>
           <h1 class="video-title">评论懒加载测试</h1>
+          <div id="arc_toolbar_report"><button type="button">分享</button></div>
           <div id="commentapp"></div>
           <button id="load-more" type="button">加载更多</button>
         </div>
@@ -1778,6 +1791,7 @@ const COMMENT_COLUMN_FIXTURE = `<!doctype html>
             </div>
           </div>
           <h1 class="video-title">评论区右列测试</h1>
+          <div id="arc_toolbar_report"><button type="button">分享</button></div>
           <div class="video-desc">视频简介</div>
           <div id="commentapp"><div id="comment-placeholder">评论组件占位</div></div>
         </div>
@@ -2014,6 +2028,7 @@ function buildRailFixture(count = 20): string {
             </div>
           </div>
           <h1 class="video-title">推荐轨道测试视频</h1>
+          <div id="arc_toolbar_report"><button type="button">分享</button></div>
           <div class="up-info"><span class="up-name">测试 UP 主</span></div>
           <div id="commentapp"></div>
         </div>

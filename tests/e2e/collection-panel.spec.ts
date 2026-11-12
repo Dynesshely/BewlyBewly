@@ -26,6 +26,8 @@ const COLLECTION_FIXTURE = `<!doctype html>
       .right-container { flex: 0 0 28%; }
       .video-title { margin: 16px 0; font-size: 20px; }
       .video-desc { min-height: 1200px; }
+      #arc_toolbar_report { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+      #arc_toolbar_report button { padding: 4px 10px; }
       .video-pod__header { padding: 8px; font-weight: 600; }
       .video-pod__list { display: flex; flex-direction: column; gap: 4px; }
       .video-pod__item { padding: 6px; }
@@ -43,6 +45,7 @@ const COLLECTION_FIXTURE = `<!doctype html>
             </div>
           </div>
           <h1 class="video-title">合集视频 2</h1>
+          <div id="arc_toolbar_report"><button type="button">分享</button></div>
           <div class="video-desc">正文</div>
         </div>
         <div class="right-container">

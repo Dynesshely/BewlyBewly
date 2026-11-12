@@ -753,27 +753,23 @@ commentColumn.bottom = 播放器 bottom < rail.top - 8
 ### 5. 分工与未做项
 
 ## 第 32 轮：简介收拢到工具栏 + 自绘 tooltip
+### 第 33 轮真机修复：点击不生效（监听丢失）
 
-### 第 32 轮真机修复：简介按钮不可见（0×0）
+**现象**：按钮存在、位置正确，但点击后 `aria-pressed` 仍是 `false`、面板不打开 —— 状态完全没变。
 
-**现象**：`#bewly-desc-trigger` 存在、文本正确、computed 是 `display:flex; height:26px`，
-但 `getBoundingClientRect()` 是 `{ x:0, y:0, w:0, h:0 }` —— 父容器 `.bar-right` 本身是 0×0
-（固定布局下 B 站把工具栏右侧操作区留空）。
+**根因**：之前给**每个按钮**单独 `addEventListener('click')`。而 `refreshToolbarActions()` 每拍可能在
+「能力切换 / 0×0 自检 / wrapper 重建」时替换节点，per-button 的监听就跟着丢了；
+点在「刚被替换」或「新建但没绑」的节点上 → 什么都不会发生。
 
-**修复（`descPopover.ts`）**：
+**修复（事件委托 + 三重兜底）**：
 
-1. `findVisibleInsertTarget(bar)`：只往**可见容器**插 ——
-   含「分享」文本 / class 含 share 的可见元素 → 其它任何可见的 `button`/`[role=button]`/`.toolbar-left-item`
-   → 都没有就 `append` 到 `#arc_toolbar_report` 本身（它整体可见）；工具栏自身不可见则返回 `null`；
-2. **标签行兜底**：工具栏里找不到可见目标时，插到 `.video-tag-container`（可见），
-   打 `data-bewly-desc-fallback="tag-row"`，CSS 让它在标签行右端（`margin-inline-start:auto`）；
-3. **可见性自检**（`refreshDescPopover()` 每 500ms 拍）：
-   - 按钮 `isRendered()` 为真 → 正常返回；
-   - 不可见且当前不在标签行 → 迁移到标签行再测；
-   - 仍不可见 → 且页面里**确实还有可用容器**时才 `teardown + setup` 重建
-     （避免影院 / 全屏 / 标签页切走时每 500ms 反复拆建）；
-4. CSS 兜底：`.bewly-desc-trigger { flex: 0 0 auto; min-width: 44px; max-width: 96px; white-space: nowrap }`，
-   防止被父容器压成 0。
+| 措施 | 说明 |
+| --- | --- |
+| wrapper 上一次性委托 | `#bewly-toolbar-actions` 上挂 `click`（**capture 阶段**）、`pointerup`、`keydown`，用 `composedPath()` 判断命中的是不是 `.bewly-toolbar-action[data-bvp-action]`；用 `WeakSet` 记录已绑定的 wrapper，重建后自动重新绑定 |
+| capture 阶段 | B 站可能在 `document` 上挂了捕获委托；我们在自己的 wrapper 上更早拿到事件，处理完 `stopPropagation`，不会漏到原生委托 |
+| pointerup 兜底 | 某些环境下 click 被取消；pointerup 再补一次，**用 200ms 时间戳去重**避免一次点击切换两次（展开又立刻收起） |
+| keydown 兜底 | Enter / Space（原生 button 会合成 click，这里对非 button 元素兜底） |
+| 不再无谓重建 | `refreshToolbarActions()` 只在「能力变化 / 按钮丢失 / 0×0」时增删或换位；已存在且可见时只更新文案与 aria |
 
-**真机验收口径**：`#bewly-desc-trigger` rect `w > 40 && h > 20`；hover 300ms 后
-`.bewly-desc-tooltip` 可见（`rect.w > 200`、文本非空）；Esc / 点击外部可关闭。
+**真机验收口径**：点「选集」→ `#bewly-toolbar-selection` 的 `aria-pressed` 在 ≤500ms 变 `true`、
+shadow 内出现 `.bvp-playlist` 面板；再点一次关闭。点「快捷键」→ 帮助面板打开。

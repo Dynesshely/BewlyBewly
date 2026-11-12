@@ -51,6 +51,7 @@ import { syncPlayerScreenMode, teardownPlayerScreenMode } from './playerMode'
 import selectionPanelCss from './playlistPanel.shadow.scss?inline'
 import { bindRailHost, railState, syncRecommendRail, teardownRecommendRail } from './recommendRail'
 import { setupShortcuts } from './shortcuts'
+import { setupSplitter, syncSplitter } from './splitter'
 import { resetUiState, ui } from './state'
 import { refreshToolbarActions, setupToolbarActions, teardownToolbarActions } from './toolbarActions'
 import shadowCss from './videoPage.shadow.scss?inline'
@@ -125,6 +126,7 @@ let disposeShortcuts: (() => void) | null = null
 let disposeComments: (() => void) | null = null
 let disposeCommentColumn: (() => void) | null = null
 let disposeFixedLayout: (() => void) | null = null
+let disposeSplitter: (() => void) | null = null
 
 /** iframe 内（首页空格预览的抽屉）是否处于降级状态（第 43 轮） */
 let iframeDegraded = false
@@ -149,6 +151,10 @@ function degradeForIframe(): void {
     disposeFixedLayout = null
   }
   clearFixedLayout()
+  if (disposeSplitter) {
+    disposeSplitter()
+    disposeSplitter = null
+  }
   teardownToolbarActions()
   teardownDescPopover()
   teardownRecommendRail()
@@ -165,6 +171,8 @@ function restoreFromIframe(): void {
     disposeCommentColumn = setupCommentColumn()
   if (!disposeFixedLayout)
     disposeFixedLayout = setupFixedLayout()
+  if (!disposeSplitter)
+    disposeSplitter = setupSplitter()
   if (settings.value.videoPageShortcuts && !disposeShortcuts)
     disposeShortcuts = setupShortcuts()
 }
@@ -268,6 +276,10 @@ function mount(): void {
   if (!iframeDegraded)
     disposeFixedLayout = setupFixedLayout()
 
+  // 播放器 / 评论区分隔条（第 46 轮）：iframe 降级时不渲染
+  if (!iframeDegraded)
+    disposeSplitter = setupSplitter()
+
   window.addEventListener('scroll', handleScroll, { passive: true })
   window.addEventListener('resize', handleScroll, { passive: true })
 
@@ -351,6 +363,10 @@ function unmount(): void {
   if (disposeFixedLayout) {
     disposeFixedLayout()
     disposeFixedLayout = null
+  }
+  if (disposeSplitter) {
+    disposeSplitter()
+    disposeSplitter = null
   }
   teardownAdGuard()
 
@@ -465,6 +481,9 @@ function sync(): void {
   // ⚠️ 第 36 轮起把它提到评论区同步之前：评论区 / 轨道 / 简介任何一处抛异常都不能阻止
   // 布局类落地（真机回归就是「评论组件没挂载 → 固定布局也没生效 → 整页塌」）。
   syncFixedLayout()
+
+  // 分隔条（第 46 轮）：位置靠布局变量，这里只同步无障碍属性 / 提示
+  safeSync('syncSplitter', syncSplitter)
 
   // 模式刚切换：立即再校正一次评论列（隐藏 / 恢复后高度与位置都变了）
   if (modeChanged)

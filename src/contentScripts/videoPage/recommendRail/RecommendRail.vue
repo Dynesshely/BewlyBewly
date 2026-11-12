@@ -409,49 +409,6 @@ function findCardFromEvent(event: Event): RailCard | null {
     @click.capture="onCaptureClick"
     @auxclick.capture="onCaptureClick"
   >
-    <header class="bvp-rail__head">
-      <h2 class="bvp-rail__title">
-        {{ t.recommendRailTitle }}
-      </h2>
-      <div class="bvp-rail__actions">
-        <button
-          class="bvp-rail__nav"
-          type="button"
-          :disabled="!canPrev"
-          :aria-label="t.recommendRailPrev"
-          :title="t.recommendRailPrev"
-          @click="stepBy(-1)"
-        >
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M10 3 5 8l5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </button>
-        <button
-          class="bvp-rail__nav"
-          type="button"
-          :disabled="!canNext"
-          :aria-label="t.recommendRailNext"
-          :title="t.recommendRailNext"
-          @click="stepBy(1)"
-        >
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </button>
-        <button
-          class="bvp-rail__close"
-          type="button"
-          :aria-label="t.recommendRailClose"
-          :title="t.recommendRailClose"
-          @click="emit('close')"
-        >
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-          </svg>
-        </button>
-      </div>
-    </header>
-
     <div
       ref="trackRef"
       class="bvp-rail__viewport"

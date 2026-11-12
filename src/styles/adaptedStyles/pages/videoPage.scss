@@ -2721,3 +2721,200 @@ html.bewly-design.videoPage.bewly-video-fixed {
 .bewly-comment-column {
   --bewly-comment-scrollbar: 0px;
 }
+
+/* ===== 第 46 轮 comments-responsive ===== */
+/* 评论区内容宽度自适应（第 46 轮 B 工作流，只追加在文件末尾）
+   背景：评论列宽度随窗口/拖拽变化（约 480~1400），但内部内容仍是固定量纲 ——
+   宽屏大片留白、窄屏拥挤。
+
+   做法：
+   1. 给评论列加 `container-type: inline-size`，用**容器查询**按「列宽」而不是「视口宽」响应
+      （拖拽分隔条时列宽会实时变化，媒体查询跟不上，容器查询可以）；
+   2. 头像固定尺寸（评论 40 / 窄屏 32）、文字区弹性 `flex: 1 1 auto; min-width: 0`，不写死 max-width；
+   3. 正文行长保留第 34 轮的 `max-width: 420px`，并用 `margin-inline: 0` 保持左对齐（不居中）；
+   4. 嵌套回复缩进用 `padding-left` 跟随头像宽度（容器查询里按档位给值）；
+   5. 图片 / 表情 / 视频卡 `max-width: 100%; height: auto`，多图网格用 auto-fill + minmax(120px, 1fr)。
+
+   ⚠️ B 站评论正文在 `bili-comments` 的 shadow root 内，页面级 CSS 选不到内部节点。
+   能命中的是：评论列容器、评论宿主 `#commentapp`、以及 light DOM 中由我们搬运的节点。
+   shadow 内部需要的等价规则（`.reply-item` / `#content` / 图片网格 / 子评论缩进）已列在
+   `docs/video-page.md` 的「交接项」，需要 video-page 在 comments.ts 的注入 style 通道里补。 */
+
+/* 容器上下文：列宽 = 查询尺寸 */
+html.bewly-design.videoPage .bewly-comment-column {
+  box-sizing: border-box;
+  container-type: inline-size;
+  container-name: bewly-comments;
+  /* 列内所有直接块都不许横向溢出 */
+  overflow-x: hidden;
+}
+
+/* 宿主与内容列：铺满容器，不做固定量纲 */
+html.bewly-design.videoPage .bewly-comment-column > #commentapp,
+html.bewly-design.videoPage .bewly-comment-column bili-comments {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* 头像固定 40（comment 头像；UP 卡的 48 由 up-card 段负责） */
+html.bewly-design.videoPage .bewly-comment-column .comment-avatar,
+html.bewly-design.videoPage .bewly-comment-column .bili-avatar,
+html.bewly-design.videoPage .bewly-comment-column .avatar-wrap {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border-radius: 50%;
+}
+
+/* 评论帖：头像列固定 + 内容列弹性（light DOM 中存在的部分） */
+html.bewly-design.videoPage .bewly-comment-column .reply-item,
+html.bewly-design.videoPage .bewly-comment-column .root-reply-container {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+html.bewly-design.videoPage .bewly-comment-column .content-warp,
+html.bewly-design.videoPage .bewly-comment-column .reply-content,
+html.bewly-design.videoPage .bewly-comment-column .reply-item .content {
+  flex: 1 1 auto;
+  min-width: 0;
+  /* 行长约束保留（第 34 轮），左对齐不居中 */
+  max-width: 420px;
+  margin-inline: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* 子评论缩进跟随头像宽（40）+ gap（8） */
+html.bewly-design.videoPage .bewly-comment-column .sub-reply-container,
+html.bewly-design.videoPage .bewly-comment-column .sub-reply-item {
+  padding-left: 48px;
+  margin-left: 0;
+  min-width: 0;
+}
+
+/* 图片 / 表情 / 视频卡：不超出容器 */
+html.bewly-design.videoPage .bewly-comment-column img,
+html.bewly-design.videoPage .bewly-comment-column video,
+html.bewly-design.videoPage .bewly-comment-column .reply-content img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* 多图网格：按容器宽度自动排（120px 起） */
+html.bewly-design.videoPage .bewly-comment-column .picture-container,
+html.bewly-design.videoPage .bewly-comment-column .comment-pictures {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  max-width: 100%;
+}
+
+/* ---------- 容器查询：窄列（< 520） ---------- */
+@container bewly-comments (max-width: 519px) {
+  html.bewly-design.videoPage .bewly-comment-column {
+    padding-inline: 12px;
+  }
+
+  html.bewly-design.videoPage .bewly-comment-column .comment-avatar,
+  html.bewly-design.videoPage .bewly-comment-column .bili-avatar,
+  html.bewly-design.videoPage .bewly-comment-column .avatar-wrap {
+    width: 32px;
+    height: 32px;
+  }
+
+  /* 缩进跟随 32px 头像 + 8 gap */
+  html.bewly-design.videoPage .bewly-comment-column .sub-reply-container,
+  html.bewly-design.videoPage .bewly-comment-column .sub-reply-item {
+    padding-left: 40px;
+  }
+
+  /* 操作按钮允许换行，不横向溢出 */
+  html.bewly-design.videoPage .bewly-comment-column .reply-actions,
+  html.bewly-design.videoPage .bewly-comment-column .reply-btn-wrap {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* 多图网格在窄列里两列就够 */
+  html.bewly-design.videoPage .bewly-comment-column .picture-container,
+  html.bewly-design.videoPage .bewly-comment-column .comment-pictures {
+    grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  }
+}
+
+/* ---------- 容器查询：宽列（> 900） ---------- */
+@container bewly-comments (min-width: 901px) {
+  /* 左右各留 16px，让正文与图片自然铺开；不放大字号（第 34 轮字阶不变） */
+  html.bewly-design.videoPage .bewly-comment-column {
+    padding-inline: 16px;
+  }
+
+  /* 正文行长仍限 420（用户要求不能删），宽列里靠左对齐 */
+  html.bewly-design.videoPage .bewly-comment-column .content-warp,
+  html.bewly-design.videoPage .bewly-comment-column .reply-content,
+  html.bewly-design.videoPage .bewly-comment-column .reply-item .content {
+    max-width: 420px;
+    margin-inline: 0;
+  }
+
+  /* 宽列图片网格可以更密 */
+  html.bewly-design.videoPage .bewly-comment-column .picture-container,
+  html.bewly-design.videoPage .bewly-comment-column .comment-pictures {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+}
+
+/* 高对比度 / 强制色彩：不新增颜色，只保证容器可辨识 */
+@media (prefers-contrast: more) {
+  html.bewly-design.videoPage .bewly-comment-column {
+    outline: 1px solid color-mix(in oklab, currentColor 20%, transparent);
+    outline-offset: -1px;
+  }
+}
+/* ===== 第 46 轮 comments-responsive end ===== */
+
+/* ===== 第 46 轮 splitter =====
+   播放器 / 评论区分隔条（元素由 splitter.ts 创建到 body，位置读 fixedLayout 的变量）：
+     left   = --bvp-fixed-split-left（内容左边缘 + 播放器宽 + gutter/2 − 3）
+     top    = --bvp-fixed-top
+     height = --bvp-fixed-dock-height（与 dock 等高，覆盖整块播放器列）
+   只在固定布局、非单列时显示；iframe 降级时 splitter.ts 根本不创建元素。 */
+#bewly-video-splitter {
+  position: fixed;
+  top: var(--bvp-fixed-top, 64px);
+  left: var(--bvp-fixed-split-left, 0px);
+  width: 6px;
+  height: var(--bvp-fixed-dock-height, 0px);
+  z-index: 2147483000;
+  cursor: col-resize;
+  touch-action: none;
+  background: transparent;
+  border-radius: 3px;
+  transition: background-color 120ms ease;
+}
+
+#bewly-video-splitter:hover,
+#bewly-video-splitter:focus-visible,
+#bewly-video-splitter[data-dragging] {
+  background: var(--bew-theme-color, var(--bew-bili-blue, hsl(195 100% 42%)));
+  outline: none;
+}
+
+/* 单列（网页全屏 / 宽屏）与非固定布局下不显示分隔条 */
+html:not(.bewly-video-fixed) #bewly-video-splitter,
+html.bewly-player-webfull #bewly-video-splitter,
+html.bewly-player-wide #bewly-video-splitter {
+  display: none !important;
+}
+
+/* 拖拽期间禁用页面文本选中与光标闪烁 */
+body.bewly-video-resizing,
+body.bewly-video-resizing * {
+  user-select: none !important;
+  cursor: col-resize !important;
+}

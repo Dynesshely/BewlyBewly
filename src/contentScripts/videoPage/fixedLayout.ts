@@ -65,6 +65,11 @@ const DOCK_H_VAR = '--bvp-fixed-dock-height'
 const PLAYER_W_VAR = '--bvp-fixed-player-width'
 const PLAYER_VAR = '--bvp-fixed-player-height'
 const RAIL_VAR = '--bvp-fixed-rail-space'
+/** 分隔条中心线（页面级绝对定位用）：内容左边缘 + 播放器宽 + gutter/2 */
+const SPLIT_LEFT_VAR = '--bvp-fixed-split-left'
+/** 内容区左边缘（视口坐标）与内容宽：分隔条拖拽换算比例用（第 46 轮） */
+const CONTENT_LEFT_VAR = '--bvp-fixed-content-left'
+const CONTENT_WIDTH_VAR = '--bvp-fixed-content-width'
 
 /** 视口小于这个尺寸就放不下三块区域，自动回退原生可滚动布局 */
 const MIN_VIEWPORT_WIDTH = 1280
@@ -126,6 +131,9 @@ const MIN_COMMENT_WIDTH = 400
 const MIN_COMMENT_WIDTH_RATIO = 0.4
 /** 触发 40% 兜底时，播放器宽度占视口宽的比例（0.6 = 1 − 0.4，与评论区 40% 对称） */
 const MAX_PLAYER_WIDTH_RATIO = 0.6
+/** 分隔条拖拽比例范围（第 46 轮：播放器占内容宽比例） */
+export const MIN_SPLIT_RATIO = 0.35
+export const MAX_SPLIT_RATIO = 0.75
 /** 主区左右两列之间的横向 gutter（第 34 轮 `--bvp-gutter: 24px`） */
 const COLUMN_GUTTER = 24
 
@@ -203,8 +211,33 @@ function measureDockBlocks(leftCol: HTMLElement, playerWrap: HTMLElement): { tot
  * 若 16:9 反算出的宽度超过左列可用宽，则按宽度定高（播放器变矮），**剩余高度留在 dock 里**
  * （不拉伸播放器）。评论列高度 = dockH，与 dock 严格对齐。
  */
+/** 拖拽中的临时比例（第 46 轮）：非 null 时优先于 settings 的持久值，松手后置空 */
+let splitPreviewRatio: number | null = null
+
+/**
+ * 设置拖拽预览比例（第 46 轮）。
+ *
+ * - 拖拽过程中只改内存值（不写 settings，避免每帧落盘）；
+ * - 传 null 表示结束预览，回到 settings 的持久值；
+ * - 调用方负责随后触发一次 syncFixedLayout()，把新宽度写进 CSS 变量。
+ */
+export function previewSplitRatio(ratio: number | null): void {
+  splitPreviewRatio = ratio
+}
+
+/** 当前生效的播放器比例：拖拽预览优先，其次用户持久化值，0 表示自动 */
+export function getSplitRatio(): number {
+  if (splitPreviewRatio !== null)
+    return splitPreviewRatio
+  const stored = settings.value.videoPageSplitRatio
+  return typeof stored === 'number' && stored > 0
+    ? stored
+    : 0
+}
+
 function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
-  const topOffset = Math.max(0, Math.round(mirror.getBoundingClientRect().top))
+  const mirrorRect = mirror.getBoundingClientRect()
+  const topOffset = Math.max(0, Math.round(mirrorRect.top))
 
   // 第 37 轮：网页全屏 / 宽屏时右列（评论区）隐藏 → 单列布局。
   // 网页全屏下轨道也隐藏（并被 recommendRail 撤掉渲染），因此不再预留 railSpace，播放器吃满高度。
@@ -220,9 +253,11 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
   // 容器可用宽：**不要读左列宽度** —— 左列宽度正是本模块写出来的（grid 第一列），
   // 读它就会形成「自己写 → 自己读」的反馈路径。这里只读 grid 容器自身的宽度与内边距。
   const mirrorStyle = window.getComputedStyle(mirror)
-  const padX = (Number.parseFloat(mirrorStyle.paddingLeft) || 0)
-    + (Number.parseFloat(mirrorStyle.paddingRight) || 0)
+  const padLeft = Number.parseFloat(mirrorStyle.paddingLeft) || 0
+  const padX = padLeft + (Number.parseFloat(mirrorStyle.paddingRight) || 0)
   const totalWidth = Math.max(0, Math.round(mirror.clientWidth - padX))
+  /** 内容区左边缘（视口坐标）：分隔条定位与拖拽比例换算都用它（第 46 轮） */
+  const contentLeft = Math.round(mirrorRect.left + padLeft)
   // 单列（网页全屏 / 宽屏）时播放器可用宽 = 整个内容宽；否则要给评论区留最小宽
   const leftAvailW = singleColumn
     ? totalWidth
@@ -297,14 +332,25 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
     }
   }
 
-  // 第 44 轮：评论区至少占内容宽 40%（单列模式——网页全屏 / 宽屏——评论区已隐藏，不适用）。
+  // 第 46 轮：用户拖拽过比例（> 0）时优先按比例定宽，绕过 40% 兜底。
+  // 宽度同时受「高度反算宽」约束：高度不足时按高度反算的宽度更小，取小保证不越界。
+  const splitRatio = getSplitRatio()
+  if (!singleColumn && splitRatio > 0 && totalWidth > 0) {
+    const ratio = Math.min(MAX_SPLIT_RATIO, Math.max(MIN_SPLIT_RATIO, splitRatio))
+    const widthByRatio = Math.round(totalWidth * ratio)
+    width = Math.max(0, Math.min(width, widthByRatio))
+    height = Math.round(width * 9 / 16)
+  }
+
+  // 第 44 轮：评论区至少占内容宽 40%（单列模式——网页全屏 / 宽屏——评论区已隐藏，不适用）；
+  // 用户拖拽过比例时不再强制 40%（拖拽优先）。
   // 玩家按 16:9 反算后如果评论区不足 40%，就把播放器收窄到 60%（含 gutter 修正），
   // 收窄后播放器高度按 16:9 回算（会变矮，用户明确接受）。
   // 口径按**视口宽**（用户看到的是视觉比例）：colW / innerWidth < 40% 时收窄播放器，
   // 使 colW 至少达到 ceil(innerWidth × 0.4)；ceil 保证边界（如 1601 宽）也不低于 40%。
   // 播放器可用宽上限 = 内容宽 − gutter − 评论最小宽（内容宽 = 视口宽 − 左右 padding）。
   const minCommentWidth = Math.ceil(window.innerWidth * MIN_COMMENT_WIDTH_RATIO)
-  if (!singleColumn && totalWidth > 0) {
+  if (!singleColumn && totalWidth > 0 && splitRatio <= 0) {
     const colWidth = totalWidth - width - COLUMN_GUTTER
     if (colWidth < minCommentWidth) {
       // 两个等价上限取小，保证边界（如 1601 宽）也不会低于 40%：
@@ -333,6 +379,10 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
   setVar(PLAYER_W_VAR, `${width}px`)
   setVar(PLAYER_VAR, `${height}px`)
   setVar(RAIL_VAR, `${railSpace}px`)
+  // 第 46 轮：分隔条中心线（gutter 中间，6px 宽 → 左移 3）与拖拽换算基准
+  setVar(SPLIT_LEFT_VAR, `${contentLeft + width + Math.round(COLUMN_GUTTER / 2) - 3}px`)
+  setVar(CONTENT_LEFT_VAR, `${contentLeft}px`)
+  setVar(CONTENT_WIDTH_VAR, `${totalWidth}px`)
 
   if (playerWrap.style.height !== `${height}px`)
     playerWrap.style.height = `${height}px`
@@ -363,6 +413,9 @@ export function clearFixedLayout(): void {
     PLAYER_W_VAR,
     PLAYER_VAR,
     RAIL_VAR,
+    SPLIT_LEFT_VAR,
+    CONTENT_LEFT_VAR,
+    CONTENT_WIDTH_VAR,
   ])
     document.documentElement.style.removeProperty(name)
 

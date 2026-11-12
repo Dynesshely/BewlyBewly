@@ -148,6 +148,72 @@ const FILTER_STYLE = `
 `
 
 /**
+ * 评论内容宽度自适应规则（第 46 轮，与 native-style 的页面级 `@container bewly-comments` 配套）。
+ *
+ * 页面 CSS 只能约束到宿主容器，评论正文 / 头像 / 子评论缩进 / 多图网格都在 shadow 里，
+ * 必须在「向评论 shadow 注入 style」通道里补等价规则：
+ * - 头像固定 40（窄列 32），文字区 flex 1 1 auto + min-width 0；
+ * - 正文保留第 34 轮的 420 行长上限，左对齐；
+ * - 子评论缩进跟随头像宽 + gap；多图用 auto-fill 网格随列宽自动排。
+ *
+ * 容器是页面级 `.bewly-comment-column`（`container-name: bewly-comments`），跨 shadow 仍生效，
+ * 所以拖拽分隔条调宽时这里的分支会实时切换。
+ */
+const COMMENTS_RESPONSIVE_STYLE_ID = 'bewly-comments-responsive-style'
+const COMMENTS_RESPONSIVE_STYLE = `
+.reply-item {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  min-width: 0;
+}
+.reply-item .root-reply-avatar,
+.reply-item .sub-user-avatar {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+}
+.reply-item #content,
+.reply-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 420px;
+  overflow-wrap: anywhere;
+}
+.sub-reply-container {
+  padding-left: 48px;
+}
+.reply-item img,
+.reply-content img {
+  max-width: 100%;
+  height: auto;
+}
+.picture-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+@container bewly-comments (max-width: 519px) {
+  .reply-item .root-reply-avatar,
+  .reply-item .sub-user-avatar {
+    width: 32px;
+    height: 32px;
+  }
+  .sub-reply-container {
+    padding-left: 40px;
+  }
+  .picture-container {
+    grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  }
+}
+@container bewly-comments (min-width: 901px) {
+  .picture-container {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+}
+`
+
+/**
  * 注入到每个 `bili-comment-renderer` shadow：评论正文排版（第 34 轮）。
  *
  * 为什么必须注入到这里：B 站评论正文在 `bili-comment-renderer` 的 **shadow root** 里，
@@ -778,6 +844,7 @@ function ensureCommentsStyle(): void {
   if (!shadow)
     return
   ensureStyleInShadow(shadow, COMMENTS_STYLE_ID, COMMENTS_STYLE)
+  ensureStyleInShadow(shadow, COMMENTS_RESPONSIVE_STYLE_ID, COMMENTS_RESPONSIVE_STYLE)
   styledCommentsShadow = shadow
 }
 
@@ -796,6 +863,7 @@ function ensureRendererStyle(renderer: HTMLElement): void {
   // 幂等且能自愈「样式被外部移除 / shadow 被重建」。
   ensureStyleInShadow(shadow, FOLD_STYLE_ID, FOLD_STYLE)
   ensureStyleInShadow(shadow, TEXT_STYLE_ID, TEXT_STYLE)
+  ensureStyleInShadow(shadow, COMMENTS_RESPONSIVE_STYLE_ID, COMMENTS_RESPONSIVE_STYLE)
   // B 站可能在我们的 style 之后又插入 <style>（同特异性后写胜）——把我们的挪到最后，
   // 每次调用都是幂等的，移动成本可以忽略（只是 appendChild 已有节点）。
   for (const id of [FOLD_STYLE_ID, TEXT_STYLE_ID]) {
@@ -1349,11 +1417,13 @@ export function setupComments(): () => void {
     if (styledCommentsShadow) {
       removeStyleFromShadow(styledCommentsShadow, COMMENTS_STYLE_ID)
       removeStyleFromShadow(styledCommentsShadow, NOTICE_STYLE_ID)
+      removeStyleFromShadow(styledCommentsShadow, COMMENTS_RESPONSIVE_STYLE_ID)
       styledCommentsShadow = null
     }
     for (const shadow of styledShadows) {
       removeStyleFromShadow(shadow, FOLD_STYLE_ID)
       removeStyleFromShadow(shadow, TEXT_STYLE_ID)
+      removeStyleFromShadow(shadow, COMMENTS_RESPONSIVE_STYLE_ID)
     }
     styledShadows.clear()
 

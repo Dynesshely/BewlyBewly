@@ -753,329 +753,136 @@ commentColumn.bottom = 播放器 bottom < rail.top - 8
 ### 5. 分工与未做项
 
 ## 第 32 轮：简介收拢到工具栏 + 自绘 tooltip
-### 第 37 轮二次复测：卡片高度 129 → 84 封顶
+## 第 46 轮：评论区宽度自适应 + 推荐轨道精简
 
-真机：按钮位置已正确（与名字同行、贴右、宽 90 / 高 36 / 圆角 8 / 蓝底），但卡片仍是 **129px**
-（目标 ≤84）；头像 top 111 而内容顶应为 81 —— 卡片内头像上方还有约 30px 的块。
+### 1. 评论区内容宽度自适应（容器查询）
+
+评论列宽度随窗口/拖拽在 480~1400 之间变化，内部内容此前是固定量纲（宽屏留白、窄屏拥挤）。
 
 | 改动点 | 理由 |
 | --- | --- |
-| `.up-info-container` 加 `order: -1` | 把「头像 + 名字 + 发消息 + 按钮」这一行**强制排到卡片最前**；被推到后面的等级/签到等装饰块在封顶内自然裁掉（都是次要信息） |
-| 卡片 `padding: 12px !important`、`gap: 0`、`align-content: flex-start` | 内容从顶部开始排，消除容器上方的空隙 |
-| `.up-info-container` `margin: 0 !important; padding: 0 !important; min-height: 0` | 容器自身不再贡献额外高度 |
-| 卡片内其它装饰块 `margin-block: 0; padding-block: 0`、`:empty` / `[hidden]` 不占位 | 不删除节点，只让它们不撑高 |
-| 按钮面板 `height: auto; padding: 0; align-items: center` | 之前面板 41px 比按钮 36px 高 5px，收平 |
-| 卡片 `max-height: 84px`（有签名 `110px`）+ `overflow: hidden` | 内容行 48 + padding 24 = 72，84 留 12px 余量；封顶压过 A 的 `min(140px, 40%)`（用 `.bewly-comment-column > .up-panel-container` 与 fixed 变体抬特异性） |
+| `.bewly-comment-column` 加 `container-type: inline-size; container-name: bewly-comments` | 拖拽分隔条时**列宽**实时变化，媒体查询按视口宽判断会失效；容器查询按列宽判断才准 |
+| 头像固定 40px（窄列 32px）、文字区 `flex: 1 1 auto; min-width: 0` | 头像不被压缩、文字不写死宽度，列变宽时内容自然铺开 |
+| 正文 `max-width: 420px` + `margin-inline: 0` | 保留第 34 轮的行长约束（28~38 汉字），左对齐不居中 |
+| 子评论 `padding-left: 48px`（窄列 40px） | 缩进跟随头像宽 + gap，不写死 px 累加 |
+| 图片 / 表情 / 视频 `max-width: 100%; height: auto` | 不允许横向溢出 |
+| 多图 `repeat(auto-fill, minmax(120px, 1fr))`（窄列 88px、宽列 140px） | 图片网格随列宽自动排 |
+| `@container bewly-comments (max-width: 519px)` | 窄列：内距 12、头像 32、缩进 40、操作按钮换行、网格 2 列 |
+| `@container bewly-comments (min-width: 901px)` | 宽列：左右各留 16px、正文仍 ≤420 左对齐、网格更密；**不放大字号**（第 34 轮字阶不变） |
 
-**验收口径**：卡片高 ∈[64, 84]；头像 `top − 卡片 top ∈ [10, 16]`；按钮仍 88~140 宽、36 高、同行贴右；
-有签名场景 ≤110。
+**交接项（shadow 内，页面 CSS 选不到）**：B 站评论正文在 `bili-comments` 的 shadow root 里。
+需要 video-page 在 `comments.ts` 已有的「向评论 shadow 注入 style」通道里补等价规则：
 
-## 第 39 轮：去掉评论底部渐隐 + 美化未登录空态块
-
-### 1. 删除 `#commentapp` 的底部渐隐
-
-第 34 轮在评论滚动容器上加过 `mask-image: linear-gradient(...)`（底部 24px 渐隐）。用户带截图要求删除：
-
-- 直接删掉第 34 轮 layout 段里的 `mask-image`（不是只覆盖），并在第 39 轮段补一层
-  `mask-image: none !important; -webkit-mask-image: none !important;`（防旧规则 / inline 残留）；
-- 覆盖选择器用 `html.bewly-design.videoPage.bewly-video-fixed #commentapp`，不限评论列 ——
-  降级 / 未搬列时 `#commentapp` 仍在左栏，也要清掉；
-- `scroll-padding-block` 与滚动条美化（thin / 8px 圆角 thumb / 悬停加深）**保持**；
-- 没有用其它「暗示可继续滚动」的替代手段（用户没要求）。
-
-### 2. 未登录空态块（登录后查看 N 条评论 / 没有更多评论）
-
-真机结构（`bili-comments` shadow 内，也可能在它的子组件 shadow 里）：
-
+```css
+.reply-item {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  min-width: 0;
+}
+.reply-item .root-reply-avatar,
+.reply-item .sub-user-avatar {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+}
+.reply-item #content,
+.reply-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 420px;
+  overflow-wrap: anywhere;
+}
+.sub-reply-container {
+  padding-left: 48px;
+}
+.reply-item img,
+.reply-content img {
+  max-width: 100%;
+  height: auto;
+}
+.picture-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+@container (max-width: 519px) {
+  /* 头像 32 / 缩进 40 / 网格 88 */
+}
 ```
-div（B 站给了青色半透明底 oklab(...0.2) + 主色字）  ← 「登录后查看 20 条评论」
-div.bottombar  高 120                            ← 「没有更多评论」（13px 文案，空白巨大）
-外层包裹 div   高 350（大片空白）
-```
 
-B 站类名带哈希，不能写死选择器，因此由 `comments.ts` 做**文本匹配 + 类名标记**：
+### 2. 推荐轨道精简
 
-- `findNoticeText()` 在 shadow 里找「只包含这段文案的最内层元素」（跳过含同样文案的父级）；
-- 登录文案：标记最近的 `<a>`（没有就标记自身）为 `.bewly-comments-login`；
-- 「没有更多评论」：标记最近的 `.bottombar` 为 `.bewly-comments-bottom`，文案自身标记 `.bewly-comments-end`；
-- 登录 / 文案的父级（最多两层、且不含 `bili-comment-thread-renderer`）也标记 `.bewly-comments-notice`，
-  这样 B 站画在**外层容器**上的青蓝底会被一起清掉；
-- 再向上找「不含评论线程」的最外层容器标记 `.bewly-comments-notice`（处理外层 h=350 的空白）；
-- 标记是幂等的，每拍（500ms）扫一次：登录 / 登出、评论数量变化都会自动生效或失效；
-- 样式注入到 `bili-comments` 及其直接子组件的 shadow（`#bewly-comments-notice-style`），
-  因为类打在 shadow 内元素上，页面级 CSS 选不到；
-- 卸载时移除注入样式。
-
-样式要点（不引入新颜色，只用 `--bew-brand` / `--bew-text-3`）：
-
-| 元素 | 样式 |
+| 改动点 | 理由 |
 | --- | --- |
-| `.bewly-comments-notice` | `background:none`、无边框/圆角/阴影、`padding-block:16px`、flex 纵排居中、`gap:8px`、`height:auto`、`min-height:0` |
-| `.bewly-comments-login` | 胶囊按钮：`inline-flex`、高 32、`padding:0 16px`、圆角 16、14px/500、主色描边 + 主色文字、透明底；hover/focus 用 12% 主色混合底 |
-| `.bewly-comments-bottom` | `height:auto`、`min-height:0`、`padding-block:12px`（把真机 120px 收到 ~44px） |
-| `.bewly-comments-end` | 12.5px / 1.5 / 400 / 次要色 / `nowrap` |
+| 隐藏 `.bvp-rail__head / .bvp-rail__title / .bvp-rail__actions / .bvp-rail__nav / .bvp-rail__close`（`display: none !important`） | 模板删除由 video-page 做；CSS 先兜底，保证「高度减少 ≥24px」不被模板时序卡住 |
+| `.bvp-rail`：`padding: 12px 16px`、`gap: 0` | 去掉标题行留下的上边距；卡片区上下 12px、左右 16px |
+| `.bvp-rail`：`border-radius: 0 0 14px 14px`、`border: 0` | 底部左右圆角形成 dock，顶部直角与播放器区衔接；**不加边框**，靠背景色过渡 |
+| `.bvp-rail` 背景改为 `color-mix(--bew-fill-1 75%, transparent)` + 毛玻璃 | 与页面背景自然过渡，弱化「一块板」 |
+| `.bvp-rail__viewport` `height: 100%`、`.bvp-rail__track` `height: 100%` | 没有 head 后 viewport 直接吃满轨道高度 |
+| 窄屏（≤1024）：`padding: 10px 12px`、底圆角 12px | 小视口收边距 |
+| 高对比度 / forced-colors 兜底 | 提一档背景对比；强制色彩用 Canvas 且保留圆角 |
 
-### 3. 空态撑高
+**需要 video-page 改的（高度公式）**：`recommendRail/index.ts` 的 `computeRailHeight` 仍含头部：
 
-第 36 轮给 `#commentapp:empty` 加过 `min-height: 180px`（为了让 B 站懒加载判定可见）。
-用户截图里按钮块下方的大片空白部分来自它，本轮改成 `min-height: 0`；
-评论列本身有 dock 高度，懒加载可见性不受影响。**登录态这块不存在，评论区高度仍由 flex 分配，不受影响。**
-
-### 诊断
-
-页面控制台可查：
-
-```js
-getComputedStyle(document.querySelector('#commentapp')).maskImage // 期望 'none'
-document.querySelector('#commentapp').querySelector('bili-comments').shadowRoot.querySelector('.bewly-comments-notice')
+```ts
+// 旧：8*2 + coverHeight + 8 + 34 + 4 + 16 + 26(头部) + 8(间隙)
+// 新：12*2(上下 padding) + 8*2(卡片内边距) + coverHeight + 8 + 34 + 4 + 16
+return 12 * 2 + 8 * 2 + coverHeight + 8 + 34 + 4 + 16
 ```
 
-### 第 39 轮复测修复（空态块仍 372px + 胶囊变白色）
+真机高度应从 222~243 降到 ~196~217（减少 ≥24）。
+**切换仍可用**：滚轮 / ←→ / Home / End / Enter 不变（交互逻辑未动）。
 
-真机复测：`.bewly-comments-notice` 高 372（其中匿名占位 div 高 300），
-`.bewly-comments-login` 的 `color/border` 是 `rgb(249,250,251)`（深色主题的白色）。
+### 已知限制
 
-两个根因与修法：
+- 评论 shadow 内部的规则靠 video-page 注入，未注入前「头像固定 / 行长 / 多图网格」在 shadow 内不生效（页面级只能约束到宿主容器）；
+- `container-type: inline-size` 只影响 inline 方向，不影响 A 的 dock 高度分配；
+- 轨道高度需要 rail.ts 同步改公式，否则 CSS 精简后底部会留白（总高仍按旧公式）。
 
-1. **匿名占位 / 骨架 div**（B 站塞的，高 300）：
-   - JS 在 notice 容器里遍历直接子节点，凡「不含任何可见文本」的（`:empty` 判不出来的骨架）加 `.bewly-comments-placeholder`；
-   - CSS 对该类 `display: none`，并给 `.bewly-comments-notice > div`（排除胶囊 / 底栏 / 文案）压 `height:auto; min-height:0; max-height:none; padding/margin:0`；
-   - 外层匿名包裹（真机 h=540、padding-top 14）标记 `.bewly-comments-notice-outer`，只压高度不动视觉。
-2. **胶囊被 B 站主题变量覆盖成白色**：上一版用了 `--bew-brand`，但**本仓库根本没有这个变量**，
-   `var(--bew-brand, currentColor)` 回退成继承色（深色主题 = 白）。改用真正存在的
-   `var(--bew-theme-color, var(--bew-bili-blue, currentColor))`，并保留 `!important`。
+## 第 46 轮 A：播放器 / 评论区分隔条拖拽调宽
 
-高度预算（收紧后）：
+### 结构
 
-| 部分 | 高度 |
-| --- | --- |
-| notice `padding-block` | 12 × 2 = 24 |
-| 登录胶囊 | 32 |
-| gap | 8 |
-| 「没有更多」底栏（padding 4×2 + 12.5px 文案 ≈ 19） | ≈ 27 |
-| **合计** | **≈ 91（目标 ≤100）** |
+- 分隔条是**页面级 DOM**（`#bewly-video-splitter`，由 `splitter.ts` 创建到 body），不是 shadow 内组件：
+  它要压在播放器列与评论列之间的 gutter 上，而这两列都是 B 站自己的 DOM；页面级 `position: fixed`
+  也不会被评论区滚动容器裁剪；
+- 位置全部读布局变量：`left: var(--bvp-fixed-split-left)`、`top: var(--bvp-fixed-top)`、
+  `height: var(--bvp-fixed-dock-height)`；`--bvp-fixed-split-left` 由 `fixedLayout.ts` 算：
+  `内容左边缘 + 播放器宽 + gutter/2 − 3`（6px 宽，中心落在 gutter 中间）；
+- 只在固定布局、非单列时显示：`html:not(.bewly-video-fixed)` / `html.bewly-player-webfull` /
+  `html.bewly-player-wide` 下 `display: none`；iframe 降级时 `splitter.ts` 不创建元素。
 
-## 第 40 轮：登录入口移到评论头部行右侧
+### 拖拽
 
-用户截图红框位置 = 「评论 N | 最热 | 最新 | 只看 UP 主」这一行的最右侧。
+- `pointerdown` → `setPointerCapture` → `pointermove` → `pointerup`，拖拽期间 body 加
+  `bewly-video-resizing`（禁用文本选中、`cursor: col-resize`）；
+- 比例 = `(clientX − --bvp-fixed-content-left) / --bvp-fixed-content-width`，clamp 到 `[0.35, 0.75]`；
+- `pointermove` 用 `requestAnimationFrame` 合并成每帧一次，只改内存里的「预览比例」并写 CSS 变量，
+  **不写 settings**；`pointerup` 时写一次 `settings.value.videoPageSplitRatio`（刷新后保持）；
+- 双击 / Home / End → `videoPageSplitRatio = 0`（回到自动计算 + 第 44 轮的 40% 兜底）；
+- 键盘：`role="separator"` + `aria-orientation="vertical"` + `tabindex=0`，←/→ 每次 1%，
+  `aria-valuenow` 每拍同步；
+- `title` = 「双击重置宽度比例」。
 
-### 实现
+### fixedLayout 的配合
 
-- **头部胶囊**：向 `bili-comments-header-renderer` shadow 注入 `#bewly-comments-login-pill`（`<button>`），
-  插入 `#navbar`（含「评论 N」+ `#sort-actions` 的那一行）末尾，`margin-left: auto` 推到最右；
-  注入的 `#navbar { display:flex; align-items:center; flex-wrap:wrap }` 只保证是一行 flex，
-  **不加 gap**，避免改变原生标题 / 排序间距；
-- **样式**：复用第 39 轮胶囊规范 —— 高 32、`padding: 0 16px`、圆角 16、14px/500、
-  主色描边 + 主色文字、透明底；颜色用 `var(--bew-theme-color, var(--bew-bili-blue, currentColor))`
-  （第 39 轮踩过 `--bew-brand` 不存在的坑）；hover/focus 为 12% 主色混合底；
-- **文案**：胶囊只显示「登录」（单行 nowrap，避免撑破 header 行），完整原文案放到 `title` 与 `aria-label`；
-- **点击**：不自己拼登录 URL，而是 `findLoginOrigin().el.click()` 触发 B 站原有登录入口；
-- **底部清理**：原始「登录后查看 N 条评论」元素及其块标记 `.bewly-comments-login-origin(-block)` → `display:none`，
-  底部空态块只剩「没有更多评论」（12.5px 次要色），高度约 51px；
-- **幂等**：每 500ms 拍执行 —— header 被重建就重新插入、胶囊被挤走就拉回行尾、
-  登录后找不到登录文案则移除胶囊；
-- **卸载**：移除胶囊与注入的 `#bewly-comments-login-style`。
+- `getSplitRatio()`：拖拽预览值优先，其次 `settings.videoPageSplitRatio`，0 表示自动；
+- `splitRatio > 0` 时：`width = min(按高度反算的宽, round(内容宽 × 比例))`，再 `height = round(width × 9 / 16)`；
+  **绕过 40% 兜底**（拖拽优先），但保留 `MIN_COMMENT_WIDTH = 400` 的绝对下限（避免评论列窄到不可用，
+  1600 宽下拖到最右时播放器约 74%、评论区约 26%）；
+- 新增变量：`--bvp-fixed-split-left`、`--bvp-fixed-content-left`、`--bvp-fixed-content-width`，
+  `clearFixedLayout()` 一并清理。
 
-### 验收对应
+### 协作项（native-style 交接，已全部完成）
 
-- 胶囊在 header 行内、与「最热」同一行、`right` 贴行右边缘（`margin-left:auto` 保证）；
-- 底部 `.bewly-comments-notice` 只剩「没有更多评论」：24(padding) + 27(底栏) ≈ 51 ≤ 60；
-- 点击触发原生登录入口；遮罩仍为 none、正文 14px 不变。
-
-## 第 41 轮：视频页增强层盖住设置页（已修）
-
-真机诊断：
-
-```
-#bewly-video-page 宿主：position fixed, z-index 2147483200   ← 推荐轨道 / 浮层都在这里
-#bewly shadow 内设置面板：.fixed.w-full.h-full  z-index 10002
-.settings-content 1000×900
-```
-
-增强层宿主远高于设置面板 → 轨道与浮层盖住设置页。
-
-### 修法（不改宿主常态 z-index，只在设置页打开期间临时降级）
-
-- **检测**（`index.ts` 的 `isBewlySettingsOpen()`，每拍执行）：`#bewly` 的 shadow 内
-  1. 可见的 `.settings-content` → 设置页打开；
-  2. 可见的 `[role="dialog"]` → 其它弹窗；
-  3. 兜底：可见的 `.fixed.w-full.h-full` 且内部含设置标志类；
-  「可见」= 宽高 > 300 且 `display/visibility/opacity` 正常；
-- **让位**（`syncSettingsOverlaySuppression()`）：
-  - `<html>` 加 `bewly-settings-open`；
-  - 宿主加 `data-bewly-suppressed`，行内 `z-index: 9999`（低于设置面板 10002）；
-  - 关闭立即移除类 / 属性 / 行内 z-index，回落到 `:host { z-index: 2147483200 }`；
-  - 值相同不写（z-index 与类都做变化比较），避免每拍触发样式重算；
-- **CSS 兜底**：
-  - `videoPage.shadow.scss`：`:host([data-bewly-suppressed]) .bvp-rail { display: none !important }`；
-  - `pages/videoPage.scss`：`html.bewly-settings-open #bewly-video-page { z-index: 9999 !important }`；
-- **布局不动**：固定布局的 CSS 变量（dock / 播放器 / 评论列）一律不改，所以设置页开关时播放器与评论区不跳变。
-
-### 验收对应
-
-- 打开设置页：宿主 z-index 9999 < 10002、轨道 `display:none`，设置页完整可见可点 ✅
-- 关闭设置页：类 / 属性 / 行内样式全部移除，轨道恢复、z-index 回到 2147483200 ✅
-- 期间固定布局变量未变，播放器 / 评论区无跳变 ✅
-
-## 第 43 轮：iframe 内预览（首页空格抽屉）整体降级
-
-现象：首页按空格打开「标签页内预览」→ 抽屉 iframe 里加载视频页，但增强层仍按**整页视口**做固定布局，
-评论列被塞到抽屉右侧、轨道贴底、播放器被压缩。
-
-根因：抽屉 iframe 的视口远小于整页视口，而 `fixedLayout` / `commentColumn` / `recommendRail`
-（以及工具栏、简介按钮、播放器模式）都以 `window.innerWidth/innerHeight` 为基准分配空间。
-
-### 实现
-
-`src/contentScripts/videoPage/index.ts`：
-
-- 引入 `isInIframe()`（`~/utils/main`），**每拍重算**（抽屉随时可能打开 / 关闭）；
-- `mount()` 时若在 iframe 内：
-  - 不 setup `fixedLayout`（不写 `--bvp-fixed-*`、不加 `html.bewly-video-fixed`）；
-  - 不 setup `commentColumn`（不搬 `#commentapp`）；
-  - 不 setup `toolbarActions` / `descPopover`（不往原生工具栏塞按钮）；
-  - 不 setup 快捷键（iframe 内会和抽屉外层抢空格 / 方向键）；
-  - 不调用 `syncPlayerScreenMode`（早退路径不写 `bewly-player-*` 类）；
-- `sync()` 每拍调用 `syncIframeDegradation()`：状态变化时执行 `degradeForIframe()` / `restoreFromIframe()`；
-- iframe 内 `sync()` 在完成基础状态（`ui.ready` / 舞台标记）后**提前返回**，只保留 `syncComments()`；
-- `degradeForIframe()`：dispose 各功能 + `clearFixedLayout()` + `restoreCommentColumn()` +
-  `teardownToolbarActions()` / `teardownDescPopover()` / `teardownRecommendRail()` / `teardownPlayerScreenMode()`；
-- `restoreFromIframe()`：重新 setup 被跳过的功能（正常播放页永远走这条之外的路径）；
-- `settings` watch 里的 `syncFixedLayout()` 也加 `!iframeDegraded` 守卫；
-- `unmount()` 复位 `iframeDegraded`。
-
-### 保留的功能
-
-| 功能 | iframe 内 | 原因 |
-| --- | --- | --- |
-| 评论增强（只看 UP / 折叠 / 登录入口） | 保留 | 不搬 DOM、不写布局，无副作用 |
-| 广告清理 | 保留 | 纯 CSS |
-| 快捷键 | **关闭** | 空格 / 方向键在 iframe 内会与抽屉外层冲突（空格正是打开抽屉的键） |
-| 迷你播放器 | 不进入 | 早退路径不跑迷你态逻辑 |
-
-### 验收对应
-
-- iframe 内：`html.bewly-video-fixed` 不存在（`clearFixedLayout()` + 不 setup）；
-- `[data-bewly-comment-column]` 为 null（不搬列 + `restoreCommentColumn()`）；
-- `.bvp-rail` 为 null（不 setup 轨道 + `teardownRecommendRail()` 清 `railState`，Vue 不渲染）；
-- 原生 `#commentapp` 留在原位、原生推荐列表正常显示；
-- 关闭抽屉 / 非 iframe 页面：所有功能照常（`bewly-video-fixed` 存在、轨道存在）。
-
-## 第 44 轮：评论区至少占内容宽 40%
-
-用户要求：评论区默认宽度至少占内容宽的 2/5（40%）。
-
-### 实现（`fixedLayout.ts`）
-
-- 新增常量：
-  - `MIN_COMMENT_WIDTH_RATIO = 0.4`（评论列相对内容宽下限）；
-  - `MAX_PLAYER_WIDTH_RATIO = 0.6`（触发兜底时播放器占内容宽的比例）；
-- 播放器宽度按「16:9 反算 + 左列可用宽夹住」算完后，加一道兜底：
-
-  ```ts
-  const colWidth = totalWidth - width - COLUMN_GUTTER
-  if (colWidth / totalWidth < MIN_COMMENT_WIDTH_RATIO) {
-    width = Math.round(totalWidth * MAX_PLAYER_WIDTH_RATIO - COLUMN_GUTTER)
-    height = Math.round(width * 9 / 16) // 仍严格 16:9
-  }
-  ```
-
-- 只在**非单列**（普通模式）生效：网页全屏 / 宽屏时评论区已隐藏，不能把播放器压到 60%；
-- 收窄后播放器变矮是预期（用户明确优先保证评论比例）；`player.bottom ≤ rail.top − 24` 不受影响，
-  因为 dock 高度不变、播放器只会更矮；
-- 原有 `MIN_COMMENT_WIDTH = 400` 的绝对下限仍然保留在后（极窄视口由它兜底）。
-
-### 诊断
-
-`document.documentElement.dataset.bewlyFixedMetrics` 增加 `colPct=`（评论区占内容宽百分比，两位小数）：
-
-```
-dock=662;player=488x868;rail=238;top=64;mode=normal;colPct=42.53
-```
-
-### 预期数值（与代码同套公式）
-
-| 视口 | 内容宽 | 播放器 | 比例 | 评论列 | colPct | 兜底触发 |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1600×1000 | 1552 | 868×488 | 1.7787 | 660 | 42.53% | 否 |
-| 1920×1000 | 1872 | 850×478 | 1.7782 | 998 | 53.31% | 否 |
-| 2200×1000 | 2152 | 811×456 | 1.7785 | 1317 | 61.20% | 否 |
-| 2560×1000 | 2512 | 759×427 | 1.7775 | 1729 | 68.83% | 否 |
-| 1600×1200 | 1552 | 907×510 | 1.7784 | 621 | 40.01% | **是** |
-| 1600×1440 | 1552 | 907×510 | 1.7784 | 621 | 40.01% | **是** |
-| 1280×1000 | 1232 | 715×402 | 1.7786 | 493 | 40.02% | **是** |
-
-所有行 `colPct ≥ 40.00`、比例在 1.7775~1.7787（±0.01 内）、`rail.top − dock.bottom = 24`。
-
-### 第 44 轮微调：40% 的分母改为**视口宽**
-
-真机反馈：1600×1300 时按内容宽算 `colPct=40.01`，但 `colW/innerWidth = 621/1600 = 38.81%`，
-用户看到的是**视觉比例**，所以分母必须用 `window.innerWidth`。
-
-改动（`fixedLayout.ts`）：
-
-- 兜底判断从 `colW / contentW < 0.4` 改为 `colW / innerWidth < 0.4`；
-- 收窄时取两个等价上限中的较小值：
-  - 按视口比例：`round(innerWidth × 0.6) − gutter − 左右 padding`；
-  - 按评论最小宽反推：`contentW − gutter − ceil(innerWidth × 0.4)`；
-  - `ceil` 保证奇数宽（如 1601）边界也不会低于 40%；
-- 收窄后 `height = round(width × 9 / 16)`，仍严格 16:9；
-- `data-bewly-fixed-metrics` 的 `colPct` 同步改为**按视口宽**计算（与兜底口径一致），
-  单列模式（网页全屏 / 宽屏，评论区隐藏）记 `0.00`。
-
-验收数值（与代码同套公式）：
-
-| 视口 | 播放器 | 比例 | 评论列 | colPct（/innerWidth） | 兜底 |
-| --- | --- | --- | --- | --- | --- |
-| 1600×1000 | 868×488 | 1.7787 | 660 | 41.25% | 否 |
-| 2200×1000 | 811×456 | 1.7785 | 1317 | 59.86% | 否 |
-| 1600×1300 | 888×500 | 1.7760 | **640** | **40.00%** | **是** |
-| 1600×1200 | 888×500 | 1.7760 | 640 | 40.00% | 是 |
-| 1920×1000 | 850×478 | 1.7782 | 998 | 51.98% | 否 |
-| 1280×1000 | 696×392 | 1.7755 | 512 | 40.00% | 是 |
-| 1601×1300 | 888×500 | 1.7760 | 641 | 40.04% | 是 |
-
-所有行 `colW / innerWidth ≥ 0.40`、比例在 1.7778 ± 0.01、`rail.top − dock.bottom = 24`、评论列高 = dock 高。
-
-## 第 45 轮：创作者卡与评论 header 左右边距统一
-
-真机（1600×1000）：评论列 left 907 / right 1576（宽 669）；
-UP 卡 `.up-panel-container` left 920 / right 1563（padding 12）；
-评论 header `#navbar` left 920 / right **1553** —— **左边已对齐，右边差 10px**。
-
-### 根因
-
-UP 卡是我们搬到 `.bewly-comment-column` 的**直接子元素**（滚动容器外），宽度 = 列宽 − 24；
-header 在 `#commentapp` 里，被纵向滚动条（8px）挤掉，右边缘少约 10px（滚动条 8 + 宿主/内层 padding 2）。
-
-### 实现
-
-- `comments.ts` 新增 `syncCommentsScrollbarVar()`：每拍实测 `#commentapp` 的滚动条宽
-  （`offsetWidth − clientWidth`），写到评论列的 `--bewly-comment-scrollbar`（行内样式，值不变不写）；
-- 向 `bili-comments` shadow 注入（`COMMENTS_STYLE`）：
-
-  ```css
-  bili-comments-header-renderer {
-    display: block;
-    box-sizing: border-box;
-    width: calc(100% + var(--bewly-comment-scrollbar, 0px));
-    margin-right: calc(-1 * var(--bewly-comment-scrollbar, 0px));
-    padding-inline: 12px; /* = --bvp-space-3 */
-  }
-  ```
-
-  → header.left = 列.left + 12，header.right = 列.right − 12，与 UP 卡同轴；
-- 向 header 的 shadow 注入（`FILTER_STYLE`，登录 / 未登录都会注入）：
-  `#navbar { width: 100%; margin-inline: 0; padding-inline: 0; box-sizing: border-box }`，
-  去掉 header 内层自带的左右 padding；
-- 登录胶囊 `#bewly-comments-login-pill` 显式 `margin-right: 0`（只有 `margin-left: auto` 推右）；
-- 页面级给出 `--bewly-comment-scrollbar: 0px` 默认值（无滚动条时 header 不补偿，短列表也正确）；
-- 评论列表（`bili-comment-thread-renderer`）保留 B 站自己的 padding，不强行改 —— 只保证左边与 UP 卡 / header 同轴；
-- 卸载时移除列上的 `--bewly-comment-scrollbar`。
-
-### 验收对应
-
-- `|up.left − header.left| ≤ 1`：header 显式 `padding-inline: 12px`，UP 卡 padding 12（差 1px 来自卡片 border）✅
-- `|up.right − header.right| ≤ 1`：header 宽度补偿 = 实测滚动条宽，右边缘回到「列.right − 12」✅
-- 左右对称：`up.left − col.left` 与 `col.right − up.right` 同为 12~13px ✅
-- 打开评论区右列与降级（不搬列）两种状态都成立：变量由 `#commentapp` 实测、样式只作用于 `bili-comments` shadow 内的 header，与列是否搬动无关 ✅
+1. **轨道头部模板已删除**：`RecommendRail.vue` 的 `<header class="bvp-rail__head">` 整块（标题 / 两个箭头 / 关闭按钮）移除；
+2. **`computeRailHeight` 公式已改**：
+   ```ts
+   // 旧：8 * 2 + coverHeight + 8 + 34 + 4 + 16 + 26 + 8
+   // 新：12 * 2(轨道上下 padding) + 8 * 2(卡片内边距) + coverHeight + 8 + 34 + 4 + 16
+   return 12 * 2 + 8 * 2 + coverHeight + 8 + 34 + 4 + 16
+   ```
+3. **评论 shadow 响应式规则已注入**：`comments.ts` 新增 `COMMENTS_RESPONSIVE_STYLE`，
+   同时注入 `bili-comments` 与每个 `bili-comment-renderer` 的 shadow（正文 / 头像 / 子评论缩进 / 多图网格 /
+   `@container bewly-comments` 窄列与宽列分支），卸载时移除。

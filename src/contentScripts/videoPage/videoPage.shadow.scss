@@ -1305,3 +1305,69 @@
   }
 }
 /* ===== 第 34 轮 typography end ===== */
+
+/* ===== 第 46 轮 rail-slim ===== */
+/* 推荐轨道精简（第 46 轮 B 工作流，只追加）
+   用户要求：删掉轨道标题行（「推荐视频」+ ←/→ + ×），轨道改成底部圆角的 dock，卡片区上下 12px。
+   模板删除由 video-page 负责；本段做两件事：
+   1. 视觉收尾：底部 14px 圆角、顶部直角、去边框、卡片区 padding 12/16；
+   2. 兜底：即使模板里的 `.bvp-rail__head` 还在（未删 / 中间态），也用 CSS 收成 0 高度并隐藏，
+      保证「高度减少 ≥24px」的验收不被模板时序卡住。 */
+
+.bvp-rail {
+  box-sizing: border-box;
+  /* 卡片区上下 12px、左右 16px；去掉标题行留下的上边距 */
+  padding: 12px 16px;
+  gap: 0;
+  /* 圆角：底部左右 14px，顶部直角（与上方播放器/评论区 dock 衔接） */
+  border-radius: 0 0 14px 14px;
+  /* 不要边框：靠背景色与下方页面背景自然过渡 */
+  border: 0;
+  border-top: 0;
+  background: color-mix(in oklab, var(--bew-fill-1), transparent 25%);
+  backdrop-filter: var(--bew-filter-glass-1);
+}
+
+/* 兜底：标题行（含标题 / 箭头 / 关闭按钮）即使还在 DOM 也不占位 */
+.bvp-rail__head,
+.bvp-rail__title,
+.bvp-rail__actions,
+.bvp-rail__nav,
+.bvp-rail__close {
+  display: none !important;
+}
+
+/* viewport 直接吃满轨道（没有 head 了） */
+.bvp-rail__viewport {
+  height: 100%;
+  margin: 0;
+  border-radius: 10px;
+}
+
+/* 卡片高度跟着 viewport 走（轨道高度由 rail.ts 计算，这里只保证卡片对齐） */
+.bvp-rail__track {
+  height: 100%;
+}
+
+/* 窄屏：左右边距略收，底圆角不变 */
+@media (max-width: 1024px) {
+  .bvp-rail {
+    padding: 10px 12px;
+    border-radius: 0 0 12px 12px;
+  }
+}
+
+/* 高对比度：dock 边界靠背景色区分，不额外加边框；这里只抬一档对比度 */
+@media (prefers-contrast: more) {
+  .bvp-rail {
+    background: color-mix(in oklab, var(--bew-fill-2), transparent 10%);
+  }
+}
+
+@media (forced-colors: active) {
+  .bvp-rail {
+    background: Canvas;
+    border-radius: 0 0 14px 14px;
+  }
+}
+/* ===== 第 46 轮 rail-slim end ===== */

@@ -52,14 +52,21 @@ export const railState = reactive<RecommendRailState>({
 
 const t = useMessages()
 
-/** 轨道高度：卡片宽度按可见张数算出后，16:9 封面 + 标题 + 头部 */
+/**
+ * 轨道高度：卡片宽度按可见张数算出后，16:9 封面 + 标题 + 元信息。
+ *
+ * 第 46 轮：轨道头部（标题行 / 左右箭头 / 关闭按钮）已从模板删除，
+ * native-style 的 CSS 也改成「无头部 + 上下 12px padding + 底部圆角 14px」，
+ * 因此公式去掉头部 26 与间隙 8，改为：
+ * `12 * 2(轨道上下 padding) + 8 * 2(卡片内边距) + 封面 + 8 + 34(标题两行) + 4 + 16(元信息)`
+ * 真机轨道高度从 222~243 降到 ~196~217（减少 ≥24px）。
+ */
 export function computeRailHeight(width: number): number {
   const visible = Math.min(7, Math.max(4, Math.floor(width / RAIL_MIN_CARD_WIDTH)))
   const gaps = 12 * (visible - 1)
   const cardWidth = Math.max(148, Math.floor((width - gaps) / visible))
   const coverHeight = Math.round((cardWidth - 16) * 9 / 16)
-  // 8(卡片内边距) * 2 + 封面 + 8(间隙) + 标题两行(约 34) + 4 + 元信息(16) + 头部(26) + 间隙(8)
-  return 8 * 2 + coverHeight + 8 + 34 + 4 + 16 + 26 + 8
+  return 12 * 2 + 8 * 2 + coverHeight + 8 + 34 + 4 + 16
 }
 
 function sameSequence(a: RailCard[], b: RailCard[]): boolean {

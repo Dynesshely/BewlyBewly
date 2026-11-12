@@ -1495,8 +1495,6 @@ html.bewly-design.videoPage.bewly-video-fixed {
     scrollbar-width: thin;
     scrollbar-color: var(--bvp-scroll-thumb) var(--bvp-scroll-track);
     scroll-padding-block: var(--bvp-space-4);
-    /* 底部 24px 渐隐：mask 不改颜色，深浅主题都成立 */
-    mask-image: linear-gradient(to bottom, #000 calc(100% - var(--bvp-scroll-fade)), transparent);
   }
 
   .bewly-comment-column > #commentapp::-webkit-scrollbar,
@@ -1539,8 +1537,8 @@ html.bewly-design.videoPage.bewly-video-fixed {
    令牌会随 CSS 变量继承进 shadow，native-style 的 typography 段可直接复用：
    .bvp-rail__viewport / .bvp-playlist__list / .bvp-help__body
    → scrollbar-width: thin; scrollbar-color: var(--bvp-scroll-thumb) var(--bvp-scroll-track);
-   → mask-image: linear-gradient(to bottom, #000 calc(100% - var(--bvp-scroll-fade)), transparent);
-   → scroll-padding-block: var(--bvp-space-4); */
+   → scroll-padding-block: var(--bvp-space-4);
+   （不提供 mask / 渐隐：第 39 轮用户明确要求删除。） */
 /* #endregion */
 
 /* #region z-index 分层落地（A5） */
@@ -2073,7 +2071,7 @@ html.bewly-design.videoPage.bewly-video-fixed .bewly-comment-column #commentapp,
 }
 
 html.bewly-design.videoPage.bewly-video-fixed .bewly-comment-column > #commentapp:empty {
-  min-height: 180px !important;
+  min-height: 0 !important;
 }
 
 /* ===== 第 37 轮 up-card ===== */
@@ -2689,3 +2687,23 @@ html.bewly-design.videoPage.bewly-player-wide {
     margin-inline: auto !important;
   }
 }
+
+/* ===== 第 39 轮 comments-notice =====
+   用户带截图反馈：未登录状态评论区很丑。
+   1. 去掉第 34 轮加的底部 24px 渐隐（mask-image）—— 用户明确要求删除；
+      scroll-padding-block 与滚动条美化保留。
+   2. 「登录后查看 N 条评论 / 没有更多评论」块：去掉整块蓝底、做成低调空态提示。
+      文本匹配与属性标记由 comments.ts 完成（B 站类名带哈希，不能写死选择器），
+      这里只写标记后的样式。
+*/
+html.bewly-design.videoPage.bewly-video-fixed {
+  /* 1) 渐隐彻底移除（含 -webkit- 前缀，防止旧规则或 inline 残留） */
+  .bewly-comment-column > #commentapp,
+  .bewly-comment-column #commentapp {
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+  }
+}
+
+/* 2) 「登录后查看 N 条评论 / 没有更多评论」的样式注入在 comments.ts 的 NOTICE_STYLE，
+   因为那些元素在 bili-comments 的 shadow root 里，页面级 CSS 选不到。 */

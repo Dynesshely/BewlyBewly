@@ -769,3 +769,88 @@ commentColumn.bottom = 播放器 bottom < rail.top - 8
 
 **验收口径**：卡片高 ∈[64, 84]；头像 `top − 卡片 top ∈ [10, 16]`；按钮仍 88~140 宽、36 高、同行贴右；
 有签名场景 ≤110。
+
+## 第 39 轮：去掉评论底部渐隐 + 美化未登录空态块
+
+### 1. 删除 `#commentapp` 的底部渐隐
+
+第 34 轮在评论滚动容器上加过 `mask-image: linear-gradient(...)`（底部 24px 渐隐）。用户带截图要求删除：
+
+- 直接删掉第 34 轮 layout 段里的 `mask-image`（不是只覆盖），并在第 39 轮段补一层
+  `mask-image: none !important; -webkit-mask-image: none !important;`（防旧规则 / inline 残留）；
+- 覆盖选择器用 `html.bewly-design.videoPage.bewly-video-fixed #commentapp`，不限评论列 ——
+  降级 / 未搬列时 `#commentapp` 仍在左栏，也要清掉；
+- `scroll-padding-block` 与滚动条美化（thin / 8px 圆角 thumb / 悬停加深）**保持**；
+- 没有用其它「暗示可继续滚动」的替代手段（用户没要求）。
+
+### 2. 未登录空态块（登录后查看 N 条评论 / 没有更多评论）
+
+真机结构（`bili-comments` shadow 内，也可能在它的子组件 shadow 里）：
+
+```
+div（B 站给了青色半透明底 oklab(...0.2) + 主色字）  ← 「登录后查看 20 条评论」
+div.bottombar  高 120                            ← 「没有更多评论」（13px 文案，空白巨大）
+外层包裹 div   高 350（大片空白）
+```
+
+B 站类名带哈希，不能写死选择器，因此由 `comments.ts` 做**文本匹配 + 类名标记**：
+
+- `findNoticeText()` 在 shadow 里找「只包含这段文案的最内层元素」（跳过含同样文案的父级）；
+- 登录文案：标记最近的 `<a>`（没有就标记自身）为 `.bewly-comments-login`；
+- 「没有更多评论」：标记最近的 `.bottombar` 为 `.bewly-comments-bottom`，文案自身标记 `.bewly-comments-end`；
+- 登录 / 文案的父级（最多两层、且不含 `bili-comment-thread-renderer`）也标记 `.bewly-comments-notice`，
+  这样 B 站画在**外层容器**上的青蓝底会被一起清掉；
+- 再向上找「不含评论线程」的最外层容器标记 `.bewly-comments-notice`（处理外层 h=350 的空白）；
+- 标记是幂等的，每拍（500ms）扫一次：登录 / 登出、评论数量变化都会自动生效或失效；
+- 样式注入到 `bili-comments` 及其直接子组件的 shadow（`#bewly-comments-notice-style`），
+  因为类打在 shadow 内元素上，页面级 CSS 选不到；
+- 卸载时移除注入样式。
+
+样式要点（不引入新颜色，只用 `--bew-brand` / `--bew-text-3`）：
+
+| 元素 | 样式 |
+| --- | --- |
+| `.bewly-comments-notice` | `background:none`、无边框/圆角/阴影、`padding-block:16px`、flex 纵排居中、`gap:8px`、`height:auto`、`min-height:0` |
+| `.bewly-comments-login` | 胶囊按钮：`inline-flex`、高 32、`padding:0 16px`、圆角 16、14px/500、主色描边 + 主色文字、透明底；hover/focus 用 12% 主色混合底 |
+| `.bewly-comments-bottom` | `height:auto`、`min-height:0`、`padding-block:12px`（把真机 120px 收到 ~44px） |
+| `.bewly-comments-end` | 12.5px / 1.5 / 400 / 次要色 / `nowrap` |
+
+### 3. 空态撑高
+
+第 36 轮给 `#commentapp:empty` 加过 `min-height: 180px`（为了让 B 站懒加载判定可见）。
+用户截图里按钮块下方的大片空白部分来自它，本轮改成 `min-height: 0`；
+评论列本身有 dock 高度，懒加载可见性不受影响。**登录态这块不存在，评论区高度仍由 flex 分配，不受影响。**
+
+### 诊断
+
+页面控制台可查：
+
+```js
+getComputedStyle(document.querySelector('#commentapp')).maskImage // 期望 'none'
+document.querySelector('#commentapp').querySelector('bili-comments').shadowRoot.querySelector('.bewly-comments-notice')
+```
+
+### 第 39 轮复测修复（空态块仍 372px + 胶囊变白色）
+
+真机复测：`.bewly-comments-notice` 高 372（其中匿名占位 div 高 300），
+`.bewly-comments-login` 的 `color/border` 是 `rgb(249,250,251)`（深色主题的白色）。
+
+两个根因与修法：
+
+1. **匿名占位 / 骨架 div**（B 站塞的，高 300）：
+   - JS 在 notice 容器里遍历直接子节点，凡「不含任何可见文本」的（`:empty` 判不出来的骨架）加 `.bewly-comments-placeholder`；
+   - CSS 对该类 `display: none`，并给 `.bewly-comments-notice > div`（排除胶囊 / 底栏 / 文案）压 `height:auto; min-height:0; max-height:none; padding/margin:0`；
+   - 外层匿名包裹（真机 h=540、padding-top 14）标记 `.bewly-comments-notice-outer`，只压高度不动视觉。
+2. **胶囊被 B 站主题变量覆盖成白色**：上一版用了 `--bew-brand`，但**本仓库根本没有这个变量**，
+   `var(--bew-brand, currentColor)` 回退成继承色（深色主题 = 白）。改用真正存在的
+   `var(--bew-theme-color, var(--bew-bili-blue, currentColor))`，并保留 `!important`。
+
+高度预算（收紧后）：
+
+| 部分 | 高度 |
+| --- | --- |
+| notice `padding-block` | 12 × 2 = 24 |
+| 登录胶囊 | 32 |
+| gap | 8 |
+| 「没有更多」底栏（padding 4×2 + 12.5px 文案 ≈ 19） | ≈ 27 |
+| **合计** | **≈ 91（目标 ≤100）** |

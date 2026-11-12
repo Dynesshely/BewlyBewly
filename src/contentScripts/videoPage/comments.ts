@@ -50,6 +50,8 @@ const COMMENTS_STYLE_ID = 'bewly-comments-style'
 /** 「只看 UP 主」按钮（第 36 轮并入原生排序行） */
 const ONLY_UP_BUTTON_ID = 'bewly-comment-only-up'
 const FILTER_STYLE_ID = 'bewly-comment-filter-style'
+/** 未登录空态块（登录后查看 N 条评论 / 没有更多评论）的注入样式（第 39 轮） */
+const NOTICE_STYLE_ID = 'bewly-comments-notice-style'
 const FOLD_STYLE_ID = 'bewly-comment-fold-style'
 const TEXT_STYLE_ID = 'bewly-comment-text-style'
 
@@ -135,6 +137,118 @@ const TEXT_STYLE = `
 #content * {
   font-size: 14px !important;
   line-height: 1.65 !important;
+}
+`
+
+/**
+ * 注入到 `bili-comments` shadow：未登录空态块的低调样式（第 39 轮）。
+ *
+ * 真机结构（未登录时）：
+ * - 「登录后查看 20 条评论」：div，B 站自己给了青色半透明底（oklab(...0.2)）+ 主色字，就是截图里那块；
+ * - 「没有更多评论」：div.bottombar，高 120（原文案只有 13px，空白巨大）；
+ * - 外层包裹 div 高 350，含大片空白。
+ *
+ * 样式全部走类名（由 `markCommentsNotice()` 打标记），因为 B 站类名带哈希、不能写死选择器。
+ * 颜色只用现有变量（--bew-brand / --bew-text-3），不引入新颜色。
+ */
+const NOTICE_STYLE = `
+.bewly-comments-notice {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  /* 高度预算：padding 12*2 + 胶囊 32 + gap 8 + 「没有更多」约 27 ≈ 91（目标 ≤100） */
+  padding-block: 12px !important;
+  margin: 0 !important;
+  text-align: center !important;
+  background: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* B 站占位 / 骨架块（真机里一个匿名 div 高 300）：
+   去掉它的高度与内边距；确实空的（无文本、无子元素）直接不渲染。 */
+.bewly-comments-notice > div:not(.bewly-comments-login):not(.bewly-comments-bottom):not(.bewly-comments-end) {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  padding-block: 0 !important;
+  margin-block: 0 !important;
+  overflow: hidden !important;
+}
+
+.bewly-comments-notice > div:not(.bewly-comments-login):not(.bewly-comments-bottom):not(.bewly-comments-end):empty {
+  display: none !important;
+}
+
+/* JS 判定为「无文本占位」的节点（:empty 判不出来、但没有任何可见文案） */
+.bewly-comments-placeholder {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* 外层匿名包裹（真机 h=540、padding-top 14）：只压高度，不动其它视觉 */
+.bewly-comments-notice-outer {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  padding-block: 0 !important;
+  margin-block: 0 !important;
+}
+
+.bewly-comments-login {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  width: auto !important;
+  height: 32px !important;
+  padding: 0 16px !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  line-height: 1 !important;
+  /* 深色主题下 B 站会把它设为白色（--text_white 一类变量），必须 !important + 明确主色变量。
+     --bew-brand 在本仓库并不存在（上一版用了它 → 回退 currentColor → 白色），改用 --bew-theme-color。 */
+  color: var(--bew-theme-color, var(--bew-bili-blue, currentColor)) !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+  cursor: pointer;
+  background: transparent !important;
+  border: 1px solid var(--bew-theme-color, var(--bew-bili-blue, currentColor)) !important;
+  border-radius: 16px !important;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.bewly-comments-login:hover,
+.bewly-comments-login:focus-visible {
+  background: color-mix(in oklab, var(--bew-theme-color, var(--bew-bili-blue, currentColor)) 12%, transparent) !important;
+}
+
+.bewly-comments-bottom {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  /* 真机 120 → 4px 上下留白 + 一行 12.5px 文案 ≈ 27 */
+  padding-block: 4px !important;
+  margin: 0 !important;
+}
+
+.bewly-comments-end {
+  margin: 0 !important;
+  font-size: 12.5px !important;
+  font-weight: 400 !important;
+  line-height: 1.5 !important;
+  color: var(--bew-text-3, currentColor) !important;
+  white-space: nowrap !important;
 }
 `
 
@@ -344,6 +458,131 @@ function ensureOnlyUpButton(): void {
     actions.appendChild(btn)
 
   syncOnlyUpButtonState(btn)
+}
+
+/** 未登录空态文案匹配 */
+const LOGIN_NOTICE_RE = /登录后查看/
+const END_NOTICE_RE = /没有更多评论/
+
+/** 在 shadow 里找「只包含这段文案」的最内层元素 */
+function findNoticeText(shadow: ShadowRoot, re: RegExp): HTMLElement | null {
+  const candidates = shadow.querySelectorAll<HTMLElement>('div, a, p, span, button')
+  for (const el of Array.from(candidates)) {
+    const text = (el.textContent ?? '').trim()
+    if (!text || !re.test(text))
+      continue
+    // 跳过「子元素里也含这段文案」的父级
+    const nested = Array.from(el.children)
+      .some(child => re.test((child.textContent ?? '').trim()))
+    if (nested)
+      continue
+    return el
+  }
+  return null
+}
+
+/**
+ * 给未登录空态块打标记（第 39 轮）。
+ *
+ * 幂等：每拍扫一次，B 站登录态变化 / 评论数量变化后自动重新标记。
+ * 注意只标记「不含评论线程」的容器，避免误伤整个评论区。
+ */
+function markCommentsNoticeInRoot(root: ShadowRoot): void {
+  ensureStyleInShadow(root, NOTICE_STYLE_ID, NOTICE_STYLE)
+
+  const loginText = findNoticeText(root, LOGIN_NOTICE_RE)
+  const endText = findNoticeText(root, END_NOTICE_RE)
+  if (!loginText && !endText)
+    return
+
+  const loginEl = loginText
+    ? (loginText.closest<HTMLElement>('a') ?? loginText)
+    : null
+  if (loginEl)
+    loginEl.classList.add('bewly-comments-login')
+
+  // B 站把「青蓝底」画在按钮外面的一层容器上（真机 div h=50 w=698 bg=oklab(...0.2)），
+  // 只清按钮自己的背景不够：把按钮 / 文案的父级也按空态容器处理（最多两层，且不含评论线程）。
+  for (const anchorEl of [loginEl, endText]) {
+    let parent = anchorEl?.parentElement ?? null
+    for (let depth = 0; depth < 2 && parent; depth++) {
+      if (parent.querySelector(THREAD_EL_SELECTOR))
+        break
+      parent.classList.add('bewly-comments-notice')
+      parent = parent.parentElement
+    }
+  }
+
+  let bottomEl: HTMLElement | null = null
+  if (endText) {
+    bottomEl = endText.closest<HTMLElement>('.bottombar') ?? endText
+    bottomEl.classList.add('bewly-comments-bottom')
+    endText.classList.add('bewly-comments-end')
+  }
+
+  // 外层包裹（真机 h=350 的大片空白）：登录 / 结束的公共祖先里，
+  // 向上找「不含评论线程」的最外层容器（最多 4 层，避免把整个评论区标进去）
+  const blocks = [loginEl, bottomEl].filter((el): el is HTMLElement => Boolean(el))
+  if (!blocks.length)
+    return
+  let common: HTMLElement | null = blocks[0]
+  while (common && blocks.some(block => !common!.contains(block)))
+    common = common.parentElement
+  if (!common)
+    return
+
+  let notice: HTMLElement | null = common
+  let cursor: HTMLElement | null = common
+  for (let depth = 0; depth < 4 && cursor; depth++) {
+    if (cursor.querySelector(THREAD_EL_SELECTOR))
+      break
+    notice = cursor
+    cursor = cursor.parentElement
+  }
+  if (notice && !notice.querySelector(THREAD_EL_SELECTOR))
+    notice.classList.add('bewly-comments-notice')
+
+  // 逐个检查 notice 的直接子节点：B 站会塞一个匿名占位 / 骨架 div（真机 h=300），
+  // 它没有任何可见文本，:empty 判不出来 —— 主动标记后隐藏，让空态块高度回到 ~100 以内。
+  if (notice) {
+    for (const child of Array.from(notice.children)) {
+      if (!(child instanceof HTMLElement))
+        continue
+      if (child.classList.contains('bewly-comments-login')
+        || child.classList.contains('bewly-comments-bottom')
+        || child.classList.contains('bewly-comments-end')) {
+        continue
+      }
+      const text = (child.textContent ?? '').replace(/\s+/g, ' ').trim()
+      if (!text)
+        child.classList.add('bewly-comments-placeholder')
+    }
+
+    // 外层匿名包裹（真机 h=540、padding-top 14）：只压高度，不动视觉。
+    const outer = notice.parentElement
+    if (outer && !outer.querySelector(THREAD_EL_SELECTOR))
+      outer.classList.add('bewly-comments-notice-outer')
+  }
+}
+
+/**
+ * 给未登录空态块打标记（第 39 轮）。
+ *
+ * 幂等：每拍扫一次，B 站登录态变化 / 评论数量变化后自动重新标记。
+ * 除了 bili-comments 自身的 shadow，也会扫它直接子组件的 shadow（B 站可能把
+ * 登录提示放进 `bili-comments-footer` 之类的嵌套 Web Component）。
+ */
+function markCommentsNotice(): void {
+  const shadow = getCommentsShadow()
+  if (!shadow)
+    return
+
+  markCommentsNoticeInRoot(shadow)
+  for (const child of Array.from(shadow.children)) {
+    const childShadow = (child as HTMLElement).shadowRoot
+    if (childShadow)
+      markCommentsNoticeInRoot(childShadow)
+  }
 }
 
 function ensureCommentsStyle(): void {
@@ -756,6 +995,8 @@ export function syncComments(): void {
   }
 
   ensureCommentsStyle()
+  // 未登录空态块美化（第 39 轮）：每拍幂等标记，登录态变化时自动生效 / 失效
+  markCommentsNotice()
   observeCommentsShadow()
 
   const threads = getThreads()
@@ -913,6 +1154,7 @@ export function setupComments(): () => void {
     // 清掉注入的样式
     if (styledCommentsShadow) {
       removeStyleFromShadow(styledCommentsShadow, COMMENTS_STYLE_ID)
+      removeStyleFromShadow(styledCommentsShadow, NOTICE_STYLE_ID)
       styledCommentsShadow = null
     }
     for (const shadow of styledShadows) {

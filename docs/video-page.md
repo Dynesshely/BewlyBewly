@@ -787,3 +787,55 @@ commentColumn.bottom = 播放器 bottom < rail.top - 8
 **遗留（属 A 的 layout 段）**：信息栏 `#viewbox_report { max-height: var(--bvp-fixed-info, 56px); overflow: hidden }`。
 标题 20px × 1.35 × 2 行 = 54px，加 padding 12px = **66px** > 56px，第二行会被裁。
 建议 A 把 `--bvp-fixed-info` 提到 **68~70px**（与简报 A3 的「标题组 70px」一致）。
+
+## 第 35 轮：恢复全宽 + dock 与轨道之间 24px 分区间距
+
+### 1. 去掉容器 max-width，恢复全宽
+
+- `#mirror-vdcon` / `.video-container-v1`：删掉 `max-width: var(--bvp-content-max)`（1720）与 `margin-inline: auto`，
+  改为 `width: 100%` + `max-width: none` + `margin-inline: 0`；
+- 左右 `--bvp-page-pad`（24px）的 padding **保留** —— 全宽不等于贴边；
+- `>2200px` 不再有额外加宽限制；`--bvp-content-max` 令牌保留但标注「不再用于布局」，
+  避免其它段落引用时报变量缺失；
+- `fixedLayout.ts` 的宽度预算基于 `#mirror-vdcon.clientWidth − padding`，全宽后自动变大，
+  播放器宽度仍由「16:9 反算 + 左列可用宽上限」共同决定，比例不受影响。
+
+### 2. dock 底边与轨道顶边 24px（原来只有 8px）
+
+真机复测：`col.bottom = 737`、`rail.top = 745` —— 只差 8px，视觉上几乎贴住。
+用户要求「明显的分区间距」，按 Kimi 规范面板 gutter = 24。
+
+```
+railTop  = 视口高 − railSpace − 12           // 轨道底部保留 12
+dockTop  = topOffset
+dockH    = railTop − 24 − dockTop            // 分区间距 24
+         = 视口高 − topOffset − railSpace − 36
+```
+
+- `fixedLayout.ts` 新增常量 `DOCK_RAIL_GAP = 24`、`DOCK_BOTTOM_MARGIN = RAIL_BOTTOM_GAP + DOCK_RAIL_GAP = 36`；
+- 自检从 `dock.bottom <= rail.top − 8` 收紧为 `<= rail.top − 24`（`allowedDock = railTop − DOCK_RAIL_GAP − topOffset`）；
+- 左列 dock 底边（标签行）与右列评论列底边都遵循同一组变量，因此同时与轨道保持 24；
+- dockH 从 678 → 662，播放器相应变矮（16:9 自适应，属预期）。
+
+### 3. 预期数值（1600×1000，rail 实测/估算较大者 238）
+
+| 项目 | 计算 | 结果 |
+| --- | --- | --- |
+| dockH | 1000 − 64 − 238 − 36 | **662** |
+| 播放器高 | floor(662 − (70+52+30) − 8×3) | **486** |
+| 播放器宽 | round(486 × 16/9) | **864** |
+| 16:9 | 864 / 486 | **1.7778** |
+| 评论列高 | `--bvp-fixed-dock-height` | **662 = dock 高** |
+| rail.top − dock.bottom | 24（构造保证） | **24** |
+| 全宽 | `#mirror-vdcon` width | **1600**（含 24 padding 在内） |
+
+2200 宽时：内容宽 2152，播放器仍由高度反算（约 807×454），右列变宽，无横向滚动。
+
+### 4. 评论面板拉满右列（第 35 轮补充）
+
+全宽后右列会变宽（2200 时约 1300px）。第 34 轮的 clamp(400~640) 会导致右侧留白 ~680px，
+与「页面恢复全宽」的诉求冲突，因此：
+- `--bvp-col-comment-max` 改为 **100%**（面板拉满右列）；
+- 下限保留 `min-width: min(100%, 400px)`，窄屏不会溢出；
+- **行长仍由正文 `max-width: 420px` 控制**（注入在 `bili-comment-renderer` 的 shadow 里），
+  面板变宽只影响容器背景，不会让正文行变长。

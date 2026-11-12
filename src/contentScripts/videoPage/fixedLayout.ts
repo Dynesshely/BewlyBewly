@@ -82,13 +82,20 @@ export const DOCK_GAP = 8
 /** 播放器下方「详情 dock」的固定高度：工具栏 / 简介 / 标签压成三行，不产生内部滚动 */
 export const DETAILS_HEIGHT = 104
 /**
- * 播放器 dock 与轨道之间的底部留白。
+ * dock 底边与轨道顶边之间的**分区间距**（Kimi 规范：面板之间 gutter 24px）。
  *
- * `dockH = 视口高 − top − railSpace − DOCK_BOTTOM_MARGIN`，而轨道顶边是
- * `视口高 − railSpace − 12`，因此 DOCK_BOTTOM_MARGIN = 20 恰好让
- * `dock.bottom = rail.top − 8`（用户要求的三区互不重叠）。
+ * 第 34 轮曾按 `rail.top − 8` 做自检，真机上 8px 视觉上几乎贴在一起（用户截图反馈）。
+ * 现在：
+ * ```
+ * railTop = 视口高 − railSpace − RAIL_BOTTOM_GAP(12)   // 轨道底部保留 12px
+ * dock.bottom = railTop − DOCK_RAIL_GAP(24)
+ * ⇒ dockH = 视口高 − top − railSpace − 36
+ * ```
  */
-const DOCK_BOTTOM_MARGIN = DOCK_GAP * 2 + 4
+const DOCK_RAIL_GAP = 24
+/** 轨道离视口底部的间距（与 recommendRail/rail.ts 的 RAIl_FIXED_BOTTOM_GAP 保持一致） */
+const RAIL_BOTTOM_GAP = 12
+const DOCK_BOTTOM_MARGIN = RAIL_BOTTOM_GAP + DOCK_RAIL_GAP
 
 /** 播放器最小 / 最大高度：避免极端窗口下压成一条或撑破 */
 const MIN_PLAYER_HEIGHT = 320
@@ -108,8 +115,6 @@ const MAX_PLAYER_HEIGHT = 1200
 const MIN_COMMENT_WIDTH = 400
 /** 主区左右两列之间的横向 gutter（第 34 轮 `--bvp-gutter: 24px`） */
 const COLUMN_GUTTER = 24
-/** 轨道离视口底部的间距（与 recommendRail/rail.ts 的 RAIl_FIXED_BOTTOM_GAP 保持一致） */
-const RAIL_BOTTOM_GAP = 12
 
 /** 播放器原来的行内高度（卸载时恢复） */
 let originalPlayerHeight = ''
@@ -254,7 +259,7 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
   // 自检：dock 底边不得越过「轨道顶边 − gutter」（三区互不重叠）
   if (railSpace > 0) {
     const railTop = window.innerHeight - railSpace - RAIL_BOTTOM_GAP
-    const allowedDock = railTop - DOCK_GAP - topOffset
+    const allowedDock = railTop - DOCK_RAIL_GAP - topOffset
     if (dockHeight > allowedDock && allowedDock > 0) {
       dockHeight = allowedDock
       const byDock = Math.floor(dockHeight - blocks.total - DOCK_GAP * blocks.count)

@@ -1345,8 +1345,10 @@ html.bewly-design.videoPage.bewly-video-fixed {
   --bvp-title-group-h: 70px;
   --bvp-toolbar-h: 52px;
   --bvp-col-comment-w: 400px;
-  --bvp-col-comment-max: 640px;
+  /* 第 35 轮补充：面板拉满右列（不留白）。行长由正文 max-width 420 控制，与面板宽度无关 */
+  --bvp-col-comment-max: 100%;
   --bvp-gutter: var(--bvp-space-6);
+  /* 第 35 轮起不再用于布局（用户要求全宽）；保留令牌供诊断/未来复用 */
   --bvp-content-max: 1720px;
   --bvp-page-pad: var(--bvp-space-6);
   --bvp-font-stack: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
@@ -1379,13 +1381,14 @@ html.bewly-design.videoPage.bewly-video-fixed {
   #mirror-vdcon,
   .video-container-v1 {
     box-sizing: border-box;
-    /* 内容宽上限 1720：>2200 视口时靠 margin-inline:auto 吸收左右留白 */
-    max-width: var(--bvp-content-max) !important;
-    margin-inline: auto !important;
+    /* 第 35 轮：用户要求去掉 max-width、恢复全宽。
+       全宽 ≠ 贴边：左右 --bvp-page-pad(24) 的 padding 保留；也不再限制 >2200 的留白。 */
+    width: 100% !important;
+    max-width: none !important;
+    margin-inline: 0 !important;
     padding-inline: var(--bvp-page-pad) !important;
     /* 右列吃掉剩余宽度（不退回固定 400，第 30 轮要求），
-       评论面板本体再用 clamp(400, 剩余, 640) 夹一次（见下方 A2-2），
-       这样窄视口时面板不会超过 640，宽视口时面板贴满右边缘。 */
+       评论面板本体再用 clamp(400, 剩余, 640) 夹一次（见下方 A2-2）。 */
     grid-template-columns: minmax(0, var(--bvp-fixed-player-width, 1fr)) minmax(0, 1fr) !important;
     column-gap: var(--bvp-gutter) !important;
   }
@@ -1395,9 +1398,9 @@ html.bewly-design.videoPage.bewly-video-fixed {
      - 典型 1600×1000：右列剩余 580 → 面板 580（贴右边缘，第 30 轮验收不变）；
      - 视口很矮、播放器收窄时：面板最多 640，多出来的空间留在右列右侧（不拉伸正文）。 */
   .bewly-comment-column {
-    width: min(100%, var(--bvp-col-comment-max)) !important;
-    min-width: var(--bvp-col-comment-w) !important;
-    max-width: var(--bvp-col-comment-max) !important;
+    width: 100% !important;
+    min-width: min(100%, var(--bvp-col-comment-w, 400px)) !important;
+    max-width: 100% !important;
   }
 
   /* 左栏一条左轴线：信息栏 / 工具栏 / 标签行 / 详情一律不额外缩进 */

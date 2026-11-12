@@ -116,7 +116,7 @@ function setVarIfChanged(name: string, value: string): void {
  */
 function applyColumnMetrics(parts: LayoutParts): void {
   if (isFixedLayoutActive()) {
-    // 固定布局接管时把本模块的变量清掉：尺寸完全交给 fixedLayout 的 CSS 变量
+    // 固定布局接管时把本模块的变量清掉：尺寸（宽 / 高）完全交给 fixedLayout 的 CSS 变量
     document.documentElement.style.removeProperty(HEIGHT_VAR)
     document.documentElement.style.removeProperty(OFFSET_VAR)
     return

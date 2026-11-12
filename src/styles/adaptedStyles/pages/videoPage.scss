@@ -572,11 +572,15 @@
     #mirror-vdcon,
     .video-container-v1 {
       display: grid !important;
+      box-sizing: border-box !important;
       grid-template-rows: 1fr;
-      grid-template-columns: minmax(0, 1fr) min(350px, 26vw);
+      /* 左列宽度 = 播放器宽度（严格 16:9 反算），右列吃掉剩余宽度给评论区。
+         两列都用 minmax(0, …) 夹住最小内容宽，避免子元素 min-content 把轨道撑出容器。 */
+      grid-template-columns: minmax(0, var(--bvp-fixed-player-width, 1fr)) minmax(0, 1fr);
       column-gap: var(--bvp-fixed-gap, 8px);
       align-content: start;
       align-items: start;
+      width: 100% !important;
       max-width: 100% !important;
       height: calc(
         100vh - var(--bvp-fixed-top, 0px) - var(--bvp-fixed-rail-space, 0px) - 12px - var(--bvp-fixed-gap, 8px)
@@ -590,19 +594,28 @@
     .left-container.scroll-sticky {
       position: static !important;
       display: flex !important;
+      box-sizing: border-box !important;
+      justify-self: stretch !important;
       flex-direction: column !important;
       gap: var(--bvp-fixed-gap, 8px);
-      width: 100% !important;
-      max-width: none !important;
+      /* 宽度交给 grid 轨道（auto = 拉伸填满轨道），不要写 100%：
+         B 站若原生带 margin / padding，100% 会以内容盒计算并把列撑出容器（第 30 轮真机溢出 20px 的根因）。 */
+      width: auto !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
       height: 100% !important;
       max-height: 100% !important;
       min-height: 0 !important;
+      margin: 0 !important;
+      padding-inline: 0 !important;
       overflow: hidden !important;
     }
 
-    /* 信息栏压成一行：标题 + UP + 播放量，超出裁掉而不是换行撑高 */
+    /* 信息栏压成一行：标题 + UP + 播放量，超出裁掉而不是换行撑高。
+       宽度跟随左列（= 播放器宽），因此在视觉上与播放器左对齐 */
     #viewbox_report {
       flex: 0 0 auto;
+      width: 100% !important;
       max-height: var(--bvp-fixed-info, 56px) !important;
       padding-top: 6px !important;
       padding-bottom: 6px !important;
@@ -622,9 +635,11 @@
     /* 播放器：高度只认变量，宽度铺满左列 */
     #playerWrap {
       flex: 0 0 var(--bvp-fixed-player-height, 420px);
+      width: var(--bvp-fixed-player-width, 100%) !important;
       height: var(--bvp-fixed-player-height, 420px) !important;
       min-height: 0 !important;
-      margin: 0 !important;
+      /* 左列宽就是播放器宽，这里的 auto 只是防御；不参与居中计算 */
+      margin: 0 auto !important;
       overflow: hidden !important;
     }
 
@@ -682,23 +697,49 @@
     .right-container-inner,
     .right-container-inner.scroll-sticky {
       position: static !important;
-      width: 100% !important;
+      box-sizing: border-box !important;
+      justify-self: stretch !important;
+      /* 同上：让 grid 轨道决定宽度，清掉 B 站原生的 margin / 横向 padding，
+         否则「100% 宽 + padding」会把右列顶出容器右边缘（真机超出 20px） */
+      width: auto !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
       height: 100% !important;
       max-height: 100% !important;
       min-height: 0 !important;
+      margin: 0 !important;
+      padding-inline: 0 !important;
       overflow: hidden !important;
     }
 
     .right-container-inner,
     .right-container-inner.scroll-sticky {
       padding-top: calc(var(--bvp-fixed-info, 56px) + var(--bvp-fixed-gap, 8px)) !important;
+      padding-inline: 0 !important;
     }
 
-    /* 评论列：高度只认变量，不再由 commentColumn.ts 反算 margin-top */
+    /* 评论列：高度只认变量（与播放器等高）；宽度补满右列，不再固定 350px */
     .bewly-comment-column {
+      box-sizing: border-box !important;
+      width: 100% !important;
+      max-width: 100% !important;
       height: var(--bvp-fixed-player-height, 480px) !important;
       max-height: var(--bvp-fixed-player-height, 480px) !important;
       margin-top: 0 !important;
+    }
+
+    /* 评论宿主（B 站 Web Components）必须能撑满变宽后的评论列，别被旧的窄规则压住 */
+    .bewly-comment-column > #commentapp,
+    .bewly-comment-column #commentapp {
+      width: 100% !important;
+      max-width: none !important;
+    }
+
+    /* 原生评论组件内部可能有自己的定宽容器，这里只放开 max-width，不改内部布局行为 */
+    .bewly-comment-column #commentapp > *,
+    .bewly-comment-column bili-comments {
+      width: 100% !important;
+      max-width: none !important;
     }
   }
 }

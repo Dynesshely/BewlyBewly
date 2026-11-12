@@ -21,6 +21,7 @@
  * | `--bvp-fixed-top` | `#mirror-vdcon` 距视口顶部的距离 |
  * | `--bvp-fixed-info` | 压缩后的信息栏高度 |
  * | `--bvp-fixed-gap` | 三个 dock 之间统一的 gutter |
+ * | `--bvp-fixed-player-width` | 播放器宽度（= 左列宽度，严格 16:9 反算） |
  * | `--bvp-fixed-player-height` | 播放器高度（= 评论列高度） |
  * | `--bvp-fixed-rail-space` | 轨道预留高度（没渲染时为 0） |
  *
@@ -32,9 +33,11 @@
  * 用户要求「缩放比例正确、播放器不能侵入推荐区」：
  * ```
  * 可用高 = 视口高 − 顶部偏移 − 信息栏 − 详情 dock − 3 × gutter − 轨道预留
- * 播放器高 = clamp(320, min(可用高, 播放器宽 × 9 / 16), 1200)
+ * 左列可用宽 = 容器宽 − 评论区最小宽(280) − gutter
+ * 播放器宽 = min(左列可用宽, round(可用高 × 16 / 9))    ← 可用高不足时宽度回收，而不是拉扁
+ * 播放器高 = round(播放器宽 × 9 / 16)                   ← 严格 16:9
  * ```
- * 即**先按宽度定高**，再按可用高度上限回落，最后做一次「播放器底边不得越过轨道顶边 − gutter」的自检。
+ * 空出来的宽度全部补给评论区：右列 = 容器宽 − 播放器宽 − gutter（不再固定 350px）。
  *
  * ## 写入纪律
  *
@@ -57,6 +60,7 @@ const TOP_VAR = '--bvp-fixed-top'
 const INFO_VAR = '--bvp-fixed-info'
 const GAP_VAR = '--bvp-fixed-gap'
 const DETAILS_VAR = '--bvp-fixed-details'
+const PLAYER_W_VAR = '--bvp-fixed-player-width'
 const PLAYER_VAR = '--bvp-fixed-player-height'
 const RAIL_VAR = '--bvp-fixed-rail-space'
 
@@ -73,6 +77,8 @@ export const DETAILS_HEIGHT = 104
 /** 播放器最小 / 最大高度：避免极端窗口下压成一条或撑破 */
 const MIN_PLAYER_HEIGHT = 320
 const MAX_PLAYER_HEIGHT = 1200
+/** 评论区（右列）的最小宽度：再窄就看不清评论了，此时宁可让播放器继续缩宽 */
+const MIN_COMMENT_WIDTH = 280
 /** 轨道离视口底部的间距（与 recommendRail/rail.ts 的 RAIl_FIXED_BOTTOM_GAP 保持一致） */
 const RAIL_BOTTOM_GAP = 12
 
@@ -83,18 +89,6 @@ let applied = false
 
 function getMirror(): HTMLElement | null {
   return document.querySelector<HTMLElement>('#mirror-vdcon')
-}
-
-function getLeftColumn(): HTMLElement | null {
-  return document.querySelector<HTMLElement>('#mirror-vdcon .left-container')
-}
-
-/** 轨道当前占的高度：没渲染就是 0（播放器可以把这块空间吃掉） */
-function getRailSpace(): number {
-  const placement = railState.placement
-  if (!placement)
-    return 0
-  return Math.max(0, Math.round(computeRailHeight(placement.width)))
 }
 
 /** 只在值变化时写 CSS 变量：相同值重复写会触发样式重算并可能唤醒 ResizeObserver */
@@ -122,43 +116,77 @@ function shouldEnable(): boolean {
  */
 function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
   const topOffset = Math.max(0, Math.round(mirror.getBoundingClientRect().top))
-  const playerWidth = Math.max(0, Math.round(getLeftColumn()?.clientWidth ?? playerWrap.clientWidth))
-  const railSpace = getRailSpace()
+  const railVisible = Boolean(railState.placement)
 
-  // 可用高：视口 − 顶部 − 信息栏 − 详情 dock − 3 个 gutter − 轨道预留
-  // （dock 依次为：信息栏 / 播放器+评论区 / 详情 / 轨道，相邻之间各留一个 gutter）
-  const available = window.innerHeight
-    - topOffset
-    - INFO_BAR_HEIGHT
-    - DETAILS_HEIGHT
-    - DOCK_GAP * 3
-    - railSpace
+  // 容器可用宽：**不要读左列宽度** —— 左列宽度正是本模块写出来的（grid 第一列），
+  // 读它就会形成「自己写 → 自己读」的反馈路径。这里只读 grid 容器自身的宽度与内边距。
+  const mirrorStyle = window.getComputedStyle(mirror)
+  const padX = (Number.parseFloat(mirrorStyle.paddingLeft) || 0)
+    + (Number.parseFloat(mirrorStyle.paddingRight) || 0)
+  const totalWidth = Math.max(0, Math.round(mirror.clientWidth - padX))
+  const leftAvailW = Math.max(0, totalWidth - MIN_COMMENT_WIDTH - DOCK_GAP)
 
-  // 16:9：先按宽度定高，再按可用高回落
-  const byWidth = playerWidth > 0
-    ? Math.round(playerWidth * 9 / 16)
-    : available
-  let height = Math.min(available, byWidth)
-  height = Math.max(MIN_PLAYER_HEIGHT, Math.min(MAX_PLAYER_HEIGHT, height))
+  // 轨道的宽度跟着左列（= 播放器宽）走，而轨道高度又由宽度决定 —— 这里从 0 开始迭代到不动点。
+  // 必须固定起点：若以上一拍的轨道高为起点，迭代会停在振荡区间里的不同相位，真机表现为每拍
+  // 变几像素；从 0 起迭代可保证同样输入得到同样输出（确定性）。
+  let railSpace = 0
+  let width = 0
+  let height = 0
+  for (let iteration = 0; iteration < 10; iteration++) {
+    // 可用高：视口 − 顶部 − 信息栏 − 详情 dock − 3 个 gutter − 轨道预留
+    const availableH = window.innerHeight
+      - topOffset
+      - INFO_BAR_HEIGHT
+      - DETAILS_HEIGHT
+      - DOCK_GAP * 3
+      - railSpace
 
-  // 自检：播放器底边不得越过「轨道顶边 − gutter − 详情 dock」。
-  // 这是用户明确要求的三区互不重叠（player.bottom <= rail.top - 8）的最终兜底。
+    // 严格 16:9：**先按可用高反算宽度**（可用高不足时宽度回收，而不是把播放器拉扁）
+    width = Math.min(leftAvailW, Math.round(availableH * 16 / 9))
+    height = Math.round(width * 9 / 16)
+
+    // 极端窗口的高度夹取：夹完重新按 16:9 反算宽度，保证比例不破
+    if (height < MIN_PLAYER_HEIGHT || height > MAX_PLAYER_HEIGHT) {
+      height = Math.min(MAX_PLAYER_HEIGHT, Math.max(MIN_PLAYER_HEIGHT, height))
+      width = Math.min(leftAvailW, Math.round(height * 16 / 9))
+      height = Math.round(width * 9 / 16)
+    }
+
+    if (!railVisible)
+      break
+
+    const nextRailSpace = Math.max(0, Math.round(computeRailHeight(width)))
+    const converged = Math.abs(nextRailSpace - railSpace) < 1
+    railSpace = nextRailSpace
+    if (converged)
+      break
+  }
+
+  // 自检 1：播放器底边不得越过「轨道顶边 − gutter − 详情 dock」
+  // （用户要求三区互不重叠，这是最终兜底；越界时按可用高重算宽度，比例保持不变）
   if (railSpace > 0) {
     const railTop = window.innerHeight - railSpace - RAIL_BOTTOM_GAP
-    const playerBottom = topOffset + INFO_BAR_HEIGHT + DOCK_GAP + height + DOCK_GAP + DETAILS_HEIGHT
-    if (playerBottom > railTop - DOCK_GAP) {
-      const allowed = railTop - DOCK_GAP - DETAILS_HEIGHT - DOCK_GAP - topOffset - INFO_BAR_HEIGHT - DOCK_GAP
-      height = Math.max(MIN_PLAYER_HEIGHT, allowed)
+    const allowedH = railTop - DOCK_GAP - DETAILS_HEIGHT - DOCK_GAP
+      - topOffset - INFO_BAR_HEIGHT - DOCK_GAP
+    if (height > allowedH && allowedH > 0) {
+      width = Math.min(leftAvailW, Math.round(allowedH * 16 / 9))
+      height = Math.round(width * 9 / 16)
     }
   }
+
+  // 自检 2：右列至少要拿到 MIN_COMMENT_WIDTH
+  width = Math.max(0, Math.min(width, totalWidth - MIN_COMMENT_WIDTH - DOCK_GAP))
+  height = Math.round(width * 9 / 16)
 
   setVar(TOP_VAR, `${topOffset}px`)
   setVar(INFO_VAR, `${INFO_BAR_HEIGHT}px`)
   setVar(GAP_VAR, `${DOCK_GAP}px`)
   setVar(DETAILS_VAR, `${DETAILS_HEIGHT}px`)
+  setVar(PLAYER_W_VAR, `${width}px`)
   setVar(PLAYER_VAR, `${height}px`)
   setVar(RAIL_VAR, `${railSpace}px`)
 
+  // 播放器容器同时写宽高（CSS 里也有变量兜底，这里保证首帧就正确）
   if (playerWrap.style.height !== `${height}px`)
     playerWrap.style.height = `${height}px`
 }
@@ -171,6 +199,7 @@ export function clearFixedLayout(): void {
     INFO_VAR,
     GAP_VAR,
     DETAILS_VAR,
+    PLAYER_W_VAR,
     PLAYER_VAR,
     RAIL_VAR,
   ])

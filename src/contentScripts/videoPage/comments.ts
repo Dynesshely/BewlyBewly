@@ -475,9 +475,11 @@ function updateToolbarPosition(): void {
   if (!inView)
     return
 
-  // 贴评论列左上角（原生排序 tab 在上方，不遮挡）
+  // 贴评论列左上角（原生排序 tab 在上方，不遮挡）。
+  // 第 30 轮：评论列宽度随播放器宽度变化（空出的宽度补给评论区），这里始终用容器自身的
+  // rect.left，因此左对齐会自动跟着右列左边缘走，不会停留在原来的 350px 列位置。
   const top = Math.max(8, Math.min(Math.round(rect.top) + 8, window.innerHeight - 56))
-  const left = Math.max(8, Math.min(Math.round(rect.left) + 8, window.innerWidth - 340))
+  const left = Math.max(8, Math.round(rect.left) + 8)
 
   if (Math.abs(ui.commentToolbarTop - top) > 0.5)
     ui.commentToolbarTop = top

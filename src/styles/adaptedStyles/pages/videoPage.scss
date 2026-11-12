@@ -2709,3 +2709,15 @@ html.bewly-design.videoPage.bewly-video-fixed {
 
 /* 2) 「登录后查看 N 条评论 / 没有更多评论」的样式注入在 comments.ts 的 NOTICE_STYLE，
    因为那些元素在 bili-comments 的 shadow root 里，页面级 CSS 选不到。 */
+
+/* ===== 第 45 轮 comment-axis =====
+   UP 卡与评论 header 的左右边距统一到同一条轴线：
+     up.left = header.left = 列.left + 12
+     up.right = header.right = 列.right − 12
+   header 在 #commentapp 里会被纵向滚动条挤掉约 8px，右边缘比 UP 卡少约 10px；
+   补偿量 --bewly-comment-scrollbar 由 comments.ts 每拍实测（offsetWidth − clientWidth）写进列的行内样式，
+   注入到 bili-comments shadow 的样式再用它把 header 宿主向右扩 8px 并统一 12px 左右 padding。
+   这里只提供默认值（无滚动条时 0px）。评论列表保留 B 站自己的 padding，不强行改。 */
+.bewly-comment-column {
+  --bewly-comment-scrollbar: 0px;
+}

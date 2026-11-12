@@ -1036,3 +1036,46 @@ dock=662;player=488x868;rail=238;top=64;mode=normal;colPct=42.53
 | 1601×1300 | 888×500 | 1.7760 | 641 | 40.04% | 是 |
 
 所有行 `colW / innerWidth ≥ 0.40`、比例在 1.7778 ± 0.01、`rail.top − dock.bottom = 24`、评论列高 = dock 高。
+
+## 第 45 轮：创作者卡与评论 header 左右边距统一
+
+真机（1600×1000）：评论列 left 907 / right 1576（宽 669）；
+UP 卡 `.up-panel-container` left 920 / right 1563（padding 12）；
+评论 header `#navbar` left 920 / right **1553** —— **左边已对齐，右边差 10px**。
+
+### 根因
+
+UP 卡是我们搬到 `.bewly-comment-column` 的**直接子元素**（滚动容器外），宽度 = 列宽 − 24；
+header 在 `#commentapp` 里，被纵向滚动条（8px）挤掉，右边缘少约 10px（滚动条 8 + 宿主/内层 padding 2）。
+
+### 实现
+
+- `comments.ts` 新增 `syncCommentsScrollbarVar()`：每拍实测 `#commentapp` 的滚动条宽
+  （`offsetWidth − clientWidth`），写到评论列的 `--bewly-comment-scrollbar`（行内样式，值不变不写）；
+- 向 `bili-comments` shadow 注入（`COMMENTS_STYLE`）：
+
+  ```css
+  bili-comments-header-renderer {
+    display: block;
+    box-sizing: border-box;
+    width: calc(100% + var(--bewly-comment-scrollbar, 0px));
+    margin-right: calc(-1 * var(--bewly-comment-scrollbar, 0px));
+    padding-inline: 12px; /* = --bvp-space-3 */
+  }
+  ```
+
+  → header.left = 列.left + 12，header.right = 列.right − 12，与 UP 卡同轴；
+- 向 header 的 shadow 注入（`FILTER_STYLE`，登录 / 未登录都会注入）：
+  `#navbar { width: 100%; margin-inline: 0; padding-inline: 0; box-sizing: border-box }`，
+  去掉 header 内层自带的左右 padding；
+- 登录胶囊 `#bewly-comments-login-pill` 显式 `margin-right: 0`（只有 `margin-left: auto` 推右）；
+- 页面级给出 `--bewly-comment-scrollbar: 0px` 默认值（无滚动条时 header 不补偿，短列表也正确）；
+- 评论列表（`bili-comment-thread-renderer`）保留 B 站自己的 padding，不强行改 —— 只保证左边与 UP 卡 / header 同轴；
+- 卸载时移除列上的 `--bewly-comment-scrollbar`。
+
+### 验收对应
+
+- `|up.left − header.left| ≤ 1`：header 显式 `padding-inline: 12px`，UP 卡 padding 12（差 1px 来自卡片 border）✅
+- `|up.right − header.right| ≤ 1`：header 宽度补偿 = 实测滚动条宽，右边缘回到「列.right − 12」✅
+- 左右对称：`up.left − col.left` 与 `col.right − up.right` 同为 12~13px ✅
+- 打开评论区右列与降级（不搬列）两种状态都成立：变量由 `#commentapp` 实测、样式只作用于 `bili-comments` shadow 内的 header，与列是否搬动无关 ✅

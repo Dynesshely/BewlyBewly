@@ -69,6 +69,23 @@ const COMMENTS_STYLE = `
 :host([${ONLY_UP_HOST_ATTR}]) ${THREAD_EL_SELECTOR}:not([${UP_ATTR}="1"]) {
   display: none !important;
 }
+
+/*
+ * 第 45 轮：评论 header 与 UP 卡左右边缘对齐。
+ *
+ * UP 卡是 .bewly-comment-column 的直接子元素（滚动容器外），宽度 = 列宽 − 24；
+ * header 在 #commentapp 里，被纵向滚动条挤掉约 8px，右边缘比 UP 卡少约 10px。
+ * 用 --bewly-comment-scrollbar（comments.ts 每拍实测 offsetWidth − clientWidth）把 header
+ * 宿主向右补偿回来，并统一左右 padding 12px（= --bvp-space-3），
+ * 使 header.left = col.left + 12、header.right = col.right − 12，与 UP 卡同轴。
+ */
+bili-comments-header-renderer {
+  display: block;
+  box-sizing: border-box;
+  width: calc(100% + var(--bewly-comment-scrollbar, 0px));
+  margin-right: calc(-1 * var(--bewly-comment-scrollbar, 0px));
+  padding-inline: 12px;
+}
 `
 
 /** 注入到每个 bili-comment-renderer shadow：折叠正文（用 mask 渐隐，不依赖颜色变量） */
@@ -96,6 +113,15 @@ const FOLD_STYLE = `
  * 不新增颜色）。
  */
 const FILTER_STYLE = `
+#navbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  margin-inline: 0;
+  padding-inline: 0;
+}
 #sort-actions {
   display: flex;
   flex-wrap: wrap;
@@ -284,6 +310,7 @@ const LOGIN_PILL_STYLE = `
   box-sizing: border-box;
   height: 32px;
   margin-left: auto;
+  margin-right: 0;
   padding: 0 16px;
   font-size: 14px;
   font-weight: 500;
@@ -723,6 +750,29 @@ function markCommentsNotice(): void {
   }
 }
 
+/** 第 45 轮：评论 header 的右边缘补偿量 = #commentapp 的纵向滚动条宽 */
+const COMMENTS_SCROLLBAR_VAR = '--bewly-comment-scrollbar'
+
+/**
+ * 实测 `#commentapp` 的滚动条宽度并写到评论列（CSS 变量会继承进 bili-comments 的 shadow），
+ * 供 header 宿主做宽度补偿，让它的右边缘与 UP 卡对齐。
+ *
+ * - 没有滚动条时写 0px，header 不补偿（短列表也正确）；
+ * - 值不变不写，避免每拍触发样式重算。
+ */
+function syncCommentsScrollbarVar(): void {
+  const app = document.querySelector<HTMLElement>('#commentapp')
+  const column = document.querySelector<HTMLElement>('[data-bewly-comment-column], #bewly-comment-column')
+  const target = column ?? app
+  if (!app || !target)
+    return
+
+  const scrollbarWidth = Math.max(0, app.offsetWidth - app.clientWidth)
+  const value = `${scrollbarWidth}px`
+  if (target.style.getPropertyValue(COMMENTS_SCROLLBAR_VAR) !== value)
+    target.style.setProperty(COMMENTS_SCROLLBAR_VAR, value)
+}
+
 function ensureCommentsStyle(): void {
   const shadow = getCommentsShadow()
   if (!shadow)
@@ -1133,6 +1183,8 @@ export function syncComments(): void {
   }
 
   ensureCommentsStyle()
+  // 第 45 轮：实测滚动条宽 → 供 header 做右边缘补偿（值不变不写）
+  syncCommentsScrollbarVar()
   // 未登录空态块美化（第 39 轮）：每拍幂等标记，登录态变化时自动生效 / 失效
   markCommentsNotice()
   // 登录入口挪到评论头部行右侧（第 40 轮）：每拍幂等插入，登录后自动移除
@@ -1325,6 +1377,9 @@ export function setupComments(): () => void {
     document.documentElement.classList.remove(ONLY_UP_ROOT_CLASS)
     document.documentElement.removeAttribute(STYLE_STAT_ATTR)
     document.documentElement.removeAttribute('data-bewly-comments-state')
+    document.querySelector<HTMLElement>('[data-bewly-comment-column], #bewly-comment-column')
+      ?.style
+      .removeProperty(COMMENTS_SCROLLBAR_VAR)
 
     ui.commentsOnlyUp = false
     ui.commentFoldButtons = []

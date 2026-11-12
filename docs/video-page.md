@@ -753,29 +753,19 @@ commentColumn.bottom = 播放器 bottom < rail.top - 8
 ### 5. 分工与未做项
 
 ## 第 32 轮：简介收拢到工具栏 + 自绘 tooltip
-### 第 37 轮真机复测：关注按钮不是全宽（82px）
+### 第 37 轮二次复测：卡片高度 129 → 84 封顶
 
-**真机宽度链**：卡片 788 → `.up-info-container` 754 → `.up-info--right` **277** →
-`.up-info__btn-panel` 82 → `.upinfo-btn-panel` 82 → `.default-btn` 82。
-
-按钮的 `width: 100%` 只在 82px 的父级里生效 —— 卡在 `.up-info--right` 只有 277 宽这一步
-（按钮面板在它内部，不是卡片直接子元素）。
-
-**修法**：
+真机：按钮位置已正确（与名字同行、贴右、宽 90 / 高 36 / 圆角 8 / 蓝底），但卡片仍是 **129px**
+（目标 ≤84）；头像 top 111 而内容顶应为 81 —— 卡片内头像上方还有约 30px 的块。
 
 | 改动点 | 理由 |
 | --- | --- |
-| `.up-info--right { display: contents }` | 让它的子元素（名字 / 发消息 / 签名 / 按钮面板）直接成为 `.up-info-container` 的 flex 项，按钮面板才可能跨到整卡宽 |
-| `.up-info-container`：`flex-wrap: wrap` + `gap: 8px 12px` | 容器允许换行，名字行与按钮行才能分成两行 |
-| `.up-info__btn-panel` / `.upinfo-btn-panel` / `.attention-btn-ctnr`：`flex: 1 1 100%` + `width: 100%` | 按钮面板独占一行并撑满整卡内容宽 |
-| `.default-btn`：`flex: 1 1 auto`（原来继承 `0 0 auto`）+ `width: 100%` + `max-width: none` | 按钮真正撑满父级；**不覆盖 background/color**，保留 B 站蓝底白字（真机 `rgb(0,161,214)` 即原版主色） |
-| 名字 `flex: 1 1 auto`、发消息 `margin-left: auto` | 名字行仍是「UP 名 + 发消息」 |
-| 签名 `flex: 1 1 100%` + `width: 100%` + `margin: 0` | 独占一行；`display: contents` 后不再需要 60px 缩进 |
-| `:has(.up-description:not(:empty))` → `padding: 12px`、`gap: 4px`、按钮 `36px` | 有签名时三行会超 140 封顶；收紧后 24+48+4+19+4+36 = 135 ✓ |
+| `.up-info-container` 加 `order: -1` | 把「头像 + 名字 + 发消息 + 按钮」这一行**强制排到卡片最前**；被推到后面的等级/签到等装饰块在封顶内自然裁掉（都是次要信息） |
+| 卡片 `padding: 12px !important`、`gap: 0`、`align-content: flex-start` | 内容从顶部开始排，消除容器上方的空隙 |
+| `.up-info-container` `margin: 0 !important; padding: 0 !important; min-height: 0` | 容器自身不再贡献额外高度 |
+| 卡片内其它装饰块 `margin-block: 0; padding-block: 0`、`:empty` / `[hidden]` 不占位 | 不删除节点，只让它们不撑高 |
+| 按钮面板 `height: auto; padding: 0; align-items: center` | 之前面板 41px 比按钮 36px 高 5px，收平 |
+| 卡片 `max-height: 84px`（有签名 `110px`）+ `overflow: hidden` | 内容行 48 + padding 24 = 72，84 留 12px 余量；封顶压过 A 的 `min(140px, 40%)`（用 `.bewly-comment-column > .up-panel-container` 与 fixed 变体抬特异性） |
 
-**高度预算**：
-- 无签名（真机 `.up-info-no-d`）：32(padding) + 48(头像行) + 8(row-gap) + 40(按钮) = **128 ≤ 140**；
-- 有签名：24 + 48 + 4 + 19 + 4 + 36 = **135 ≤ 140**。
-
-**验收口径**：`.default-btn` 宽 / 卡片内容宽 > 0.95（预期 ≈ 754）；高 40（有签名 36）、圆角 8；
-`background-color` 仍为 B 站主色；卡片高 ≤ 140、按钮 bottom ≤ 卡片 bottom。
+**验收口径**：卡片高 ∈[64, 84]；头像 `top − 卡片 top ∈ [10, 16]`；按钮仍 88~140 宽、36 高、同行贴右；
+有签名场景 ≤110。

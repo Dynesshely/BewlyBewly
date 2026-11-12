@@ -2422,6 +2422,233 @@ html.bewly-design.videoPage {
   }
 }
 
+/* ---------- UP 卡一行布局（第 37 轮补充） ----------
+   用户新要求：关注按钮不要独占整行，移到「头像行」右侧；整卡高度回到 ~72~80px。
+   目标：头像 | 名字+签名（弹性） | 关注按钮（右侧自适应宽）。
+
+   上一轮的 display: contents 保留（正是它让按钮面板能逃出 .up-info--right 参与卡片级布局），
+   这里把「按钮面板 / 按钮」从 flex-basis:100% 改回 auto，并让签名用 order + basis:100% 落到第二行：
+   - 第 1 行（高度 = max(头像 48, 名字行)）：头像 48 · 名字 · 发消息 · [按钮面板 margin-left:auto]
+   - 第 2 行（仅当有签名）：签名 12.5px，margin-left 60 与名字对齐
+   高度预算：无签名 24(padding) + 48 = 72 ✓；有签名 24 + 48 + 4 + 19 = 95（A 的 140 封顶内） ✓ */
+
+html.bewly-design.videoPage {
+  /* 容器：可换行（签名要换到第二行），行内垂直居中 */
+  .up-panel-container .up-info-container,
+  .up-panel-container .up-info {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    align-items: center;
+  }
+
+  /* 头像不缩 */
+  .up-panel-container .up-avatar-wrap,
+  .up-panel-container .up-avatar,
+  .up-panel-container .bili-avatar {
+    flex: 0 0 auto;
+  }
+
+  /* 名字：按内容宽（不 grow 占满），过长时省略，把右侧空间留给按钮 */
+  .up-panel-container .up-name,
+  .up-panel-container .up-info--name {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 发消息紧跟名字右侧（不是 auto，避免被推到按钮那头） */
+  .up-panel-container .send-msg,
+  .up-panel-container .send-msg-btn {
+    flex: 0 0 auto;
+    margin: 0 0 0 8px;
+  }
+
+  /* 签名：排到最后（order 99 保证不抢第 1 行）+ flex-basis 100% 独占第二行；
+     margin-left 60 = 头像 48 + gap 12，与名字左对齐 */
+  .up-panel-container .up-description,
+  .up-panel-container .up-info--desc {
+    order: 99;
+    flex: 1 1 100%;
+    width: auto;
+    margin: 0 0 0 60px;
+  }
+
+  /* 按钮面板：不再占整行，按自身宽度贴右 */
+  .up-panel-container .up-info__btn-panel,
+  .up-panel-container .upinfo-btn-panel,
+  .up-panel-container .attention-btn-ctnr {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 8px;
+    align-items: center;
+    box-sizing: border-box;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    margin-left: auto;
+  }
+
+  /* 关注按钮：自适应宽度（按内容 + min 88），36 高、8 圆角、左右 16 内边距；
+     不覆盖 background / color —— 保留 B 站蓝底白字 */
+  .up-panel-container .default-btn,
+  .up-panel-container .follow-btn,
+  .up-panel-container .attention-btn-ctnr .default-btn,
+  .up-panel-container .attention-btn-ctnr .follow-btn {
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    width: auto;
+    min-width: 88px;
+    max-width: none;
+    height: 36px;
+    padding: 0 16px;
+    margin: 0;
+    border-radius: 8px;
+  }
+
+  /* 卡片：目标高度 72~80 —— padding 12 + gap 8（无签名时 24 + 48 = 72） */
+  .up-panel-container {
+    gap: 8px;
+    padding: 12px;
+  }
+
+  /* 有签名：收紧行距，整体 24 + 48 + 4 + 19 = 95（仍在 A 的 140 封顶内） */
+  .up-panel-container:has(.up-description:not(:empty)),
+  .up-panel-container:has(.up-info--desc:not(:empty)) {
+    gap: 4px;
+    padding: 12px;
+  }
+
+  .up-panel-container:has(.up-description:not(:empty)) .up-info-container,
+  .up-panel-container:has(.up-info--desc:not(:empty)) .up-info-container,
+  .up-panel-container:has(.up-description:not(:empty)) .up-info,
+  .up-panel-container:has(.up-info--desc:not(:empty)) .up-info {
+    gap: 4px 12px;
+  }
+}
+
+/* 窄卡片（< 520px）：按钮不再压低名字，min-width 收到 72，内边距收到 12 */
+@media (max-width: 520px) {
+  html.bewly-design.videoPage .up-panel-container .default-btn,
+  html.bewly-design.videoPage .up-panel-container .follow-btn {
+    min-width: 72px;
+    padding: 0 12px;
+  }
+}
+
+/* ---------- UP 卡收高（第 37 轮真机二次） ----------
+   真机：卡片 h=129，但内容行只有 48（头像）+ 按钮 40 —— 多出来的 30~40px 来自
+   卡片内其它块 / 容器的上边距（头像 top 111 而内容顶应为 81，空出 30px）。
+
+   处理（只做「不占位」与「封顶」，不改内容）：
+   1. 卡片 padding 归到 12、gap 归零、内容从顶部开始排（align-content: flex-start）；
+   2. .up-info-container 的 margin / padding 归零，容器内空元素不占位；
+   3. 按钮面板不再额外撑高（height: auto + padding 0 + 居中对齐）；
+   4. 卡片 max-height 84（无签名）/ 110（有签名）+ overflow: hidden 兜底：
+      真机内容行 48 + padding 24 = 72，远小于封顶；被隐藏的只会是那条空出来的 30px 间隙。 */
+
+html.bewly-design.videoPage {
+  /* 封顶必须压过 A 第 36 轮 layout 的 max-height: min(140px, 40%)（其特异性 0,4,1），
+     所以同时写「普通 / .bewly-comment-column 子级 / fixed 场景」三种选择器。 */
+  .up-panel-container,
+  .bewly-comment-column > .up-panel-container,
+  &.bewly-video-fixed .bewly-comment-column > .up-panel-container {
+    box-sizing: border-box;
+    padding: 12px !important;
+    gap: 0 !important;
+    align-content: flex-start;
+    justify-content: flex-start;
+    /* 无签名：内容行 48 + padding 24 = 72；封顶 84 留余量，不会裁到内容行 */
+    max-height: 84px !important;
+    overflow: hidden !important;
+  }
+
+  /* 内容行容器：不再有任何外边距 / 内边距 / 额外行 */
+  .up-panel-container .up-info-container,
+  .up-panel-container .up-info {
+    flex-wrap: wrap;
+    align-content: flex-start;
+    align-items: center;
+    gap: 4px 12px;
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+  }
+
+  /* 容器里空的块（占位符 / 空节点）不占位 */
+  .up-panel-container .up-info-container > :empty,
+  .up-panel-container .up-info > :empty {
+    display: none !important;
+  }
+
+  /* 头像：不额外留白 */
+  .up-panel-container .up-avatar-wrap,
+  .up-panel-container .up-avatar,
+  .up-panel-container .bili-avatar {
+    margin-block: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* 按钮面板：高度跟内容走，不再比按钮高 5px */
+  .up-panel-container .up-info__btn-panel,
+  .up-panel-container .upinfo-btn-panel,
+  .up-panel-container .attention-btn-ctnr {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    padding: 0 !important;
+    margin-block: 0 !important;
+    align-items: center;
+  }
+
+  /* 名字 / 发消息 / 签名：垂直方向不额外占高 */
+  .up-panel-container .up-name,
+  .up-panel-container .up-info--name,
+  .up-panel-container .send-msg,
+  .up-panel-container .send-msg-btn,
+  .up-panel-container .up-description,
+  .up-panel-container .up-info--desc {
+    margin-block: 0 !important;
+  }
+
+  /* 内容行强制排最前：真机卡片内头像上方还有 30px 空块（等级 / 签到之类），
+     用 order: -1 把「头像 + 名字 + 按钮」这一行永远放在最前面；
+     被推到后面的装饰块在 84px 封顶内自然被裁掉（它们都是次要信息）。 */
+  .up-panel-container .up-info-container,
+  .up-panel-container .up-info {
+    order: -1;
+  }
+
+  /* 卡片内其它装饰块：不额外撑高（不删除，只归零垂直间距） */
+  .up-panel-container
+    > *:not(.up-info-container):not(.up-info):not(.up-info--right):not(.up-info__btn-panel):not(.upinfo-btn-panel):not(
+      .attention-btn-ctnr
+    ):not(.default-btn):not(.follow-btn) {
+    flex: 0 0 auto;
+    margin-block: 0 !important;
+    padding-block: 0 !important;
+  }
+
+  .up-panel-container > [hidden],
+  .up-panel-container > :empty {
+    display: none !important;
+  }
+
+  /* 有签名：允许到 110（24 + 48 + 4 + 19 = 95，留余量） */
+  .up-panel-container:has(.up-description:not(:empty)),
+  .up-panel-container:has(.up-info--desc:not(:empty)),
+  .bewly-comment-column > .up-panel-container:has(.up-description:not(:empty)),
+  .bewly-comment-column > .up-panel-container:has(.up-info--desc:not(:empty)),
+  &.bewly-video-fixed .bewly-comment-column > .up-panel-container:has(.up-description:not(:empty)),
+  &.bewly-video-fixed .bewly-comment-column > .up-panel-container:has(.up-info--desc:not(:empty)) {
+    max-height: 110px !important;
+  }
+}
+
 /* ===== 第 37 轮 up-card end ===== */
 
 /* ===== 第 37 轮 player-modes =====

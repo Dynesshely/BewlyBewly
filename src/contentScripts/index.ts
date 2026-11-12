@@ -17,6 +17,7 @@ import { setupLivePage } from './livePage'
 import { muteNativeScripts, setNativeGuardEnabled } from './nativeGuard'
 import { setupNotificationPage } from './notificationPage'
 import { setupSearchEnhance } from './searchPage'
+import { setupSiteTweaks, syncSiteTweaks, teardownSiteTweaks } from './siteTweaks'
 import { setupSpacePage } from './spacePage'
 import { setupVideoPage } from './videoPage'
 import App from './views/App.vue'
@@ -200,6 +201,9 @@ else {
 // see: https://github.com/BewlyBewly/BewlyBewly/issues/967
 const removeOriginalTopBar = injectCSS(`.bili-header, #biliMainHeader { visibility: hidden !important; }`)
 
+/** 站点净化心跳定时器（页面卸载时清理） */
+let siteTweaksTimer: number | null = null
+
 async function onDOMLoaded() {
   let originalTopBar: HTMLElement | null = null
 
@@ -241,6 +245,10 @@ async function onDOMLoaded() {
     }
   }
 
+  // 站点净化（第 40 轮，内化自 Make BiliBili Great Again）：
+  // URL 清理 / P2P 回落 / 专栏复制 / 屏蔽提示 / 充电列表 / 视频裁切
+  setupSiteTweaks()
+
   // 直播页增强层（影院 / 弹幕 / 隐藏侧栏 / 快捷键）
   setupLivePage()
 
@@ -267,6 +275,17 @@ async function onDOMLoaded() {
   // 原生页面（搜索页等）的屏蔽词过滤：标记式隐藏，可逆
   if (settings.value.nativeFilterEnabled && !isFullyTakenOverPage())
     markNativeFilteredCards()
+
+  // 站点净化心跳：重发页面世界配置（覆盖 document_start 竞态）、URL 兜底清理、
+  // 播放器设置菜单里的「视频裁切」开关项补注入。开销很小，1s 一次即可。
+  siteTweaksTimer = window.setInterval(syncSiteTweaks, 1000)
+  window.addEventListener('pagehide', () => {
+    if (siteTweaksTimer !== null) {
+      window.clearInterval(siteTweaksTimer)
+      siteTweaksTimer = null
+    }
+    teardownSiteTweaks()
+  }, { once: true })
 
   // Reset the original Bilibili top bar display style
   if (removeOriginalTopBar)

@@ -52,6 +52,9 @@ const ONLY_UP_BUTTON_ID = 'bewly-comment-only-up'
 const FILTER_STYLE_ID = 'bewly-comment-filter-style'
 /** 未登录空态块（登录后查看 N 条评论 / 没有更多评论）的注入样式（第 39 轮） */
 const NOTICE_STYLE_ID = 'bewly-comments-notice-style'
+/** 头部登录胶囊（第 40 轮） */
+const LOGIN_PILL_ID = 'bewly-comments-login-pill'
+const LOGIN_STYLE_ID = 'bewly-comments-login-style'
 const FOLD_STYLE_ID = 'bewly-comment-fold-style'
 const TEXT_STYLE_ID = 'bewly-comment-text-style'
 
@@ -188,6 +191,11 @@ const NOTICE_STYLE = `
 }
 
 /* JS 判定为「无文本占位」的节点（:empty 判不出来、但没有任何可见文案） */
+.bewly-comments-login-origin,
+.bewly-comments-login-origin-block {
+  display: none !important;
+}
+
 .bewly-comments-placeholder {
   display: none !important;
   height: 0 !important;
@@ -249,6 +257,49 @@ const NOTICE_STYLE = `
   line-height: 1.5 !important;
   color: var(--bew-text-3, currentColor) !important;
   white-space: nowrap !important;
+}
+`
+
+/**
+ * 注入到 `bili-comments-header-renderer` shadow：头部行右侧的登录胶囊（第 40 轮）。
+ *
+ * 用户要求把「登录后查看 N 条评论」的入口从评论底部挪到与「评论 N | 最热 | 最新 | 只看 UP 主」同一行的最右侧，
+ * 样式复用第 39 轮的胶囊规范（h 32 / radius 16 / 主色描边 + 主色文字 / 透明底 / 14px）。
+ *
+ * 颜色只用仓库已定义的主色变量（`--bew-theme-color` → `--bew-bili-blue` 兜底），不引入新颜色。
+ */
+const LOGIN_PILL_STYLE = `
+/* 只保证 header 是「一行 flex」，让 margin-left:auto 能把胶囊推到最右；
+   不加 gap，避免改变 B 站原生「评论 N | 最热 | 最新」的间距。 */
+#navbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+#${LOGIN_PILL_ID} {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 32px;
+  margin-left: auto;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  color: var(--bew-theme-color, var(--bew-bili-blue, currentColor)) !important;
+  background: transparent !important;
+  border: 1px solid var(--bew-theme-color, var(--bew-bili-blue, currentColor)) !important;
+  border-radius: 16px !important;
+  transition: background-color 160ms ease;
+}
+
+#${LOGIN_PILL_ID}:hover,
+#${LOGIN_PILL_ID}:focus-visible {
+  background: color-mix(in oklab, var(--bew-theme-color, var(--bew-bili-blue, currentColor)) 12%, transparent) !important;
 }
 `
 
@@ -464,6 +515,88 @@ function ensureOnlyUpButton(): void {
 const LOGIN_NOTICE_RE = /登录后查看/
 const END_NOTICE_RE = /没有更多评论/
 
+/** 在 bili-comments（含直接子组件的 shadow）里找原始登录入口 */
+function findLoginOrigin(): { el: HTMLElement, text: string } | null {
+  const roots: ShadowRoot[] = []
+  const shell = getCommentsShadow()
+  if (shell) {
+    roots.push(shell)
+    for (const child of Array.from(shell.children)) {
+      const shadow = (child as HTMLElement).shadowRoot
+      if (shadow)
+        roots.push(shadow)
+    }
+  }
+  for (const root of roots) {
+    const found = findNoticeText(root, LOGIN_NOTICE_RE)
+    if (!found)
+      continue
+    const el = found.closest<HTMLElement>('a, button') ?? found
+    return {
+      el,
+      text: (found.textContent ?? '').replace(/\s+/g, ' ').trim(),
+    }
+  }
+  return null
+}
+
+/**
+ * 把登录入口挪到评论头部行最右侧（第 40 轮）。
+ *
+ * - 未登录：在 `#navbar`（含「评论 N」+ `#sort-actions` 的那一行）末尾插入胶囊，`margin-left: auto` 推到最右；
+ * - 已登录：找不到登录文案 → 移除胶囊；
+ * - 点击 = 触发 B 站原有登录入口（`.click()`），**不自己拼登录 URL**；
+ * - 每拍幂等：header 被 B 站重建后重新插入。
+ */
+function ensureHeaderLoginPill(): void {
+  const headerShadow = getHeaderShadow()
+  if (!headerShadow)
+    return
+
+  const origin = findLoginOrigin()
+  const existing = headerShadow.getElementById(LOGIN_PILL_ID) as HTMLElement | null
+
+  // 已登录 / 找不到入口：移除胶囊
+  if (!origin) {
+    existing?.remove()
+    return
+  }
+
+  const navbar = headerShadow.querySelector<HTMLElement>('#navbar')
+    ?? getSortActions()?.parentElement
+    ?? null
+  if (!navbar)
+    return
+
+  ensureStyleInShadow(headerShadow, LOGIN_STYLE_ID, LOGIN_PILL_STYLE)
+
+  let pill = existing
+  if (!pill || !pill.isConnected) {
+    pill = document.createElement('button')
+    pill.id = LOGIN_PILL_ID
+    pill.setAttribute('type', 'button')
+    // 只显示「登录」，完整文案放 title / aria-label（胶囊太长会破坏 header 行）
+    pill.textContent = '登录'
+    pill.addEventListener('click', (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      // 触发 B 站自己的登录入口，不自己拼 URL
+      findLoginOrigin()?.el.click()
+    })
+    navbar.appendChild(pill)
+  }
+
+  // header 被重建后胶囊可能被挤走：拉回行尾
+  if (pill.parentElement !== navbar)
+    navbar.appendChild(pill)
+
+  const title = origin.text
+  if (pill.getAttribute('title') !== title)
+    pill.setAttribute('title', title)
+  if (pill.getAttribute('aria-label') !== title)
+    pill.setAttribute('aria-label', title)
+}
+
 /** 在 shadow 里找「只包含这段文案」的最内层元素 */
 function findNoticeText(shadow: ShadowRoot, re: RegExp): HTMLElement | null {
   const candidates = shadow.querySelectorAll<HTMLElement>('div, a, p, span, button')
@@ -498,8 +631,13 @@ function markCommentsNoticeInRoot(root: ShadowRoot): void {
   const loginEl = loginText
     ? (loginText.closest<HTMLElement>('a') ?? loginText)
     : null
-  if (loginEl)
-    loginEl.classList.add('bewly-comments-login')
+  if (loginEl) {
+    // 第 40 轮：登录入口已挪到评论头部行右侧，底部这份隐藏掉（保留节点给胶囊做 click 目标）
+    loginEl.classList.add('bewly-comments-login-origin')
+    const originBlock = loginEl.parentElement
+    if (originBlock && !originBlock.querySelector(THREAD_EL_SELECTOR))
+      originBlock.classList.add('bewly-comments-login-origin-block')
+  }
 
   // B 站把「青蓝底」画在按钮外面的一层容器上（真机 div h=50 w=698 bg=oklab(...0.2)），
   // 只清按钮自己的背景不够：把按钮 / 文案的父级也按空态容器处理（最多两层，且不含评论线程）。
@@ -997,6 +1135,8 @@ export function syncComments(): void {
   ensureCommentsStyle()
   // 未登录空态块美化（第 39 轮）：每拍幂等标记，登录态变化时自动生效 / 失效
   markCommentsNotice()
+  // 登录入口挪到评论头部行右侧（第 40 轮）：每拍幂等插入，登录后自动移除
+  ensureHeaderLoginPill()
   observeCommentsShadow()
 
   const threads = getThreads()
@@ -1148,6 +1288,8 @@ export function setupComments(): () => void {
     const headerShadow = getHeaderShadow()
     if (headerShadow) {
       headerShadow.getElementById(ONLY_UP_BUTTON_ID)?.remove()
+      headerShadow.getElementById(LOGIN_PILL_ID)?.remove()
+      removeStyleFromShadow(headerShadow, LOGIN_STYLE_ID)
       removeStyleFromShadow(headerShadow, FILTER_STYLE_ID)
     }
 

@@ -71,6 +71,7 @@ type GroupKey
     | 'channel'
     | 'article'
     | 'home'
+    | 'siteTweaks'
 
 interface SettingGroupDef {
   key: GroupKey
@@ -208,6 +209,28 @@ const groups = computed<SettingGroupDef[]>(() => [
       settings.value.homeCardDensity = originalSettings.homeCardDensity
     },
   },
+  {
+    // 第 40 轮：站点净化（内化 Make BiliBili Great Again 的开关）
+    key: 'siteTweaks',
+    title: t.value.groupSiteTweaks,
+    desc: t.value.groupSiteTweaksDesc,
+    items: [
+      'siteTweaksCleanUrlParams',
+      'siteTweaksDisableP2P',
+      'siteTweaksAllowArticleCopy',
+      'siteTweaksHideAdblockTip',
+      'siteTweaksHideChargeList',
+      'siteTweaksVideoFit',
+    ],
+    reset: () => {
+      settings.value.siteTweaksCleanUrlParams = originalSettings.siteTweaksCleanUrlParams
+      settings.value.siteTweaksDisableP2P = originalSettings.siteTweaksDisableP2P
+      settings.value.siteTweaksAllowArticleCopy = originalSettings.siteTweaksAllowArticleCopy
+      settings.value.siteTweaksHideAdblockTip = originalSettings.siteTweaksHideAdblockTip
+      settings.value.siteTweaksHideChargeList = originalSettings.siteTweaksHideChargeList
+      settings.value.siteTweaksVideoFit = originalSettings.siteTweaksVideoFit
+    },
+  },
 ])
 
 /**
@@ -280,6 +303,12 @@ const itemSearchText: Record<string, () => string[]> = {
     t.value.densityComfortable,
     t.value.densityCompact,
   ],
+  siteTweaksCleanUrlParams: () => [t.value.siteTweaksCleanUrlParams, t.value.siteTweaksCleanUrlParamsDesc],
+  siteTweaksDisableP2P: () => [t.value.siteTweaksDisableP2P, t.value.siteTweaksDisableP2PDesc],
+  siteTweaksAllowArticleCopy: () => [t.value.siteTweaksAllowArticleCopy, t.value.siteTweaksAllowArticleCopyDesc],
+  siteTweaksHideAdblockTip: () => [t.value.siteTweaksHideAdblockTip, t.value.siteTweaksHideAdblockTipDesc],
+  siteTweaksHideChargeList: () => [t.value.siteTweaksHideChargeList, t.value.siteTweaksHideChargeListDesc],
+  siteTweaksVideoFit: () => [t.value.siteTweaksVideoFit, t.value.siteTweaksVideoFitDesc],
 }
 // #endregion
 
@@ -1023,6 +1052,78 @@ onBeforeUnmount(() => {
     >
       <SettingsItem v-if="itemVisible('homeCardDensity')" :title="t.homeCardDensity" :desc="t.homeCardDensityDesc">
         <Select v-model="settings.homeCardDensity" :options="densityOptions" w="full" />
+      </SettingsItem>
+    </SettingsGroupSection>
+
+    <!-- 第 40 轮：站点净化（内化 Make BiliBili Great Again 的开关，放在页面偏好之后） -->
+    <SettingsGroupSection
+      v-show="groupVisible('siteTweaks')"
+      group-key="siteTweaks"
+      :title="t.groupSiteTweaks"
+      :desc="t.groupSiteTweaksDesc"
+      :reset-label="t.resetGroup"
+      :reset-done-label="t.resetGroupDone"
+      :reset-done="resetDoneGroup === 'siteTweaks'"
+      @reset="resetGroup('siteTweaks')"
+    >
+      <SettingsItem v-if="itemVisible('siteTweaksCleanUrlParams')" :title="t.siteTweaksCleanUrlParams">
+        <template #desc>
+          <span id="pages-desc-site-tweaks-clean-url-params">{{ t.siteTweaksCleanUrlParamsDesc }}</span>
+        </template>
+        <PagesSwitch
+          v-model="settings.siteTweaksCleanUrlParams"
+          describedby="pages-desc-site-tweaks-clean-url-params"
+        />
+      </SettingsItem>
+
+      <SettingsItem v-if="itemVisible('siteTweaksDisableP2P')" :title="t.siteTweaksDisableP2P">
+        <template #desc>
+          <span id="pages-desc-site-tweaks-disable-p2p">{{ t.siteTweaksDisableP2PDesc }}</span>
+        </template>
+        <PagesSwitch
+          v-model="settings.siteTweaksDisableP2P"
+          describedby="pages-desc-site-tweaks-disable-p2p"
+        />
+      </SettingsItem>
+
+      <SettingsItem v-if="itemVisible('siteTweaksAllowArticleCopy')" :title="t.siteTweaksAllowArticleCopy">
+        <template #desc>
+          <span id="pages-desc-site-tweaks-allow-article-copy">{{ t.siteTweaksAllowArticleCopyDesc }}</span>
+        </template>
+        <PagesSwitch
+          v-model="settings.siteTweaksAllowArticleCopy"
+          describedby="pages-desc-site-tweaks-allow-article-copy"
+        />
+      </SettingsItem>
+
+      <SettingsItem v-if="itemVisible('siteTweaksHideAdblockTip')" :title="t.siteTweaksHideAdblockTip">
+        <template #desc>
+          <span id="pages-desc-site-tweaks-hide-adblock-tip">{{ t.siteTweaksHideAdblockTipDesc }}</span>
+        </template>
+        <PagesSwitch
+          v-model="settings.siteTweaksHideAdblockTip"
+          describedby="pages-desc-site-tweaks-hide-adblock-tip"
+        />
+      </SettingsItem>
+
+      <SettingsItem v-if="itemVisible('siteTweaksHideChargeList')" :title="t.siteTweaksHideChargeList">
+        <template #desc>
+          <span id="pages-desc-site-tweaks-hide-charge-list">{{ t.siteTweaksHideChargeListDesc }}</span>
+        </template>
+        <PagesSwitch
+          v-model="settings.siteTweaksHideChargeList"
+          describedby="pages-desc-site-tweaks-hide-charge-list"
+        />
+      </SettingsItem>
+
+      <SettingsItem v-if="itemVisible('siteTweaksVideoFit')" :title="t.siteTweaksVideoFit">
+        <template #desc>
+          <span id="pages-desc-site-tweaks-video-fit">{{ t.siteTweaksVideoFitDesc }}</span>
+        </template>
+        <PagesSwitch
+          v-model="settings.siteTweaksVideoFit"
+          describedby="pages-desc-site-tweaks-video-fit"
+        />
       </SettingsItem>
     </SettingsGroupSection>
 

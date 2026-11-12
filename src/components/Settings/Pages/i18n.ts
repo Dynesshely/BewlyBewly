@@ -123,6 +123,22 @@ export interface PagesSettingsMessages {
   // 第 24 轮：页面自检
   groupDiagnostics: string
   groupDiagnosticsDesc: string
+
+  // 第 40 轮：站点净化（内化 Make BiliBili Great Again）
+  groupSiteTweaks: string
+  groupSiteTweaksDesc: string
+  siteTweaksCleanUrlParams: string
+  siteTweaksCleanUrlParamsDesc: string
+  siteTweaksDisableP2P: string
+  siteTweaksDisableP2PDesc: string
+  siteTweaksAllowArticleCopy: string
+  siteTweaksAllowArticleCopyDesc: string
+  siteTweaksHideAdblockTip: string
+  siteTweaksHideAdblockTipDesc: string
+  siteTweaksHideChargeList: string
+  siteTweaksHideChargeListDesc: string
+  siteTweaksVideoFit: string
+  siteTweaksVideoFitDesc: string
 }
 
 const CMN_CN: PagesSettingsMessages = {
@@ -227,6 +243,20 @@ const CMN_CN: PagesSettingsMessages = {
   importErrorEmpty: '文件里没有可导入的设置项',
   groupDiagnostics: '诊断',
   groupDiagnosticsDesc: '检查当前页面各增强模块是否挂载、关键选择器是否命中，并给出降级原因；纯本地运行，不上报任何数据',
+  groupSiteTweaks: '站点净化',
+  groupSiteTweaksDesc: '内化自「Make BiliBili Great Again」的站点净化项；每一项都只改 B 站页面的本地表现，关闭后恢复默认行为',
+  siteTweaksCleanUrlParams: '清理 URL 追踪参数',
+  siteTweaksCleanUrlParamsDesc: '去掉 buvid / spm / vd_source 等分享追踪参数，复制出去的地址更干净；只改地址栏参数，不影响页面数据加载',
+  siteTweaksDisableP2P: '绕过 P2P CDN',
+  siteTweaksDisableP2PDesc: '让播放器从 B 站 P2P 节点回落到源站；可能增加带宽占用与首帧等待，播放异常时请关闭',
+  siteTweaksAllowArticleCopy: '允许复制专栏正文',
+  siteTweaksAllowArticleCopyDesc: '解除专栏页对选中与复制的拦截，方便摘录与引用；只作用于专栏正文',
+  siteTweaksHideAdblockTip: '隐藏屏蔽检测提示',
+  siteTweaksHideAdblockTipDesc: '隐藏「检测到屏蔽广告」提示与相应的空推荐卡，页面更干净；不改变实际广告拦截逻辑',
+  siteTweaksHideChargeList: '隐藏充电列表',
+  siteTweaksHideChargeListDesc: '隐藏视频页的充电 / 打赏推广区块，减少干扰；不改变充电状态与已充电信息',
+  siteTweaksVideoFit: '播放器视频裁切',
+  siteTweaksVideoFitDesc: '以裁剪方式填满播放器（去掉上下黑边），画面更满；可能裁掉边缘画面，可在播放器设置里切换',
 }
 
 const EN: PagesSettingsMessages = {
@@ -331,6 +361,20 @@ const EN: PagesSettingsMessages = {
   importErrorEmpty: 'The file contains no importable settings',
   groupDiagnostics: 'Diagnostics',
   groupDiagnosticsDesc: 'Check whether page enhancements are mounted and key selectors match, with degradation reasons. Runs locally — no data is reported.',
+  groupSiteTweaks: 'Site cleanup',
+  groupSiteTweaksDesc: 'Site cleanup ported from the Make BiliBili Great Again userscript. Every switch only changes the local rendering of Bilibili pages; turn it off to restore the default behavior.',
+  siteTweaksCleanUrlParams: 'Clean URL tracking parameters',
+  siteTweaksCleanUrlParamsDesc: 'Strip share tracking parameters such as buvid / spm / vd_source so copied links are cleaner. Only the address bar changes — page data loading is untouched.',
+  siteTweaksDisableP2P: 'Bypass the P2P CDN',
+  siteTweaksDisableP2PDesc: 'Make the player fall back from Bilibili P2P nodes to the origin server. This may increase bandwidth usage and wait time before the first frame — turn it off if playback misbehaves.',
+  siteTweaksAllowArticleCopy: 'Allow copying article text',
+  siteTweaksAllowArticleCopyDesc: 'Remove the selection / copy block on article pages for easier quoting. Only the article body is affected.',
+  siteTweaksHideAdblockTip: 'Hide ad-block detection tips',
+  siteTweaksHideAdblockTipDesc: 'Hide the "ad blocker detected" notice and the empty recommendation cards that come with it. The actual ad-blocking logic is unchanged.',
+  siteTweaksHideChargeList: 'Hide the charging list',
+  siteTweaksHideChargeListDesc: 'Hide the charging / reward promotion block on video pages to reduce clutter. Charging status and your existing charge records are not changed.',
+  siteTweaksVideoFit: 'Crop video to fill the player',
+  siteTweaksVideoFitDesc: 'Fill the player by cropping the video (removing top / bottom black bars). Edge content may be cropped; can also be toggled in the player settings.',
 }
 
 const CMN_TW: PagesSettingsMessages = {
@@ -435,6 +479,20 @@ const CMN_TW: PagesSettingsMessages = {
   importErrorEmpty: '檔案裡沒有可匯入的設定項',
   groupDiagnostics: '診斷',
   groupDiagnosticsDesc: '檢查目前頁面各增強模組是否掛載、關鍵選擇器是否命中，並給出降級原因；純本機執行，不上報任何資料',
+  groupSiteTweaks: '站點淨化',
+  groupSiteTweaksDesc: '內化自「Make BiliBili Great Again」的站點淨化項；每一項都只改 B 站頁面的本機呈現，關閉後恢復預設行為',
+  siteTweaksCleanUrlParams: '清理 URL 追蹤參數',
+  siteTweaksCleanUrlParamsDesc: '去掉 buvid / spm / vd_source 等分享追蹤參數，複製出去的網址更乾淨；只改網址列參數，不影響頁面資料載入',
+  siteTweaksDisableP2P: '繞過 P2P CDN',
+  siteTweaksDisableP2PDesc: '讓播放器從 B 站 P2P 節點回落到來源站；可能增加頻寬佔用與首幀等待，播放異常時請關閉',
+  siteTweaksAllowArticleCopy: '允許複製專欄正文',
+  siteTweaksAllowArticleCopyDesc: '解除專欄頁對選取與複製的攔截，方便摘錄與引用；只作用於專欄正文',
+  siteTweaksHideAdblockTip: '隱藏遮蔽偵測提示',
+  siteTweaksHideAdblockTipDesc: '隱藏「偵測到遮蔽廣告」提示與相應的空推薦卡，頁面更乾淨；不改變實際廣告遮蔽邏輯',
+  siteTweaksHideChargeList: '隱藏充電列表',
+  siteTweaksHideChargeListDesc: '隱藏影片頁的充電 / 打賞推廣區塊，減少干擾；不改變充電狀態與已充電資訊',
+  siteTweaksVideoFit: '播放器影片裁切',
+  siteTweaksVideoFitDesc: '以裁切方式填滿播放器（去掉上下黑邊），畫面更滿；可能裁掉邊緣畫面，可在播放器設定裡切換',
 }
 
 const JYUT: PagesSettingsMessages = {

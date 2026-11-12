@@ -854,3 +854,30 @@ document.querySelector('#commentapp').querySelector('bili-comments').shadowRoot.
 | gap | 8 |
 | 「没有更多」底栏（padding 4×2 + 12.5px 文案 ≈ 19） | ≈ 27 |
 | **合计** | **≈ 91（目标 ≤100）** |
+
+## 第 40 轮：登录入口移到评论头部行右侧
+
+用户截图红框位置 = 「评论 N | 最热 | 最新 | 只看 UP 主」这一行的最右侧。
+
+### 实现
+
+- **头部胶囊**：向 `bili-comments-header-renderer` shadow 注入 `#bewly-comments-login-pill`（`<button>`），
+  插入 `#navbar`（含「评论 N」+ `#sort-actions` 的那一行）末尾，`margin-left: auto` 推到最右；
+  注入的 `#navbar { display:flex; align-items:center; flex-wrap:wrap }` 只保证是一行 flex，
+  **不加 gap**，避免改变原生标题 / 排序间距；
+- **样式**：复用第 39 轮胶囊规范 —— 高 32、`padding: 0 16px`、圆角 16、14px/500、
+  主色描边 + 主色文字、透明底；颜色用 `var(--bew-theme-color, var(--bew-bili-blue, currentColor))`
+  （第 39 轮踩过 `--bew-brand` 不存在的坑）；hover/focus 为 12% 主色混合底；
+- **文案**：胶囊只显示「登录」（单行 nowrap，避免撑破 header 行），完整原文案放到 `title` 与 `aria-label`；
+- **点击**：不自己拼登录 URL，而是 `findLoginOrigin().el.click()` 触发 B 站原有登录入口；
+- **底部清理**：原始「登录后查看 N 条评论」元素及其块标记 `.bewly-comments-login-origin(-block)` → `display:none`，
+  底部空态块只剩「没有更多评论」（12.5px 次要色），高度约 51px；
+- **幂等**：每 500ms 拍执行 —— header 被重建就重新插入、胶囊被挤走就拉回行尾、
+  登录后找不到登录文案则移除胶囊；
+- **卸载**：移除胶囊与注入的 `#bewly-comments-login-style`。
+
+### 验收对应
+
+- 胶囊在 header 行内、与「最热」同一行、`right` 贴行右边缘（`margin-left:auto` 保证）；
+- 底部 `.bewly-comments-notice` 只剩「没有更多评论」：24(padding) + 27(底栏) ≈ 51 ≤ 60；
+- 点击触发原生登录入口；遮罩仍为 none、正文 14px 不变。

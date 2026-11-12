@@ -7,7 +7,9 @@ import {
   clearRailSpace,
   collectRailCards,
   computeRailPlacement,
+  countHiddenNativeBlocks,
   findNativeContainer,
+  hideDuplicateRecommendBlocks,
   hideOverlappingNativeLinks,
   markNativeTaken,
   refreshRailCovers,
@@ -72,7 +74,9 @@ export function syncRecommendRail(options: { enabled: boolean }): void {
     if (railState.cards.length)
       railState.cards = []
     document.documentElement.removeAttribute('data-bewly-rail-cover')
+    document.documentElement.removeAttribute('data-bewly-rail-native-hidden')
     clearRailSpace()
+    // 关闭轨道 / 降级：把被隐藏的原生推荐块全部还原，不能留空
     releaseNativeTaken()
     // 轨道不显示了：宿主恢复样式表的 pointer-events: none
     setHostHitOpen(false)
@@ -120,6 +124,14 @@ export function syncRecommendRail(options: { enabled: boolean }): void {
   // 轨道已经渲染出来：此时才接管（隐藏）原生推荐列表
   reserveRailSpace(height)
   markNativeTaken()
+
+  // 重复推荐栏兜底（第 32 轮）：轨道渲染成功后，把「仍在视口内、含 ≥3 个视频链接」的原生块
+  // 一并隐藏（覆盖 B 站切视频重建 / 未知容器类名的情况）。每拍重扫补齐。
+  hideDuplicateRecommendBlocks()
+  const hiddenNative = countHiddenNativeBlocks()
+  const hiddenStat = String(hiddenNative)
+  if (document.documentElement.getAttribute('data-bewly-rail-native-hidden') !== hiddenStat)
+    document.documentElement.setAttribute('data-bewly-rail-native-hidden', hiddenStat)
 
   // 封面补齐：B 站推荐是异步插入的，首拍采集时图片可能还没加载 → cover 为空。
   // 这里每拍和**当前 cards** 比较（不是和缓存比），有补充就**整体替换数组**（保证 Vue 响应）。
@@ -260,6 +272,7 @@ export function isHostHitOpen(): boolean {
 /** 页面卸载 / 导航离开：把 DOM 上的痕迹全部撤掉 */
 export function teardownRecommendRail(): void {
   document.documentElement.removeAttribute('data-bewly-rail-cover')
+  document.documentElement.removeAttribute('data-bewly-rail-native-hidden')
   setHostHitOpen(false)
   updatePointerWatch()
   railState.dismissed = false

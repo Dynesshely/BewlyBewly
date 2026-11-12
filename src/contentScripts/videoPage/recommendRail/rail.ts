@@ -450,6 +450,89 @@ export function hideOverlappingNativeLinks(rect: { top: number, left: number, wi
 }
 
 /** 归还原生列表 */
+/** 这些容器内部的视频链接属于正常内容，绝不整块隐藏 */
+const DUPLICATE_WHITELIST_SELECTOR = [
+  '#bilibili-player',
+  '.bpx-player-container',
+  '.up-panel-container',
+  '.video-pod',
+  '.video-pod-above-modules',
+  '.video-pod__list',
+  '.bewly-comment-column',
+  '#commentapp',
+  '#bewly-video-page',
+  // 左列 dock 的固定成员：信息栏 / 工具栏 / 简介 / 标签 / 资源列表，
+  // 它们内部也可能有 3 个以上视频链接，但绝不是「推荐栏」
+  '#viewbox_report',
+  '#arc_toolbar_report',
+  '#v_desc',
+  '.video-desc-container',
+  '.video-tag-container',
+  '.video-resource-list',
+].join(', ')
+
+/** 一个容器里至少要有这么多「视频链接」才认定为推荐栏 */
+const DUPLICATE_MIN_LINKS = 3
+
+/**
+ * 重复推荐栏兜底（第 32 轮需求 3）。
+ *
+ * 用户截图里出现过「两个推荐栏」，但 Lead 全 DOM 扫描只找到 1 个 —— 说明它出现在**特定状态**
+ * （切视频后原生重建、窄屏降级、轨道被关闭等）。因此除了已知选择器之外，再加一层结构兜底：
+ *
+ * - 只看**仍在视口内**的 `a[href*="/video/BV"]`（不可见的隐藏了也没意义）；
+ * - 从每个链接向上找祖先，取「**自身**有 ≥3 个视频链接、且父级不满足同样条件」的容器 = 最外层推荐块；
+ * - 跳过白名单（播放器 / 左列 / 选集 / 评论列 / 增强层）与已经标记过的节点；
+ * - 用同一套 `TAKEN_ATTR` 记录原 display，`releaseNativeTaken()` 时统一还原。
+ *
+ * @returns 当前被隐藏的原生块数量（供 `data-bewly-rail-native-hidden` 诊断）
+ */
+export function hideDuplicateRecommendBlocks(): number {
+  const inView = (el: Element): boolean => {
+    const rect = el.getBoundingClientRect()
+    return rect.width > 20 && rect.height > 20 && rect.bottom > 0 && rect.top < window.innerHeight
+  }
+
+  const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href*="/video/BV"]'))
+    .filter(link => !link.closest(`[${TAKEN_ATTR}]`) && inView(link))
+
+  const qualifying = new Set<HTMLElement>()
+  for (const link of links) {
+    let node = link.parentElement
+    let depth = 0
+    while (node && depth < 8) {
+      if (node === document.body || node === document.documentElement)
+        break
+      if (node.matches(DUPLICATE_WHITELIST_SELECTOR))
+        break
+      if (node.querySelectorAll('a[href*="/video/BV"]').length >= DUPLICATE_MIN_LINKS)
+        qualifying.add(node)
+      node = node.parentElement
+      depth += 1
+    }
+  }
+
+  // 只处理最外层：父级也满足条件的交给父级处理，避免把内层卡片全藏掉
+  const outermost = Array.from(qualifying).filter((el) => {
+    const parent = el.parentElement
+    return !parent || !qualifying.has(parent)
+  })
+
+  for (const el of outermost) {
+    if (el.hasAttribute(TAKEN_ATTR))
+      continue
+    el.setAttribute(TAKEN_ATTR, el.style.display || '')
+    el.style.display = 'none'
+  }
+
+  return document.querySelectorAll(`[${TAKEN_ATTR}]`).length
+}
+
+/** 当前隐藏了多少个原生推荐块（诊断用） */
+export function countHiddenNativeBlocks(): number {
+  return document.querySelectorAll(`[${TAKEN_ATTR}]`).length
+}
+
 /**
  * 归还原生列表。
  *

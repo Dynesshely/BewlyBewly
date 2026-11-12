@@ -28,6 +28,7 @@ import { setupCommentColumn, syncCommentColumn } from './commentColumn'
 import { setupComments, syncComments } from './comments'
 import PlaylistPanel from './components/PlaylistPanel.vue'
 import VideoPageOverlay from './components/VideoPageOverlay.vue'
+import { refreshDescPopover, setupDescPopover, teardownDescPopover } from './descPopover'
 import {
   clearPlayerStage,
   getNativePlaybackKind,
@@ -131,11 +132,18 @@ function mount(): void {
   // 评论区增强（排序 / 只看 UP / 长评论折叠）：没有评论区时组件自身不渲染
   disposeComments = setupComments()
 
+  // 简介收拢为工具栏按钮 + 自绘 tooltip（第 32 轮）：没有简介时自身不注入
+  setupDescPopover()
+
   // 评论区移到播放器右侧、与播放器同高（第 27 轮）：找不到结构 / 窄屏会自动回退
   disposeCommentColumn = setupCommentColumn()
 
   // 广告清理（第 28 轮）：CSS 清单 + MutationObserver 兜底动态插入
   setupAdGuard()
+
+  // TODO(第 32 轮 B 工作流)：简介按钮 + 自绘 tooltip（components/DescPopover 或 descPopover.ts）
+  // native-style 会提供 setupDescPopover()/teardownDescPopover() 之类的导出，
+  // 拿到导出名后在这里挂载、在 unmount() 里卸载（index.ts 由 A 工作流独占）。
 
   // 固定单页布局（第 28 轮）：窗口太小 / 番剧页 / 迷你态会自动回退到原生可滚动布局
   disposeFixedLayout = setupFixedLayout()
@@ -209,6 +217,7 @@ function unmount(): void {
     disposeComments()
     disposeComments = null
   }
+  teardownDescPopover()
   if (disposeCommentColumn) {
     disposeCommentColumn()
     disposeCommentColumn = null
@@ -306,6 +315,8 @@ function sync(): void {
 
   // 评论区：标记 UP / 探测排序 tab / 折叠长评论（没有评论区时内部会提前返回）
   syncComments()
+  // 简介按钮（第 32 轮）：切视频 / 切分P 后重读文本，变空则撤掉自己
+  refreshDescPopover()
 
   // 推荐视频轨道（第 27 轮）：读不到卡片时内部会保持原生列表不动
   syncRecommendRail({ enabled: settings.value.videoPageRecommendRail })

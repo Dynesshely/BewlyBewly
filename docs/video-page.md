@@ -752,40 +752,28 @@ commentColumn.bottom = 播放器 bottom < rail.top - 8
 
 ### 5. 分工与未做项
 
-- 本轮**没有改** `rail.ts` 的尺寸计算（`placement` / `computeRailHeight`）、没有改卡片 DOM 结构、没有改 `<img>` 的渲染条件（这些属于 A 工作流）；
-- 轨道「标题行文案」当前是 i18n 的 `recommendRailTitle`（现为「推荐视频」）。简报要求「相关推荐」，
-  改文案要动 `videoPage/i18n.ts`（四语言），**不在本轮 B 的写权限内**，已列入汇报的「Lead 接线项」；
-- 三区之间的 12px gutter 由 `fixedLayout.ts` 的 `--bvp-fixed-gap` 控制（当前 8px）；
-  若要严格 12px，需要 A 把变量值改成 12（B 不改尺寸变量，避免破坏三区自检）；
-- 轨道左右 16px / 底边 12px 是用 `.bvp-rail` 的 padding 实现的，`placement.width` 未变，
-  viewport 用 `max-width: 100%` 兜住，不会把轨道撑出视口。
+## 第 32 轮：简介收拢到工具栏 + 自绘 tooltip
 
-### 第 31 轮复测修复：封面全是占位（20 张卡 0 个 img）
+### 第 32 轮真机修复：简介按钮不可见（0×0）
 
-真机证据：轨道里 20 张卡全部是 `.bvp-rail__cover-fallback`，`railImgs = 0`；
-但原生卡片的 `img` 有 `complete: true / naturalWidth: 336 / src="//i2.hdslb.com/..."`，
-用 `new Image()` 加载同一 URL 也能成功 —— 排除网络与防盗链，问题在采集/渲染链路。
+**现象**：`#bewly-desc-trigger` 存在、文本正确、computed 是 `display:flex; height:26px`，
+但 `getBoundingClientRect()` 是 `{ x:0, y:0, w:0, h:0 }` —— 父容器 `.bar-right` 本身是 0×0
+（固定布局下 B 站把工具栏右侧操作区留空）。
 
-**根因（刷新逻辑与错误拉黑两处叠加）**：
+**修复（`descPopover.ts`）**：
 
-1. `refreshRailCovers()` 把「DOM 里的封面」和**封面缓存**比较：
-   `warmUpNativeCovers()` 在同一拍已经把 URL 写进缓存，于是刷新永远返回 `false`，
-   `railState.cards` 里第一拍采集到的 `cover: ""` 从此再没被更新；
-   B 站推荐是异步插入的，首拍必然采不到封面 → 表现为「永远全占位」；
-2. `failedCovers` 按 **bvid** 拉黑：早期拍次 `cover` 为空 / 相对地址时渲染过一次，
-   `error` 之后该 bvid 永久拉黑，后续拿到正确 URL 也不会再渲染。
+1. `findVisibleInsertTarget(bar)`：只往**可见容器**插 ——
+   含「分享」文本 / class 含 share 的可见元素 → 其它任何可见的 `button`/`[role=button]`/`.toolbar-left-item`
+   → 都没有就 `append` 到 `#arc_toolbar_report` 本身（它整体可见）；工具栏自身不可见则返回 `null`；
+2. **标签行兜底**：工具栏里找不到可见目标时，插到 `.video-tag-container`（可见），
+   打 `data-bewly-desc-fallback="tag-row"`，CSS 让它在标签行右端（`margin-inline-start:auto`）；
+3. **可见性自检**（`refreshDescPopover()` 每 500ms 拍）：
+   - 按钮 `isRendered()` 为真 → 正常返回；
+   - 不可见且当前不在标签行 → 迁移到标签行再测；
+   - 仍不可见 → 且页面里**确实还有可用容器**时才 `teardown + setup` 重建
+     （避免影院 / 全屏 / 标签页切走时每 500ms 反复拆建）；
+4. CSS 兜底：`.bewly-desc-trigger { flex: 0 0 auto; min-width: 44px; max-width: 96px; white-space: nowrap }`，
+   防止被父容器压成 0。
 
-**修法**：
-
-- `refreshRailCovers(current)` 改为与**当前 cards 的 cover 字段**比较，有补充就返回**新数组**，
-  调用方 `railState.cards = filled` 整体替换（保证 Vue 响应）；没有封面时返回 `null`，
-  于是每拍都会重试（等价于「持续重试直到补齐」，无需计数器）；
-- 渲染层 `failedUrls` 改为**按 URL** 拉黑：bvid 换了新地址会自动重试；
-- 卡片新增诊断属性 `data-cover`（是否有封面）与 `data-failed`（该 URL 是否已被拉黑）；
-- `<html>` 上新增 `data-bewly-rail-cover="<有封面数>/<总数>"`（例 `20/20`），真机一眼可判；
-- 轨道贴底问题：`computeRailPlacement` 在固定布局下改用**实际渲染高度**（真机 222 vs 估算 207），
-  `top = innerHeight − height − 12`，保证 `rail.bottom <= innerHeight − 8`；
-  `fixedLayout` 的轨道预留也取 `max(估算, 实际渲染)`，避免详情 dock 压进轨道。
-
-模拟验证（同一套判定逻辑）：首拍 `cover=""` 的 20 张卡，旧实现 `changed=false`（永远全空），
-新实现一次补齐 20/20；第二轮缓存为空时也能从 DOM 补齐。
+**真机验收口径**：`#bewly-desc-trigger` rect `w > 40 && h > 20`；hover 300ms 后
+`.bewly-desc-tooltip` 可见（`rect.w > 200`、文本非空）；Esc / 点击外部可关闭。

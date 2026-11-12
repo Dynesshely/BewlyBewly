@@ -60,6 +60,7 @@ const TOP_VAR = '--bvp-fixed-top'
 const INFO_VAR = '--bvp-fixed-info'
 const GAP_VAR = '--bvp-fixed-gap'
 const DETAILS_VAR = '--bvp-fixed-details'
+const DOCK_H_VAR = '--bvp-fixed-dock-height'
 const PLAYER_W_VAR = '--bvp-fixed-player-width'
 const PLAYER_VAR = '--bvp-fixed-player-height'
 const RAIL_VAR = '--bvp-fixed-rail-space'
@@ -74,8 +75,25 @@ export const INFO_BAR_HEIGHT = 56
 export const DOCK_GAP = 8
 /** 播放器下方「详情 dock」的固定高度：工具栏 / 简介 / 标签压成三行，不产生内部滚动 */
 export const DETAILS_HEIGHT = 104
+/**
+ * 播放器 dock 与轨道之间的底部留白。
+ *
+ * `dockH = 视口高 − top − railSpace − DOCK_BOTTOM_MARGIN`，而轨道顶边是
+ * `视口高 − railSpace − 12`，因此 DOCK_BOTTOM_MARGIN = 20 恰好让
+ * `dock.bottom = rail.top − 8`（用户要求的三区互不重叠）。
+ */
+const DOCK_BOTTOM_MARGIN = DOCK_GAP * 2 + 4
+
 /** 播放器最小 / 最大高度：避免极端窗口下压成一条或撑破 */
 const MIN_PLAYER_HEIGHT = 320
+/**
+ * dock 布局下播放器允许的更小高度。
+ *
+ * dock 总高固定，播放器是「被减出来的那一项」：窗口贴近降级阈值（高 700）时，
+ * 若仍用 320 的下限就会把 dock 撑破（内容溢出被裁）。这里放宽到 160，
+ * 保证「dock 内容之和 = dock 高度」始终成立。
+ */
+const MIN_DOCK_PLAYER_HEIGHT = 160
 const MAX_PLAYER_HEIGHT = 1200
 /** 评论区（右列）的最小宽度：再窄就看不清评论了，此时宁可让播放器继续缩宽 */
 const MIN_COMMENT_WIDTH = 280
@@ -114,9 +132,52 @@ function shouldEnable(): boolean {
  * 只读三类「本模块不修改」的量：`#mirror-vdcon` 顶边、左列宽度、视口尺寸。
  * 写出的高度不会回头影响这三者，因此不存在反馈环。
  */
+/**
+ * 量左列「播放器之外」的可见块高度（信息栏 / 工具栏 / 标签 …）。
+ *
+ * 这些块的高度由 B 站 DOM + 我们的压缩样式决定，**不由本模块写的播放器高度决定**，
+ * 所以读它们不会形成反馈环。被隐藏的块（例如 B 工作流收拢后的 #v_desc）自动跳过。
+ */
+function measureDockBlocks(leftCol: HTMLElement, playerWrap: HTMLElement): { total: number, count: number } {
+  let total = 0
+  let count = 0
+  for (const child of Array.from(leftCol.children)) {
+    if (!(child instanceof HTMLElement) || child === playerWrap)
+      continue
+    if (child.id === 'commentapp')
+      continue
+    const style = window.getComputedStyle(child)
+    if (style.display === 'none' || style.visibility === 'hidden')
+      continue
+    const height = Math.round(child.getBoundingClientRect().height)
+    if (height <= 0)
+      continue
+    total += height
+    count += 1
+  }
+  return { total, count }
+}
+
+/**
+ * 一次算完全部尺寸并写变量（第 32 轮：以「播放器 dock」为单位）。
+ *
+ * 用户要的是「左列整块（信息栏 + 播放器 + 工具栏 + 标签）与右侧评论区等高」，
+ * 所以这里先算 dock 高，再**反算**播放器高度：
+ *
+ * ```
+ * dockH   = 视口高 − top − railSpace − (gutter*2 + 4)      // dock.bottom = rail.top − 8
+ * 其它块  = 实测 #viewbox_report / #arc_toolbar_report / 标签 … 高度之和
+ * playerH = dockH − 其它块 − 内部 gap × (可见块数 − 1)
+ * playerW = min(左列可用宽, round(playerH × 16 / 9))       // 仍锁 16:9
+ * ```
+ *
+ * 若 16:9 反算出的宽度超过左列可用宽，则按宽度定高（播放器变矮），**剩余高度留在 dock 里**
+ * （不拉伸播放器）。评论列高度 = dockH，与 dock 严格对齐。
+ */
 function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
   const topOffset = Math.max(0, Math.round(mirror.getBoundingClientRect().top))
   const railVisible = Boolean(railState.placement)
+  const leftCol = document.querySelector<HTMLElement>('#mirror-vdcon .left-container')
 
   // 容器可用宽：**不要读左列宽度** —— 左列宽度正是本模块写出来的（grid 第一列），
   // 读它就会形成「自己写 → 自己读」的反馈路径。这里只读 grid 容器自身的宽度与内边距。
@@ -126,37 +187,44 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
   const totalWidth = Math.max(0, Math.round(mirror.clientWidth - padX))
   const leftAvailW = Math.max(0, totalWidth - MIN_COMMENT_WIDTH - DOCK_GAP)
 
-  // 轨道的宽度跟着左列（= 播放器宽）走，而轨道高度又由宽度决定 —— 这里从 0 开始迭代到不动点。
-  // 必须固定起点：若以上一拍的轨道高为起点，迭代会停在振荡区间里的不同相位，真机表现为每拍
-  // 变几像素；从 0 起迭代可保证同样输入得到同样输出（确定性）。
   // 视觉样式算出来的轨道实际可能比估算更高（真机 222 vs 估算 207）：
-  // 预留空间取两者较大值，否则详情 dock 会压进轨道顶边（用户报告的「重叠」）。
+  // 预留空间取两者较大值，否则 dock 会压进轨道顶边。
   const renderedRailHeight = railVisible
     ? getRenderedRailHeight()
     : 0
 
+  // 左列其它块的实测高度（不含播放器）
+  const blocks = leftCol
+    ? measureDockBlocks(leftCol, playerWrap)
+    : { total: 0, count: 0 }
+
   let railSpace = 0
   let width = 0
   let height = 0
+  let dockHeight = 0
+
   for (let iteration = 0; iteration < 10; iteration++) {
-    // 可用高：视口 − 顶部 − 信息栏 − 详情 dock − 3 个 gutter − 轨道预留
-    const availableH = window.innerHeight
-      - topOffset
-      - INFO_BAR_HEIGHT
-      - DETAILS_HEIGHT
-      - DOCK_GAP * 3
-      - railSpace
+    // dock 高：视口 − 顶部 − 轨道预留 − 底部留白（含 dock 与轨道的 gutter）
+    const dockH = Math.max(
+      MIN_PLAYER_HEIGHT,
+      window.innerHeight - topOffset - railSpace - DOCK_BOTTOM_MARGIN,
+    )
 
-    // 严格 16:9：**先按可用高反算宽度**（可用高不足时宽度回收，而不是把播放器拉扁）
-    width = Math.min(leftAvailW, Math.round(availableH * 16 / 9))
-    height = Math.round(width * 9 / 16)
+    // 反算播放器高：dock 减去其它块与块之间的 gap（左列是 flex column，gap = DOCK_GAP）
+    const gaps = DOCK_GAP * blocks.count
+    const byDock = Math.floor(dockH - blocks.total - gaps)
+    height = Math.max(MIN_DOCK_PLAYER_HEIGHT, byDock)
 
-    // 极端窗口的高度夹取：夹完重新按 16:9 反算宽度，保证比例不破
-    if (height < MIN_PLAYER_HEIGHT || height > MAX_PLAYER_HEIGHT) {
-      height = Math.min(MAX_PLAYER_HEIGHT, Math.max(MIN_PLAYER_HEIGHT, height))
-      width = Math.min(leftAvailW, Math.round(height * 16 / 9))
+    // 16:9：先按高度反算宽度，再用左列可用宽夹住；被夹住时按宽度回算高度（不拉伸）
+    width = Math.round(height * 16 / 9)
+    if (width > leftAvailW) {
+      width = leftAvailW
       height = Math.round(width * 9 / 16)
     }
+    height = Math.min(MAX_PLAYER_HEIGHT, height)
+    width = Math.round(height * 16 / 9)
+
+    dockHeight = dockH
 
     if (!railVisible)
       break
@@ -172,19 +240,23 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
       break
   }
 
-  // 自检 1：播放器底边不得越过「轨道顶边 − gutter − 详情 dock」
-  // （用户要求三区互不重叠，这是最终兜底；越界时按可用高重算宽度，比例保持不变）
+  // 自检：dock 底边不得越过「轨道顶边 − gutter」（三区互不重叠）
   if (railSpace > 0) {
     const railTop = window.innerHeight - railSpace - RAIL_BOTTOM_GAP
-    const allowedH = railTop - DOCK_GAP - DETAILS_HEIGHT - DOCK_GAP
-      - topOffset - INFO_BAR_HEIGHT - DOCK_GAP
-    if (height > allowedH && allowedH > 0) {
-      width = Math.min(leftAvailW, Math.round(allowedH * 16 / 9))
-      height = Math.round(width * 9 / 16)
+    const allowedDock = railTop - DOCK_GAP - topOffset
+    if (dockHeight > allowedDock && allowedDock > 0) {
+      dockHeight = allowedDock
+      const byDock = Math.floor(dockHeight - blocks.total - DOCK_GAP * blocks.count)
+      height = Math.max(MIN_DOCK_PLAYER_HEIGHT, byDock)
+      width = Math.round(height * 16 / 9)
+      if (width > leftAvailW) {
+        width = leftAvailW
+        height = Math.round(width * 9 / 16)
+      }
     }
   }
 
-  // 自检 2：右列至少要拿到 MIN_COMMENT_WIDTH
+  // 右列至少要拿到 MIN_COMMENT_WIDTH
   width = Math.max(0, Math.min(width, totalWidth - MIN_COMMENT_WIDTH - DOCK_GAP))
   height = Math.round(width * 9 / 16)
 
@@ -192,11 +264,11 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
   setVar(INFO_VAR, `${INFO_BAR_HEIGHT}px`)
   setVar(GAP_VAR, `${DOCK_GAP}px`)
   setVar(DETAILS_VAR, `${DETAILS_HEIGHT}px`)
+  setVar(DOCK_H_VAR, `${dockHeight}px`)
   setVar(PLAYER_W_VAR, `${width}px`)
   setVar(PLAYER_VAR, `${height}px`)
   setVar(RAIL_VAR, `${railSpace}px`)
 
-  // 播放器容器同时写宽高（CSS 里也有变量兜底，这里保证首帧就正确）
   if (playerWrap.style.height !== `${height}px`)
     playerWrap.style.height = `${height}px`
 }
@@ -209,6 +281,7 @@ export function clearFixedLayout(): void {
     INFO_VAR,
     GAP_VAR,
     DETAILS_VAR,
+    DOCK_H_VAR,
     PLAYER_W_VAR,
     PLAYER_VAR,
     RAIL_VAR,

@@ -78,6 +78,8 @@ export interface VideoPageMessages {
   commentsExpand: string
   /** 推荐轨道标题（第 27 轮） */
   recommendRailTitle: string
+  /** 「简介」按钮文案（第 32 轮：简介收拢到工具栏） */
+  descTitle: string
   recommendRailHint: string
   recommendRailPrev: string
   recommendRailNext: string
@@ -136,6 +138,7 @@ const CMN_CN: VideoPageMessages = {
   commentsOnlyUpOff: '显示全部评论',
   commentsExpand: '展开',
   recommendRailTitle: '推荐视频',
+  descTitle: '简介',
   recommendRailHint: '推荐视频轨道：← → 切换，Enter 当前页预览，Ctrl/⌘+点击 或 中键新标签页',
   recommendRailPrev: '上一张',
   recommendRailNext: '下一张',
@@ -212,6 +215,7 @@ const EN: VideoPageMessages = {
   commentsOnlyUpOff: 'Showing all comments',
   commentsExpand: 'Expand',
   recommendRailTitle: 'Recommended videos',
+  descTitle: 'Description',
   recommendRailHint: 'Recommendation rail: ← → to switch, Enter previews here, Ctrl/⌘+click or middle click opens a new tab',
   recommendRailPrev: 'Previous',
   recommendRailNext: 'Next',
@@ -284,6 +288,7 @@ const CMN_TW: VideoPageMessages = {
   commentsOnlyUpOff: '顯示全部評論',
   commentsExpand: '展開',
   recommendRailTitle: '推薦影片',
+  descTitle: '簡介',
   recommendRailHint: '推薦影片軌道：← → 切換，Enter 在當前頁預覽，Ctrl/⌘+點擊 或 中鍵開新分頁',
   recommendRailPrev: '上一張',
   recommendRailNext: '下一張',

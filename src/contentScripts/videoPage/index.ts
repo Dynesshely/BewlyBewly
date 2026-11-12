@@ -46,6 +46,7 @@ import {
   markPlayerStage,
 } from './dom'
 import { setupFixedLayout, syncFixedLayout } from './fixedLayout'
+import { syncPlayerScreenMode, teardownPlayerScreenMode } from './playerMode'
 import selectionPanelCss from './playlistPanel.shadow.scss?inline'
 import { bindRailHost, railState, syncRecommendRail, teardownRecommendRail } from './recommendRail'
 import { setupShortcuts } from './shortcuts'
@@ -270,6 +271,7 @@ function unmount(): void {
   // 所以先拆 toolbar（它会把简介按钮放回 wrapper 原位、再整体移除 wrapper），
   // 然后再拆 descPopover（移除按钮本身）。顺序反过来也不会漏清理，但会少一次「放回原位」。
   teardownToolbarActions()
+  teardownPlayerScreenMode()
   teardownDescPopover()
   if (disposeCommentColumn) {
     disposeCommentColumn()
@@ -368,8 +370,12 @@ function sync(): void {
   syncVideoTitleAttribute()
   ui.danmakuOn = isDanmakuEnabled()
 
+  // 播放器显示模式（第 37 轮）：网页全屏 / 宽屏 / 普通。必须先于轨道与布局同步，
+  // 让 rail 决定是否渲染、fixedLayout 决定是否给右列留位置。
+  const modeChanged = syncPlayerScreenMode()
+
   // 推荐视频轨道（第 27 轮）：读不到卡片时内部会保持原生列表不动
-  syncRecommendRail({ enabled: settings.value.videoPageRecommendRail })
+  safeSync('syncRecommendRail', () => syncRecommendRail({ enabled: settings.value.videoPageRecommendRail }))
   const railVisible = Boolean(railState.placement && railState.cards.length)
   if (ui.recommendRailVisible !== railVisible)
     ui.recommendRailVisible = railVisible
@@ -378,6 +384,10 @@ function sync(): void {
   // ⚠️ 第 36 轮起把它提到评论区同步之前：评论区 / 轨道 / 简介任何一处抛异常都不能阻止
   // 布局类落地（真机回归就是「评论组件没挂载 → 固定布局也没生效 → 整页塌」）。
   syncFixedLayout()
+
+  // 模式刚切换：立即再校正一次评论列（隐藏 / 恢复后高度与位置都变了）
+  if (modeChanged)
+    safeSync('syncCommentColumn(modeChanged)', syncCommentColumn)
 
   // 评论区：标记 UP / 注入筛选按钮 / 折叠长评论。包一层 try/catch，
   // 保证单点异常不会中断整拍（下面还有评论列校正与布局刷新）。

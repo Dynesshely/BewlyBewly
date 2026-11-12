@@ -2075,3 +2075,390 @@ html.bewly-design.videoPage.bewly-video-fixed .bewly-comment-column #commentapp,
 html.bewly-design.videoPage.bewly-video-fixed .bewly-comment-column > #commentapp:empty {
   min-height: 180px !important;
 }
+
+/* ===== 第 37 轮 up-card ===== */
+/* UP 主卡按原版样式还原（第 37 轮，只改视觉、不改结构）
+   用户截图原版（360px 宽卡片）：
+     [头像 48 圆]  箱庭XTer ✉ 发消息
+                   存在                     <- 签名行（无签名则不占位）
+                   [    + 关注 3188    ]     <- 全宽按钮，高 ~40，圆角 8，主色底
+   真机现状（改前）：w 510 / h 125；.up-name 12.5px；.send-msg 14px；关注按钮 60×30 非全宽；
+   无签名时容器是 .up-info-no-d，布局不应留空行。
+
+   高度预算（保证 ≤ A 给的 max-height: min(140px, 40%)）：
+     padding 16×2 = 32 + 上排 48（头像/名字+签名）+ gap 12 + 按钮 40 = 132 ≤ 140 ✓
+     无签名时 32 + 25 + 12 + 40 = 109 ✓（不会留空，也不会超过封顶） */
+
+html.bewly-design.videoPage {
+  /* UP 卡内单独的「卡片标题」字号档：18px（第 34 轮 5 档之外的唯一例外，仅用于 UP 名） */
+  .up-panel-container {
+    --bvp-fs-upname: 18px;
+    --bvp-lh-upname: 1.4;
+
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  /* 上排：头像 + 右侧（名字 / 发消息 / 签名） */
+  .up-panel-container .up-info-container,
+  .up-panel-container .up-info {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    min-width: 0;
+  }
+
+  .up-panel-container .up-avatar,
+  .up-panel-container .bili-avatar,
+  .up-panel-container .up-avatar__img,
+  .up-panel-container .up-avatar__image {
+    flex: 0 0 auto;
+    width: 48px;
+    height: 48px;
+    overflow: hidden;
+    border-radius: 50%;
+  }
+
+  /* 名字与「发消息」同一行，签名独占一行（不依赖 DOM 顺序） */
+  .up-panel-container .up-info--right {
+    display: flex;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    flex-direction: row;
+    gap: 4px 8px;
+    align-items: center;
+    min-width: 0;
+  }
+
+  /* UP 名：18 / 600 / 1.4，长名单行省略 */
+  .up-panel-container .up-name,
+  .up-panel-container .up-info--name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    font-size: var(--bvp-fs-upname);
+    font-weight: 600;
+    line-height: var(--bvp-lh-upname);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 发消息：与名字同基线的小按钮（图标 + 12.5px 文字） */
+  .up-panel-container .send-msg,
+  .up-panel-container .send-msg-btn {
+    display: inline-flex;
+    flex: 0 0 auto;
+    gap: 4px;
+    align-items: center;
+    height: 24px;
+    padding: 0 8px;
+    margin: 0 0 0 auto;
+    font-size: 12.5px;
+    line-height: 1;
+    color: var(--bew-text-3);
+    white-space: nowrap;
+    cursor: pointer;
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    transition:
+      background-color 160ms ease,
+      color 160ms ease;
+  }
+
+  .up-panel-container .send-msg:hover,
+  .up-panel-container .send-msg-btn:hover {
+    color: var(--bew-text-1);
+    background: var(--bew-fill-1);
+  }
+
+  .up-panel-container .send-msg:focus-visible,
+  .up-panel-container .send-msg-btn:focus-visible {
+    outline: 2px solid var(--bew-theme-color);
+    outline-offset: 2px;
+  }
+
+  /* 签名：12.5 / 1.5 / 次要色，单行省略，独占一行 */
+  .up-panel-container .up-description,
+  .up-panel-container .up-info--desc {
+    flex: 1 1 100%;
+    min-width: 0;
+    margin: 0; /* 已在 .up-info--right 右列内，天然与名字左对齐（头像 48 + gap 12 由父级 flex 提供） */
+    font-size: 12.5px;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--bew-text-3);
+  }
+
+  .up-panel-container .up-description > *,
+  .up-panel-container .up-info--desc > * {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 无签名（B 站用 .up-info-no-d 标记）/ 空签名：不留空行 */
+  .up-panel-container .up-info-no-d .up-description,
+  .up-panel-container .up-info-no-d .up-info--desc,
+  .up-panel-container .up-info-no-d .up-info--desc:empty,
+  .up-panel-container .up-description:empty,
+  .up-panel-container .up-info--desc:empty {
+    display: none !important;
+  }
+
+  /* 签名左对齐到名字：区右列已有 12px gap，这里补 0（60 = 48 头像 + 12 gap 是相对卡片，非相对本元素） */
+  .up-panel-container .up-info-no-d .up-info--desc {
+    display: none !important;
+  }
+
+  /* 关注按钮：全宽 / 40 高 / 8 圆角 / 13px 500 / 图标+文字居中 —— 只改尺寸，不动 B 站原有主色 */
+  .up-panel-container .attention-btn-ctnr,
+  .up-panel-container .follow-btn-ctnr,
+  .up-panel-container .up-info--follow {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .up-panel-container .default-btn,
+  .up-panel-container .follow-btn,
+  .up-panel-container .attention-btn-ctnr .default-btn,
+  .up-panel-container .attention-btn-ctnr .follow-btn {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: 100%;
+    height: 40px;
+    padding: 0 12px;
+    margin: 0;
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    /* 颜色沿用 B 站原有主色（不在这里覆盖 background / color，避免新增颜色与主题冲突） */
+    border-radius: 8px;
+    transition: filter 160ms ease;
+  }
+
+  .up-panel-container .default-btn:hover,
+  .up-panel-container .follow-btn:hover {
+    filter: brightness(1.06);
+  }
+
+  .up-panel-container .default-btn:focus-visible,
+  .up-panel-container .follow-btn:focus-visible {
+    outline: 2px solid var(--bew-theme-color);
+    outline-offset: 2px;
+  }
+
+  /* 关注按钮里的图标（+ 号）与文字之间由 gap 控制；图标不缩放 */
+  .up-panel-container .default-btn > *,
+  .up-panel-container .follow-btn > * {
+    flex: 0 0 auto;
+  }
+
+  /* 号码（粉丝数等）等宽数字，不抖 */
+  .up-panel-container .default-btn .num,
+  .up-panel-container .follow-btn .num,
+  .up-panel-container .fan {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* 小视口 / 低高度：按钮收到 36，padding 收到 12（与简报的降级口径一致），仍保持全宽 */
+@media (max-height: 900px), (max-width: 1440px) {
+  html.bewly-design.videoPage .up-panel-container {
+    gap: 8px;
+    padding: 12px;
+  }
+
+  html.bewly-design.videoPage .up-panel-container .default-btn,
+  html.bewly-design.videoPage .up-panel-container .follow-btn {
+    height: 36px;
+  }
+}
+
+/* 暗色 / 高对比 / 强制色彩 / 动效 */
+html.bewly-design.videoPage.dark .up-panel-container .send-msg:hover {
+  background: var(--bew-fill-2);
+}
+
+@media (prefers-contrast: more) {
+  html.bewly-design.videoPage .up-panel-container .send-msg {
+    color: var(--bew-text-2);
+  }
+
+  html.bewly-design.videoPage .up-panel-container .default-btn,
+  html.bewly-design.videoPage .up-panel-container .follow-btn {
+    border: 1px solid currentColor;
+  }
+}
+
+@media (forced-colors: active) {
+  html.bewly-design.videoPage .up-panel-container .default-btn,
+  html.bewly-design.videoPage .up-panel-container .follow-btn {
+    color: ButtonText;
+    background: ButtonFace;
+    border: 1px solid ButtonText;
+  }
+
+  html.bewly-design.videoPage .up-panel-container .send-msg {
+    color: ButtonText;
+    border: 1px solid ButtonText;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.bewly-design.videoPage .up-panel-container .send-msg,
+  html.bewly-design.videoPage .up-panel-container .default-btn,
+  html.bewly-design.videoPage .up-panel-container .follow-btn {
+    transition: none;
+  }
+}
+
+/* ---------- UP 卡全宽修复（第 37 轮真机复测） ----------
+   真机宽度链：卡片 788 → .up-info-container 754 → .up-info--right 277 → .up-info__btn-panel 82
+   → .upinfo-btn-panel 82 → .default-btn 82。按钮的 width:100% 只在 82px 的父级里生效。
+
+   根因：按钮面板在 .up-info--right 内部（不是卡片直接子元素），而 .up-info--right 只有 277 宽。
+   修法：把 .up-info--right 设为 display: contents，让它的子元素（名字 / 发消息 / 签名 / 按钮面板）
+   直接成为 .up-info-container 的 flex 项；容器允许换行后，按钮面板用 flex-basis:100% 独占一行，
+   宽度 = 整卡内容宽（真机 754），按钮再 width:100% 就能撑满。
+   高度预算（140 封顶内）：
+     无签名：padding 32 + 头像行 48 + row-gap 8 + 按钮 40 = 128 ✓
+     有签名：:has() 收紧到 padding 24 + 48 + 4 + 签名 19 + 4 + 按钮 36 = 135 ✓ */
+
+html.bewly-design.videoPage {
+  /* 容器允许换行，行距 8px（名字行 → 按钮行；有签名时 4px） */
+  .up-panel-container .up-info-container,
+  .up-panel-container .up-info {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    align-items: flex-start;
+  }
+
+  /* 关键：右列不再作为「独立盒子」，让它的子项参与外层 flex 排布 */
+  .up-panel-container .up-info--right {
+    display: contents;
+  }
+
+  /* 名字 + 发消息：同一行（名字吃剩余宽，发消息靠右） */
+  .up-panel-container .up-name,
+  .up-panel-container .up-info--name {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .up-panel-container .send-msg,
+  .up-panel-container .send-msg-btn {
+    flex: 0 0 auto;
+    margin: 0 0 0 auto;
+  }
+
+  /* 签名：独占一行（不做 60px 缩进，右列已不存在） */
+  .up-panel-container .up-description,
+  .up-panel-container .up-info--desc {
+    flex: 1 1 100%;
+    width: 100%;
+    margin: 0;
+  }
+
+  /* 按钮面板：独占一行 + 撑满整卡内容宽 */
+  .up-panel-container .up-info__btn-panel,
+  .up-panel-container .upinfo-btn-panel,
+  .up-panel-container .attention-btn-ctnr {
+    display: flex;
+    flex: 1 1 100%;
+    gap: 8px;
+    align-items: center;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  /* 关注按钮：撑满父级，不再 flex: 0 0 auto；不覆盖 background/color（保留 B 站蓝底白字） */
+  .up-panel-container .default-btn,
+  .up-panel-container .follow-btn,
+  .up-panel-container .attention-btn-ctnr .default-btn,
+  .up-panel-container .attention-btn-ctnr .follow-btn {
+    flex: 1 1 auto;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  /* 有签名时收紧（140 封顶内放得下全宽按钮） */
+  .up-panel-container:has(.up-description:not(:empty)),
+  .up-panel-container:has(.up-info--desc:not(:empty)) {
+    gap: 4px;
+    padding: 12px;
+  }
+
+  .up-panel-container:has(.up-description:not(:empty)) .up-info-container,
+  .up-panel-container:has(.up-info--desc:not(:empty)) .up-info-container,
+  .up-panel-container:has(.up-description:not(:empty)) .up-info,
+  .up-panel-container:has(.up-info--desc:not(:empty)) .up-info {
+    gap: 4px 12px;
+  }
+
+  .up-panel-container:has(.up-description:not(:empty)) .default-btn,
+  .up-panel-container:has(.up-info--desc:not(:empty)) .default-btn,
+  .up-panel-container:has(.up-description:not(:empty)) .follow-btn,
+  .up-panel-container:has(.up-info--desc:not(:empty)) .follow-btn {
+    height: 36px;
+  }
+}
+
+/* ===== 第 37 轮 up-card end ===== */
+
+/* ===== 第 37 轮 player-modes =====
+   用户报的两个 bug：
+   1. 网页全屏时推荐轨道仍然显示、盖在播放器上；
+   2. 宽屏（data-screen="wide"）时评论区应当隐藏。
+   状态类由 src/contentScripts/videoPage/playerMode.ts 每拍维护：
+     html.bewly-player-webfull  —— data-screen = web/full 或 body.webscreen-fix
+     html.bewly-player-wide     —— data-screen = wide
+   轨道在网页全屏下由 recommendRail 直接从渲染状态移除（不是靠 CSS 藏），
+   这里只负责页面级两列的显隐与播放器占满。
+*/
+html.bewly-design.videoPage.bewly-player-webfull,
+html.bewly-design.videoPage.bewly-player-wide {
+  /* 评论区隐藏（用户要求网页全屏只留播放器；宽屏也要隐藏评论区） */
+  .bewly-comment-column,
+  .right-container,
+  .right-container-inner,
+  .right-container-inner.scroll-sticky {
+    display: none !important;
+  }
+
+  /* 主区变单列：右列 0 宽，左列吃满内容宽 */
+  #mirror-vdcon,
+  .video-container-v1 {
+    grid-template-columns: minmax(0, 1fr) !important;
+    column-gap: 0 !important;
+  }
+
+  .left-container,
+  .left-container.scroll-sticky {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* 播放器在单列里居中（宽度由 fixedLayout 的 --bvp-fixed-player-width 决定） */
+  #playerWrap {
+    margin-inline: auto !important;
+  }
+}

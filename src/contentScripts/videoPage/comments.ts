@@ -537,6 +537,15 @@ function evaluateFold(thread: HTMLElement, renderer: HTMLElement): void {
 
 /** 展开按钮 fixed 定位：按 thread 矩形算，只保留视口内的 */
 function refreshFoldPositions(): void {
+  // 第 37 轮：网页全屏 / 宽屏时评论列被 display:none，线程 rect 全为 0，
+  // 继续计算会把展开按钮摆到视口左上角 —— 直接清空。
+  const columnEl = document.querySelector<HTMLElement>('[data-bewly-comment-column], #bewly-comment-column')
+  if (columnEl && (columnEl.offsetWidth === 0 || columnEl.offsetHeight === 0)) {
+    if (ui.commentFoldButtons.length)
+      ui.commentFoldButtons = []
+    return
+  }
+
   const next: { id: number, top: number, left: number }[] = []
   for (const [id, { thread }] of foldTargets) {
     if (!thread.isConnected) {

@@ -50,6 +50,7 @@ import { watch } from 'vue'
 import { settings } from '~/logic'
 
 import { getPlayerWrapEl } from './dom'
+import { getPlayerScreenMode } from './playerMode'
 import { computeRailHeight, getRenderedRailHeight, railState } from './recommendRail'
 import { ui } from './state'
 
@@ -192,7 +193,16 @@ function measureDockBlocks(leftCol: HTMLElement, playerWrap: HTMLElement): { tot
  */
 function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
   const topOffset = Math.max(0, Math.round(mirror.getBoundingClientRect().top))
-  const railVisible = Boolean(railState.placement)
+
+  // 第 37 轮：网页全屏 / 宽屏时右列（评论区）隐藏 → 单列布局。
+  // 网页全屏下轨道也隐藏（并被 recommendRail 撤掉渲染），因此不再预留 railSpace，播放器吃满高度。
+  const mode = getPlayerScreenMode()
+  const singleColumn = mode !== 'normal'
+  // 网页全屏必须隐藏轨道（会盖播放器）；宽屏下评论区已隐藏，轨道再留着会把 16:9 播放器压小，
+  // 所以宽屏也一并隐藏（用户诉求是「播放器占满」，视觉上更连贯）。
+  const hideRail = mode === 'webfull' || mode === 'wide'
+  const railVisible = !hideRail && Boolean(railState.placement)
+
   const leftCol = document.querySelector<HTMLElement>('#mirror-vdcon .left-container')
 
   // 容器可用宽：**不要读左列宽度** —— 左列宽度正是本模块写出来的（grid 第一列），
@@ -201,7 +211,10 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
   const padX = (Number.parseFloat(mirrorStyle.paddingLeft) || 0)
     + (Number.parseFloat(mirrorStyle.paddingRight) || 0)
   const totalWidth = Math.max(0, Math.round(mirror.clientWidth - padX))
-  const leftAvailW = Math.max(0, totalWidth - MIN_COMMENT_WIDTH - COLUMN_GUTTER)
+  // 单列（网页全屏 / 宽屏）时播放器可用宽 = 整个内容宽；否则要给评论区留最小宽
+  const leftAvailW = singleColumn
+    ? totalWidth
+    : Math.max(0, totalWidth - MIN_COMMENT_WIDTH - COLUMN_GUTTER)
 
   // 视觉样式算出来的轨道实际可能比估算更高（真机 222 vs 估算 207）：
   // 预留空间取两者较大值，否则 dock 会压进轨道顶边。
@@ -272,8 +285,10 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
     }
   }
 
-  // 右列至少要拿到 MIN_COMMENT_WIDTH
-  width = Math.max(0, Math.min(width, totalWidth - MIN_COMMENT_WIDTH - COLUMN_GUTTER))
+  // 右列至少要拿到 MIN_COMMENT_WIDTH（单列模式下不需要让位）
+  width = Math.max(0, Math.min(width, singleColumn
+    ? totalWidth
+    : totalWidth - MIN_COMMENT_WIDTH - COLUMN_GUTTER))
   height = Math.round(width * 9 / 16)
 
   setVar(TOP_VAR, `${topOffset}px`)
@@ -290,7 +305,7 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
 
   // 真机诊断（第 36 轮回归排查）：把布局关键值写到 DOM 属性，页面控制台可直接读：
   //   document.documentElement.dataset.bewlyFixedMetrics
-  const metrics = `dock=${dockHeight};player=${height}x${width};rail=${railSpace};top=${topOffset}`
+  const metrics = `dock=${dockHeight};player=${height}x${width};rail=${railSpace};top=${topOffset};mode=${mode}`
   if (document.documentElement.getAttribute('data-bewly-fixed-metrics') !== metrics)
     document.documentElement.setAttribute('data-bewly-fixed-metrics', metrics)
 }

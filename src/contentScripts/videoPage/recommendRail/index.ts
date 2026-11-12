@@ -3,6 +3,7 @@ import type { RailCard, RailPlacement } from './types'
 import { computed, reactive } from 'vue'
 
 import { useMessages } from '../i18n'
+import { getPlayerScreenMode } from '../playerMode'
 import {
   clearRailSpace,
   collectRailCards,
@@ -67,8 +68,10 @@ function sameSequence(a: RailCard[], b: RailCard[]): boolean {
 
 /** 重新采集并更新轨道（渲染状态由 railState.placement 表示） */
 export function syncRecommendRail(options: { enabled: boolean }): void {
-  // 关闭开关 / 用户手动关闭：轨道不渲染，并把原生列表还回去
-  if (!options.enabled || railState.dismissed) {
+  // 关闭开关 / 用户手动关闭 / 网页全屏与宽屏：轨道不渲染，并把原生列表还回去。
+  // 第 37 轮：网页全屏时轨道会盖在播放器上（用户截图），宽屏下留着轨道又会把播放器压小；
+  // 这里直接从渲染状态移除（不是降 z-index），退出模式后下一拍自动重算 placement 并恢复。
+  if (!options.enabled || railState.dismissed || getPlayerScreenMode() !== 'normal') {
     if (railState.placement)
       railState.placement = null
     if (railState.cards.length)

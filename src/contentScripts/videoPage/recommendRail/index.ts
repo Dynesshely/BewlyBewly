@@ -78,7 +78,9 @@ export function syncRecommendRail(options: { enabled: boolean }): void {
   // 关闭开关 / 用户手动关闭 / 网页全屏与宽屏：轨道不渲染，并把原生列表还回去。
   // 第 37 轮：网页全屏时轨道会盖在播放器上（用户截图），宽屏下留着轨道又会把播放器压小；
   // 这里直接从渲染状态移除（不是降 z-index），退出模式后下一拍自动重算 placement 并恢复。
-  if (!options.enabled || railState.dismissed || getPlayerScreenMode() !== 'normal') {
+  // 第 48 轮：窄屏（宽 <1280 或高 <700，含 iframe 抽屉）走上下分区，轨道不渲染
+  const narrowViewport = window.innerWidth < 1280 || window.innerHeight < 700
+  if (!options.enabled || railState.dismissed || getPlayerScreenMode() !== 'normal' || narrowViewport) {
     if (railState.placement)
       railState.placement = null
     if (railState.cards.length)

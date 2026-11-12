@@ -831,3 +831,42 @@ commentColumn.bottom = 播放器 bottom < rail.top - 8
 
 说明：1600×1000 下播放器宽度受 16:9 + dock 高度限制，拖到最右只能停在 885（评论区 40.19%，仍远高于 20% 下限）；
 视口更高（≥1200）时才能把评论区压到 20%。这满足「评论区 ≥20%」的验收，但不是「一定能拖到 20%」。
+
+## 第 48 轮：降低增强层层级 + iframe 预览启用自定义布局
+
+### 需求 1：宿主 z-index 2147483200 → 1000
+
+真机：轨道 `rect = 952..1205` 与 B 站「更多」下拉 `rect = 928..972` 重叠 20px，
+下拉 `z-index = 2`，但我们的增强层宿主是**全屏 fixed 容器**且 `z-index = 2147483200`，
+于是整个页面区域都压在 B 站浮层之上。
+
+- `videoPage.shadow.scss`：`:host { z-index: 1000 }`（高于页面内容 / 播放器控件，低于 B 站下拉与设置页 2147483600）；
+- 页面级分隔条 `#bewly-video-splitter`：`z-index` 2147483000 → **1001**（与宿主同量级，不再盖住下拉）；
+- 设置页 `z-index: 2147483600` 不动（Lead 改的 App.vue 仍高于一切）；
+- shadow 内部的 `--bvp-z-*` 层级保持原值：宿主已创建层叠上下文，内部层级只在宿主内比较，不影响外部。
+
+### 需求 2：iframe 预览窗口启用自定义布局
+
+第 43 轮的「iframe 内一刀切降级」撤销，改为**按视口尺寸分级**（每拍重算）：
+
+| 视口 | 行为 |
+| --- | --- |
+| 宽 ≥1280 且 高 ≥700 | 完整三区 dock（同主页面） |
+| 1280/700 以下，但 ≥900×600 | **上下分区**：上播放器（左列）、下评论区，轨道隐藏；新增 `html.bewly-video-narrow` |
+| <900 宽 或 <600 高 | 退回第 43 轮降级：只保留评论增强 + 广告清理 |
+
+实现：
+
+- `fixedLayout.ts` 阈值 `MIN_VIEWPORT_*` 1280/700 → **900/600**；
+- 新增窄屏常量与分支：`NARROW_VIEWPORT_WIDTH/HEIGHT`、`NARROW_COMMENT_MIN_HEIGHT = 220`、
+  `NARROW_CLASS = bewly-video-narrow`、`NARROW_COMMENT_VAR = --bvp-fixed-narrow-comment-height`；
+- 窄屏分支：`dockH = innerHeight − top − 36`、播放器优先按内容宽 16:9、超出高度预算则按高度反算宽，
+  评论区高 = dock 剩余；轨道 `railSpace = 0`；写变量 + 加类后 return；
+- 页面 CSS：`html.bewly-video-fixed.bewly-video-narrow` 下 `#mirror-vdcon` 单列两行、
+  评论区（右列）高度 = 窄屏变量、内部滚动；隐藏分隔条；
+- `recommendRail/index.ts`：窄屏不渲染轨道（同网页全屏 / 宽屏的守卫）；
+- `index.ts`：`isInIframe()` 一刀切改为 `shouldDegradeForViewport()`（<900 宽或 <600 高）；
+  **快捷键仍在 iframe 内关闭**（避免和外层抽屉抢空格 / 方向键）；
+- 「偶尔不生效」排查辅助：`safeSync` 的 warn 现在打印**堆栈**，真机 console 能定位是哪个模块抛错；
+  若 iframe 内根本没宿主元素，说明 `contentScripts/index.ts` 的 `isVideoOrBangumiPage()` 判定在 iframe 下失败，
+  需要下一步查 `location` / UA 分支（本轮范围外，已列入交接）。

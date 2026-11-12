@@ -2890,7 +2890,8 @@ html.bewly-design.videoPage .bewly-comment-column .comment-pictures {
   left: var(--bvp-fixed-split-left, 0px);
   width: 6px;
   height: var(--bvp-fixed-dock-height, 0px);
-  z-index: 2147483000;
+  /* 第 48 轮：与宿主同量级（1000 出头），不再盖住 B 站下拉菜单 */
+  z-index: 1001;
   cursor: col-resize;
   touch-action: none;
   background: transparent;
@@ -3086,5 +3087,51 @@ html.bewly-design.videoPage.bewly-video-fixed {
   .bewly-comment-column > .up-panel-container {
     margin-top: var(--bvp-comment-card-gap, 13px) !important;
     margin-bottom: 0 !important;
+  }
+}
+
+/* ===== 第 48 轮 narrow-iframe =====
+   第 43 轮曾在 iframe 内完全禁用自定义布局；现在改为「按 iframe 自身视口判断」：
+   - 视口 ≥900×600 且 ≥1280×700：完整三区 dock（同主页面）；
+   - 1280 宽 / 700 高以下：上下分区（播放器在上、评论区在下、轨道隐藏）；
+   - <900 宽或 <600 高：脚本层退回「只保留评论增强 + 广告清理」（index.ts 的 DEGRADE_* 阈值）。
+   html.bewly-video-narrow 由 fixedLayout.ts 在窄屏分支加上，评论区高度取它写出的剩余高度。 */
+html.bewly-design.videoPage.bewly-video-fixed.bewly-video-narrow {
+  /* 单列 + 两行：上左列（信息栏 / 播放器 / 工具栏 / 标签），下评论区 */
+  #mirror-vdcon,
+  .video-container-v1 {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto auto !important;
+    column-gap: 0 !important;
+    row-gap: var(--bvp-fixed-gap, 8px) !important;
+  }
+
+  .left-container,
+  .left-container.scroll-sticky {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  #playerWrap {
+    margin-inline: auto !important;
+  }
+
+  /* 评论区变成第二行：高度 = dock 剩余（fixedLayout 实测写入），内部继续滚动 */
+  .right-container,
+  .right-container-inner,
+  .right-container-inner.scroll-sticky {
+    height: var(--bvp-fixed-narrow-comment-height, 240px) !important;
+    max-height: var(--bvp-fixed-narrow-comment-height, 240px) !important;
+    overflow: hidden !important;
+  }
+
+  .bewly-comment-column {
+    height: 100% !important;
+    max-height: 100% !important;
+  }
+
+  /* 窄屏上下分区没有分隔条（左右两列结构不存在） */
+  #bewly-video-splitter {
+    display: none !important;
   }
 }

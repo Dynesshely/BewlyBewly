@@ -16,7 +16,12 @@
 
   position: fixed;
   inset: 0;
-  z-index: 2147483200;
+  /* 第 48 轮：从 2147483200 降到 1000。
+     宿主是「全屏 fixed 容器」，层级过高会把整个页面压在 B 站浮层之上
+     （真机：B 站「更多」下拉 z-index=2、与轨道区域重叠 20px 被完全盖住）。
+     现在：高于页面内容与播放器控件，低于 B 站弹窗 / 下拉 / 设置页（2147483600）。
+     内部浮层需要更高层级时用局部 z-index（--bvp-z-*），不再抬整个宿主。 */
+  z-index: 1000;
   display: block;
   font-family: inherit;
   font-size: var(--bew-base-font-size, 14px);

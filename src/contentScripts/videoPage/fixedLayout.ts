@@ -70,10 +70,22 @@ const SPLIT_LEFT_VAR = '--bvp-fixed-split-left'
 /** 内容区左边缘（视口坐标）与内容宽：分隔条拖拽换算比例用（第 46 轮） */
 const CONTENT_LEFT_VAR = '--bvp-fixed-content-left'
 const CONTENT_WIDTH_VAR = '--bvp-fixed-content-width'
+/**
+ * 视口小于这个尺寸就放不下三块区域，回退原生可滚动布局。
+ * 第 48 轮：1280/700 → 900/600，让 900~1400 × 700~900 的首页空格预览抽屉也能用自定义布局。
+ */
+const MIN_VIEWPORT_WIDTH = 900
+const MIN_VIEWPORT_HEIGHT = 600
 
-/** 视口小于这个尺寸就放不下三块区域，自动回退原生可滚动布局 */
-const MIN_VIEWPORT_WIDTH = 1280
-const MIN_VIEWPORT_HEIGHT = 700
+/** 窄屏断点：低于它改「上下分区」（上播放器、下评论区、轨道隐藏），第 48 轮 */
+const NARROW_VIEWPORT_WIDTH = 1280
+const NARROW_VIEWPORT_HEIGHT = 700
+/** 窄屏下评论区至少保留的高度 */
+const NARROW_COMMENT_MIN_HEIGHT = 220
+/** 窄屏断点标记类（页面级 CSS 用） */
+const NARROW_CLASS = 'bewly-video-narrow'
+/** 窄屏下评论区高度变量 */
+const NARROW_COMMENT_VAR = '--bvp-fixed-narrow-comment-height'
 
 /**
  * 信息栏（标题组）高度：70，与简报 A3 的「标题组 70px」一致。
@@ -250,10 +262,13 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
   // 第 37 轮：网页全屏 / 宽屏时右列（评论区）隐藏 → 单列布局。
   // 网页全屏下轨道也隐藏（并被 recommendRail 撤掉渲染），因此不再预留 railSpace，播放器吃满高度。
   const mode = getPlayerScreenMode()
-  const singleColumn = mode !== 'normal'
+  // 第 48 轮：窄视口（含 iframe 抽屉）走「上下分区」——播放器在上、评论区在下、轨道隐藏。
+  const narrowLayout = window.innerWidth < NARROW_VIEWPORT_WIDTH
+    || window.innerHeight < NARROW_VIEWPORT_HEIGHT
+  const singleColumn = mode !== 'normal' || narrowLayout
   // 网页全屏必须隐藏轨道（会盖播放器）；宽屏下评论区已隐藏，轨道再留着会把 16:9 播放器压小，
   // 所以宽屏也一并隐藏（用户诉求是「播放器占满」，视觉上更连贯）。
-  const hideRail = mode === 'webfull' || mode === 'wide'
+  const hideRail = mode === 'webfull' || mode === 'wide' || narrowLayout
   const railVisible = !hideRail && Boolean(railState.placement)
 
   const leftCol = document.querySelector<HTMLElement>('#mirror-vdcon .left-container')
@@ -287,6 +302,54 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
   const blocks = leftCol
     ? measureDockBlocks(leftCol, playerWrap)
     : { total: 0, count: 0 }
+
+  // 第 48 轮：窄视口（含首页空格预览抽屉）→ 上下分区
+  //   上：信息栏 / 播放器 / 工具栏 / 标签（左列）
+  //   下：评论区（右列变成第二行，高度 = dock 剩余）
+  // 轨道隐藏、不预留空间；播放器优先按内容宽 16:9，超出高度预算时按高度反算宽度。
+  if (narrowLayout) {
+    const dockH = Math.max(
+      MIN_DOCK_PLAYER_HEIGHT + NARROW_COMMENT_MIN_HEIGHT,
+      window.innerHeight - topOffset - DOCK_BOTTOM_MARGIN,
+    )
+    const gaps = DOCK_GAP * blocks.count
+    const heightBudget = Math.max(
+      MIN_DOCK_PLAYER_HEIGHT,
+      dockH - blocks.total - gaps - NARROW_COMMENT_MIN_HEIGHT,
+    )
+    let narrowWidth = totalWidth
+    let narrowHeight = Math.round(narrowWidth * 9 / 16)
+    if (narrowHeight > heightBudget) {
+      narrowHeight = heightBudget
+      narrowWidth = Math.round(narrowHeight * 16 / 9)
+    }
+    const commentHeight = Math.max(120, dockH - blocks.total - gaps - narrowHeight)
+
+    setVar(TOP_VAR, `${topOffset}px`)
+    setVar(INFO_VAR, `${INFO_BAR_HEIGHT}px`)
+    setVar(GAP_VAR, `${DOCK_GAP}px`)
+    setVar(DETAILS_VAR, `${DETAILS_HEIGHT}px`)
+    setVar(DOCK_H_VAR, `${dockH}px`)
+    setVar(PLAYER_W_VAR, `${narrowWidth}px`)
+    setVar(PLAYER_VAR, `${narrowHeight}px`)
+    setVar(RAIL_VAR, '0px')
+    setVar(NARROW_COMMENT_VAR, `${commentHeight}px`)
+    setVar(SPLIT_LEFT_VAR, '0px')
+    setVar(CONTENT_LEFT_VAR, `${contentLeft}px`)
+    setVar(CONTENT_WIDTH_VAR, `${totalWidth}px`)
+
+    document.documentElement.classList.add(NARROW_CLASS)
+
+    if (playerWrap.style.height !== `${narrowHeight}px`)
+      playerWrap.style.height = `${narrowHeight}px`
+
+    const narrowMetrics = `narrow=1;dock=${dockH};player=${narrowHeight}x${narrowWidth};comment=${commentHeight};top=${topOffset};mode=${mode}`
+    if (document.documentElement.getAttribute('data-bewly-fixed-metrics') !== narrowMetrics)
+      document.documentElement.setAttribute('data-bewly-fixed-metrics', narrowMetrics)
+    return
+  }
+
+  document.documentElement.classList.remove(NARROW_CLASS)
 
   let railSpace = 0
   let width = 0
@@ -438,8 +501,10 @@ export function clearFixedLayout(): void {
     SPLIT_LEFT_VAR,
     CONTENT_LEFT_VAR,
     CONTENT_WIDTH_VAR,
+    NARROW_COMMENT_VAR,
   ])
     document.documentElement.style.removeProperty(name)
+  document.documentElement.classList.remove(NARROW_CLASS)
 
   const playerWrap = getPlayerWrapEl()
   if (playerWrap) {

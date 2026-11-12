@@ -87,7 +87,10 @@ function safeSync(label: string, fn: () => void): void {
     fn()
   }
   catch (error) {
-    console.warn(`[Bewly] ${label} failed:`, error)
+    // 第 48 轮：打印堆栈，真机 console 能直接看到是哪个模块 / 哪一步失败
+    console.warn(`[Bewly] ${label} failed:`, error instanceof Error
+      ? (error.stack ?? error.message)
+      : error)
   }
 }
 
@@ -128,15 +131,27 @@ let disposeCommentColumn: (() => void) | null = null
 let disposeFixedLayout: (() => void) | null = null
 let disposeSplitter: (() => void) | null = null
 
-/** iframe 内（首页空格预览的抽屉）是否处于降级状态（第 43 轮） */
-let iframeDegraded = false
+/**
+ * 视口过窄（含极端 iframe 预览）时是否处于降级状态。
+ *
+ * 第 43 轮曾用 `isInIframe()` 一刀切禁用全部自定义布局；第 48 轮改为**按 iframe 自身视口判断**：
+ * 抽屉里的 `window.innerWidth/innerHeight` 就是 iframe 尺寸，正常尺寸下照常启用固定布局，
+ * 只有极窄（<900×600）才退回「只保留评论增强 + 广告清理」。
+ */
+const DEGRADE_MIN_WIDTH = 900
+const DEGRADE_MIN_HEIGHT = 600
+let viewportDegraded = false
+
+function shouldDegradeForViewport(): boolean {
+  return window.innerWidth < DEGRADE_MIN_WIDTH || window.innerHeight < DEGRADE_MIN_HEIGHT
+}
 
 /**
  * 进入 iframe 降级：把可能已经写入过的布局 / 轨道 / 工具栏全部还原。
  *
  * 触发场景：正常播放页先挂载、随后被放进 iframe（少见，但 teardown 必须能还原）。
  */
-function degradeForIframe(): void {
+function degradeForNarrowViewport(): void {
   if (disposeShortcuts) {
     disposeShortcuts()
     disposeShortcuts = null
@@ -164,7 +179,7 @@ function degradeForIframe(): void {
 }
 
 /** 退出 iframe 降级：恢复被跳过的功能 */
-function restoreFromIframe(): void {
+function restoreAfterNarrowViewport(): void {
   setupDescPopover()
   setupToolbarActions()
   if (!disposeCommentColumn)
@@ -173,7 +188,7 @@ function restoreFromIframe(): void {
     disposeFixedLayout = setupFixedLayout()
   if (!disposeSplitter)
     disposeSplitter = setupSplitter()
-  if (settings.value.videoPageShortcuts && !disposeShortcuts)
+  if (!isInIframe() && settings.value.videoPageShortcuts && !disposeShortcuts)
     disposeShortcuts = setupShortcuts()
 }
 
@@ -182,15 +197,15 @@ function restoreFromIframe(): void {
  *
  * 抽屉随时可能被打开 / 关闭，所以不做一次性判断；只在状态变化时动作，避免每拍抖动。
  */
-function syncIframeDegradation(): void {
-  const inIframe = isInIframe()
-  if (inIframe === iframeDegraded)
+function syncViewportDegradation(): void {
+  const degraded = shouldDegradeForViewport()
+  if (degraded === viewportDegraded)
     return
-  iframeDegraded = inIframe
-  if (inIframe)
-    degradeForIframe()
+  viewportDegraded = degraded
+  if (degraded)
+    degradeForNarrowViewport()
   else
-    restoreFromIframe()
+    restoreAfterNarrowViewport()
 }
 let stopSettingsWatch: (() => void) | null = null
 let syncTimer: number | null = null
@@ -243,9 +258,9 @@ function mount(): void {
   // iframe 内（首页空格预览的抽屉）整体降级（第 43 轮）：
   // 抽屉视口远小于整页，fixedLayout / commentColumn / 轨道 / 工具栏都按整页视口分配，
   // 在抽屉里必然挤压错乱 —— 这里不 setup 这些功能，只保留评论增强与广告清理。
-  iframeDegraded = isInIframe()
+  viewportDegraded = shouldDegradeForViewport()
   // 快捷键在 iframe 内也会和外层抽屉抢空格 / 方向键，一并关闭。
-  if (!iframeDegraded && settings.value.videoPageShortcuts)
+  if (!viewportDegraded && !isInIframe() && settings.value.videoPageShortcuts)
     disposeShortcuts = setupShortcuts()
 
   // 评论区增强（排序 / 只看 UP / 长评论折叠）：没有评论区时组件自身不渲染
@@ -257,7 +272,7 @@ function mount(): void {
   // window 钩子保留给 content script 自身调试用。
   ;(window as unknown as Record<string, unknown>).__bewlyCommentsStyleStat = getCommentStyleStat
 
-  if (!iframeDegraded) {
+  if (!viewportDegraded) {
     // 简介收拢为工具栏按钮 + 自绘 tooltip（第 32 轮）：没有简介时自身不注入
     setupDescPopover()
 
@@ -273,11 +288,11 @@ function mount(): void {
 
   // 固定单页布局（第 28 轮）：窗口太小 / 番剧页 / 迷你态会自动回退到原生可滚动布局。
   // iframe 内不启用（抽屉视口不是整页视口）。
-  if (!iframeDegraded)
+  if (!viewportDegraded)
     disposeFixedLayout = setupFixedLayout()
 
   // 播放器 / 评论区分隔条（第 46 轮）：iframe 降级时不渲染
-  if (!iframeDegraded)
+  if (!viewportDegraded)
     disposeSplitter = setupSplitter()
 
   window.addEventListener('scroll', handleScroll, { passive: true })
@@ -298,7 +313,7 @@ function mount(): void {
       // 推荐轨道开关：关掉时立刻还原原生列表
       if (!recommendRailEnabled)
         syncRecommendRail({ enabled: false })
-      if (shortcutsEnabled && !disposeShortcuts) {
+      if (!isInIframe() && shortcutsEnabled && !disposeShortcuts) {
         disposeShortcuts = setupShortcuts()
       }
       else if (!shortcutsEnabled && disposeShortcuts) {
@@ -313,7 +328,7 @@ function mount(): void {
       updateScrollState()
       safeSync('syncRecommendRail', () => syncRecommendRail({ enabled: settings.value.videoPageRecommendRail }))
       // 固定布局开关：立刻生效 / 立刻还原（iframe 内不写布局）
-      if (!iframeDegraded)
+      if (!viewportDegraded)
         syncFixedLayout()
     },
   )
@@ -381,7 +396,7 @@ function unmount(): void {
     endedTimer = null
   }
   document.documentElement.classList.remove('bewly-video-mini')
-  iframeDegraded = false
+  viewportDegraded = false
   document.documentElement.style.removeProperty('--bvp-mini-placeholder')
   clearStagePlaceholder()
   clearPlayerStage()
@@ -414,7 +429,7 @@ function sync(): void {
   ui.isBangumi = kind === 'bangumi'
 
   // iframe 内（抽屉预览）整体降级：每拍重算，抽屉开 / 关都能正确切换（第 43 轮）。
-  safeSync('syncIframeDegradation', syncIframeDegradation)
+  safeSync('syncViewportDegradation', syncViewportDegradation)
 
   if (document.hidden)
     return
@@ -432,7 +447,7 @@ function sync(): void {
 
   // iframe 内只保留「不写布局」的增强（评论折叠按钮 / 只看 UP / 登录入口），
   // 其余固定布局、轨道、工具栏、播放器模式一律不写入。
-  if (iframeDegraded) {
+  if (viewportDegraded) {
     safeSync('syncComments', syncComments)
     return
   }

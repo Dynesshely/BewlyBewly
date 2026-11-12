@@ -27,7 +27,12 @@ jobs:
             - args: [--frozen-lockfile]
 
       - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
+        # 2026-11：ubuntu-latest 迁移到 Ubuntu 26 后，`--with-deps` 依赖的字体包
+        # （fonts-unifont / xfonts-cyrillic / fonts-wqy-zenhei / fonts-tlwg-loma-otf 等）
+        # 在新镜像的软件源里已不存在，安装会整体失败并把 job 判红。
+        # 这里改为「先尝试带依赖安装，失败则退回不带依赖」：runner 镜像本身通常已具备
+        # 运行 Chromium headless 所需的库，退回路径可以正常跑通。
+        run: pnpm exec playwright install --with-deps chromium || pnpm exec playwright install chromium
 
       - name: Run online DOM probe
         run: pnpm run test:e2e:online

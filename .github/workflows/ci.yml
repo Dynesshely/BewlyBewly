@@ -39,7 +39,12 @@ jobs:
         run: pnpm build
 
       - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
+        # 2026-11：ubuntu-latest 迁移到 Ubuntu 26 后，`--with-deps` 依赖的字体包
+        # （fonts-unifont / xfonts-cyrillic / fonts-wqy-zenhei / fonts-tlwg-loma-otf 等）
+        # 在新镜像的软件源里已不存在，安装会整体失败并把 job 判红。
+        # 这里改为「先尝试带依赖安装，失败则退回不带依赖」：runner 镜像本身通常已具备
+        # 运行 Chromium headless 所需的库，退回路径可以正常跑通。
+        run: pnpm exec playwright install --with-deps chromium || pnpm exec playwright install chromium
 
       # 扩展类 e2e 依赖真实浏览器扩展加载环境，CI 上易受无头/沙箱差异影响，
       # 这里只跑不依赖扩展的离线快照探针；扩展 e2e 在本地或发行前手动执行。

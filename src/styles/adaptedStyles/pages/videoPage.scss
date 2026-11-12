@@ -1866,3 +1866,212 @@ html.bewly-design.videoPage .video-tag-container .tag-link {
 }
 
 /* ===== 第 34 轮 typography end ===== */
+
+/* ===== 第 36 轮 visual ===== */
+/* 工具栏去装饰 + 标签行排版（第 36 轮 B 工作流，只追加在文件末尾；layout 段由 video-page 负责，不重排）
+   用户反馈 2 条：
+   1) 点赞/投币/收藏/分享那一行「视觉奇怪」：真机同时有 background rgba(131,131,145,.15)
+      + border-bottom 0.67px + border-radius 10px（底色 + 线 + 圆角三重装饰）；
+   2) 标签行「被截断」：真机 .video-tag-container h=32 / padding-bottom 10 / border-bottom 0.67px，
+      但 scrollWidth == clientWidth（不是横向溢出），是纵向空间被横线与 padding 吃掉。
+   本段只改视觉，不动交互与 DOM；高度用 A 的 --bvp-toolbar-h 令牌，不硬编码新值。 */
+
+/* ---------- B1 工具栏：默认透明，悬浮才有浅底 ---------- */
+html.bewly-design.videoPage #arc_toolbar_report,
+html.bewly-design.videoPage.bewly-video-fixed #arc_toolbar_report {
+  box-sizing: border-box;
+  /* 去掉三重装饰：底色 / 边框 / 圆角 / 阴影一律清零 */
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 0 !important;
+  border-bottom: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  /* 与播放器左对齐（第 31 轮加的 4px 内缩会让工具栏比播放器窄一截） */
+  padding-inline: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  /* 高度只认 A 的令牌（52），不再被旧的 max-height: 44 压扁 */
+  height: var(--bvp-toolbar-h, 52px) !important;
+  min-height: var(--bvp-toolbar-h, 52px) !important;
+  max-height: var(--bvp-toolbar-h, 52px) !important;
+  /* 允许 hover 底色溢出容器边界 1px 而不被裁 */
+  overflow: visible !important;
+}
+
+/* 单项：默认透明，hover 时浅底 + 6px 圆角（间距由 8px gap 统一控制） */
+html.bewly-design.videoPage #arc_toolbar_report .toolbar-left-item-wrap,
+html.bewly-design.videoPage #arc_toolbar_report .toolbar-left-item,
+html.bewly-design.videoPage #arc_toolbar_report .video-toolbar-left-item {
+  box-sizing: border-box;
+  background: transparent;
+  border-radius: 6px;
+  transition: background-color 160ms ease;
+}
+
+html.bewly-design.videoPage #arc_toolbar_report .toolbar-left-item-wrap:hover,
+html.bewly-design.videoPage #arc_toolbar_report .toolbar-left-item:hover,
+html.bewly-design.videoPage #arc_toolbar_report .video-toolbar-left-item:hover {
+  background: var(--bew-fill-1);
+}
+
+/* 竖分隔线（若 B 站仍渲染）：只允许 15% currentColor，不能实心色；能藏就藏 */
+html.bewly-design.videoPage #arc_toolbar_report hr,
+html.bewly-design.videoPage #arc_toolbar_report .vertical-line,
+html.bewly-design.videoPage #arc_toolbar_report .toolbar-line,
+html.bewly-design.videoPage #arc_toolbar_report [class*="divider"] {
+  background: color-mix(in oklab, currentColor 15%, transparent) !important;
+  border-color: color-mix(in oklab, currentColor 15%, transparent) !important;
+}
+
+/* 我们自己的两个按钮与工具栏保持同一行高与间距（不再额外加 margin） */
+html.bewly-design.videoPage #arc_toolbar_report #bewly-toolbar-actions {
+  margin-inline-start: var(--bvp-space-2, 8px);
+}
+
+/* ---------- B2 标签行：去横线 + 单行横向滚动 ---------- */
+html.bewly-design.videoPage .video-tag-container,
+html.bewly-design.videoPage.bewly-video-fixed .video-tag-container {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  gap: var(--bvp-space-2, 8px) !important;
+  box-sizing: border-box !important;
+  /* 整行 ≤ 28px（标签 24 + 上下视觉留白），把 padding-bottom 10px 让给标签本身 */
+  height: 28px !important;
+  min-height: 28px !important;
+  max-height: 28px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  /* 去掉下方那条 0.67px 横线 */
+  border: 0 !important;
+  border-bottom: 0 !important;
+  background: transparent !important;
+  /* 隐藏滚动条但保留滚动能力 */
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+
+html.bewly-design.videoPage .video-tag-container::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* 标签本体：不换行、不收缩、24px 高、8px 内边距、badge 档 11px、6px 圆角 */
+html.bewly-design.videoPage .video-tag-container > *,
+html.bewly-design.videoPage .video-tag-container .tag,
+html.bewly-design.videoPage .video-tag-container a,
+html.bewly-design.videoPage .video-tag-container .tag-link {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: 24px;
+  padding: 0 8px;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--bvp-fs-badge, 11px);
+  font-weight: var(--bvp-fw-badge, 500);
+  line-height: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  border-radius: 6px;
+  transition: background-color 160ms ease;
+}
+
+html.bewly-design.videoPage .video-tag-container .tag:hover,
+html.bewly-design.videoPage .video-tag-container a:hover,
+html.bewly-design.videoPage .video-tag-container .tag-link:hover {
+  background: var(--bew-fill-1);
+}
+
+/* 标签行里我们注入的按钮（简介兜底位置）也按同一套尺寸 */
+html.bewly-design.videoPage .video-tag-container .bewly-desc-trigger,
+html.bewly-design.videoPage .video-tag-container .bewly-toolbar-action {
+  height: 24px;
+  padding: 0 8px;
+  font-size: var(--bvp-fs-badge, 11px);
+  border-radius: 6px;
+}
+
+/* ---------- 无障碍 / 主题 ---------- */
+@media (prefers-contrast: more) {
+  html.bewly-design.videoPage #arc_toolbar_report .toolbar-left-item-wrap:hover,
+  html.bewly-design.videoPage .video-tag-container .tag:hover {
+    background: var(--bew-fill-2);
+  }
+}
+
+@media (forced-colors: active) {
+  html.bewly-design.videoPage #arc_toolbar_report .toolbar-left-item-wrap:hover,
+  html.bewly-design.videoPage .video-tag-container .tag:hover {
+    background: Highlight;
+    color: HighlightText;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.bewly-design.videoPage #arc_toolbar_report .toolbar-left-item-wrap,
+  html.bewly-design.videoPage .video-tag-container .tag {
+    transition: none;
+  }
+}
+/* ===== 第 36 轮 visual end ===== */
+
+/* ===== 第 36 轮 layout =====
+   A1：UP 主卡不再被裁（真机：卡片 72px + overflow hidden，内部内容 90px，关注按钮下半截被裁 18px）。
+   A2：「只看 UP 主」并入评论筛选行（最热 | 最新 | 只看 UP 主），独立浮动工具条已移除，
+       按钮与样式注入在 comments.ts 里（shadow root 内），本段只处理页面级布局。
+*/
+/* A1：UP 主卡自适应但**必须受限**。
+   第 36 轮第一版写成 max-height: none，真机上评论列被内容撑到 837（> dock 657）且 B 站评论组件不渲染；
+   现在封顶 min(140px, 40%)：内容自然高度（真机 ~125）能完整显示关注按钮，又不会把评论列表挤没。 */
+html.bewly-design.videoPage.bewly-video-fixed .bewly-comment-column > .up-panel-container,
+.bewly-design.videoPage .bewly-comment-column > .up-panel-container {
+  flex: 0 0 auto !important;
+  height: auto !important;
+  min-height: 72px !important;
+  max-height: min(140px, 40%) !important;
+  overflow: hidden !important;
+}
+
+/* 卡内右侧信息与关注按钮按内容排布（卡片已封顶，不会再无限变高） */
+html.bewly-design.videoPage.bewly-video-fixed .bewly-comment-column > .up-panel-container .up-info--right,
+html.bewly-design.videoPage.bewly-video-fixed .bewly-comment-column > .up-panel-container .attention-btn-ctnr,
+html.bewly-design.videoPage.bewly-video-fixed .bewly-comment-column > .up-panel-container .default-btn,
+html.bewly-design.videoPage.bewly-video-fixed .bewly-comment-column > .up-panel-container .follow-btn {
+  flex: 0 0 auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+/* A1-2：评论列高度**锁死** dock 高（真机回归：放开 UP 卡后评论列被内容撑到 837）。
+   外层锁高 + overflow hidden；滚动只发生在内部的 #commentapp。
+   fallback 用 calc，避免 --bvp-fixed-dock-height 缺失时退化成 480/auto。 */
+html.bewly-design.videoPage.bewly-video-fixed [data-bewly-comment-column],
+html.bewly-design.videoPage.bewly-video-fixed .bewly-comment-column {
+  height: var(--bvp-fixed-dock-height, calc(100vh - 160px)) !important;
+  max-height: var(--bvp-fixed-dock-height, calc(100vh - 160px)) !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* A1-3：评论列表由父级剩余高度决定（不是固定值），并在内部滚动。
+   空态给一个最小高度，保证 B 站懒加载能判定「可见」并把 bili-comments 挂进来（第 36 轮回归修复）。 */
+html.bewly-design.videoPage.bewly-video-fixed .bewly-comment-column > #commentapp,
+html.bewly-design.videoPage.bewly-video-fixed .bewly-comment-column #commentapp,
+.bewly-design.videoPage .bewly-comment-column > #commentapp {
+  flex: 1 1 auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+html.bewly-design.videoPage.bewly-video-fixed .bewly-comment-column > #commentapp:empty {
+  min-height: 180px !important;
+}

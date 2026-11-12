@@ -287,10 +287,17 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
 
   if (playerWrap.style.height !== `${height}px`)
     playerWrap.style.height = `${height}px`
+
+  // 真机诊断（第 36 轮回归排查）：把布局关键值写到 DOM 属性，页面控制台可直接读：
+  //   document.documentElement.dataset.bewlyFixedMetrics
+  const metrics = `dock=${dockHeight};player=${height}x${width};rail=${railSpace};top=${topOffset}`
+  if (document.documentElement.getAttribute('data-bewly-fixed-metrics') !== metrics)
+    document.documentElement.setAttribute('data-bewly-fixed-metrics', metrics)
 }
 
 /** 清掉固定布局留下的全部痕迹（类 / CSS 变量 / 播放器行内高度） */
 export function clearFixedLayout(): void {
+  document.documentElement.removeAttribute('data-bewly-fixed-metrics')
   document.documentElement.classList.remove(FIXED_LAYOUT_CLASS)
   for (const name of [
     TOP_VAR,

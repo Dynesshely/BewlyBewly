@@ -1368,19 +1368,37 @@ async function openCommentPage(): Promise<{ context: BrowserContext, page: Page 
 test.describe('评论区增强（Web Components）', () => {
   skipIfExtensionMissing()
 
-  test('工具条只承载「只看 UP 主」：原生排序保留且不被重复渲染', async () => {
+  test('「只看 UP 主」内化进原生排序行：最热 / 最新 / 只看 UP 主，且无重复浮动工具条', async () => {
     const { context, page } = await openCommentPage()
 
     try {
       await ensureOverlay(page)
 
-      const toolbar = page.locator('.bvp-comment-toolbar')
-      await expect(toolbar).toBeVisible()
+      // 第 36 轮：独立浮动工具条已移除，「只看 UP 主」并入 #sort-actions
+      await expect(page.locator('.bvp-comment-toolbar')).toHaveCount(0)
+      const onlyUp = page.locator('#bewly-comment-only-up')
+      await expect(onlyUp).toHaveCount(1, { timeout: 10_000 })
+      // e2e 默认英文 locale，真机中文；两语言都接受
+      await expect(onlyUp).toHaveText(/只看 UP 主|uploader only/i)
+      await expect(onlyUp).toHaveAttribute('aria-pressed', 'false')
 
-      // 第 28 轮：排序沿用评论区标题旁的原生控件，工具条里不再重复出现「最热 / 最新」
-      await expect(toolbar.locator('[data-bvp-action="comment-sort-hot"]')).toHaveCount(0)
-      await expect(toolbar.locator('[data-bvp-action="comment-sort-latest"]')).toHaveCount(0)
-      await expect(toolbar.locator('[data-bvp-action="comment-only-up"]')).toHaveCount(1)
+      // 它必须在原生 #sort-actions 同一组里，且该组同时含「最热 / 最新」
+      // （不依赖具体顺序：B 站可能在排序行末尾追加其它节点）
+      const placement = await page.evaluate(() => {
+        const hs = document.querySelector('#commentapp bili-comments')?.shadowRoot?.querySelector('bili-comments-header-renderer')?.shadowRoot
+        const row = hs?.querySelector('#sort-actions')
+        const btn = hs?.querySelector('#bewly-comment-only-up')
+        if (!row || !btn)
+          return null
+        return {
+          inSortRow: btn.parentElement === row,
+          texts: Array.from(row.children).map(child => (child.textContent || '').trim()),
+        }
+      })
+      expect(placement).not.toBeNull()
+      expect(placement!.inSortRow).toBe(true)
+      expect(placement!.texts.some(text => /最热|popular|hot/i.test(text))).toBe(true)
+      expect(placement!.texts.some(text => /最新|latest/i.test(text))).toBe(true)
 
       // 原生排序区仍可见（未被我们隐藏）
       await expect(page.locator('#commentapp bili-comments')).toHaveCount(1)
@@ -1409,11 +1427,11 @@ test.describe('评论区增强（Web Components）', () => {
       await expect(page.locator('bili-comment-thread-renderer[data-bewly-comment-up="1"]')).toHaveCount(2, { timeout: 10_000 })
       await expect(page.locator('bili-comment-thread-renderer:visible')).toHaveCount(6)
 
-      await page.locator('[data-bvp-action="comment-only-up"]').click()
+      await page.locator('#bewly-comment-only-up').click()
       await expect(page.locator('html')).toHaveClass(/bewly-comments-only-up/)
       await expect(page.locator('bili-comment-thread-renderer:visible')).toHaveCount(2)
 
-      await page.locator('[data-bvp-action="comment-only-up"]').click()
+      await page.locator('#bewly-comment-only-up').click()
       await expect(page.locator('bili-comment-thread-renderer:visible')).toHaveCount(6)
     }
     finally {
@@ -1666,7 +1684,7 @@ test.describe('评论区懒加载 / 翻页状态保持', () => {
       await ensureOverlay(page)
       await expect(page.locator('bili-comment-thread-renderer')).toHaveCount(4, { timeout: 10_000 })
 
-      await page.locator('[data-bvp-action="comment-only-up"]').click()
+      await page.locator('#bewly-comment-only-up').click()
       await expect(page.locator('html')).toHaveClass(/bewly-comments-only-up/)
       await expect(page.locator('bili-comment-thread-renderer:visible')).toHaveCount(2)
 
@@ -1676,7 +1694,7 @@ test.describe('评论区懒加载 / 翻页状态保持', () => {
       await expect(page.locator('bili-comment-thread-renderer:visible')).toHaveCount(3)
       await expect(page.locator('#new-normal')).toBeHidden()
 
-      await page.locator('[data-bvp-action="comment-only-up"]').click()
+      await page.locator('#bewly-comment-only-up').click()
       await expect(page.locator('bili-comment-thread-renderer:visible')).toHaveCount(7)
     }
     finally {
@@ -1717,7 +1735,7 @@ test.describe('评论区懒加载 / 翻页状态保持', () => {
       await ensureOverlay(page)
       await expect(page.locator('bili-comment-thread-renderer')).toHaveCount(4, { timeout: 10_000 })
 
-      await page.locator('[data-bvp-action="comment-only-up"]').click()
+      await page.locator('#bewly-comment-only-up').click()
       await expect(page.locator('bili-comment-thread-renderer:visible')).toHaveCount(2)
 
       // 点原生「最新」→ fixture 整体重建线程列表（1 UP / 1 普通 / 1 超长）。
@@ -1738,7 +1756,7 @@ test.describe('评论区懒加载 / 翻页状态保持', () => {
       await expect(page.locator('#sorted-normal')).toBeHidden()
 
       // 被隐藏线程量不到高度，先关掉只看 UP 让长评论参与折叠判定，再打开只看 UP
-      await page.locator('[data-bvp-action="comment-only-up"]').click()
+      await page.locator('#bewly-comment-only-up').click()
       await expect(page.locator('bili-comment-thread-renderer:visible')).toHaveCount(3)
       await expect(page.locator('bili-comment-renderer[data-bewly-comment-clamped]')).toHaveCount(1, { timeout: 10_000 })
       await page.locator('#sorted-tall').scrollIntoViewIfNeeded()

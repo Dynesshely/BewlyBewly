@@ -73,6 +73,21 @@ const MINI_RESTORE_MARGIN = 160
 /** 播放器状态轮询间隔 */
 const SYNC_INTERVAL = 500
 
+/**
+ * 单拍同步里的「功能同步」统一包装。
+ *
+ * 第 36 轮真机回归：某个功能同步抛异常 → 整个 `sync()` 中断 → 固定布局那一步没执行
+ * → 页面滚动 → B 站评论区懒加载不触发 → 评论组件不渲染。这里逐个隔离，布局永远能跑完。
+ */
+function safeSync(label: string, fn: () => void): void {
+  try {
+    fn()
+  }
+  catch (error) {
+    console.warn(`[Bewly] ${label} failed:`, error)
+  }
+}
+
 /** 上次写入 title 属性的元素与文本：只在标题变化时写，避免每拍改属性 */
 let titledElement: HTMLElement | null = null
 let titledText = ''
@@ -213,7 +228,7 @@ function mount(): void {
         setMini(false)
 
       updateScrollState()
-      syncRecommendRail({ enabled: settings.value.videoPageRecommendRail })
+      safeSync('syncRecommendRail', () => syncRecommendRail({ enabled: settings.value.videoPageRecommendRail }))
       // 固定布局开关：立刻生效 / 立刻还原
       syncFixedLayout()
     },
@@ -353,27 +368,29 @@ function sync(): void {
   syncVideoTitleAttribute()
   ui.danmakuOn = isDanmakuEnabled()
 
-  // 评论区：标记 UP / 探测排序 tab / 折叠长评论（没有评论区时内部会提前返回）
-  syncComments()
-  // 简介按钮（第 32 轮）：切视频 / 切分P 后重读文本，变空则撤掉自己
-  refreshDescPopover()
-
-  // 工具栏入口（第 33 轮）：切视频 / 切分P 后工具栏会被 B 站重建，这里每拍补齐
-  refreshToolbarActions()
-
   // 推荐视频轨道（第 27 轮）：读不到卡片时内部会保持原生列表不动
   syncRecommendRail({ enabled: settings.value.videoPageRecommendRail })
   const railVisible = Boolean(railState.placement && railState.cards.length)
   if (ui.recommendRailVisible !== railVisible)
     ui.recommendRailVisible = railVisible
 
-  // 固定单页布局（第 29 轮）：**唯一**的布局所有者，先算三区尺寸再让评论列校正。
-  // 顺序很重要：fixedLayout 只读「轨道高度 / 左列宽 / 视口尺寸」这些自己不改的量，
-  // commentColumn 在固定布局下不再读 rect，两者不会互相驱动。
+  // 固定单页布局（第 29 轮）：**唯一**的布局所有者。
+  // ⚠️ 第 36 轮起把它提到评论区同步之前：评论区 / 轨道 / 简介任何一处抛异常都不能阻止
+  // 布局类落地（真机回归就是「评论组件没挂载 → 固定布局也没生效 → 整页塌」）。
   syncFixedLayout()
 
+  // 评论区：标记 UP / 注入筛选按钮 / 折叠长评论。包一层 try/catch，
+  // 保证单点异常不会中断整拍（下面还有评论列校正与布局刷新）。
+  safeSync('syncComments', syncComments)
+
+  // 简介按钮（第 32 轮）：切视频 / 切分P 后重读文本，变空则撤掉自己
+  safeSync('refreshDescPopover', refreshDescPopover)
+
+  // 工具栏入口（第 33 轮）：切视频 / 切分P 后工具栏会被 B 站重建，这里每拍补齐
+  safeSync('refreshToolbarActions', refreshToolbarActions)
+
   // 评论区右列布局：B 站可能重渲染 #commentapp / 右栏，每拍校正一次（不满足条件时内部直接还原）
-  syncCommentColumn()
+  safeSync('syncCommentColumn', syncCommentColumn)
 }
 
 function handleScroll(): void {

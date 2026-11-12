@@ -753,89 +753,103 @@ commentColumn.bottom = 播放器 bottom < rail.top - 8
 ### 5. 分工与未做项
 
 ## 第 32 轮：简介收拢到工具栏 + 自绘 tooltip
-### 第 34 轮真机复测：字号被既有规则覆盖（特异性修正）
+## 第 36 轮：工具栏去装饰 + 标签行排版（visual）
 
-**现象**（真机 1600×1000）：视频标题仍是 `15px / 600 / line-height 21px / clamp 1`，元信息 12px，
-工具栏按钮 12px —— 与 5 档字阶期望（20 / 27 / clamp 2、12.5、12.5）不符。
+样式追加在 `src/styles/adaptedStyles/pages/videoPage.scss` 末尾的 `/* ===== 第 36 轮 visual ===== */` 段
+（A 的 layout 段另写，两段互不重排）。只改视觉，不动交互与 DOM。
 
-**根因**：本轮的 typography 段写在 `.bewly-design.videoPage ...`（0,2,0 级），而第 28–31 轮有几条
-**更早、特异性更高**的既有规则：
+### 改动点 → 理由
 
-| 既有规则 | 位置 | 特异性 | 被覆盖的值 |
-| --- | --- | --- | --- |
-| `.bewly-design.videoPage.bewly-video-fixed #viewbox_report .video-title` | L624–632 | ~(1,4,0) | 17px / lh 22px / clamp 1 |
-| `&.bewly-video-fixed #viewbox_report .video-title` | L861–866 | ~(1,4,0) | 15px / lh 1.4 |
-| `&.bewly-video-fixed #viewbox_report .video-info-meta` | L869–871 | ~(1,4,0) | 12px |
-| `&.bewly-video-fixed .bewly-desc-trigger` | L1007 | ~(0,4,0) | 12px |
-| `&.bewly-video-fixed .bewly-toolbar-action` | L1194 | ~(0,4,0) | 12px |
-| `.up-panel-container .up-name` / `.fan` | L818–831 | ~(0,3,0) | 13px / 11px |
+| 改动点 | 理由 |
+| --- | --- |
+| `#arc_toolbar_report`：`background / border / border-bottom / border-radius / box-shadow` 全部清零（`!important`） | 真机同时存在 `rgba(131,131,145,.15)` 底 + `0.67px` 下边框 + 10px 圆角 = 三重装饰，视觉发脏；统一透明后与播放器区域连成一体 |
+| 工具栏 `padding-inline: 0`、`padding-top/bottom: 0` | 第 31 轮为了「详情 dock 视觉分层」加过 4px 内缩，会让工具栏比播放器窄一截；去装饰后不再需要 |
+| 工具栏 `height/min-height/max-height = var(--bvp-toolbar-h, 52px)` | 旧的固定布局段把 `max-height` 压到 44px；统一认令牌后高度保持 52，且不硬编码 |
+| 单项（`.toolbar-left-item-wrap / .toolbar-left-item / .video-toolbar-left-item`）默认透明、`:hover` 才 `--bew-fill-1` + 6px 圆角 | 用户要求「悬浮时才出现浅底」；单项 hover 比整行 hover 更精准，点击目标仍完整 |
+| 分隔线只允许 `color-mix(in oklab, currentColor 15%, transparent)` | 简报明确不能实心色；用 currentColor 跟随主题，不引入新颜色 |
+| `#bewly-toolbar-actions` 左边距统一 `--bvp-space-2`(8px) | 与工具栏内其它单项间距一致，第 33 轮的 6/8px 混用收口 |
+| `#arc_toolbar_report { overflow: visible }` | 单项 hover 底色在容器边界有 1px 圆角溢出，`hidden` 会把它切平 |
+| `.video-tag-container`：`border: 0` + `border-bottom: 0` + `padding: 0` | 去下方那条 0.67px 横线与 `padding-bottom: 10px`，把纵向空间还给标签本身（真机 h=32 的 10px 就是被 padding 吃掉的） |
+| 标签行固定 `height: 28px`（min/max 同值）+ `overflow-x: auto` + `scrollbar-width: none` + WebKit 滚动条隐藏 | 单行不换行、横向可滚、视觉上没有滚动条；28px = 标签 24 + 上下 2px 留白 |
+| 标签本体 `flex: 0 0 auto`、`white-space: nowrap`、`height: 24px`、`padding: 0 8px`、badge 档 11px、6px 圆角 | 不收缩不换行 → 21 个标签不会被压扁；尺寸按简报；圆角与工具栏 hover 底色统一 |
+| 标签 `:hover` 用 `--bew-fill-1` | 与工具栏 hover 同一套语言；默认不改 B 站原有标签底色（避免改动配色） |
+| 标签行里注入的 `#bewly-desc-trigger`（简介兜底位置）也按 24px / 8px / 11px | 第 32 轮的兜底位置在标签行内，尺寸必须与标签一致，否则那一行会高低不齐 |
+| 高对比度 / forced-colors / reduced-motion 兜底 | 深色下 hover 用 `--bew-fill-2` 更易分辨；强制色彩用 Highlight；动效可关 |
 
-**修法**：在 typography 段末尾追加「特异性修正」子段，用 **`html` + 双类 + ID** 抬高特异性：
+### 若真机仍见标签被裁（属 A 的 dock 分配）
 
-| 目标 | 新选择器 | 特异性 |
-| --- | --- | --- |
-| 视频标题 | `html.bewly-design.videoPage.bewly-video-fixed #viewbox_report .video-title`（+ 非固定布局一条） | (1,4,1) |
-| 元信息 | 同上模式（`--bvp-fs-meta` 12.5px + tabular-nums） | (1,4,1) |
-| UP 名 / 粉丝数 | `html.bewly-design.videoPage .up-panel-container .up-name` 等 | (0,3,1) |
-| 工具栏按钮 | `html.bewly-design.videoPage.bewly-video-fixed .bewly-desc-trigger` / `.bewly-toolbar-action` + 原生 `#arc_toolbar_report` 项 | (0,4,1) / (1,2,1) |
-| 标签 | `html.bewly-design.videoPage .video-tag-container .tag / a / .tag-link` | (0,3,1) |
-| 窄屏（≤1280）标题 18px | 同高特异性 + media | — |
+本段把标签行自身高度锁到 28px 且去掉了 padding/border。若真机仍然只显示一部分，
+说明**左列 flex 分配给标签行的高度不足**（A 的 `fixedLayout` 在算 dock 剩余高度时把标签行算小了）。
+这属于 layout 段，我不再追加 `!important` 覆盖，请 A 按以下实测数据调整：
+- 标签行 `getBoundingClientRect().height` 应为 28；
+- 若小于 28 或被父容器 `overflow: hidden` 裁掉，检查 `.left-container` 的 `flex` 分配与 `--bvp-fixed-details` 的拆分明细。
 
-轨道标题（shadow 内）已核查：`.bvp-rail__title` 在编译后共 4 条规则，最后一条是本轮的
-`font-size: var(--bvp-fs-section)`（16px），后写覆盖前值，无需额外提权。
+## 第 36 轮 layout：UP 主卡完整显示 + 「只看 UP 主」并入评论筛选行
 
-**遗留（属 A 的 layout 段）**：信息栏 `#viewbox_report { max-height: var(--bvp-fixed-info, 56px); overflow: hidden }`。
-标题 20px × 1.35 × 2 行 = 54px，加 padding 12px = **66px** > 56px，第二行会被裁。
-建议 A 把 `--bvp-fixed-info` 提到 **68~70px**（与简报 A3 的「标题组 70px」一致）。
+### A1. UP 主卡不再被裁
 
-## 第 35 轮：恢复全宽 + dock 与轨道之间 24px 分区间距
+真机数据：`.up-panel-container` 高 72 / `max-height: 72` / `overflow: hidden`，但内部 `.up-info--right` 需要 56px、
+关注按钮 `.default-btn` 高 30px，内容底边 159 而卡片底边 141 —— **溢出 18px 被裁**，关注按钮下半截看不见。
 
-### 1. 去掉容器 max-width，恢复全宽
+改为**自适应但封顶**（第一版写成 `max-height: none`，真机上评论列被内容撑到 837 > dock 657，B 站评论组件也不渲染，已修正）：
 
-- `#mirror-vdcon` / `.video-container-v1`：删掉 `max-width: var(--bvp-content-max)`（1720）与 `margin-inline: auto`，
-  改为 `width: 100%` + `max-width: none` + `margin-inline: 0`；
-- 左右 `--bvp-page-pad`（24px）的 padding **保留** —— 全宽不等于贴边；
-- `>2200px` 不再有额外加宽限制；`--bvp-content-max` 令牌保留但标注「不再用于布局」，
-  避免其它段落引用时报变量缺失；
-- `fixedLayout.ts` 的宽度预算基于 `#mirror-vdcon.clientWidth − padding`，全宽后自动变大，
-  播放器宽度仍由「16:9 反算 + 左列可用宽上限」共同决定，比例不受影响。
-
-### 2. dock 底边与轨道顶边 24px（原来只有 8px）
-
-真机复测：`col.bottom = 737`、`rail.top = 745` —— 只差 8px，视觉上几乎贴住。
-用户要求「明显的分区间距」，按 Kimi 规范面板 gutter = 24。
-
-```
-railTop  = 视口高 − railSpace − 12           // 轨道底部保留 12
-dockTop  = topOffset
-dockH    = railTop − 24 − dockTop            // 分区间距 24
-         = 视口高 − topOffset − railSpace − 36
+```scss
+.bewly-comment-column > .up-panel-container {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 72px; /* 保留视觉基准 */
+  max-height: min(140px, 40%); /* 封顶，避免把评论列表挤没 */
+  overflow: visible;
+}
 ```
 
-- `fixedLayout.ts` 新增常量 `DOCK_RAIL_GAP = 24`、`DOCK_BOTTOM_MARGIN = RAIL_BOTTOM_GAP + DOCK_RAIL_GAP = 36`；
-- 自检从 `dock.bottom <= rail.top − 8` 收紧为 `<= rail.top − 24`（`allowedDock = railTop − DOCK_RAIL_GAP − topOffset`）；
-- 左列 dock 底边（标签行）与右列评论列底边都遵循同一组变量，因此同时与轨道保持 24；
-- dockH 从 678 → 662，播放器相应变矮（16:9 自适应，属预期）。
+- 卡内 `.up-info--right` / `.attention-btn-ctnr` / `.default-btn` 取消内层 `max-height`，关注按钮完整可见；
+- 卡片占用的高度从评论列里扣：`#commentapp` 仍是 `flex: 1 1 auto; min-height: 0`，评论列表继续内部滚动；
+- 评论列整体高度仍等于 `--bvp-fixed-dock-height`，卡片变高只是压缩列表可视高度，不会把列表挤出可视区。
 
-### 3. 预期数值（1600×1000，rail 实测/估算较大者 238）
+### A2. 「只看 UP 主」并入原生筛选行
 
-| 项目 | 计算 | 结果 |
-| --- | --- | --- |
-| dockH | 1000 − 64 − 238 − 36 | **662** |
-| 播放器高 | floor(662 − (70+52+30) − 8×3) | **486** |
-| 播放器宽 | round(486 × 16/9) | **864** |
-| 16:9 | 864 / 486 | **1.7778** |
-| 评论列高 | `--bvp-fixed-dock-height` | **662 = dock 高** |
-| rail.top − dock.bottom | 24（构造保证） | **24** |
-| 全宽 | `#mirror-vdcon` width | **1600**（含 24 padding 在内） |
+用户原话：「只看 UP 主」内化到评论区的筛选（最热 | 最新）中。
 
-2200 宽时：内容宽 2152，播放器仍由高度反算（约 807×454），右列变宽，无横向滚动。
+- **移除独立浮动工具条**：`VideoPageOverlay.vue` 不再渲染 `<CommentToolbar />`（文件保留避免其它引用报错）；
+- **注入原生筛选行**：在 `bili-comments-header-renderer` 的 shadow 内、`#sort-actions`（最热 / 最新）之后追加一个
+  `bili-text-button`（与原生排序同标签，继承 B 站按钮样式），id = `bewly-comment-only-up`；
+- **同排版**：向 header shadow 注入 `bewly-comment-filter-style` —— `#sort-actions` 用 flex + `gap: 8px`，
+  按钮 `font: inherit`；激活态 `[aria-pressed="true"]` 用 `color: var(--bew-brand, currentColor)` + 600 字重，
+  **不新增颜色**；不可用时 `[aria-disabled="true"]` 半透明 + `not-allowed`；
+- **行为复用**：点击 / 键盘 Enter / Space 都调同一个 `toggleCommentsOnlyUp()`；激活态仍由 `html.bewly-comments-only-up`
+  （宿主属性 `data-bewly-only-up` 驱动隐藏样式）表达，按钮自身只同步 `aria-pressed`；
+- **幂等重建**：每 500ms 拍 `ensureOnlyUpButton()` —— 按钮丢失就重建、被挤到别处就拉回 `#sort-actions` 末尾、
+  文本 / aria / disabled 只在变化时写；B 站切排序或重建 header 后自动恢复；
+- **卸载清理**：`teardownComments()` 移除按钮与注入样式；
+- 最终评论区那一行是「最热 | 最新 | 只看 UP 主」，只有一个筛选入口组（符合第 28 轮「不重复控件」原则）。
 
-### 4. 评论面板拉满右列（第 35 轮补充）
+### 已知取舍
 
-全宽后右列会变宽（2200 时约 1300px）。第 34 轮的 clamp(400~640) 会导致右侧留白 ~680px，
-与「页面恢复全宽」的诉求冲突，因此：
-- `--bvp-col-comment-max` 改为 **100%**（面板拉满右列）；
-- 下限保留 `min-width: min(100%, 400px)`，窄屏不会溢出；
-- **行长仍由正文 `max-width: 420px` 控制**（注入在 `bili-comment-renderer` 的 shadow 里），
-  面板变宽只影响容器背景，不会让正文行变长。
+- `CommentToolbar.vue` 文件保留但不渲染（简报要求不删文件）；其配套 `ui.commentToolbar*` 状态与
+  `updateToolbarPosition()` 仍在（无消费方，不影响行为），后续可单独清理；
+- 按钮用 `bili-text-button` 标签，若 B 站以后改自定义元素名，注入仍会创建元素但可能拿不到原生样式，
+  届时把标签名告诉我即可（一处常量）。
+
+### 第 36 轮回归修复：UP 卡放开裁切后评论区塌了
+
+真机现象：`#commentapp h=694 children=[]`、`bili-comments` 不存在、评论列 `h=837`（应 = dock 657）。
+
+根因链（两处叠加）：
+
+1. UP 卡第一版写成 `max-height: none`，内容无界 → 评论列被撑到 837；
+2. **更关键**：某个功能同步（评论 / 简介 / 工具栏）在真机抛异常 → 整个 `sync()` 中断 →
+   `syncFixedLayout()` 没执行 → `html.bewly-video-fixed` 没加上 → 页面恢复滚动 →
+   B 站评论区在视口外 → 懒加载不触发 → `bili-comments` 永远不挂载。
+
+修复：
+
+- 评论列高度**锁死**：`height/max-height: var(--bvp-fixed-dock-height, calc(100vh - 160px)) !important` + `overflow: hidden`；
+- UP 卡 `max-height: min(140px, 40%)`（不再是 none），关注按钮完整可见；
+- `#commentapp` 明确 `flex: 1 1 auto; height: auto; min-height: 0; overflow-y: auto`（高度由父级剩余决定），
+  空态给 `min-height: 180px` 保证懒加载判定「可见」；
+- `sync()` 顺序改为「轨道 → **固定布局** → 评论 → 简介 → 工具栏 → 评论列」，
+  且每个功能同步包 `safeSync()`：任何一处异常都不再中断布局；
+- 新增真机诊断属性：
+  - `document.documentElement.dataset.bewlyFixedMetrics` → `dock=…;player=…;rail=…;top=…`
+  - `document.documentElement.dataset.bewlyCommentsState` → `mounted=…;threads=…;col=…`

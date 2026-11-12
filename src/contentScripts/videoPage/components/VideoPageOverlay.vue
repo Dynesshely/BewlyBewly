@@ -5,7 +5,6 @@ import { dismissRecommendRail, railState } from '../recommendRail'
 import RecommendRail from '../recommendRail/RecommendRail.vue'
 import { ui } from '../state'
 import CommentFoldButtons from './CommentFoldButtons.vue'
-import CommentToolbar from './CommentToolbar.vue'
 import CompactBar from './CompactBar.vue'
 import FloatingControls from './FloatingControls.vue'
 import ShortcutHelp from './ShortcutHelp.vue'
@@ -49,7 +48,6 @@ function openRailNewTab(url: string): void {
 <template>
   <div class="bvp-root" :data-ready="ui.ready" :data-mini="ui.mini" :data-fixed="ui.fixedLayout">
     <CompactBar />
-    <CommentToolbar />
     <CommentFoldButtons />
     <!-- 第 27 轮：推荐视频横向聚焦轨道（页面下部，卡片来自原生 .rcmd-tab） -->
     <RecommendRail

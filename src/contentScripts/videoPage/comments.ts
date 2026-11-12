@@ -47,6 +47,9 @@ const EXPANDED_ATTR = 'data-bewly-comment-expanded'
 const FOLD_ID_ATTR = 'data-bewly-comment-fold-id'
 
 const COMMENTS_STYLE_ID = 'bewly-comments-style'
+/** 「只看 UP 主」按钮（第 36 轮并入原生排序行） */
+const ONLY_UP_BUTTON_ID = 'bewly-comment-only-up'
+const FILTER_STYLE_ID = 'bewly-comment-filter-style'
 const FOLD_STYLE_ID = 'bewly-comment-fold-style'
 const TEXT_STYLE_ID = 'bewly-comment-text-style'
 
@@ -76,6 +79,40 @@ const FOLD_STYLE = `
   overflow: visible !important;
   -webkit-mask-image: none !important;
   mask-image: none !important;
+}
+`
+
+/**
+ * 注入到 `bili-comments-header-renderer` shadow：让「只看 UP 主」与原生排序同排版。
+ *
+ * 第 36 轮用户要求：把「只看 UP 主」内化进评论区筛选行（最热 | 最新 | 只看 UP 主），
+ * 去掉我们独立浮在评论区左上的工具条。按钮用和原生排序相同的 `bili-text-button` 标签，
+ * 继承 B 站自己的按钮样式，这里只补间距、光标、激活 / 禁用态（高亮用 currentColor / --bew-brand，
+ * 不新增颜色）。
+ */
+const FILTER_STYLE = `
+#sort-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+#${ONLY_UP_BUTTON_ID} {
+  cursor: pointer;
+  font: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+}
+#${ONLY_UP_BUTTON_ID}[aria-pressed="true"] {
+  color: var(--bew-brand, currentColor);
+  font-weight: 600;
+}
+#${ONLY_UP_BUTTON_ID}[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 `
 
@@ -239,6 +276,74 @@ function ensureStyleInShadow(shadow: ShadowRoot, id: string, css: string): void 
 
 function removeStyleFromShadow(shadow: ShadowRoot, id: string): void {
   shadow.getElementById(id)?.remove()
+}
+
+/** 「只看 UP 主」按钮的激活 / 禁用状态同步（幂等，每拍调用） */
+function syncOnlyUpButtonState(btn: HTMLElement): void {
+  const label = messages().commentsOnlyUp
+  if (btn.textContent !== label)
+    btn.textContent = label
+
+  const pressed = ui.commentsOnlyUp && ui.commentUpAvailable
+    ? 'true'
+    : 'false'
+  if (btn.getAttribute('aria-pressed') !== pressed)
+    btn.setAttribute('aria-pressed', pressed)
+
+  const disabled = ui.commentUpAvailable ? 'false' : 'true'
+  if (btn.getAttribute('aria-disabled') !== disabled)
+    btn.setAttribute('aria-disabled', disabled)
+  if (btn.tabIndex !== (ui.commentUpAvailable
+    ? 0
+    : -1)) {
+    btn.tabIndex = ui.commentUpAvailable
+      ? 0
+      : -1
+  }
+
+  const title = ui.commentUpAvailable
+    ? messages().commentsOnlyUp
+    : messages().commentsUpUnavailable
+  if (btn.getAttribute('title') !== title)
+    btn.setAttribute('title', title)
+}
+
+/**
+ * 在原生排序行（#sort-actions）之后注入「只看 UP 主」按钮（第 36 轮）。
+ *
+ * 幂等：按钮已在就只同步状态；B 站重建 header（切视频 / 切排序）后会重新注入。
+ * 点击沿用 `toggleCommentsOnlyUp()`，键盘 Enter / Space 同样可触发。
+ */
+function ensureOnlyUpButton(): void {
+  const shadow = getHeaderShadow()
+  const actions = getSortActions()
+  if (!shadow || !actions)
+    return
+
+  ensureStyleInShadow(shadow, FILTER_STYLE_ID, FILTER_STYLE)
+
+  let btn = shadow.getElementById(ONLY_UP_BUTTON_ID) as HTMLElement | null
+  if (!btn || !btn.isConnected) {
+    btn = document.createElement('bili-text-button')
+    btn.id = ONLY_UP_BUTTON_ID
+    btn.setAttribute('role', 'button')
+    btn.tabIndex = 0
+    btn.addEventListener('click', () => toggleCommentsOnlyUp())
+    btn.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ')
+        return
+      event.preventDefault()
+      toggleCommentsOnlyUp()
+    })
+    // 追加在原生「最热 / 最新」之后
+    actions.appendChild(btn)
+  }
+
+  // B 站重建 #sort-actions 后按钮可能被挤到别处：拉回排序行末尾
+  if (btn.parentElement !== actions)
+    actions.appendChild(btn)
+
+  syncOnlyUpButtonState(btn)
 }
 
 function ensureCommentsStyle(): void {
@@ -658,6 +763,21 @@ export function syncComments(): void {
 
   publishStyleStat()
 
+  // 真机诊断（第 36 轮）：bili-comments 是否存在 / 线程数 / 评论列高度
+  {
+    const host = getCommentsHost()
+    const column = document.querySelector<HTMLElement>('[data-bewly-comment-column]')
+    const state = [
+      `mounted=${host ? 1 : 0}`,
+      `threads=${threads.length}`,
+      `col=${column
+        ? Math.round(column.getBoundingClientRect().height)
+        : 0}`,
+    ].join(';')
+    if (document.documentElement.getAttribute('data-bewly-comments-state') !== state)
+      document.documentElement.setAttribute('data-bewly-comments-state', state)
+  }
+
   pruneDisconnected()
   ui.commentUpAvailable = upThreads.size > 0
   applyOnlyUpState()
@@ -668,7 +788,10 @@ export function syncComments(): void {
   if (ui.commentActiveSort !== active)
     ui.commentActiveSort = active
 
-  updateToolbarPosition()
+  // 第 36 轮：「只看 UP 主」并入原生筛选行（最热 | 最新 | 只看 UP 主），
+  // 不再渲染独立浮动工具条。每拍幂等同步（B 站重建 header 后会重新注入）。
+  ensureOnlyUpButton()
+
   refreshFoldPositions()
 
   // 全量扫描完成：之前收集的增量信息已经被覆盖，清掉避免下拍重复处理
@@ -771,6 +894,13 @@ export function setupComments(): () => void {
     observer = null
     observedShadow = null
 
+    // 移除注入到 header shadow 的筛选按钮与样式（第 36 轮）
+    const headerShadow = getHeaderShadow()
+    if (headerShadow) {
+      headerShadow.getElementById(ONLY_UP_BUTTON_ID)?.remove()
+      removeStyleFromShadow(headerShadow, FILTER_STYLE_ID)
+    }
+
     // 清掉注入的样式
     if (styledCommentsShadow) {
       removeStyleFromShadow(styledCommentsShadow, COMMENTS_STYLE_ID)
@@ -801,6 +931,7 @@ export function setupComments(): () => void {
     getCommentsHost()?.removeAttribute(ONLY_UP_HOST_ATTR)
     document.documentElement.classList.remove(ONLY_UP_ROOT_CLASS)
     document.documentElement.removeAttribute(STYLE_STAT_ATTR)
+    document.documentElement.removeAttribute('data-bewly-comments-state')
 
     ui.commentsOnlyUp = false
     ui.commentFoldButtons = []

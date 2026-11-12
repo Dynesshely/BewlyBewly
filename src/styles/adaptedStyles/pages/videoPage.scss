@@ -2707,3 +2707,16 @@ html.bewly-design.videoPage.bewly-video-fixed {
 
 /* 2) 「登录后查看 N 条评论 / 没有更多评论」的样式注入在 comments.ts 的 NOTICE_STYLE，
    因为那些元素在 bili-comments 的 shadow root 里，页面级 CSS 选不到。 */
+
+/* ===== 第 41 轮 settings-suppression =====
+   Bewly 设置页打开时（index.ts 检测 #bewly shadow 内可见的 .settings-content / [role="dialog"]），
+   给 <html> 加 .bewly-settings-open，并把增强层宿主临时压到 z-index 9999（低于设置面板 10002）。
+   这里只做「兜底」：轨道在 shadow 内已由 :host([data-bewly-suppressed]) 隐藏；
+   页面级再把我们可能残留的 fixed 装饰层压到设置页之下（避免任何一帧浮在最上面）。
+   注意：固定布局变量一律不动，播放器 / 评论区不会跳变。 */
+html.bewly-settings-open {
+  /* 增强层宿主（B 站页面上唯一由我们挂在 body 上的 fixed 浮层） */
+  #bewly-video-page {
+    z-index: 9999 !important;
+  }
+}

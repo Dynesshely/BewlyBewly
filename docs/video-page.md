@@ -881,3 +881,38 @@ document.querySelector('#commentapp').querySelector('bili-comments').shadowRoot.
 - 胶囊在 header 行内、与「最热」同一行、`right` 贴行右边缘（`margin-left:auto` 保证）；
 - 底部 `.bewly-comments-notice` 只剩「没有更多评论」：24(padding) + 27(底栏) ≈ 51 ≤ 60；
 - 点击触发原生登录入口；遮罩仍为 none、正文 14px 不变。
+
+## 第 41 轮：视频页增强层盖住设置页（已修）
+
+真机诊断：
+
+```
+#bewly-video-page 宿主：position fixed, z-index 2147483200   ← 推荐轨道 / 浮层都在这里
+#bewly shadow 内设置面板：.fixed.w-full.h-full  z-index 10002
+.settings-content 1000×900
+```
+
+增强层宿主远高于设置面板 → 轨道与浮层盖住设置页。
+
+### 修法（不改宿主常态 z-index，只在设置页打开期间临时降级）
+
+- **检测**（`index.ts` 的 `isBewlySettingsOpen()`，每拍执行）：`#bewly` 的 shadow 内
+  1. 可见的 `.settings-content` → 设置页打开；
+  2. 可见的 `[role="dialog"]` → 其它弹窗；
+  3. 兜底：可见的 `.fixed.w-full.h-full` 且内部含设置标志类；
+  「可见」= 宽高 > 300 且 `display/visibility/opacity` 正常；
+- **让位**（`syncSettingsOverlaySuppression()`）：
+  - `<html>` 加 `bewly-settings-open`；
+  - 宿主加 `data-bewly-suppressed`，行内 `z-index: 9999`（低于设置面板 10002）；
+  - 关闭立即移除类 / 属性 / 行内 z-index，回落到 `:host { z-index: 2147483200 }`；
+  - 值相同不写（z-index 与类都做变化比较），避免每拍触发样式重算；
+- **CSS 兜底**：
+  - `videoPage.shadow.scss`：`:host([data-bewly-suppressed]) .bvp-rail { display: none !important }`；
+  - `pages/videoPage.scss`：`html.bewly-settings-open #bewly-video-page { z-index: 9999 !important }`；
+- **布局不动**：固定布局的 CSS 变量（dock / 播放器 / 评论列）一律不改，所以设置页开关时播放器与评论区不跳变。
+
+### 验收对应
+
+- 打开设置页：宿主 z-index 9999 < 10002、轨道 `display:none`，设置页完整可见可点 ✅
+- 关闭设置页：类 / 属性 / 行内样式全部移除，轨道恢复、z-index 回到 2147483200 ✅
+- 期间固定布局变量未变，播放器 / 评论区无跳变 ✅

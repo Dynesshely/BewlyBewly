@@ -1305,3 +1305,12 @@
   }
 }
 /* ===== 第 34 轮 typography end ===== */
+
+// ===== 第 41 轮：Bewly 设置页打开时增强层让位 =====
+// 宿主由 index.ts 在设置页打开期间加 data-bewly-suppressed 并把行内 z-index 降到 9999
+// （低于设置面板的 10002）。这里显式把推荐轨道藏掉：即使将来 z-index 调整，也不会再盖住设置页。
+:host([data-bewly-suppressed]) {
+  .bvp-rail {
+    display: none !important;
+  }
+}

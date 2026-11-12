@@ -48,6 +48,7 @@ const FOLD_ID_ATTR = 'data-bewly-comment-fold-id'
 
 const COMMENTS_STYLE_ID = 'bewly-comments-style'
 const FOLD_STYLE_ID = 'bewly-comment-fold-style'
+const TEXT_STYLE_ID = 'bewly-comment-text-style'
 
 /** >400px 的长评论默认折叠 */
 const FOLD_HEIGHT = 400
@@ -75,6 +76,28 @@ const FOLD_STYLE = `
   overflow: visible !important;
   -webkit-mask-image: none !important;
   mask-image: none !important;
+}
+`
+
+/**
+ * 注入到每个 `bili-comment-renderer` shadow：评论正文排版（第 34 轮）。
+ *
+ * 为什么必须注入到这里：B 站评论正文在 `bili-comment-renderer` 的 **shadow root** 里，
+ * 页面级 CSS 与 `bili-comments` 的样式都选不到它 —— native-style 在页面级写的
+ * `max-width: 420px` 实际是不生效的（行长收口失败）。
+ *
+ * 只作用于正文容器 `#content`：header（UP 名）/ footer（时间戳、操作按钮）走 meta 档，不受影响。
+ */
+const TEXT_STYLE = `
+#content {
+  max-width: 420px;
+}
+/* 字号 / 行高必须 !important：B 站自己的样式表也在 renderer 的 shadow 里，
+   且可能在我们的 <style> 之后插入（真机复测：max-width 生效但 font-size 仍是 15px）。 */
+#content,
+#content * {
+  font-size: 14px !important;
+  line-height: 1.65 !important;
 }
 `
 
@@ -226,11 +249,28 @@ function ensureCommentsStyle(): void {
   styledCommentsShadow = shadow
 }
 
-function ensureFoldStyle(renderer: HTMLElement): void {
+/**
+ * 给 renderer 的 shadow 注入样式：折叠（按需生效）+ 正文排版（常驻）。
+ *
+ * 两者共用同一个 style 注入通道（`ensureStyleInShadow`），在 `processThread` 里
+ * 每个 renderer 都会走一次，因此懒加载 / 翻页 / 容器重建后的新线程也会被覆盖。
+ */
+function ensureRendererStyle(renderer: HTMLElement): void {
   const shadow = renderer.shadowRoot
-  if (!shadow || styledShadows.has(shadow))
+  if (!shadow)
     return
+  // 不要用「集合里已有 shadow 就跳过」：真机复测发现 renderer 的 shadow 里一个 style 都没有，
+  // 说明这条路径当时根本没被走到。改成按 style id 判重（ensureStyleInShadow 内部判），
+  // 幂等且能自愈「样式被外部移除 / shadow 被重建」。
   ensureStyleInShadow(shadow, FOLD_STYLE_ID, FOLD_STYLE)
+  ensureStyleInShadow(shadow, TEXT_STYLE_ID, TEXT_STYLE)
+  // B 站可能在我们的 style 之后又插入 <style>（同特异性后写胜）——把我们的挪到最后，
+  // 每次调用都是幂等的，移动成本可以忽略（只是 appendChild 已有节点）。
+  for (const id of [FOLD_STYLE_ID, TEXT_STYLE_ID]) {
+    const el = shadow.getElementById(id)
+    if (el && el !== shadow.lastElementChild)
+      shadow.appendChild(el)
+  }
   styledShadows.add(shadow)
 }
 // #endregion
@@ -343,7 +383,7 @@ function setCommentsOnlyUp(on: boolean): void {
 
 // #region 长评论折叠
 function setClamped(renderer: HTMLElement, thread: HTMLElement): number {
-  ensureFoldStyle(renderer)
+  ensureRendererStyle(renderer)
   renderer.setAttribute(CLAMPED_ATTR, '')
   touchedRenderers.add(renderer)
 
@@ -508,8 +548,12 @@ function processThread(thread: HTMLElement): void {
   }
 
   const renderer = getRenderer(thread)
-  if (renderer)
+  if (renderer) {
+    // 正文排版（14px / 1.65 / max-width 420）必须**无条件**注入到每个 renderer 的 shadow：
+    // 之前只在 setClamped()（长评论折叠）里注入，短评论根本没有 style（第 34 轮真机复测根因）。
+    ensureRendererStyle(renderer)
     evaluateFold(thread, renderer)
+  }
 
   processedThreads.add(thread)
 }
@@ -539,6 +583,49 @@ function pruneDisconnected(): void {
   }
 }
 
+/**
+ * 诊断：当前有多少 renderer、多少个已注入正文排版样式（真机排查用）。
+ *
+ * 控制台可直接调 `window.__bewlyCommentsStyleStat()`（index.ts 里挂到 window 上）。
+ */
+export function getCommentStyleStat(): { renderers: number, styled: number, sampleFontSize: string } {
+  const threads = getThreads()
+  let renderers = 0
+  let styled = 0
+  let sampleFontSize = ''
+  for (const thread of threads) {
+    const renderer = getRenderer(thread)
+    const shadow = renderer?.shadowRoot
+    if (!renderer || !shadow)
+      continue
+    renderers += 1
+    if (shadow.getElementById(TEXT_STYLE_ID))
+      styled += 1
+    if (!sampleFontSize) {
+      const content = getRendererContent(renderer)
+      if (content)
+        sampleFontSize = window.getComputedStyle(content).fontSize
+    }
+  }
+  return { renderers, styled, sampleFontSize }
+}
+
+/** 诊断属性名：页面控制台可直接读 document.documentElement.dataset.bewlyCommentsStyle */
+const STYLE_STAT_ATTR = 'data-bewly-comments-style'
+
+/**
+ * 把「注入统计」写到 <html> 的属性上。
+ *
+ * 为什么不只挂 window：content script 运行在 **isolated world**，它给 `window` 赋的值
+ * 在页面主世界的控制台里是 `undefined`（真机复测确认）。DOM 属性两个世界共享，可靠。
+ */
+function publishStyleStat(): void {
+  const stat = getCommentStyleStat()
+  const value = `${stat.styled}/${stat.renderers};fs=${stat.sampleFontSize || '-'}`
+  if (document.documentElement.getAttribute(STYLE_STAT_ATTR) !== value)
+    document.documentElement.setAttribute(STYLE_STAT_ATTR, value)
+}
+
 /** 每个 500ms 同步拍 + MutationObserver 都会调用 */
 export function syncComments(): void {
   const host = getCommentsHost()
@@ -560,6 +647,16 @@ export function syncComments(): void {
   const threads = getThreads()
   for (const thread of threads)
     processThread(thread)
+
+  // 保底注入（第 34 轮复测修复）：即使某个线程走增量路径 / 被提前跳过，
+  // 每 500ms 拍也保证当前所有 renderer 的 shadow 里都有正文排版样式（按 id 判重，成本可忽略）。
+  for (const thread of threads) {
+    const renderer = getRenderer(thread)
+    if (renderer)
+      ensureRendererStyle(renderer)
+  }
+
+  publishStyleStat()
 
   pruneDisconnected()
   ui.commentUpAvailable = upThreads.size > 0
@@ -679,8 +776,10 @@ export function setupComments(): () => void {
       removeStyleFromShadow(styledCommentsShadow, COMMENTS_STYLE_ID)
       styledCommentsShadow = null
     }
-    for (const shadow of styledShadows)
+    for (const shadow of styledShadows) {
       removeStyleFromShadow(shadow, FOLD_STYLE_ID)
+      removeStyleFromShadow(shadow, TEXT_STYLE_ID)
+    }
     styledShadows.clear()
 
     // 清掉所有标记
@@ -701,6 +800,7 @@ export function setupComments(): () => void {
 
     getCommentsHost()?.removeAttribute(ONLY_UP_HOST_ATTR)
     document.documentElement.classList.remove(ONLY_UP_ROOT_CLASS)
+    document.documentElement.removeAttribute(STYLE_STAT_ATTR)
 
     ui.commentsOnlyUp = false
     ui.commentFoldButtons = []

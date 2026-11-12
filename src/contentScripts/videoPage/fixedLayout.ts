@@ -69,8 +69,14 @@ const RAIL_VAR = '--bvp-fixed-rail-space'
 const MIN_VIEWPORT_WIDTH = 1280
 const MIN_VIEWPORT_HEIGHT = 700
 
-/** 压缩后的信息栏高度（与 videoPage.scss 里的 max-height 保持一致） */
-export const INFO_BAR_HEIGHT = 56
+/**
+ * 信息栏（标题组）高度：70，与简报 A3 的「标题组 70px」一致。
+ *
+ * 为什么必须 70：标题 2 行 = 20×1.35×2 = 54，元信息（12.5×1.25）= 15.6，合计 69.6；
+ * 若沿用 56 会把第 2 行标题裁掉（第 34 轮真机复测）。此值写入 `--bvp-fixed-info`，
+ * 页面级 CSS 的 `#viewbox_report` 高度与它联动。
+ */
+export const INFO_BAR_HEIGHT = 70
 /** 三个 dock 之间统一的 gutter（页面级 CSS 用同一个变量，保证分隔感一致） */
 export const DOCK_GAP = 8
 /** 播放器下方「详情 dock」的固定高度：工具栏 / 简介 / 标签压成三行，不产生内部滚动 */
@@ -95,8 +101,13 @@ const MIN_PLAYER_HEIGHT = 320
  */
 const MIN_DOCK_PLAYER_HEIGHT = 160
 const MAX_PLAYER_HEIGHT = 1200
-/** 评论区（右列）的最小宽度：再窄就看不清评论了，此时宁可让播放器继续缩宽 */
-const MIN_COMMENT_WIDTH = 280
+/**
+ * 评论区（右列）的最小宽度：与页面级栅格的第 34 轮令牌保持一致
+ * （`--bvp-col-comment-w: 400px`）。播放器的宽度预算必须先扣掉它，否则两列会挤出容器。
+ */
+const MIN_COMMENT_WIDTH = 400
+/** 主区左右两列之间的横向 gutter（第 34 轮 `--bvp-gutter: 24px`） */
+const COLUMN_GUTTER = 24
 /** 轨道离视口底部的间距（与 recommendRail/rail.ts 的 RAIl_FIXED_BOTTOM_GAP 保持一致） */
 const RAIL_BOTTOM_GAP = 12
 
@@ -185,7 +196,7 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
   const padX = (Number.parseFloat(mirrorStyle.paddingLeft) || 0)
     + (Number.parseFloat(mirrorStyle.paddingRight) || 0)
   const totalWidth = Math.max(0, Math.round(mirror.clientWidth - padX))
-  const leftAvailW = Math.max(0, totalWidth - MIN_COMMENT_WIDTH - DOCK_GAP)
+  const leftAvailW = Math.max(0, totalWidth - MIN_COMMENT_WIDTH - COLUMN_GUTTER)
 
   // 视觉样式算出来的轨道实际可能比估算更高（真机 222 vs 估算 207）：
   // 预留空间取两者较大值，否则 dock 会压进轨道顶边。
@@ -257,7 +268,7 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
   }
 
   // 右列至少要拿到 MIN_COMMENT_WIDTH
-  width = Math.max(0, Math.min(width, totalWidth - MIN_COMMENT_WIDTH - DOCK_GAP))
+  width = Math.max(0, Math.min(width, totalWidth - MIN_COMMENT_WIDTH - COLUMN_GUTTER))
   height = Math.round(width * 9 / 16)
 
   setVar(TOP_VAR, `${topOffset}px`)

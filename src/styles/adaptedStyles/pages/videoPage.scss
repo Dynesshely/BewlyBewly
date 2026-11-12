@@ -543,7 +543,7 @@
 // 所有者：src/contentScripts/videoPage/fixedLayout.ts
 // 它一次算出全部尺寸，只写 CSS 变量（写在 <html> 的行内样式上）：
 //   --bvp-fixed-top              #mirror-vdcon 距视口顶部
-//   --bvp-fixed-info             信息栏 dock 高度（≤56）
+//   --bvp-fixed-info             信息栏 dock 高度（70，与标题组一致）
 //   --bvp-fixed-gap              三个 dock 之间的 gutter（8）
 //   --bvp-fixed-details          详情 dock 高度（104）
 //   --bvp-fixed-player-height    播放器 / 评论列高度（先按 16:9 再按可用高回落）
@@ -610,15 +610,20 @@
       overflow: hidden !important;
     }
 
-    /* 信息栏压成一行：标题 + UP + 播放量，超出裁掉而不是换行撑高。
-       宽度跟随左列（= 播放器宽），因此在视觉上与播放器左对齐 */
+    /* 信息栏（标题组）：高度只认 --bvp-fixed-info（JS 写 70，与简报 A3 的「标题组 70」一致）。
+       标题 2 行 = 20×1.35×2 = 54；元信息 12.5×1.25 = 15.6；合计 69.6 ≤ 70 —— 2 行标题不再被裁。
+       宽度跟随左列（= 播放器宽），视觉上与播放器左对齐。 */
     #viewbox_report {
       flex: 0 0 auto;
+      box-sizing: border-box;
       width: 100% !important;
-      max-height: var(--bvp-fixed-info, 56px) !important;
-      padding-top: 6px !important;
-      padding-bottom: 6px !important;
+      height: var(--bvp-fixed-info, 70px) !important;
+      min-height: var(--bvp-fixed-info, 70px) !important;
+      max-height: var(--bvp-fixed-info, 70px) !important;
+      padding-block: 0 !important;
       overflow: hidden !important;
+      /* 只在信息栏内把 meta 行高收到 1.25：全局 --bvp-lh-meta 仍是 1.5（B 的其它 meta 文案不受影响） */
+      --bvp-lh-meta: 1.25;
     }
 
     #viewbox_report .video-title,
@@ -1299,3 +1304,562 @@
     display: none !important;
   }
 }
+
+/* ===== 第 34 轮 layout =====
+   视频页排版 / 布局规范化（参考 Kimi K3 提案，弹幕相关全部跳过）。
+   约定：
+   - 本段**只在文件末尾追加**，不重排既有段落；
+   - 所有规则都包在 `html.bewly-video-fixed` 作用域里：JS 降级（<1280 宽 / <700 高 / 关开关）后自动不生效；
+   - 令牌定义在 <html> 上，因此会**继承进 shadow root**，native-style 的 typography 段可直接消费；
+   - 不引入新颜色：滚动条 thumb 用 rgba(currentColor)，轨道用 rgba(0,0,0,.12)；
+   - 无排版外的行为改动（不改 DOM、不改交互）。
+*/
+
+/* #region 令牌（A1） */
+html.bewly-design.videoPage.bewly-video-fixed {
+  /* 间距：只允许这 7 档（其它间距一律归并到最近的档） */
+  --bvp-space-1: 4px;
+  --bvp-space-2: 8px;
+  --bvp-space-3: 12px;
+  --bvp-space-4: 16px;
+  --bvp-space-6: 24px;
+  --bvp-space-8: 32px;
+  --bvp-space-12: 48px;
+
+  /* 字号 5 档（字重上限 600） */
+  --bvp-fs-title: 20px;
+  --bvp-lh-title: 1.35;
+  --bvp-fw-title: 600;
+  --bvp-fs-section: 16px;
+  --bvp-lh-section: 1.4;
+  --bvp-fw-section: 600;
+  --bvp-fs-body: 14px;
+  --bvp-lh-body: 1.65;
+  --bvp-fw-body: 400;
+  --bvp-fs-meta: 12.5px;
+  --bvp-lh-meta: 1.5;
+  --bvp-fs-badge: 11px;
+
+  /* 布局尺寸 */
+  --bvp-topbar-h: 60px;
+  --bvp-title-group-h: 70px;
+  --bvp-toolbar-h: 52px;
+  --bvp-col-comment-w: 400px;
+  --bvp-col-comment-max: 640px;
+  --bvp-gutter: var(--bvp-space-6);
+  --bvp-content-max: 1720px;
+  --bvp-page-pad: var(--bvp-space-6);
+  --bvp-font-stack: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+
+  /* 内部滚动面板（A4）：评论列 / 轨道 viewport / 选集面板 / 帮助面板共用 */
+  /* 用 color-mix 而不是 rgba(currentColor, x)：后者不是合法 CSS（浏览器会整条丢弃）；
+     color-mix 让 thumb 跟随文字色，深浅主题自适应，且不引入新颜色 */
+  --bvp-scroll-thumb: color-mix(in oklab, currentColor 30%, transparent);
+  --bvp-scroll-thumb-hover: color-mix(in oklab, currentColor 48%, transparent);
+  --bvp-scroll-track: transparent;
+  --bvp-scroll-size: 8px;
+  --bvp-scroll-fade: var(--bvp-space-6);
+
+  /* z-index 分层（A5）：B 站自身浮层在 1e6 量级，所以保留同一个量级做基准，
+     只把散落的 2147483100 / 2147483300 换成「基准 + 层级」 */
+  --bvp-z-base: 2147483000;
+  --bvp-z-content: 0;
+  --bvp-z-danmaku: 10;
+  --bvp-z-panel-overlay: 100;
+  --bvp-z-topbar: 500;
+  --bvp-z-popup: 1000;
+  --bvp-z-settings: 2000;
+
+  font-family: var(--bvp-font-stack);
+}
+/* #endregion */
+
+/* #region 主区栅格（A2） */
+html.bewly-design.videoPage.bewly-video-fixed {
+  #mirror-vdcon,
+  .video-container-v1 {
+    box-sizing: border-box;
+    /* 内容宽上限 1720：>2200 视口时靠 margin-inline:auto 吸收左右留白 */
+    max-width: var(--bvp-content-max) !important;
+    margin-inline: auto !important;
+    padding-inline: var(--bvp-page-pad) !important;
+    /* 右列吃掉剩余宽度（不退回固定 400，第 30 轮要求），
+       评论面板本体再用 clamp(400, 剩余, 640) 夹一次（见下方 A2-2），
+       这样窄视口时面板不会超过 640，宽视口时面板贴满右边缘。 */
+    grid-template-columns: minmax(0, var(--bvp-fixed-player-width, 1fr)) minmax(0, 1fr) !important;
+    column-gap: var(--bvp-gutter) !important;
+  }
+
+  /* A2-2 评论面板本体：clamp(400, 右列剩余宽, 640)。
+     右列本身仍是 1fr（补满到容器右边缘），面板在其中左对齐并限宽 640：
+     - 典型 1600×1000：右列剩余 580 → 面板 580（贴右边缘，第 30 轮验收不变）；
+     - 视口很矮、播放器收窄时：面板最多 640，多出来的空间留在右列右侧（不拉伸正文）。 */
+  .bewly-comment-column {
+    width: min(100%, var(--bvp-col-comment-max)) !important;
+    min-width: var(--bvp-col-comment-w) !important;
+    max-width: var(--bvp-col-comment-max) !important;
+  }
+
+  /* 左栏一条左轴线：信息栏 / 工具栏 / 标签行 / 详情一律不额外缩进 */
+  #viewbox_report,
+  #arc_toolbar_report,
+  .video-tag-container,
+  #v_desc,
+  .video-resource-list {
+    padding-inline-start: 0 !important;
+    margin-inline-start: 0 !important;
+  }
+}
+/* #endregion */
+
+/* #region 垂直分配（A3） */
+html.bewly-design.videoPage.bewly-video-fixed {
+  /* 标题组：高度与 --bvp-fixed-info 联动（JS 写 70）。不写 padding：
+     70 = 标题 2 行(54) + 元信息(15.6)，留 ~0.4px 余量，避免第 2 行被裁。 */
+  #viewbox_report {
+    box-sizing: border-box;
+    height: var(--bvp-fixed-info, 70px) !important;
+    min-height: var(--bvp-fixed-info, 70px) !important;
+    max-height: var(--bvp-fixed-info, 70px) !important;
+    padding-block: 0 !important;
+    overflow: hidden !important;
+    --bvp-lh-meta: 1.25;
+  }
+  /* 子元素外边距归零：B 站标题 / 元信息常有默认 margin，会把 meta 顶出 70px 容器被裁掉 */
+  #viewbox_report > * {
+    margin-block: 0 !important;
+  }
+
+  /* 工具栏：固定 52px，输入条居左弹性 + 按钮组居右（只调 flex 与高度） */
+  #arc_toolbar_report {
+    box-sizing: border-box;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: var(--bvp-space-2) !important;
+    min-height: var(--bvp-toolbar-h) !important;
+    max-height: var(--bvp-toolbar-h) !important;
+    padding-block: 0 !important;
+    overflow: hidden !important;
+  }
+
+  #arc_toolbar_report > .video-toolbar-left,
+  #arc_toolbar_report > .video-toolbar-right,
+  #arc_toolbar_report #bewly-toolbar-actions {
+    flex: 0 0 auto;
+  }
+
+  #arc_toolbar_report > .video-toolbar-left {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* 标签行：单行、横向内部滚动，不换行、不占两行高度 */
+  .video-tag-container {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    gap: var(--bvp-space-2) !important;
+    max-height: 32px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+
+  .video-tag-container::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+
+  .video-tag-container > * {
+    flex: 0 0 auto;
+  }
+
+  /* 评论面板：高度 = JS 的 dock 高（与播放器 dock 严格等高）。
+     ⚠️ 这里**不能**再叠加 calc(100vh - …) 的 max-height：那会比 dock 高度小十几像素，
+     直接把评论列压矮、破坏等高自检。dock 变量本身已经是守卫。 */
+  .bewly-comment-column {
+    min-height: 0 !important;
+    max-height: var(--bvp-fixed-dock-height, 100%) !important;
+  }
+}
+/* #endregion */
+
+/* #region 内部滚动面板美化（A4） */
+html.bewly-design.videoPage.bewly-video-fixed {
+  .bewly-comment-column > #commentapp,
+  .bewly-comment-column #commentapp {
+    scrollbar-width: thin;
+    scrollbar-color: var(--bvp-scroll-thumb) var(--bvp-scroll-track);
+    scroll-padding-block: var(--bvp-space-4);
+    /* 底部 24px 渐隐：mask 不改颜色，深浅主题都成立 */
+    mask-image: linear-gradient(to bottom, #000 calc(100% - var(--bvp-scroll-fade)), transparent);
+  }
+
+  .bewly-comment-column > #commentapp::-webkit-scrollbar,
+  .bewly-comment-column #commentapp::-webkit-scrollbar {
+    width: var(--bvp-scroll-size);
+    height: var(--bvp-scroll-size);
+  }
+
+  .bewly-comment-column > #commentapp::-webkit-scrollbar-track,
+  .bewly-comment-column #commentapp::-webkit-scrollbar-track {
+    background: var(--bvp-scroll-track);
+  }
+
+  .bewly-comment-column > #commentapp::-webkit-scrollbar-thumb,
+  .bewly-comment-column #commentapp::-webkit-scrollbar-thumb {
+    background: var(--bvp-scroll-thumb);
+    background-clip: padding-box;
+    border: 2px solid transparent;
+    border-radius: var(--bvp-space-2);
+  }
+
+  .bewly-comment-column > #commentapp::-webkit-scrollbar-thumb:hover,
+  .bewly-comment-column #commentapp::-webkit-scrollbar-thumb:hover {
+    background: var(--bvp-scroll-thumb-hover);
+    background-clip: padding-box;
+  }
+
+  /* 评论列自身不出滚动条（滚动发生在 #commentapp 内） */
+  .bewly-comment-column {
+    scrollbar-width: none;
+  }
+
+  .bewly-comment-column::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+}
+
+/* 轨道 viewport / 选集面板 / 帮助面板都在 shadow root 里（A 本轮不持有 shadow scss）。
+   令牌会随 CSS 变量继承进 shadow，native-style 的 typography 段可直接复用：
+   .bvp-rail__viewport / .bvp-playlist__list / .bvp-help__body
+   → scrollbar-width: thin; scrollbar-color: var(--bvp-scroll-thumb) var(--bvp-scroll-track);
+   → mask-image: linear-gradient(to bottom, #000 calc(100% - var(--bvp-scroll-fade)), transparent);
+   → scroll-padding-block: var(--bvp-space-4); */
+/* #endregion */
+
+/* #region z-index 分层落地（A5） */
+html.bewly-design.videoPage.bewly-video-fixed {
+  /* 迷你播放器浮窗：原 2147483100 = base(2147483000) + panel-overlay(100)，值不变 */
+  &.bewly-video-mini #playerWrap {
+    z-index: calc(var(--bvp-z-base) + var(--bvp-z-panel-overlay)) !important;
+  }
+
+  /* 简介 tooltip：原 2147483300（base + 300）→ popup 层（base + 1000），
+     仍高于增强层宿主 2147483200（base + 200），不会掉到宿主下面 */
+  .bewly-desc-tooltip {
+    z-index: calc(var(--bvp-z-base) + var(--bvp-z-popup)) !important;
+  }
+}
+/* #endregion */
+
+/* #region 响应式断点（A6） */
+/* 1280~2200：双栏（A2 已定义，无额外规则） */
+
+/* 900~1280：评论面板收窄到 340。当前 JS 在 <1280 会降级成原生布局，
+   这段是为将来放宽降级阈值预留的；降级期间 html 上没有 bewly-video-fixed，规则不生效。 */
+@media (min-width: 900px) and (max-width: 1279.98px) {
+  html.bewly-design.videoPage.bewly-video-fixed {
+    #mirror-vdcon,
+    .video-container-v1 {
+      grid-template-columns: minmax(0, var(--bvp-fixed-player-width, 1fr)) 340px !important;
+    }
+  }
+}
+
+/* <900：上下分区（上视频、下面板区），仍内部滚动、不整页滚 */
+@media (max-width: 899.98px) {
+  html.bewly-design.videoPage.bewly-video-fixed {
+    #mirror-vdcon,
+    .video-container-v1 {
+      display: flex !important;
+      flex-direction: column !important;
+      gap: var(--bvp-gutter) !important;
+      height: auto !important;
+    }
+
+    .left-container,
+    .left-container.scroll-sticky,
+    .right-container,
+    .right-container-inner {
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+
+    /* 16:9 改为按宽度算（高度由 aspect-ratio 决定，不再由 dock 反算） */
+    #playerWrap {
+      flex: 0 0 auto !important;
+      width: 100% !important;
+      height: auto !important;
+      aspect-ratio: 16 / 9;
+    }
+
+    .bewly-comment-column {
+      height: 52vh !important;
+      max-height: 52vh !important;
+    }
+  }
+}
+/* #endregion */
+
+/* ===== 第 34 轮 layout end ===== */
+/* ===== 第 34 轮 typography ===== */
+/* 视频页字阶与卡片排版收口（第 34 轮 B 工作流，只追加在 layout 段之后；不重排任何既有段落）
+   用户方案（Kimi K3）：弹幕相关全部跳过（交给 B 站播放器），只做排版与字阶。
+
+   字阶只留 5 档（令牌由 A 的 layout 段提供，这里只引用 + 兜底值）：
+     title   20 / 600 / 1.35   —— 视频标题
+     section 16 / 600 / 1.40   —— 分区标题（评论 N / 推荐视频）
+     body    14 / 400 / 1.65   —— 评论正文、简介 tooltip 正文
+     meta    12.5 / 400 / 1.5  —— UP 名 / 时间戳 / 播放量 / 粉丝数
+     badge   11 / 500          —— 徽章 / 标签 / 时长
+   其余散落字号（6/8/10/11/12/13/15/17px）在本段被归并到上面 5 档；
+   原生播放器与弹幕设置不动（选择器一律限定在我们的 UI 容器内）。 */
+
+.bewly-design.videoPage {
+  /* ---------- 1. 视频标题：20 / 600 / 1.35，2 行截断 ---------- */
+  #viewbox_report .video-title,
+  #viewbox_report h1 {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: var(--bvp-fs-title, 20px);
+    font-weight: var(--bvp-fw-title, 600);
+    line-height: var(--bvp-lh-title, 1.35);
+    letter-spacing: 0.01em;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow-wrap: anywhere;
+    /* 中英混排不加 word-spacing / 手动空格 */
+    word-spacing: normal;
+  }
+
+  /* ---------- 2. 元信息（UP / 播放量 / 时间）：meta 档 + 等宽数字 ---------- */
+  #viewbox_report .video-info-meta,
+  #viewbox_report .video-info-detail,
+  .up-panel-container .up-description,
+  .up-panel-container .fan,
+  .up-panel-container .up-info--desc {
+    font-size: var(--bvp-fs-meta, 12.5px);
+    font-weight: 400;
+    line-height: var(--bvp-lh-meta, 1.5);
+    color: var(--bew-text-3);
+    font-variant-numeric: tabular-nums;
+  }
+
+  #viewbox_report .video-info-meta .view,
+  #viewbox_report .video-info-meta .dm,
+  #viewbox_report .video-info-meta .num,
+  #viewbox_report .video-info-detail .view {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* UP 名：meta 档、单行省略 */
+  .up-panel-container .up-name,
+  .up-panel-container .up-info--name {
+    overflow: hidden;
+    font-size: var(--bvp-fs-meta, 12.5px);
+    font-weight: 600;
+    line-height: var(--bvp-lh-meta, 1.5);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ---------- 3. 工具栏：按钮文字统一到 meta 档 ---------- */
+  #arc_toolbar_report .toolbar-left-item,
+  #arc_toolbar_report .toolbar-left-item-wrap,
+  #arc_toolbar_report .video-toolbar-left-item,
+  .bewly-desc-trigger,
+  .bewly-toolbar-action {
+    font-size: var(--bvp-fs-meta, 12.5px);
+    line-height: var(--bvp-lh-meta, 1.5);
+  }
+
+  /* 计数（点赞 / 投币 / 收藏 / 分享）：等宽数字，数值变化时不抖 */
+  #arc_toolbar_report .bpx-common-num,
+  #arc_toolbar_report .num,
+  #arc_toolbar_report .video-toolbar-left-item .num {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- 4. 评论区：正文 body 档 + 行长 420px ---------- */
+  .bewly-comment-column bili-comment-renderer #content,
+  .bewly-comment-column .reply-content,
+  .bewly-comment-column .reply-item .content,
+  .bewly-comment-column .comment-content {
+    max-width: 420px;
+    font-size: var(--bvp-fs-body, 14px);
+    font-weight: 400;
+    line-height: var(--bvp-lh-body, 1.65);
+    overflow-wrap: anywhere;
+    word-spacing: normal;
+  }
+
+  /* 评论里的次要信息（时间 / 楼层 / 回复数）：meta 档 + 等宽数字 */
+  .bewly-comment-column .reply-info,
+  .bewly-comment-column .reply-time,
+  .bewly-comment-column .sub-reply-info {
+    font-size: var(--bvp-fs-meta, 12.5px);
+    line-height: var(--bvp-lh-meta, 1.5);
+    color: var(--bew-text-3);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 分区标题（评论区「评论 N」） */
+  .bewly-comment-column .reply-header .title,
+  .bewly-comment-column .comm-header,
+  .bewly-comment-column .comment-header__title {
+    font-size: var(--bvp-fs-section, 16px);
+    font-weight: var(--bvp-fw-section, 600);
+    line-height: var(--bvp-lh-section, 1.4);
+  }
+
+  /* ---------- 5. 详情 dock：简介 body 档、标签 badge 档 ---------- */
+  #v_desc .desc-info-text,
+  #v_desc .basic-desc-info {
+    font-size: var(--bvp-fs-body, 14px);
+    line-height: var(--bvp-lh-body, 1.65);
+    overflow-wrap: anywhere;
+    word-spacing: normal;
+  }
+
+  .video-tag-container .tag,
+  .video-tag-container a,
+  .video-tag-container .tag-link {
+    font-size: var(--bvp-fs-badge, 11px);
+    font-weight: var(--bvp-fw-badge, 500);
+    line-height: 1.4;
+  }
+}
+
+/* ---------- 6. 简介 tooltip（挂在 body 末尾，独立作用域） ---------- */
+.bewly-desc-tooltip {
+  max-width: min(420px, calc(100vw - 16px));
+  font-family: var(
+    --bvp-font-stack,
+    system-ui,
+    -apple-system,
+    "PingFang SC",
+    "Microsoft YaHei",
+    "Noto Sans CJK SC",
+    sans-serif
+  );
+  font-size: var(--bvp-fs-body, 14px);
+  font-weight: 400;
+  line-height: var(--bvp-lh-body, 1.65);
+  overflow-wrap: anywhere;
+  word-spacing: normal;
+}
+
+/* ---------- 7. 窄屏：整体降一档（直接写数值，不改 A 的令牌） ---------- */
+@media (max-width: 1280px) {
+  .bewly-design.videoPage #viewbox_report .video-title,
+  .bewly-design.videoPage #viewbox_report h1 {
+    font-size: 18px;
+  }
+
+  .bewly-design.videoPage .bewly-comment-column .reply-header .title,
+  .bewly-design.videoPage .bewly-comment-column .comm-header {
+    font-size: 15px;
+  }
+}
+
+/* ---------- 8. 高对比度：次要文字提一档 ---------- */
+@media (prefers-contrast: more) {
+  .bewly-design.videoPage #viewbox_report .video-info-meta,
+  .bewly-design.videoPage .up-panel-container .up-description,
+  .bewly-design.videoPage .bewly-comment-column .reply-info {
+    color: var(--bew-text-2);
+  }
+}
+/* ---------- 10. 特异性修正（第 34 轮真机复测） ----------
+   真机现象：标题仍是 15px / line-height 21px / clamp 1，元信息 12px、工具栏按钮 12px。
+   原因：第 28–31 轮的既有规则特异性更高 ——
+   `.bewly-design.videoPage.bewly-video-fixed #viewbox_report .video-title`（约 0,4,0 级）、
+   `&.bewly-video-fixed .bewly-desc-trigger / .bewly-toolbar-action`（约 0,4,0 级），
+   而本段原规则只有 0,2,0 级，被它们盖住。
+   修法：用「html + 双类 + ID」把选择器提到 0,4,1 / 1,4,1 级，压过既有规则；
+   固定布局与非固定布局各写一条（降级到原生布局时字号也不会跳回 15/17px）。 */
+html.bewly-design.videoPage #viewbox_report .video-title,
+html.bewly-design.videoPage #viewbox_report h1,
+html.bewly-design.videoPage.bewly-video-fixed #viewbox_report .video-title,
+html.bewly-design.videoPage.bewly-video-fixed #viewbox_report h1 {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: var(--bvp-fs-title, 20px);
+  font-weight: var(--bvp-fw-title, 600);
+  line-height: var(--bvp-lh-title, 1.35);
+  letter-spacing: 0.01em;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
+  word-spacing: normal;
+}
+
+/* 元信息（UP / 播放量 / 弹幕数 / 时间）：既有 12px → meta 档 12.5 */
+html.bewly-design.videoPage #viewbox_report .video-info-meta,
+html.bewly-design.videoPage #viewbox_report .video-info-detail,
+html.bewly-design.videoPage.bewly-video-fixed #viewbox_report .video-info-meta,
+html.bewly-design.videoPage.bewly-video-fixed #viewbox_report .video-info-detail {
+  font-size: var(--bvp-fs-meta, 12.5px);
+  font-weight: 400;
+  line-height: var(--bvp-lh-meta, 1.5);
+  color: var(--bew-text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* UP 名 / 粉丝数（既有 13px / 11px） */
+html.bewly-design.videoPage .up-panel-container .up-name,
+html.bewly-design.videoPage .up-panel-container .up-info--name {
+  overflow: hidden;
+  font-size: var(--bvp-fs-meta, 12.5px);
+  font-weight: 600;
+  line-height: var(--bvp-lh-meta, 1.5);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html.bewly-design.videoPage .up-panel-container .up-description,
+html.bewly-design.videoPage .up-panel-container .up-info--desc,
+html.bewly-design.videoPage .up-panel-container .fan,
+html.bewly-design.videoPage .up-panel-container .attention-btn-ctnr {
+  font-size: var(--bvp-fs-meta, 12.5px);
+  line-height: var(--bvp-lh-meta, 1.5);
+  color: var(--bew-text-3);
+}
+
+/* 工具栏按钮：我们的两个按钮（既有 13px / 固定布局 12px）+ 原生工具项 */
+html.bewly-design.videoPage .bewly-desc-trigger,
+html.bewly-design.videoPage.bewly-video-fixed .bewly-desc-trigger,
+html.bewly-design.videoPage .bewly-toolbar-action,
+html.bewly-design.videoPage.bewly-video-fixed .bewly-toolbar-action,
+html.bewly-design.videoPage #arc_toolbar_report .toolbar-left-item,
+html.bewly-design.videoPage #arc_toolbar_report .toolbar-left-item-wrap,
+html.bewly-design.videoPage #arc_toolbar_report .video-toolbar-left-item {
+  font-size: var(--bvp-fs-meta, 12.5px);
+  line-height: var(--bvp-lh-meta, 1.5);
+}
+
+/* 标签行（既有 12/13px）→ badge 档 11 */
+html.bewly-design.videoPage .video-tag-container .tag,
+html.bewly-design.videoPage .video-tag-container a,
+html.bewly-design.videoPage .video-tag-container .tag-link {
+  font-size: var(--bvp-fs-badge, 11px);
+  font-weight: var(--bvp-fw-badge, 500);
+  line-height: 1.4;
+}
+
+/* 窄屏（≤1280）与主段一致降一档，同时保持高特异性 */
+@media (max-width: 1280px) {
+  html.bewly-design.videoPage #viewbox_report .video-title,
+  html.bewly-design.videoPage #viewbox_report h1,
+  html.bewly-design.videoPage.bewly-video-fixed #viewbox_report .video-title,
+  html.bewly-design.videoPage.bewly-video-fixed #viewbox_report h1 {
+    font-size: 18px;
+  }
+}
+
+/* ===== 第 34 轮 typography end ===== */

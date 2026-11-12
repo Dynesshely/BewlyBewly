@@ -753,23 +753,37 @@ commentColumn.bottom = 播放器 bottom < rail.top - 8
 ### 5. 分工与未做项
 
 ## 第 32 轮：简介收拢到工具栏 + 自绘 tooltip
-### 第 33 轮真机修复：点击不生效（监听丢失）
+### 第 34 轮真机复测：字号被既有规则覆盖（特异性修正）
 
-**现象**：按钮存在、位置正确，但点击后 `aria-pressed` 仍是 `false`、面板不打开 —— 状态完全没变。
+**现象**（真机 1600×1000）：视频标题仍是 `15px / 600 / line-height 21px / clamp 1`，元信息 12px，
+工具栏按钮 12px —— 与 5 档字阶期望（20 / 27 / clamp 2、12.5、12.5）不符。
 
-**根因**：之前给**每个按钮**单独 `addEventListener('click')`。而 `refreshToolbarActions()` 每拍可能在
-「能力切换 / 0×0 自检 / wrapper 重建」时替换节点，per-button 的监听就跟着丢了；
-点在「刚被替换」或「新建但没绑」的节点上 → 什么都不会发生。
+**根因**：本轮的 typography 段写在 `.bewly-design.videoPage ...`（0,2,0 级），而第 28–31 轮有几条
+**更早、特异性更高**的既有规则：
 
-**修复（事件委托 + 三重兜底）**：
+| 既有规则 | 位置 | 特异性 | 被覆盖的值 |
+| --- | --- | --- | --- |
+| `.bewly-design.videoPage.bewly-video-fixed #viewbox_report .video-title` | L624–632 | ~(1,4,0) | 17px / lh 22px / clamp 1 |
+| `&.bewly-video-fixed #viewbox_report .video-title` | L861–866 | ~(1,4,0) | 15px / lh 1.4 |
+| `&.bewly-video-fixed #viewbox_report .video-info-meta` | L869–871 | ~(1,4,0) | 12px |
+| `&.bewly-video-fixed .bewly-desc-trigger` | L1007 | ~(0,4,0) | 12px |
+| `&.bewly-video-fixed .bewly-toolbar-action` | L1194 | ~(0,4,0) | 12px |
+| `.up-panel-container .up-name` / `.fan` | L818–831 | ~(0,3,0) | 13px / 11px |
 
-| 措施 | 说明 |
-| --- | --- |
-| wrapper 上一次性委托 | `#bewly-toolbar-actions` 上挂 `click`（**capture 阶段**）、`pointerup`、`keydown`，用 `composedPath()` 判断命中的是不是 `.bewly-toolbar-action[data-bvp-action]`；用 `WeakSet` 记录已绑定的 wrapper，重建后自动重新绑定 |
-| capture 阶段 | B 站可能在 `document` 上挂了捕获委托；我们在自己的 wrapper 上更早拿到事件，处理完 `stopPropagation`，不会漏到原生委托 |
-| pointerup 兜底 | 某些环境下 click 被取消；pointerup 再补一次，**用 200ms 时间戳去重**避免一次点击切换两次（展开又立刻收起） |
-| keydown 兜底 | Enter / Space（原生 button 会合成 click，这里对非 button 元素兜底） |
-| 不再无谓重建 | `refreshToolbarActions()` 只在「能力变化 / 按钮丢失 / 0×0」时增删或换位；已存在且可见时只更新文案与 aria |
+**修法**：在 typography 段末尾追加「特异性修正」子段，用 **`html` + 双类 + ID** 抬高特异性：
 
-**真机验收口径**：点「选集」→ `#bewly-toolbar-selection` 的 `aria-pressed` 在 ≤500ms 变 `true`、
-shadow 内出现 `.bvp-playlist` 面板；再点一次关闭。点「快捷键」→ 帮助面板打开。
+| 目标 | 新选择器 | 特异性 |
+| --- | --- | --- |
+| 视频标题 | `html.bewly-design.videoPage.bewly-video-fixed #viewbox_report .video-title`（+ 非固定布局一条） | (1,4,1) |
+| 元信息 | 同上模式（`--bvp-fs-meta` 12.5px + tabular-nums） | (1,4,1) |
+| UP 名 / 粉丝数 | `html.bewly-design.videoPage .up-panel-container .up-name` 等 | (0,3,1) |
+| 工具栏按钮 | `html.bewly-design.videoPage.bewly-video-fixed .bewly-desc-trigger` / `.bewly-toolbar-action` + 原生 `#arc_toolbar_report` 项 | (0,4,1) / (1,2,1) |
+| 标签 | `html.bewly-design.videoPage .video-tag-container .tag / a / .tag-link` | (0,3,1) |
+| 窄屏（≤1280）标题 18px | 同高特异性 + media | — |
+
+轨道标题（shadow 内）已核查：`.bvp-rail__title` 在编译后共 4 条规则，最后一条是本轮的
+`font-size: var(--bvp-fs-section)`（16px），后写覆盖前值，无需额外提权。
+
+**遗留（属 A 的 layout 段）**：信息栏 `#viewbox_report { max-height: var(--bvp-fixed-info, 56px); overflow: hidden }`。
+标题 20px × 1.35 × 2 行 = 54px，加 padding 12px = **66px** > 56px，第二行会被裁。
+建议 A 把 `--bvp-fixed-info` 提到 **68~70px**（与简报 A3 的「标题组 70px」一致）。

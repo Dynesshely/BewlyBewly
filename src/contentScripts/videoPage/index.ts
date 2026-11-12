@@ -25,7 +25,7 @@ import {
 } from './actions'
 import { setupAdGuard, teardownAdGuard } from './adGuard'
 import { setupCommentColumn, syncCommentColumn } from './commentColumn'
-import { setupComments, syncComments } from './comments'
+import { getCommentStyleStat, setupComments, syncComments } from './comments'
 import PlaylistPanel from './components/PlaylistPanel.vue'
 import VideoPageOverlay from './components/VideoPageOverlay.vue'
 import { refreshDescPopover, setupDescPopover, teardownDescPopover } from './descPopover'
@@ -72,6 +72,34 @@ const MINI_ENTER_BOTTOM = 140
 const MINI_RESTORE_MARGIN = 160
 /** 播放器状态轮询间隔 */
 const SYNC_INTERVAL = 500
+
+/** 上次写入 title 属性的元素与文本：只在标题变化时写，避免每拍改属性 */
+let titledElement: HTMLElement | null = null
+let titledText = ''
+
+/**
+ * 视频标题补 `title` 属性（第 34 轮）。
+ *
+ * 标题在固定布局里被 2 行截断（native-style 的 typography 段），截断后用户看不到全文，
+ * 这里把完整标题写到原生 `title` 上，悬浮即可查看。
+ * 只在「元素或文本变化」时写，避免 500ms 拍里反复触发属性变更 / 重排。
+ */
+function syncVideoTitleAttribute(): void {
+  const el = document.querySelector<HTMLElement>('#viewbox_report .video-title')
+  if (!el) {
+    titledElement = null
+    titledText = ''
+    return
+  }
+  const text = (el.textContent ?? '').trim()
+  if (!text)
+    return
+  if (el === titledElement && text === titledText)
+    return
+  titledElement = el
+  titledText = text
+  el.title = text
+}
 
 let hostEl: HTMLDivElement | null = null
 let vueApp: App | null = null
@@ -132,6 +160,12 @@ function mount(): void {
 
   // 评论区增强（排序 / 只看 UP / 长评论折叠）：没有评论区时组件自身不渲染
   disposeComments = setupComments()
+
+  // 真机诊断（第 34 轮）：**读 DOM 属性**，因为 content script 在 isolated world，
+  // 给 window 赋的函数页面控制台看不到。
+  //   document.documentElement.dataset.bewlyCommentsStyle  → 形如 "2/2;fs=14px"
+  // window 钩子保留给 content script 自身调试用。
+  ;(window as unknown as Record<string, unknown>).__bewlyCommentsStyleStat = getCommentStyleStat
 
   // 简介收拢为工具栏按钮 + 自绘 tooltip（第 32 轮）：没有简介时自身不注入
   setupDescPopover()
@@ -315,6 +349,8 @@ function sync(): void {
   // 赋值相同字符串不会触发 Vue 更新，这里可以直接每拍刷新
   ui.title = getVideoTitle()
   ui.upName = getUploaderName()
+  // 标题 2 行截断后补全文提示（第 34 轮）
+  syncVideoTitleAttribute()
   ui.danmakuOn = isDanmakuEnabled()
 
   // 评论区：标记 UP / 探测排序 tab / 折叠长评论（没有评论区时内部会提前返回）

@@ -1117,3 +1117,191 @@
     background: Canvas;
   }
 }
+
+/* ===== 第 34 轮 typography ===== */
+/* 字阶收口（第 34 轮 B 工作流，只追加，不重排上面的轨道/浮层样式）
+   用户方案（Kimi K3）落地的排版规范，弹幕相关全部跳过（交给 B 站播放器）。
+
+   原则：
+   1. 字号只留 5 档：title 20 / section 16 / body 14 / meta 12.5 / badge 11；
+      shadow 里此前散落的 11/12/12.5/13/14/16px 全部归并到这些变量；
+   2. 字重上限 600（我们自己的 UI 里本来就没有 700+，这里统一用变量收口）；
+   3. 系统字体栈，不引 WebFont；
+   4. 并排数字用 tabular-nums（时长 / 播放量 / 进度 / 计数）；
+   5. 推荐卡片：封面 16:9 + cover、标题 2 行固定高 2.8em、UP 单行 ellipsis、卡片等高；
+   6. 中英混排不加 word-spacing、不手动空格，只用 overflow-wrap: anywhere 防溢出。 */
+
+:host {
+  /* 展示用字阶令牌（5 档） */
+  --bvp-fs-title: 20px;
+  --bvp-lh-title: 1.35;
+  --bvp-fw-title: 600;
+  --bvp-fs-section: 16px;
+  --bvp-lh-section: 1.4;
+  --bvp-fw-section: 600;
+  --bvp-fs-body: 14px;
+  --bvp-lh-body: 1.65;
+  --bvp-fw-body: 400;
+  --bvp-fs-meta: 12.5px;
+  --bvp-lh-meta: 1.5;
+  --bvp-fs-badge: 11px;
+  --bvp-fw-badge: 500;
+  /** 系统字体栈：跟随平台默认，不下载 WebFont */
+  --bvp-font-stack: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+
+  font-family: var(--bvp-font-stack);
+}
+
+/* ---------- 浮层按钮组 / 紧凑信息栏 ---------- */
+.bvp-fab,
+.bvp-fab__label,
+.bvp-icon-btn,
+.bvp-toast,
+.bvp-help__hint,
+.bvp-comment-btn,
+.bvp-comment-expand {
+  font-size: var(--bvp-fs-meta);
+  line-height: var(--bvp-lh-meta);
+}
+
+.bvp-compact__title {
+  font-size: var(--bvp-fs-body);
+  font-weight: var(--bvp-fw-body);
+  line-height: 1.4;
+}
+
+.bvp-compact__up {
+  font-size: var(--bvp-fs-meta);
+  line-height: var(--bvp-lh-meta);
+}
+
+/* 数字并排变化不应让文字抖动 */
+.bvp-compact__progress,
+.bvp-rail__views,
+.bvp-rail__duration {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 帮助面板 ---------- */
+.bvp-help__title {
+  font-size: var(--bvp-fs-section);
+  font-weight: var(--bvp-fw-section);
+  line-height: var(--bvp-lh-section);
+}
+
+.bvp-help__label {
+  font-size: var(--bvp-fs-body);
+  line-height: 1.5;
+}
+
+.bvp-help__separator,
+.bvp-kbd {
+  font-size: var(--bvp-fs-meta);
+}
+
+/* ---------- 推荐轨道 ---------- */
+/* 分区标题：轨道头部「推荐视频」 */
+.bvp-rail__title {
+  font-size: var(--bvp-fs-section);
+  font-weight: var(--bvp-fw-section);
+  line-height: var(--bvp-lh-section);
+  letter-spacing: 0.01em;
+}
+
+/* 卡片：内部 封面 → 8px → 标题 → 6px → UP 行；等高由 flex + track stretch 保证 */
+.bvp-rail__track {
+  align-items: stretch;
+}
+
+.bvp-rail__card {
+  /* 等高的关键：卡片撑满 track 高度，内部按列排布，底边自然对齐 */
+  height: 100%;
+  gap: 0;
+  /* 中英混排不做 word-spacing / 手动空格，只允许必要处断行 */
+  overflow-wrap: anywhere;
+}
+
+.bvp-rail__cover {
+  flex: none;
+  margin-bottom: var(--bvp-space-2, 8px);
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+}
+
+.bvp-rail__cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bvp-rail__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+}
+
+/* 卡片标题：2 行固定高 2.8em（14px 档为 body，12.5px 档按 meta 计算 → 统一用 em 表达） */
+.bvp-rail__card-title {
+  display: -webkit-box;
+  height: 2.8em;
+  overflow: hidden;
+  font-size: var(--bvp-fs-meta);
+  line-height: 1.4;
+  color: var(--bew-text-1);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+}
+
+/* UP + 播放量：12.5px 次要信息；UP 单行 ellipsis，播放量右对齐等宽数字 */
+.bvp-rail__meta {
+  margin-top: var(--bvp-space-1, 4px);
+  font-size: var(--bvp-fs-meta);
+  line-height: var(--bvp-lh-meta);
+  color: var(--bew-text-3);
+}
+
+.bvp-rail__up {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bvp-rail__duration {
+  font-size: var(--bvp-fs-badge);
+  font-weight: var(--bvp-fw-badge);
+  line-height: 1.4;
+}
+
+/* ---------- 评论工具条 / 展开按钮 ---------- */
+.bvp-comment-toolbar .bvp-comment-btn {
+  font-size: var(--bvp-fs-meta);
+  line-height: var(--bvp-lh-meta);
+}
+
+.bvp-comment-expand {
+  font-size: var(--bvp-fs-badge);
+  font-weight: var(--bvp-fw-badge);
+}
+
+/* ---------- 窄屏：字阶整体降一档，保证 1280 以下不挤 ---------- */
+@media (max-width: 1280px) {
+  :host {
+    --bvp-fs-title: 18px;
+    --bvp-fs-section: 15px;
+    --bvp-fs-body: 13px;
+    --bvp-fs-meta: 12px;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .bvp-rail__meta {
+    color: var(--bew-text-2);
+  }
+}
+/* ===== 第 34 轮 typography end ===== */

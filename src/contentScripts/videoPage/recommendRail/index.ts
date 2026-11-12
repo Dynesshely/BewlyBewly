@@ -10,10 +10,14 @@ import {
   findNativeContainer,
   hideOverlappingNativeLinks,
   markNativeTaken,
+  refreshRailCovers,
   releaseNativeTaken,
   reserveRailSpace,
+  warmUpNativeCovers,
 } from './rail'
 import { RAIL_MIN_CARD_WIDTH } from './types'
+
+export { getRenderedRailHeight } from './rail'
 
 /**
  * 推荐轨道的状态与生命周期（第 27 轮）。
@@ -67,6 +71,7 @@ export function syncRecommendRail(options: { enabled: boolean }): void {
       railState.placement = null
     if (railState.cards.length)
       railState.cards = []
+    document.documentElement.removeAttribute('data-bewly-rail-cover')
     clearRailSpace()
     releaseNativeTaken()
     // 轨道不显示了：宿主恢复样式表的 pointer-events: none
@@ -74,6 +79,10 @@ export function syncRecommendRail(options: { enabled: boolean }): void {
     updatePointerWatch()
     return
   }
+
+  // 封面必须在隐藏原生列表**之前**预热：一旦 display:none，B 站的懒加载就再也不会触发
+  // （第 31 轮真机：轨道卡片里根本没有 <img>，因为采集时 src 还是空串）。
+  warmUpNativeCovers()
 
   const cards = collectRailCards()
   if (!cards.length || !findNativeContainer()) {
@@ -111,6 +120,18 @@ export function syncRecommendRail(options: { enabled: boolean }): void {
   // 轨道已经渲染出来：此时才接管（隐藏）原生推荐列表
   reserveRailSpace(height)
   markNativeTaken()
+
+  // 封面补齐：B 站推荐是异步插入的，首拍采集时图片可能还没加载 → cover 为空。
+  // 这里每拍和**当前 cards** 比较（不是和缓存比），有补充就**整体替换数组**（保证 Vue 响应）。
+  const filled = refreshRailCovers(railState.cards)
+  if (filled)
+    railState.cards = filled
+
+  // 诊断标记：真机可直接读 `<html data-bewly-rail-cover="20/20">` 判断采集是否成功
+  const withCover = railState.cards.filter(card => Boolean(card.cover)).length
+  const coverStat = `${withCover}/${railState.cards.length}`
+  if (document.documentElement.getAttribute('data-bewly-rail-cover') !== coverStat)
+    document.documentElement.setAttribute('data-bewly-rail-cover', coverStat)
   // 宿主命中改为「随指针位置」开关：指针进入轨道矩形才打开，移出立即恢复
   updatePointerWatch()
   // 兜底：把坐标落在轨道矩形内、但不在推荐容器里的原生视频链接也隐藏（避免点击被抢）
@@ -238,6 +259,7 @@ export function isHostHitOpen(): boolean {
 
 /** 页面卸载 / 导航离开：把 DOM 上的痕迹全部撤掉 */
 export function teardownRecommendRail(): void {
+  document.documentElement.removeAttribute('data-bewly-rail-cover')
   setHostHitOpen(false)
   updatePointerWatch()
   railState.dismissed = false

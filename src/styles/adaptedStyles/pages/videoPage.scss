@@ -718,14 +718,41 @@
       padding-inline: 0 !important;
     }
 
-    /* 评论列：高度只认变量（与播放器等高）；宽度补满右列，不再固定 350px */
+    /* 评论列：高度只认变量（与播放器等高）；宽度补满右列，不再固定 350px。
+       内部顺序（第 31 轮）：作者卡 → 评论列表，评论列表吃剩余高度并内部滚动。 */
     .bewly-comment-column {
       box-sizing: border-box !important;
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 8px;
       width: 100% !important;
       max-width: 100% !important;
       height: var(--bvp-fixed-player-height, 480px) !important;
       max-height: var(--bvp-fixed-player-height, 480px) !important;
       margin-top: 0 !important;
+      overflow: hidden !important;
+    }
+
+    /* 作者卡固定在评论列顶部：高度 72px，超出裁切（不参与滚动） */
+    .bewly-comment-column > .up-panel-container {
+      flex: 0 0 auto !important;
+      width: 100% !important;
+      max-height: 72px !important;
+      margin: 0 !important;
+      overflow: hidden !important;
+    }
+
+    /* 评论列表（B 站 Web Components）吃掉剩余高度，自己内部滚动 */
+    .bewly-comment-column > #commentapp,
+    .bewly-comment-column #commentapp {
+      flex: 1 1 auto !important;
+      width: 100% !important;
+      max-width: none !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      overflow-x: hidden !important;
+      overflow-y: auto !important;
+      overscroll-behavior: contain;
     }
 
     /* 评论宿主（B 站 Web Components）必须能撑满变宽后的评论列，别被旧的窄规则压住 */
@@ -744,3 +771,177 @@
   }
 }
 // #endregion
+
+/* #region 评论区 / 信息栏 / 详情 dock 视觉细化（第 31 轮 B 工作流，只追加）
+   用户要求：详细优化美观程度、排版与间距。这里只改**视觉属性（颜色 / 圆角 / 内边距 / 字号）**，
+   不改 A 工作流的尺寸计算：
+   - 高度、顶部对齐、grid 轨道、三区间距都由 fixedLayout.ts 的 CSS 变量决定，本区块**不写 height / margin-top**；
+   - 内边距用 padding 表达，且全部配 box-sizing: border-box，不会把容器撑大；
+   - 颜色全部 --bew-* 变量；暗色 / 高对比度 / forced-colors / reduced-motion 均已覆盖。
+
+   结构前提（A 工作流正在改）：
+   作者卡 .up-panel-container 会被搬进 .bewly-comment-column 的第一块，
+   评论列内部纵向顺序为「作者卡 → 评论列表」；这里对两种顺序都写规则：
+   - 作者卡在评论列外（当前）：只做卡片外观；
+   - 作者卡在评论列内（A 改完）：额外补「作者卡与评论列表之间 12px 间距」。 */
+
+.bewly-design.videoPage {
+  /* ---------- 作者卡（UP 主信息） ---------- */
+  .up-panel-container {
+    box-sizing: border-box;
+    padding: 8px;
+    background: var(--bew-fill-1);
+    border: 1px solid var(--bew-border-color);
+    border-radius: 12px;
+    transition:
+      background-color 200ms ease,
+      border-color 200ms ease;
+  }
+
+  .up-panel-container:hover {
+    background: var(--bew-fill-2);
+  }
+
+  /* 头像：圆角 + 固定尺寸，避免不同 UP 头像把行高撑变 */
+  .up-panel-container .up-avatar,
+  .up-panel-container .bili-avatar,
+  .up-panel-container .up-avatar__img {
+    flex: none;
+    overflow: hidden;
+    border-radius: 50%;
+  }
+
+  /* UP 名 + 粉丝数：一行省略，字号统一 */
+  .up-panel-container .up-name,
+  .up-panel-container .up-info--name {
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.4;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .up-panel-container .up-description,
+  .up-panel-container .up-info--desc,
+  .up-panel-container .fan,
+  .up-panel-container .attention-btn-ctnr {
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--bew-text-3);
+  }
+
+  /* ---------- 评论列 ---------- */
+  .bewly-comment-column {
+    /* 左右 12px：评论内容不再贴着播放器右边缘；box-sizing 已在既有规则里设过 */
+    box-sizing: border-box;
+    padding-inline: 12px;
+    padding-block: 4px;
+    background: var(--bew-content);
+    border: 1px solid var(--bew-border-color);
+    border-radius: 12px;
+  }
+
+  /* 评论列里的作者卡（A 搬进来之后）：与评论列表之间 12px 间距 */
+  .bewly-comment-column > .up-panel-container {
+    flex: none;
+    margin-bottom: 12px;
+  }
+
+  /* 评论列表容器：吃掉剩余高度并内部滚动（高度由 A 的 flex 布局决定，这里只兜 overflow） */
+  .bewly-comment-column #commentapp,
+  .bewly-comment-column bili-comments {
+    min-height: 0;
+  }
+
+  /* ---------- 信息栏（标题行） ---------- */
+  /* 固定布局下信息栏被压成一行；这里只保证字号 / 行高可读（≥15px / 1.4），不写高度 */
+  &.bewly-video-fixed #viewbox_report .video-title,
+  &.bewly-video-fixed #viewbox_report h1 {
+    font-size: 15px;
+    line-height: 1.4;
+    letter-spacing: 0.01em;
+  }
+
+  /* 标题与 UP / 播放量之间的分隔：用一条短竖线替代紧凑排布 */
+  &.bewly-video-fixed #viewbox_report .video-info-meta,
+  &.bewly-video-fixed #viewbox_report .video-info-detail {
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--bew-text-3);
+  }
+
+  /* ---------- 详情 dock（工具栏 / 简介 / 标签） ---------- */
+  /* 只做视觉分层：不写高度、不写上下外边距（高度与间距由 A 的 grid / flex 变量控制） */
+  &.bewly-video-fixed #arc_toolbar_report {
+    box-sizing: border-box;
+    padding-inline: 4px;
+    background: var(--bew-fill-1);
+    border-radius: 10px;
+  }
+
+  &.bewly-video-fixed #v_desc,
+  &.bewly-video-fixed .video-desc-container {
+    box-sizing: border-box;
+    padding-inline: 4px;
+    border-radius: 8px;
+  }
+
+  &.bewly-video-fixed .video-tag-container {
+    box-sizing: border-box;
+    padding-inline: 4px;
+  }
+
+  /* 详情 dock 里的按钮 / 标签：统一圆角与 hover，避免原生硬边 */
+  &.bewly-video-fixed #arc_toolbar_report .toolbar-left-item-wrap,
+  &.bewly-video-fixed #arc_toolbar_report .video-toolbar-left-item {
+    border-radius: 8px;
+    transition: background-color 160ms ease;
+  }
+
+  &.bewly-video-fixed #arc_toolbar_report .toolbar-left-item-wrap:hover {
+    background: var(--bew-fill-2);
+  }
+
+  /* ---------- 暗色 / 高对比度 / 强制颜色 / reduced-motion ---------- */
+  &.dark .up-panel-container,
+  &.dark .bewly-comment-column {
+    border-color: var(--bew-border-color);
+  }
+
+  &.dark .bewly-comment-column {
+    background: var(--bew-elevated);
+  }
+
+  @media (prefers-contrast: more) {
+    .up-panel-container,
+    .bewly-comment-column,
+    &.bewly-video-fixed #arc_toolbar_report {
+      border-color: var(--bew-text-3);
+    }
+
+    .up-panel-container .up-description,
+    .up-panel-container .fan,
+    &.bewly-video-fixed #viewbox_report .video-info-meta {
+      color: var(--bew-text-2);
+    }
+  }
+
+  @media (forced-colors: active) {
+    .up-panel-container,
+    .bewly-comment-column,
+    &.bewly-video-fixed #arc_toolbar_report {
+      background: Canvas;
+      border: 1px solid CanvasText;
+      color: CanvasText;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .up-panel-container,
+    &.bewly-video-fixed #arc_toolbar_report .toolbar-left-item-wrap {
+      transition: none;
+    }
+  }
+}
+/* #endregion */

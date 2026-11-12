@@ -654,3 +654,138 @@ grid-template-columns: var(--bvp-fixed-player-width, 1fr) minmax(280px, 1fr);
 
 修复后：`col.right = 容器内容右边缘 = mirror.right − paddingRight`，
 `col.width = 容器内容宽 − 播放器宽 − gutter`，不会再越过视口/容器右边界。
+
+## 结构修复：封面 / 作者卡位置 / 三区不重叠（第 31 轮）
+
+### 1. 轨道封面看不见（`img = null`）
+
+真机现象：轨道卡片里根本没有 `<img>`，因为 `card.cover` 是空串，模板 `v-if="card.cover"` 不渲染。
+根因是**采集发生在隐藏原生 `.rcmd-tab` 之前但图片尚未加载**：B 站封面是懒加载，
+而我们把列表 `display: none` 之后，懒加载再也不会触发，`src` 永远是空串。
+
+修法（`recommendRail/rail.ts`）：
+
+1. **隐藏前预热**：`warmUpNativeCovers()` 在 `markNativeTaken()` 之前执行 —— 把卡片里的 `img`
+   改为 `loading="eager"`，有 `data-src` / `data-original` / `data-lazy-src` 就补到 `src` 触发请求；
+2. **取值兜底顺序**：`currentSrc → src → data-src → data-original → data-lazy-src → srcset 首项 →
+   <picture><source srcset> → 背景图 → 任意元素的 data-src/data-background → 外层 a 的背景图`；
+3. **封面缓存**：`coverCache`（bvid → URL）跨拍保留，切视频后同一 bvid 仍可直接复用；
+4. **每拍刷新**：`refreshRailCovers()` 在隐藏之后继续尝试，有变化就更新 `railState.cards`，
+   模板随即渲染 `<img>`；
+5. **占位兜底**：仍然拿不到封面、或图片 `@error`（地址过期/403）时，渲染
+   `.bvp-rail__cover-fallback` 占位块，而不是留白。
+
+### 2. 作者卡移到评论区上方
+
+用户要求作者区在评论区**上方**，且不能压到推荐轨道（真机 UP 卡 `bottom=765 > railTop=762`，压进 3px）。
+
+`commentColumn.ts` 现在会：
+
+- 把 `.up-panel-container` 一并搬进评论列容器，作为**第一块**（顺序：作者卡 → 评论列表）；
+- 记录作者卡原来的 `parent` / `nextSibling`，关闭开关 / 窄屏 / 卸载时原样放回；
+- 作者卡被 B 站整块替换（切视频）时，把新节点重新搬进来并保持「评论列表之前」的位置；
+- 评论列内部改为 flex 纵排：作者卡固定 72px（超出裁切），`#commentapp` 吃剩余高度并
+  `overflow-y: auto` 内部滚动；
+- 评论列整体高度仍是 `--bvp-fixed-player-height`，所以「作者卡 + 评论」总高 === 播放器高，
+  不会再溢出到轨道区域。
+
+### 3. 三区不重叠（结论）
+
+作者卡进入评论列之后，右列在固定布局下只剩评论列本身（其余 `.video-pod-above-modules`、
+`.rcmd-tab` 被右列 `overflow: hidden` 裁掉，不参与视觉），于是：
+
+```
+commentColumn.top    = 播放器 top
+commentColumn.height = 播放器 height
+commentColumn.bottom = 播放器 bottom < rail.top - 8
+作者卡 top = commentColumn.top，bottom = top + 72 <= commentColumn.bottom
+```
+
+### 与 native-style 的分工
+
+- A（本文件）：封面采集 / 占位**结构**、作者卡搬运、评论列 flex 结构、右列裁剪；
+- B：轨道卡片与评论列的外观（圆角 / 间距 / 字号 / hover / 暗色等），本轮不在 `docs` 里替它定义。
+## 第 31 轮：视觉与间距细化
+
+用户要求：详细优化美观程度、排版与间距（本轮只改**视觉属性**，不动 A 工作流的尺寸计算与卡片 DOM 结构）。
+
+### 1. 推荐轨道（`videoPage.shadow.scss`，只追加）
+
+| 元素 | 规格 |
+| --- | --- |
+| 卡片 | 圆角 12px、内边距 8px、间距 12px、`--bew-elevated` 底 + 1px 边框 |
+| 卡片 hover / active | **抬升 2px**（`translateY(-2px)`）+ `--bew-shadow-2` + 主题色 40% 边框 + `--bew-elevated-hover` 底 |
+| 卡片 `:focus-visible` | 2px 主题色描边、offset 2px |
+| 封面 | 固定 `aspect-ratio: 16/9` + `object-fit: cover` + 圆角 8px + `--bew-fill-1` 占位底 |
+| 封面占位（A 新增 `bvp-rail__cover-fallback`） | 135° 渐变底 + 居中图标；暗色提一档文字色；高对比度加虚线框；forced-colors 用 Canvas/CanvasText |
+| 标题 | **12.5px / 行高 1.35 / 两行截断**（`-webkit-line-clamp: 2`）+ `word-break: break-word` |
+| UP + 播放量 | 同一行、**11px**、`--bew-text-3`；UP 最多 62% 宽省略、播放量右对齐等宽数字 |
+| 外壳 | 左右 16px、底边 12px、12px 间距；顶部 1px 分隔线 + `--bew-fill-1` 35% 半透明底 + 顶部圆角 14px + 毛玻璃 → **dock 停靠区观感** |
+| 标题行 | 左「推荐视频」13px 600；右侧 ← / → / 收起三个 26px 圆钮（hover 抬 1px） |
+| 窄屏 ≤1024 | 左右 12px、底 10px、标题 12px、间距 10px、卡片内边距 7px |
+
+### 2. 评论区（`src/styles/adaptedStyles/pages/videoPage.scss`，只追加）
+
+| 元素 | 规格 |
+| --- | --- |
+| 作者卡 `.up-panel-container` | 圆角 12px、内边距 8px、`--bew-fill-1` 底 + 1px 边框；hover 提亮到 `--bew-fill-2` |
+| 头像 | 圆形裁切、不可收缩（不同 UP 头像不会把行高撑变） |
+| UP 名 / 粉丝数 | 13px/600 单行省略；副信息 11px 次要色 |
+| 评论列 `.bewly-comment-column` | 左右 **12px** 内边距、`--bew-content` 底 + 1px 边框 + 圆角 12px |
+| 作者卡与评论列表之间 | **12px 间距**（`.bewly-comment-column > .up-panel-container { margin-bottom: 12px }`，A 把作者卡搬进评论列后自动生效） |
+
+### 3. 信息栏与详情 dock（同文件，只追加）
+
+| 元素 | 规格 |
+| --- | --- |
+| 标题 | 固定布局下 **15px / 行高 1.4**（满足可读下限 ≥15px / 1.4），letter-spacing 0.01em |
+| 元信息（UP / 播放量） | 12px / 1.4、次要色 |
+| 工具栏 `#arc_toolbar_report` | `--bew-fill-1` 底 + 10px 圆角、左右 4px 内边距；按钮 hover 提亮 |
+| 简介 / 标签 | 左右 4px、8px 圆角（只做视觉分层，不改 A 的高度） |
+
+### 4. 主题与无障碍覆盖
+
+- **暗色**：hover 边框改用 `color-mix(theme-color, white 12%)` 提对比；评论列底改为 `--bew-elevated`；
+- **prefers-contrast: more**：卡片 / 箭头 / 轨道 / 作者卡 / 评论列 / 工具栏边框统一提到 `--bew-text-3`，次要文字提一档；
+- **forced-colors: active**：轨道、卡片、封面、箭头、作者卡、评论列全部改用 `Canvas` / `CanvasText`，选中态用 `Highlight`；
+- **prefers-reduced-motion: reduce**：轨道平移、卡片抬升、箭头 hover 位移全部关闭（只保留颜色变化）。
+
+### 5. 分工与未做项
+
+- 本轮**没有改** `rail.ts` 的尺寸计算（`placement` / `computeRailHeight`）、没有改卡片 DOM 结构、没有改 `<img>` 的渲染条件（这些属于 A 工作流）；
+- 轨道「标题行文案」当前是 i18n 的 `recommendRailTitle`（现为「推荐视频」）。简报要求「相关推荐」，
+  改文案要动 `videoPage/i18n.ts`（四语言），**不在本轮 B 的写权限内**，已列入汇报的「Lead 接线项」；
+- 三区之间的 12px gutter 由 `fixedLayout.ts` 的 `--bvp-fixed-gap` 控制（当前 8px）；
+  若要严格 12px，需要 A 把变量值改成 12（B 不改尺寸变量，避免破坏三区自检）；
+- 轨道左右 16px / 底边 12px 是用 `.bvp-rail` 的 padding 实现的，`placement.width` 未变，
+  viewport 用 `max-width: 100%` 兜住，不会把轨道撑出视口。
+
+### 第 31 轮复测修复：封面全是占位（20 张卡 0 个 img）
+
+真机证据：轨道里 20 张卡全部是 `.bvp-rail__cover-fallback`，`railImgs = 0`；
+但原生卡片的 `img` 有 `complete: true / naturalWidth: 336 / src="//i2.hdslb.com/..."`，
+用 `new Image()` 加载同一 URL 也能成功 —— 排除网络与防盗链，问题在采集/渲染链路。
+
+**根因（刷新逻辑与错误拉黑两处叠加）**：
+
+1. `refreshRailCovers()` 把「DOM 里的封面」和**封面缓存**比较：
+   `warmUpNativeCovers()` 在同一拍已经把 URL 写进缓存，于是刷新永远返回 `false`，
+   `railState.cards` 里第一拍采集到的 `cover: ""` 从此再没被更新；
+   B 站推荐是异步插入的，首拍必然采不到封面 → 表现为「永远全占位」；
+2. `failedCovers` 按 **bvid** 拉黑：早期拍次 `cover` 为空 / 相对地址时渲染过一次，
+   `error` 之后该 bvid 永久拉黑，后续拿到正确 URL 也不会再渲染。
+
+**修法**：
+
+- `refreshRailCovers(current)` 改为与**当前 cards 的 cover 字段**比较，有补充就返回**新数组**，
+  调用方 `railState.cards = filled` 整体替换（保证 Vue 响应）；没有封面时返回 `null`，
+  于是每拍都会重试（等价于「持续重试直到补齐」，无需计数器）；
+- 渲染层 `failedUrls` 改为**按 URL** 拉黑：bvid 换了新地址会自动重试；
+- 卡片新增诊断属性 `data-cover`（是否有封面）与 `data-failed`（该 URL 是否已被拉黑）；
+- `<html>` 上新增 `data-bewly-rail-cover="<有封面数>/<总数>"`（例 `20/20`），真机一眼可判；
+- 轨道贴底问题：`computeRailPlacement` 在固定布局下改用**实际渲染高度**（真机 222 vs 估算 207），
+  `top = innerHeight − height − 12`，保证 `rail.bottom <= innerHeight − 8`；
+  `fixedLayout` 的轨道预留也取 `max(估算, 实际渲染)`，避免详情 dock 压进轨道。
+
+模拟验证（同一套判定逻辑）：首拍 `cover=""` 的 20 张卡，旧实现 `changed=false`（永远全空），
+新实现一次补齐 20/20；第二轮缓存为空时也能从 DOM 补齐。

@@ -50,7 +50,7 @@ import { watch } from 'vue'
 import { settings } from '~/logic'
 
 import { getPlayerWrapEl } from './dom'
-import { computeRailHeight, railState } from './recommendRail'
+import { computeRailHeight, getRenderedRailHeight, railState } from './recommendRail'
 import { ui } from './state'
 
 /** 固定布局生效时挂在 <html> 上的类（页面级样式与 e2e 都靠它） */
@@ -129,6 +129,12 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
   // 轨道的宽度跟着左列（= 播放器宽）走，而轨道高度又由宽度决定 —— 这里从 0 开始迭代到不动点。
   // 必须固定起点：若以上一拍的轨道高为起点，迭代会停在振荡区间里的不同相位，真机表现为每拍
   // 变几像素；从 0 起迭代可保证同样输入得到同样输出（确定性）。
+  // 视觉样式算出来的轨道实际可能比估算更高（真机 222 vs 估算 207）：
+  // 预留空间取两者较大值，否则详情 dock 会压进轨道顶边（用户报告的「重叠」）。
+  const renderedRailHeight = railVisible
+    ? getRenderedRailHeight()
+    : 0
+
   let railSpace = 0
   let width = 0
   let height = 0
@@ -155,7 +161,11 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
     if (!railVisible)
       break
 
-    const nextRailSpace = Math.max(0, Math.round(computeRailHeight(width)))
+    const nextRailSpace = Math.max(
+      0,
+      Math.round(computeRailHeight(width)),
+      renderedRailHeight,
+    )
     const converged = Math.abs(nextRailSpace - railSpace) < 1
     railSpace = nextRailSpace
     if (converged)

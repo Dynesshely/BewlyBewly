@@ -68,27 +68,198 @@ function absoluteUrl(href: string): string {
   }
 }
 
-/** 封面：img 的 src / data-src / srcset / 背景图都试一遍 */
+/**
+ * 封面 URL 缓存（bvid → URL）。
+ *
+ * 为什么必须缓存：轨道渲染出来之后我们会把原生 `.rcmd-tab` 隐藏，B 站的懒加载封面
+ * 从此**永远不会再加载**（真机实测：卡片里 `img` 在轨道里是 null，因为采集时 src 还是空串）。
+ * 所以只要某个 bvid 曾经拿到过封面 URL，就一直记住它，后续每拍刷新都能用上。
+ */
+const coverCache = new Map<string, string>()
+
+/** 从元素上按「越接近真实地址越优先」的顺序取封面候选 */
+function coverCandidatesFrom(img: HTMLImageElement): string[] {
+  const dataset = img.dataset as Record<string, string | undefined>
+  const srcset = (img.getAttribute('srcset') ?? '')
+    .split(',')
+    .map(item => item.trim().split(/\s+/)[0])
+    .filter(Boolean)
+  return [
+    img.currentSrc,
+    img.getAttribute('src') ?? '',
+    dataset.src ?? '',
+    img.getAttribute('data-src') ?? '',
+    img.getAttribute('data-original') ?? '',
+    dataset.original ?? '',
+    img.getAttribute('data-lazy-src') ?? '',
+    img.getAttribute('data-lazy') ?? '',
+    srcset[0] ?? '',
+    dataset.srcset ?? '',
+  ]
+}
+
+/**
+ * 封面取值兜底顺序：
+ * `img.currentSrc → img.src → data-src → data-original → srcset 首项 → <picture><source> → 背景图 → 外层 a 的图`。
+ */
 function findCover(card: HTMLElement): string {
   const img = card.querySelector<HTMLImageElement>('img')
   if (img) {
-    const candidates = [
-      img.getAttribute('src'),
-      img.getAttribute('data-src'),
-      img.getAttribute('data-original'),
-      (img.getAttribute('srcset') ?? '').split(',')[0]?.trim().split(' ')[0],
-    ]
-    for (const candidate of candidates) {
+    for (const candidate of coverCandidatesFrom(img)) {
       if (candidate && !candidate.startsWith('data:'))
         return absoluteUrl(candidate)
     }
   }
+
+  // <picture><source srcset>
+  const source = card.querySelector<HTMLSourceElement>('picture source[srcset]')
+  const sourceFirst = (source?.getAttribute('srcset') ?? '').split(',')[0]?.trim().split(/\s+/)[0]
+  if (sourceFirst && !sourceFirst.startsWith('data:'))
+    return absoluteUrl(sourceFirst)
+
+  // 背景图（封面容器常写成 background-image）
   const styleEl = Array.from(card.querySelectorAll<HTMLElement>('[style*="background"]'))
     .find(el => /background-image/.test(el.getAttribute('style') ?? ''))
   const styleUrl = styleEl?.getAttribute('style')?.match(/url\(["']?([^"')]+)["']?\)/)?.[1]
-  return styleUrl
-    ? absoluteUrl(styleUrl)
+  if (styleUrl)
+    return absoluteUrl(styleUrl)
+
+  // 任意元素上的懒加载属性（B 站有时把 data-src 挂在封面 div / picture 上而不是 img）
+  const lazyEl = Array.from(card.querySelectorAll<HTMLElement>('[data-src], [data-original], [data-lazy-src], [data-background]'))
+    .find(el => Boolean(
+      el.getAttribute('data-src')
+      || el.getAttribute('data-original')
+      || el.getAttribute('data-lazy-src')
+      || el.getAttribute('data-background'),
+    ))
+  const lazyUrl = lazyEl?.getAttribute('data-src')
+    ?? lazyEl?.getAttribute('data-original')
+    ?? lazyEl?.getAttribute('data-lazy-src')
+    ?? lazyEl?.getAttribute('data-background')
+  if (lazyUrl && !lazyUrl.startsWith('data:'))
+    return absoluteUrl(lazyUrl)
+
+  // 外层链接上的背景图 / 缩略图
+  const anchor = card.closest<HTMLAnchorElement>('a[href]')
+  const anchorStyle = anchor?.getAttribute('style') ?? ''
+  const anchorUrl = anchorStyle.match(/url\(["']?([^"')]+)["']?\)/)?.[1]
+  return anchorUrl
+    ? absoluteUrl(anchorUrl)
     : ''
+}
+
+/**
+ * 预热封面：在**隐藏原生列表之前**调用。
+ *
+ * B 站封面多数是懒加载（`<img loading="lazy" data-src="...">`，或根本还没插 `<img>`）。
+ * 一旦把列表 `display: none`，懒加载就再也不会触发。这里做三件事：
+ * 1. 把卡片里的 `img` 改成 `loading="eager"`，有 `data-src` 就补到 `src` 上触发请求；
+ * 2. 顺便把所有能直接读到的封面 URL 记进缓存（不依赖图片真的加载完成）；
+ * 3. 卡片里确实没有 `img` 时，尝试给封面容器塞一个临时 img（不插入布局，只为了让浏览器开始抓图），
+ *    并在下一拍从它的 `currentSrc` 取回真实地址。
+ */
+export function warmUpNativeCovers(): void {
+  for (const card of collectNativeCards()) {
+    const link = findLink(card)
+    const bvid = (link?.getAttribute('href') ?? '').match(BV_RE)?.[1] ?? ''
+    if (!bvid)
+      continue
+
+    const img = card.querySelector<HTMLImageElement>('img')
+    if (img) {
+      img.loading = 'eager'
+      const lazy = (img.dataset.src
+        ?? img.getAttribute('data-src')
+        ?? img.getAttribute('data-original')
+        ?? img.getAttribute('data-lazy-src')
+        ?? '') as string
+      if (!img.getAttribute('src') && lazy)
+        img.setAttribute('src', lazy)
+    }
+
+    const cover = findCover(card)
+    if (cover && !coverCache.has(bvid)) {
+      coverCache.set(bvid, cover)
+    }
+    else if (!cover) {
+      // 已经缓存过就继续用；没有的话才留空（模板会渲染占位）
+      const cached = coverCache.get(bvid)
+      if (cached)
+        continue
+    }
+  }
+}
+
+/** 拿当前所有原生卡片（不依赖容器选择器，逐级兜底） */
+export function collectNativeCards(): HTMLElement[] {
+  const cards: HTMLElement[] = []
+  const seen = new Set<HTMLElement>()
+  for (const container of findNativeContainers()) {
+    if (container.matches(CARD_SELECTOR)) {
+      if (!seen.has(container)) {
+        seen.add(container)
+        cards.push(container)
+      }
+      continue
+    }
+    container.querySelectorAll<HTMLElement>(CARD_SELECTOR).forEach((card) => {
+      if (!seen.has(card)) {
+        seen.add(card)
+        cards.push(card)
+      }
+    })
+  }
+  return cards
+}
+
+/**
+ * 给已有卡片补封面（每拍调用）。
+ *
+ * ⚠️ 第 31 轮真机 bug（20 张卡 0 个 img）：旧实现把「DOM 里的封面」和**缓存**比较，
+ * 而 `warmUpNativeCovers()` 早就把同一个 URL 写进缓存了 —— 于是这里永远返回 false，
+ * `railState.cards` 里第一拍采集到的 `cover: ''` 就再也没被更新过。
+ * 现在改成和**当前 cards 的 cover 字段**比较，并返回**新的数组**（整体替换，保证 Vue 响应）。
+ *
+ * @param current 当前已渲染的卡片
+ * @returns 需要更新时返回新数组（cover 已补齐），否则返回 null
+ */
+export function refreshRailCovers(current: RailCard[]): RailCard[] | null {
+  if (!current.length)
+    return null
+
+  const covers = new Map<string, string>()
+  for (const card of collectNativeCards()) {
+    const link = findLink(card)
+    const bvid = (link?.getAttribute('href') ?? '').match(BV_RE)?.[1] ?? ''
+    if (!bvid)
+      continue
+    const cover = findCover(card)
+    if (cover) {
+      coverCache.set(bvid, cover)
+      covers.set(bvid, cover)
+    }
+  }
+  if (!covers.size)
+    return null
+
+  let changed = false
+  const next = current.map((card) => {
+    if (card.cover)
+      return card
+    const cover = covers.get(card.bvid) ?? coverCache.get(card.bvid) ?? ''
+    if (!cover)
+      return card
+    changed = true
+    return { ...card, cover }
+  })
+  return changed
+    ? next
+    : null
+}
+
+/** 从缓存取封面（供卡片对象填充） */
+function cachedCover(bvid: string): string {
+  return coverCache.get(bvid) ?? ''
 }
 
 /** 标题：优先带 title 类的元素，其次 link 的 title / img 的 alt */
@@ -172,11 +343,14 @@ export function collectRailCards(): RailCard[] {
       return
     seen.add(bvid)
     const { upName, views } = findUpAndViews(card)
+    const cover = findCover(card) || cachedCover(bvid)
+    if (cover && !coverCache.has(bvid))
+      coverCache.set(bvid, cover)
     cards.push({
       bvid,
       url,
       title,
-      cover: findCover(card),
+      cover,
       duration: findDuration(card),
       upName,
       views,
@@ -276,6 +450,12 @@ export function hideOverlappingNativeLinks(rect: { top: number, left: number, wi
 }
 
 /** 归还原生列表 */
+/**
+ * 归还原生列表。
+ *
+ * 注意：这里**不清空封面缓存** —— 切视频后 B 站会替换整份列表，旧卡片的封面 URL 仍然有效
+ * （同一个 bvid 的封面地址不会变），保留下来可以让新采集的卡片立刻有图。
+ */
 export function releaseNativeTaken(): void {
   document.querySelectorAll<HTMLElement>(`[${TAKEN_ATTR}]`).forEach((el) => {
     el.style.display = el.getAttribute(TAKEN_ATTR) || ''
@@ -297,6 +477,19 @@ export function findMainColumn(): HTMLElement | null {
 const RAIl_FIXED_BOTTOM_GAP = 12
 
 /**
+ * 已渲染轨道的高度（没有渲染时返回 0）。
+ *
+ * 轨道在增强层 shadow root 里，只读它不影响我们写的位置，因此可以每拍读。
+ */
+export function getRenderedRailHeight(): number {
+  const host = document.getElementById('bewly-video-page')
+  const rail = host?.shadowRoot?.querySelector<HTMLElement>('.bvp-rail')
+  return rail
+    ? Math.round(rail.getBoundingClientRect().height)
+    : 0
+}
+
+/**
  * 轨道在视口里的放置位置。
  *
  * 轨道渲染在视频页 shadow root 里（fixed 定位），top 取**主列底边在视口中的位置**：
@@ -313,11 +506,15 @@ export function computeRailPlacement(railHeight: number): RailPlacement | null {
   if (width < 320)
     return null
 
-  // 固定单页布局（第 28 轮）：页面不滚动，轨道直接贴视口底部，「始终可见」
+  // 固定单页布局（第 28 轮）：页面不滚动，轨道直接贴视口底部，「始终可见」。
+  // 实际渲染高度可能与 computeRailHeight 的估算不同（视觉样式算出来的卡片更高），
+  // 所以优先用**已渲染的轨道高度**，保证 bottom 至少留 RAIl_FIXED_BOTTOM_GAP。
   if (document.documentElement.classList.contains('bewly-video-fixed')) {
-    const height = Math.round(railHeight)
+    const renderedHeight = getRenderedRailHeight()
+    const height = Math.round(Math.max(railHeight, renderedHeight))
+    const top = Math.max(0, window.innerHeight - height - RAIl_FIXED_BOTTOM_GAP)
     return {
-      top: Math.max(0, window.innerHeight - height - RAIl_FIXED_BOTTOM_GAP),
+      top,
       left: Math.round(rect.left + Math.max(0, (rect.width - width) / 2)),
       width: Math.round(width),
       height,

@@ -46,12 +46,23 @@ interface LayoutParts {
   commentApp: HTMLElement
 }
 
+/** 作者（UP 主）卡：第 31 轮要求放在评论列**上方**，作为评论列的第一块 */
+const UP_PANEL_SELECTOR = '.up-panel-container'
+
+interface MovedUpPanel {
+  el: HTMLElement
+  originalParent: HTMLElement
+  originalNextSibling: Node | null
+}
+
 interface MovedState {
   wrapper: HTMLElement
   commentApp: HTMLElement
   originalParent: HTMLElement
   originalNextSibling: Node | null
   playerWrap: HTMLElement
+  /** 被搬进评论列的作者卡（页面上没有作者卡时为 null） */
+  upPanel: MovedUpPanel | null
 }
 
 let moved: MovedState | null = null
@@ -154,6 +165,20 @@ function moveCommentApp(parts: LayoutParts): void {
   }
   const originalNextSibling = parts.commentApp.nextSibling
 
+  // 作者卡先搬：评论列内部顺序为「作者卡 → 评论列表」（第 31 轮用户要求）。
+  // 记录它原来的 parent / nextSibling，卸载与降级时原样放回。
+  let upPanel: MovedUpPanel | null = null
+  const upEl = parts.rightInner.querySelector<HTMLElement>(UP_PANEL_SELECTOR)
+    ?? parts.mirror.querySelector<HTMLElement>(UP_PANEL_SELECTOR)
+  if (upEl && upEl.parentElement) {
+    upPanel = {
+      el: upEl,
+      originalParent: upEl.parentElement,
+      originalNextSibling: upEl.nextSibling,
+    }
+    wrapper.appendChild(upEl)
+  }
+
   wrapper.appendChild(parts.commentApp)
   document.documentElement.classList.add(COMMENT_COLUMN_CLASS)
 
@@ -163,6 +188,7 @@ function moveCommentApp(parts: LayoutParts): void {
     originalParent,
     originalNextSibling,
     playerWrap: parts.playerWrap,
+    upPanel,
   }
   observePlayer(parts.playerWrap)
   applyColumnMetrics(parts)
@@ -176,7 +202,24 @@ export function restoreCommentColumn(): void {
   disconnectPlayerObserver()
 
   if (state) {
-    const { wrapper, commentApp, originalParent, originalNextSibling } = state
+    const { wrapper, commentApp, originalParent, originalNextSibling, upPanel } = state
+
+    // 作者卡放回原位（原位置失效时退回右栏顶部，保证不丢节点）
+    if (upPanel && upPanel.el.isConnected) {
+      const { el, originalParent: upParent, originalNextSibling: upNext } = upPanel
+      if (upParent.isConnected) {
+        try {
+          if (upNext && upNext.parentNode === upParent)
+            upParent.insertBefore(el, upNext)
+          else
+            upParent.appendChild(el)
+        }
+        catch {
+          // 原位置不可用：保持节点在原父级即可
+        }
+      }
+    }
+
     if (commentApp.isConnected && originalParent.isConnected) {
       try {
         if (originalNextSibling && originalNextSibling.parentNode === originalParent)
@@ -209,9 +252,22 @@ export function syncCommentColumn(): void {
 
   // B 站重建了评论宿主 / 右栏：清掉旧容器后重新接管（旧节点已断开，不需要再插回原位）
   if (moved && (!moved.commentApp.isConnected || !moved.wrapper.isConnected || moved.commentApp !== parts.commentApp)) {
-    moved.wrapper.remove()
-    moved = null
-    clearColumnVars()
+    restoreCommentColumn()
+  }
+
+  // 作者卡被 B 站整块替换（切视频后常见）：把新节点也搬进来，位置保持在评论列表之前
+  if (moved && moved.wrapper.isConnected) {
+    const currentUp = parts.rightInner.querySelector<HTMLElement>(UP_PANEL_SELECTOR)
+      ?? parts.mirror.querySelector<HTMLElement>(UP_PANEL_SELECTOR)
+    if (currentUp && currentUp.parentElement !== moved.wrapper) {
+      if (moved.upPanel && !moved.upPanel.el.isConnected)
+        moved.upPanel = null
+      // 先记录原位置，再搬（顺序反了会把 wrapper 记成原始父级，卸载时就放不回去了）
+      const originalParent = currentUp.parentElement ?? parts.rightInner
+      const originalNextSibling = currentUp.nextSibling
+      moved.wrapper.insertBefore(currentUp, moved.commentApp)
+      moved.upPanel = { el: currentUp, originalParent, originalNextSibling }
+    }
   }
 
   if (moved && moved.wrapper.isConnected && moved.commentApp.parentElement === moved.wrapper) {

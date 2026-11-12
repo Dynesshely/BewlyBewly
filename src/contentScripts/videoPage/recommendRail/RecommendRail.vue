@@ -40,6 +40,23 @@ const trackRef = ref<HTMLElement | null>(null)
 const cardRefs = ref<HTMLElement[]>([])
 const activeIndex = ref(0)
 
+/**
+ * 加载失败的封面**按 URL** 拉黑（第 31 轮修）。
+ *
+ * 之前按 bvid 拉黑：早期拍次里 `card.cover` 还是空串 / 相对地址时就渲染过一次，
+ * error 之后该 bvid 被永久拉黑，后续即使拿到正确 URL 也不会再渲染（真机表现为 20 张全占位）。
+ * 按 URL 拉黑后，bvid 换了新地址会自动重试。
+ */
+const failedUrls = ref<Set<string>>(new Set())
+
+function markCoverFailed(url: string): void {
+  if (!url)
+    return
+  const next = new Set(failedUrls.value)
+  next.add(url)
+  failedUrls.value = next
+}
+
 /** 可见卡片数量：4~7，按容器宽与最小卡宽计算 */
 const visibleCount = computed(() => {
   const raw = Math.floor(props.placement.width / 168)
@@ -456,19 +473,31 @@ function findCardFromEvent(event: Event): RailCard | null {
           :aria-label="`${card.title} ${card.upName}`"
           :data-bvid="card.bvid"
           :data-active="index === activeIndex ? '1' : '0'"
+          :data-cover="card.cover ? '1' : '0'"
+          :data-failed="failedUrls.has(card.cover) ? '1' : '0'"
           @pointerdown="onCardPointerDown"
           @mousedown="onCardPointerDown"
           @focus="activeIndex = Math.min(maxIndex, index)"
         >
           <span class="bvp-rail__cover">
+            <!-- 封面：采集不到 / 加载失败时渲染占位，避免整块留白（第 31 轮） -->
             <img
-              v-if="card.cover"
+              v-if="card.cover && !failedUrls.has(card.cover)"
               :src="card.cover"
               :alt="card.title"
               loading="lazy"
               decoding="async"
               referrerpolicy="no-referrer"
+              @error="markCoverFailed(card.cover)"
             >
+            <span
+              v-else
+              class="bvp-rail__cover-fallback"
+              role="img"
+              :aria-label="card.title"
+            >
+              <span class="bvp-rail__cover-fallback-icon" aria-hidden="true" />
+            </span>
             <span v-if="card.duration" class="bvp-rail__duration">{{ card.duration }}</span>
           </span>
           <span class="bvp-rail__body">

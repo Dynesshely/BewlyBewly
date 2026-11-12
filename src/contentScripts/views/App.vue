@@ -631,7 +631,13 @@ onUnmounted(() => {
 
     <!-- Settings -->
     <KeepAlive>
-      <Settings v-if="showSettings" z-10002 @close="showSettings = false" />
+      <!-- 第 42 轮：设置页必须盖住各页面增强层（宿主 z-index 2147483200），
+           所以层级不再用 10002，而是抬到增强层之上（用户要求：调高层级而不是隐藏轨道） -->
+      <Settings
+        v-if="showSettings"
+        :style="{ zIndex: 2147483600 }"
+        @close="showSettings = false"
+      />
     </KeepAlive>
 
     <!-- Dock & RightSideButtons -->

@@ -119,92 +119,6 @@ function syncVideoTitleAttribute(): void {
 
 let hostEl: HTMLDivElement | null = null
 
-/** Bewly 设置页打开时挂在 <html> 上的类（第 41 轮） */
-const SETTINGS_OPEN_CLASS = 'bewly-settings-open'
-/** 增强层宿主被设置页压制期间降到这个 z-index（设置面板是 10002） */
-const SUPPRESSED_Z_INDEX = '9999'
-
-let settingsOverlayOpen = false
-
-/** 元素是否「真的可见」：尺寸够大 + display/visibility/opacity 都正常 */
-function isElementVisible(el: HTMLElement): boolean {
-  const rect = el.getBoundingClientRect()
-  if (rect.width <= 300 || rect.height <= 300)
-    return false
-  const style = window.getComputedStyle(el)
-  return style.display !== 'none'
-    && style.visibility !== 'hidden'
-    && Number(style.opacity || '1') > 0.01
-}
-
-/**
- * Bewly 自己的设置页 / 弹窗是否打开（第 41 轮）。
- *
- * 真机结构：设置面板在 `#bewly` 的 shadow root 里，容器是 `.fixed.w-full.h-full`（z-index 10002），
- * 里面是 `.settings-content`（1000×900）。我们的视频页增强层宿主 z-index 是 2147483200，
- * 远高于它 → 推荐轨道 / 浮层会盖在设置页上（用户报的 bug）。
- *
- * 判定顺序（从最可靠到兜底）：
- * 1. `#bewly` shadow 内可见的 `.settings-content`；
- * 2. 可见的 `[role="dialog"]`（其它弹窗，如确认框 / 抽屉）；
- * 3. 可见的 `.fixed.w-full.h-full` 且其内部含设置标志类。
- */
-function isBewlySettingsOpen(): boolean {
-  const shadow = document.getElementById('bewly')?.shadowRoot
-  if (!shadow)
-    return false
-
-  const settingsContent = shadow.querySelector<HTMLElement>('.settings-content')
-  if (settingsContent && isElementVisible(settingsContent))
-    return true
-
-  const dialog = shadow.querySelector<HTMLElement>('[role="dialog"]')
-  if (dialog && isElementVisible(dialog))
-    return true
-
-  return Array.from(shadow.querySelectorAll<HTMLElement>('.fixed.w-full.h-full')).some(el =>
-    isElementVisible(el)
-    && Boolean(el.querySelector('.settings-content, .b-settings-item-group, [class*="settings"]')),
-  )
-}
-
-/**
- * 设置页打开时让视频页增强层「让位」（第 41 轮）。
- *
- * - 给 `<html>` 加 `bewly-settings-open`（CSS 兜底：轨道显式 display:none）；
- * - 给宿主临时写 `z-index: 9999`（低于设置面板 10002），关闭后移除行内样式、回落到
- *   `videoPage.shadow.scss` 里 `:host { z-index: 2147483200 }`；
- * - 只切 class / 行内 z-index，**不动固定布局变量**，所以播放器与评论区不会跳变；
- * - 每拍执行，值相同不写（避免每拍触发样式重算）。
- */
-function syncSettingsOverlaySuppression(): void {
-  const open = isBewlySettingsOpen()
-  const host = hostEl
-
-  if (open !== settingsOverlayOpen) {
-    settingsOverlayOpen = open
-    document.documentElement.classList.toggle(SETTINGS_OPEN_CLASS, open)
-    if (host) {
-      if (open)
-        host.setAttribute('data-bewly-suppressed', '')
-      else
-        host.removeAttribute('data-bewly-suppressed')
-    }
-  }
-
-  if (!host)
-    return
-
-  const current = host.style.zIndex
-  if (open) {
-    if (current !== SUPPRESSED_Z_INDEX)
-      host.style.zIndex = SUPPRESSED_Z_INDEX
-  }
-  else if (current !== '') {
-    host.style.removeProperty('z-index')
-  }
-}
-
 let vueApp: App | null = null
 let disposeShortcuts: (() => void) | null = null
 let disposeComments: (() => void) | null = null
@@ -380,9 +294,7 @@ function unmount(): void {
     window.clearTimeout(endedTimer)
     endedTimer = null
   }
-
-  document.documentElement.classList.remove('bewly-video-mini', SETTINGS_OPEN_CLASS)
-  settingsOverlayOpen = false
+  document.documentElement.classList.remove('bewly-video-mini')
   document.documentElement.style.removeProperty('--bvp-mini-placeholder')
   clearStagePlaceholder()
   clearPlayerStage()
@@ -461,9 +373,6 @@ function sync(): void {
   // 播放器显示模式（第 37 轮）：网页全屏 / 宽屏 / 普通。必须先于轨道与布局同步，
   // 让 rail 决定是否渲染、fixedLayout 决定是否给右列留位置。
   const modeChanged = syncPlayerScreenMode()
-
-  // 设置页让位（第 41 轮）：Bewly 设置页打开时把增强层压到它下面，关闭立即还原。
-  safeSync('syncSettingsOverlaySuppression', syncSettingsOverlaySuppression)
 
   // 推荐视频轨道（第 27 轮）：读不到卡片时内部会保持原生列表不动
   safeSync('syncRecommendRail', () => syncRecommendRail({ enabled: settings.value.videoPageRecommendRail }))

@@ -106,7 +106,7 @@ function handleConfirm() {
       <div
         v-if="showDialog"
         class="dialog"
-        pos="fixed top-0 left-0" w-full h-full z-10002
+        pos="fixed top-0 left-0" w-full h-full :style="{ zIndex: 2147483500 }"
         transform-gpu pointer-events-auto
       >
         <div

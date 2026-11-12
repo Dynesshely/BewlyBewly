@@ -1371,3 +1371,32 @@
   }
 }
 /* ===== 第 46 轮 rail-slim end ===== */
+
+/* ===== 第 47 轮 rail-corners ===== */
+/* 轨道四角圆角（第 47 轮 B 工作流，只追加）
+   用户要求：左上 / 右上也要圆 —— 第 46 轮为了衔接已删除的标题行只做了底部圆角，
+   现在标题行已彻底删除、轨道是独立浮层，四角圆最自然。
+   ≤1024px 用 12px；高对比度与强制色彩下同样保留圆角。 */
+
+.bvp-rail {
+  border-radius: 14px;
+}
+
+@media (max-width: 1024px) {
+  .bvp-rail {
+    border-radius: 12px;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .bvp-rail {
+    border-radius: 14px;
+  }
+}
+
+@media (forced-colors: active) {
+  .bvp-rail {
+    border-radius: 14px;
+  }
+}
+/* ===== 第 47 轮 rail-corners end ===== */

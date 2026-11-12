@@ -85,6 +85,8 @@ bili-comments-header-renderer {
   width: calc(100% + var(--bewly-comment-scrollbar, 0px));
   margin-right: calc(-1 * var(--bewly-comment-scrollbar, 0px));
   padding-inline: 12px;
+  /* 第 47 轮：UP 卡底边到「评论 N」这一行的间距 = 13px（与卡片左右边距一致，对称） */
+  padding-block-start: 13px;
 }
 `
 

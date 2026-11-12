@@ -131,9 +131,17 @@ const MIN_COMMENT_WIDTH = 400
 const MIN_COMMENT_WIDTH_RATIO = 0.4
 /** 触发 40% 兜底时，播放器宽度占视口宽的比例（0.6 = 1 − 0.4，与评论区 40% 对称） */
 const MAX_PLAYER_WIDTH_RATIO = 0.6
-/** 分隔条拖拽比例范围（第 46 轮：播放器占内容宽比例） */
+/** 分隔条拖拽比例范围（第 46 轮：播放器占内容宽比例；第 47 轮上限放到 80%） */
 export const MIN_SPLIT_RATIO = 0.35
-export const MAX_SPLIT_RATIO = 0.75
+export const MAX_SPLIT_RATIO = 0.8
+/**
+ * 拖拽时评论区相对**视口宽**的下限（第 47 轮：用户要求评论区最小 = 页面宽 1/5）。
+ *
+ * 与自动模式的 40% 兜底分开：
+ * - 自动（splitRatio = 0）：评论区 ≥ 40%，另有 MIN_COMMENT_WIDTH=400 的绝对下限；
+ * - 拖拽（splitRatio > 0）：以用户为准，只保证评论区 ≥ 20%（此时允许窄于 400）。
+ */
+const MIN_COMMENT_WIDTH_RATIO_DRAG = 0.2
 /** 主区左右两列之间的横向 gutter（第 34 轮 `--bvp-gutter: 24px`） */
 const COLUMN_GUTTER = 24
 
@@ -258,10 +266,16 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
   const totalWidth = Math.max(0, Math.round(mirror.clientWidth - padX))
   /** 内容区左边缘（视口坐标）：分隔条定位与拖拽比例换算都用它（第 46 轮） */
   const contentLeft = Math.round(mirrorRect.left + padLeft)
-  // 单列（网页全屏 / 宽屏）时播放器可用宽 = 整个内容宽；否则要给评论区留最小宽
+  // 单列（网页全屏 / 宽屏）时播放器可用宽 = 整个内容宽；否则要给评论区留最小宽。
+  // 第 47 轮：拖拽模式下评论区只保证 ≥ 视口宽 20%（用户可以把评论区压得比 400 更窄），
+  // 自动模式仍用 MIN_COMMENT_WIDTH(400) 的绝对下限。
+  const splitRatioForAvail = getSplitRatio()
+  const minCommentForAvail = splitRatioForAvail > 0
+    ? Math.ceil(window.innerWidth * MIN_COMMENT_WIDTH_RATIO_DRAG)
+    : MIN_COMMENT_WIDTH
   const leftAvailW = singleColumn
     ? totalWidth
-    : Math.max(0, totalWidth - MIN_COMMENT_WIDTH - COLUMN_GUTTER)
+    : Math.max(0, totalWidth - minCommentForAvail - COLUMN_GUTTER)
 
   // 视觉样式算出来的轨道实际可能比估算更高（真机 222 vs 估算 207）：
   // 预留空间取两者较大值，否则 dock 会压进轨道顶边。
@@ -338,7 +352,10 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
   if (!singleColumn && splitRatio > 0 && totalWidth > 0) {
     const ratio = Math.min(MAX_SPLIT_RATIO, Math.max(MIN_SPLIT_RATIO, splitRatio))
     const widthByRatio = Math.round(totalWidth * ratio)
-    width = Math.max(0, Math.min(width, widthByRatio))
+    // 用户拖拽优先，但评论区不能小于视口宽 20%（第 47 轮）
+    const maxPlayerByComment = totalWidth - COLUMN_GUTTER
+      - Math.ceil(window.innerWidth * MIN_COMMENT_WIDTH_RATIO_DRAG)
+    width = Math.max(0, Math.min(width, widthByRatio, maxPlayerByComment))
     height = Math.round(width * 9 / 16)
   }
 
@@ -365,10 +382,15 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
     }
   }
 
-  // 右列至少要拿到 MIN_COMMENT_WIDTH（单列模式下不需要让位）
+  // 右列最小宽：自动模式用 MIN_COMMENT_WIDTH(400) 绝对下限；
+  // 拖拽模式只保证评论区 ≥ 视口宽 20%（第 47 轮：允许用户把评论区压得更窄）。
+  const minCommentForDrag = Math.ceil(window.innerWidth * MIN_COMMENT_WIDTH_RATIO_DRAG)
+  const minCommentWidthFinal = splitRatio > 0
+    ? minCommentForDrag
+    : MIN_COMMENT_WIDTH
   width = Math.max(0, Math.min(width, singleColumn
     ? totalWidth
-    : totalWidth - MIN_COMMENT_WIDTH - COLUMN_GUTTER))
+    : totalWidth - minCommentWidthFinal - COLUMN_GUTTER))
   height = Math.round(width * 9 / 16)
 
   setVar(TOP_VAR, `${topOffset}px`)

@@ -753,136 +753,81 @@ commentColumn.bottom = 播放器 bottom < rail.top - 8
 ### 5. 分工与未做项
 
 ## 第 32 轮：简介收拢到工具栏 + 自绘 tooltip
-## 第 46 轮：评论区宽度自适应 + 推荐轨道精简
+## 第 47 轮：轨道四角圆角 + 工具栏去 hover 背景 + 标签全部展开
 
-### 1. 评论区内容宽度自适应（容器查询）
-
-评论列宽度随窗口/拖拽在 480~1400 之间变化，内部内容此前是固定量纲（宽屏留白、窄屏拥挤）。
+### 改动点 → 理由
 
 | 改动点 | 理由 |
 | --- | --- |
-| `.bewly-comment-column` 加 `container-type: inline-size; container-name: bewly-comments` | 拖拽分隔条时**列宽**实时变化，媒体查询按视口宽判断会失效；容器查询按列宽判断才准 |
-| 头像固定 40px（窄列 32px）、文字区 `flex: 1 1 auto; min-width: 0` | 头像不被压缩、文字不写死宽度，列变宽时内容自然铺开 |
-| 正文 `max-width: 420px` + `margin-inline: 0` | 保留第 34 轮的行长约束（28~38 汉字），左对齐不居中 |
-| 子评论 `padding-left: 48px`（窄列 40px） | 缩进跟随头像宽 + gap，不写死 px 累加 |
-| 图片 / 表情 / 视频 `max-width: 100%; height: auto` | 不允许横向溢出 |
-| 多图 `repeat(auto-fill, minmax(120px, 1fr))`（窄列 88px、宽列 140px） | 图片网格随列宽自动排 |
-| `@container bewly-comments (max-width: 519px)` | 窄列：内距 12、头像 32、缩进 40、操作按钮换行、网格 2 列 |
-| `@container bewly-comments (min-width: 901px)` | 宽列：左右各留 16px、正文仍 ≤420 左对齐、网格更密；**不放大字号**（第 34 轮字阶不变） |
+| `.bvp-rail { border-radius: 14px }`（四角） | 第 46 轮为了衔接已删除的标题行只做了底部圆角（`0 0 14px 14px`）；标题行现在已彻底删除、轨道是独立浮层，四角圆最自然 |
+| `@media (max-width: 1024px)` → 12px；`prefers-contrast` / `forced-colors` 下保持 14px | 小视口圆角略收；高对比与强制色彩模式不能把圆角丢掉（会被系统色覆盖成直角） |
+| 工具栏单项 `background / background-color: transparent !important`（默认 + `:hover`） | 用户要求去掉 hover 背景；第 36 轮加的 `--bew-fill-1` 要压平 |
+| hover 保留 `opacity: 0.9` + `cursor: pointer`，`:focus-visible` 保留主题色 outline | 「不要完全没有反馈」——用透明度与焦点环替代底色 |
+| 额外压平「项内子节点」的 hover 底色（`:hover *`） | B 站常给项内图标 / 文字节点单独挂 hover 背景，只压外层会漏 |
+| 我们自己的「简介 / 选集 / 快捷键」按钮同样去底色（`background-color: transparent` + `border-color: transparent`） | 与原生工具栏单项保持一致；边框宽度不删，避免 layout 跳动 |
+| 标签行 `flex-wrap: wrap !important` + `height: auto` + `max-height: none` + `overflow: visible` | 用户要求「取消隐藏、默认全部展示」；第 36 轮的 nowrap + 横向滚动 + 锁 28px 全部覆盖 |
+| 标签保持 24px 高 / `0 8px` / 11px / 6px 圆角 | 尺寸不变，只改折行行为 |
+| 隐藏「展开 / 收起」按钮：`[class*="toggle"]` / `[class*="expand"]` / `[class*="fold"]` / `[class*="show-more"]` / `[class*="show-all"]` + `> button:not(.bewly-desc-trigger):not(.bewly-toolbar-action)` 兜底 | 真机没抓到确切的展开按钮节点（类名随版本变），用「语义前缀 + 孤立 button」双保险；后者只作用于标签行内部，不会误伤页面其它折叠按钮 |
+| 高对比度 / forced-colors 给标签补 1px 边框 | 折行后标签之间靠底色区分不明显，高对比下需要边界 |
+| `reduced-motion` 关闭工具栏单项过渡 | 动效可关 |
 
-**交接项（shadow 内，页面 CSS 选不到）**：B 站评论正文在 `bili-comments` 的 shadow root 里。
-需要 video-page 在 `comments.ts` 已有的「向评论 shadow 注入 style」通道里补等价规则：
+### 交接 / 依赖
 
-```css
-.reply-item {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  min-width: 0;
-}
-.reply-item .root-reply-avatar,
-.reply-item .sub-user-avatar {
-  flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
-}
-.reply-item #content,
-.reply-content {
-  flex: 1 1 auto;
-  min-width: 0;
-  max-width: 420px;
-  overflow-wrap: anywhere;
-}
-.sub-reply-container {
-  padding-left: 48px;
-}
-.reply-item img,
-.reply-content img {
-  max-width: 100%;
-  height: auto;
-}
-.picture-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 8px;
-}
-@container (max-width: 519px) {
-  /* 头像 32 / 缩进 40 / 网格 88 */
-}
-```
-
-### 2. 推荐轨道精简
-
-| 改动点 | 理由 |
-| --- | --- |
-| 隐藏 `.bvp-rail__head / .bvp-rail__title / .bvp-rail__actions / .bvp-rail__nav / .bvp-rail__close`（`display: none !important`） | 模板删除由 video-page 做；CSS 先兜底，保证「高度减少 ≥24px」不被模板时序卡住 |
-| `.bvp-rail`：`padding: 12px 16px`、`gap: 0` | 去掉标题行留下的上边距；卡片区上下 12px、左右 16px |
-| `.bvp-rail`：`border-radius: 0 0 14px 14px`、`border: 0` | 底部左右圆角形成 dock，顶部直角与播放器区衔接；**不加边框**，靠背景色过渡 |
-| `.bvp-rail` 背景改为 `color-mix(--bew-fill-1 75%, transparent)` + 毛玻璃 | 与页面背景自然过渡，弱化「一块板」 |
-| `.bvp-rail__viewport` `height: 100%`、`.bvp-rail__track` `height: 100%` | 没有 head 后 viewport 直接吃满轨道高度 |
-| 窄屏（≤1024）：`padding: 10px 12px`、底圆角 12px | 小视口收边距 |
-| 高对比度 / forced-colors 兜底 | 提一档背景对比；强制色彩用 Canvas 且保留圆角 |
-
-**需要 video-page 改的（高度公式）**：`recommendRail/index.ts` 的 `computeRailHeight` 仍含头部：
-
-```ts
-// 旧：8*2 + coverHeight + 8 + 34 + 4 + 16 + 26(头部) + 8(间隙)
-// 新：12*2(上下 padding) + 8*2(卡片内边距) + coverHeight + 8 + 34 + 4 + 16
-return 12 * 2 + 8 * 2 + coverHeight + 8 + 34 + 4 + 16
-```
-
-真机高度应从 222~243 降到 ~196~217（减少 ≥24）。
-**切换仍可用**：滚轮 / ←→ / Home / End / Enter 不变（交互逻辑未动）。
+- 标签行高度现在**由内容决定**（可能多行），dock 高度需要 video-page 的 JS 实测标签行高度后分配 —— 该逻辑他已实现（第 46 轮以后），所以我这边**没有锁任何高度**；
+- 真机诊断显示 21 个标签都在 DOM 里（`scrollWidth == clientWidth == 888`），所以 `wrap` 后应能全部可见；若个别视频的标签行只渲染了前 N 个（B 站 JSON 里带 `show_more`），那属于原生数据层，CSS 无法补出未渲染的标签。
 
 ### 已知限制
 
-- 评论 shadow 内部的规则靠 video-page 注入，未注入前「头像固定 / 行长 / 多图网格」在 shadow 内不生效（页面级只能约束到宿主容器）；
-- `container-type: inline-size` 只影响 inline 方向，不影响 A 的 dock 高度分配；
-- 轨道高度需要 rail.ts 同步改公式，否则 CSS 精简后底部会留白（总高仍按旧公式）。
+- 展开/收起按钮是「按类名/结构兜底隐藏」，若 B 站改成文字按钮且类名不含上述前缀，需要再补一条精确选择器（真机给我节点即可）；
+- 工具栏 hover 压平用的是 `.toolbar-left-item-wrap / .toolbar-left-item / .video-toolbar-left-item` 三类，若某次改版换了类名，hover 底色会回来（默认态仍是透明）。
 
-## 第 46 轮 A：播放器 / 评论区分隔条拖拽调宽
+## 第 47 轮：布局三项（UP 卡上边距 / 评论区最小 20% / 上部区域 +16）
 
-### 结构
+### 需求 2：UP 卡 top margin 与左右一致
 
-- 分隔条是**页面级 DOM**（`#bewly-video-splitter`，由 `splitter.ts` 创建到 body），不是 shadow 内组件：
-  它要压在播放器列与评论列之间的 gutter 上，而这两列都是 B 站自己的 DOM；页面级 `position: fixed`
-  也不会被评论区滚动容器裁剪；
-- 位置全部读布局变量：`left: var(--bvp-fixed-split-left)`、`top: var(--bvp-fixed-top)`、
-  `height: var(--bvp-fixed-dock-height)`；`--bvp-fixed-split-left` 由 `fixedLayout.ts` 算：
-  `内容左边缘 + 播放器宽 + gutter/2 − 3`（6px 宽，中心落在 gutter 中间）；
-- 只在固定布局、非单列时显示：`html:not(.bewly-video-fixed)` / `html.bewly-player-webfull` /
-  `html.bewly-player-wide` 下 `display: none`；iframe 降级时 `splitter.ts` 不创建元素。
+真机：UP 卡 `topGap=5`、`leftGap/rightGap=13`。
+13px 的来源：评论列内距 12（`--bvp-space-3`）+ 卡片自身 border 1 → 13。
 
-### 拖拽
+```scss
+.bewly-comment-column > .up-panel-container {
+  margin-top: var(--bvp-comment-card-gap, 13px) !important;
+  margin-bottom: 0 !important;
+}
+```
 
-- `pointerdown` → `setPointerCapture` → `pointermove` → `pointerup`，拖拽期间 body 加
-  `bewly-video-resizing`（禁用文本选中、`cursor: col-resize`）；
-- 比例 = `(clientX − --bvp-fixed-content-left) / --bvp-fixed-content-width`，clamp 到 `[0.35, 0.75]`；
-- `pointermove` 用 `requestAnimationFrame` 合并成每帧一次，只改内存里的「预览比例」并写 CSS 变量，
-  **不写 settings**；`pointerup` 时写一次 `settings.value.videoPageSplitRatio`（刷新后保持）；
-- 双击 / Home / End → `videoPageSplitRatio = 0`（回到自动计算 + 第 44 轮的 40% 兜底）；
-- 键盘：`role="separator"` + `aria-orientation="vertical"` + `tabindex=0`，←/→ 每次 1%，
-  `aria-valuenow` 每拍同步；
-- `title` = 「双击重置宽度比例」。
+- 卡片底部到「评论 N」那一行的间距交给 `bili-comments-header-renderer` 的 `padding-block-start: 13px`
+  （在 `comments.ts` 的 `COMMENTS_STYLE` 里注入），避免卡片 margin-bottom 与 header padding 叠成 24；
+- 两个量都是变量 / 单点定义，真机差 1px 直接调。
 
-### fixedLayout 的配合
+### 需求 4：拖拽时评论区最小 = 页面宽 1/5
 
-- `getSplitRatio()`：拖拽预览值优先，其次 `settings.videoPageSplitRatio`，0 表示自动；
-- `splitRatio > 0` 时：`width = min(按高度反算的宽, round(内容宽 × 比例))`，再 `height = round(width × 9 / 16)`；
-  **绕过 40% 兜底**（拖拽优先），但保留 `MIN_COMMENT_WIDTH = 400` 的绝对下限（避免评论列窄到不可用，
-  1600 宽下拖到最右时播放器约 74%、评论区约 26%）；
-- 新增变量：`--bvp-fixed-split-left`、`--bvp-fixed-content-left`、`--bvp-fixed-content-width`，
-  `clearFixedLayout()` 一并清理。
+- 分隔条比例上限从 0.75 → **0.80**（`MAX_SPLIT_RATIO`），下限仍 0.35；
+- 新增 `MIN_COMMENT_WIDTH_RATIO_DRAG = 0.2`：拖拽模式下评论区只保证 ≥ `ceil(innerWidth × 0.2)`；
+- 拖拽模式下 `leftAvailW`（播放器可用宽）也按 20% 口径放宽，所以评论区能压到 320（1600 宽时正好 20%）；
+- 自动模式不变：40% 兜底 + `MIN_COMMENT_WIDTH = 400` 绝对下限；**拖拽后（`splitRatio > 0`）不再走 40% 兜底**，以用户为准。
 
-### 协作项（native-style 交接，已全部完成）
+### 需求 5：上部区域 top margin +16
 
-1. **轨道头部模板已删除**：`RecommendRail.vue` 的 `<header class="bvp-rail__head">` 整块（标题 / 两个箭头 / 关闭按钮）移除；
-2. **`computeRailHeight` 公式已改**：
-   ```ts
-   // 旧：8 * 2 + coverHeight + 8 + 34 + 4 + 16 + 26 + 8
-   // 新：12 * 2(轨道上下 padding) + 8 * 2(卡片内边距) + coverHeight + 8 + 34 + 4 + 16
-   return 12 * 2 + 8 * 2 + coverHeight + 8 + 34 + 4 + 16
-   ```
-3. **评论 shadow 响应式规则已注入**：`comments.ts` 新增 `COMMENTS_RESPONSIVE_STYLE`，
-   同时注入 `bili-comments` 与每个 `bili-comment-renderer` 的 shadow（正文 / 头像 / 子评论缩进 / 多图网格 /
-   `@container bewly-comments` 窄列与宽列分支），卸载时移除。
+```scss
+#mirror-vdcon,
+.video-container-v1 {
+  margin-top: var(--bvp-fixed-top-gap, 16px) !important;
+}
+```
+
+- `fixedLayout.ts` 读的是 `#mirror-vdcon` 的**实测 top**，所以 `--bvp-fixed-top` 自动从 64 → **80**，
+  dock 高度相应减少 16（播放器变矮，预期）；
+- 用实测而不是硬编码：若 B 站改顶栏高度，这里自动跟随，只需保证「+16」这个呼吸空间常量。
+
+### 预期数值（1600×1000，新轨道公式 212）
+
+| 场景 | 播放器 | 比例 | 评论列 | colPct(/1600) |
+| --- | --- | --- | --- | --- |
+| 自动（splitRatio=0） | 885×498 | 1.7771 | 643 | 40.19% |
+| 拖到最左（0.35） | 543×305 | 1.7803 | 985 | 61.56% |
+| 拖到最右（0.80） | 885×498（高度受限，拖不动） | 1.7771 | 643 | 40.19% |
+| 1600×1200 拖到最右 | 1208×680 | 1.7765 | **320** | **20.00%** |
+| 2200×1000 拖到最右 | 800×450 | 1.7778 | 1328 | 60.36% |
+
+说明：1600×1000 下播放器宽度受 16:9 + dock 高度限制，拖到最右只能停在 885（评论区 40.19%，仍远高于 20% 下限）；
+视口更高（≥1200）时才能把评论区压到 20%。这满足「评论区 ≥20%」的验收，但不是「一定能拖到 20%」。

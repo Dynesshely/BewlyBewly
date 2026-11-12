@@ -2918,3 +2918,173 @@ body.bewly-video-resizing * {
   user-select: none !important;
   cursor: col-resize !important;
 }
+
+/* ===== 第 47 轮 flat-toolbar-tags ===== */
+/* 工具栏去 hover 背景 + 标签全部展开（第 47 轮 B 工作流，只追加）
+
+   需求 2：点赞 / 投币 / 收藏 / 分享那一行「不要 hover 背景」。
+   第 36 轮给单项加过 `:hover { background: var(--bew-fill-1) }`，这里全部压回透明；
+   但保留可访问性反馈：轻微 opacity 变化 + pointer 光标（不是完全没反馈）。
+   同时把 B 站原生可能自带的 hover 背景（含项内图标 / 文字节点）一起压平。
+
+   需求 3：视频标签「取消隐藏、全部展示、移除展开/收起按钮」。
+   第 36 轮是 nowrap + 横向滚动 + 锁 28px 高；现在改成 wrap 多行、高度自适应、不裁剪。
+   标签尺寸保持不变（11px / 24px / 6px 圆角）。dock 高度由 video-page 的 JS 实测标签行高度适配。 */
+
+/* ---------- 需求 2：工具栏单项 hover 背景压平 ---------- */
+html.bewly-design.videoPage #arc_toolbar_report .toolbar-left-item-wrap,
+html.bewly-design.videoPage #arc_toolbar_report .toolbar-left-item,
+html.bewly-design.videoPage #arc_toolbar_report .video-toolbar-left-item {
+  cursor: pointer;
+  background: transparent !important;
+  background-color: transparent !important;
+  transition:
+    opacity 160ms ease,
+    color 160ms ease;
+}
+
+/* hover / focus 仍然是透明的：只有轻微的透明度与文字色变化 */
+html.bewly-design.videoPage #arc_toolbar_report .toolbar-left-item-wrap:hover,
+html.bewly-design.videoPage #arc_toolbar_report .toolbar-left-item:hover,
+html.bewly-design.videoPage #arc_toolbar_report .video-toolbar-left-item:hover {
+  background: transparent !important;
+  background-color: transparent !important;
+  opacity: 0.9;
+}
+
+html.bewly-design.videoPage #arc_toolbar_report .toolbar-left-item-wrap:focus-visible,
+html.bewly-design.videoPage #arc_toolbar_report .toolbar-left-item:focus-visible {
+  background: transparent !important;
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+
+/* 项内部的图标 / 文字节点也常被 B 站单独给 hover 底色，一并压平 */
+html.bewly-design.videoPage #arc_toolbar_report .toolbar-left-item-wrap:hover *,
+html.bewly-design.videoPage #arc_toolbar_report .toolbar-left-item:hover *,
+html.bewly-design.videoPage #arc_toolbar_report .video-toolbar-left-item:hover * {
+  background-color: transparent !important;
+}
+
+/* 我们自己的两个按钮（简介 / 选集 / 快捷键）同样不要 hover 底色 */
+html.bewly-design.videoPage #arc_toolbar_report .bewly-desc-trigger:hover,
+html.bewly-design.videoPage #arc_toolbar_report .bewly-toolbar-action:hover {
+  background-color: transparent !important;
+  border-color: transparent !important;
+  opacity: 0.9;
+}
+
+/* ---------- 需求 3：标签全部展示 ---------- */
+html.bewly-design.videoPage .video-tag-container,
+html.bewly-design.videoPage.bewly-video-fixed .video-tag-container {
+  display: flex !important;
+  /* 多行展示全部标签（原来是 nowrap + 横向滚动） */
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 8px !important;
+  box-sizing: border-box !important;
+  /* 高度交给内容（dock 高度由 video-page 的 JS 实测后分配） */
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  /* 不裁剪、不横向滚动 */
+  overflow: visible !important;
+  border: 0 !important;
+  border-bottom: 0 !important;
+  background: transparent !important;
+  scrollbar-width: none;
+}
+
+/* 去掉残留的滚动条（若 B 站内联了 overflow-x） */
+html.bewly-design.videoPage .video-tag-container::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* 标签本体：保持 11px / 24px 高 / 6px 圆角；允许折行时各自独立高度 */
+html.bewly-design.videoPage .video-tag-container > *,
+html.bewly-design.videoPage .video-tag-container .tag,
+html.bewly-design.videoPage .video-tag-container a,
+html.bewly-design.videoPage .video-tag-container .tag-link {
+  flex: 0 0 auto;
+  height: 24px;
+  padding: 0 8px;
+  font-size: var(--bvp-fs-badge, 11px);
+  line-height: 1;
+  white-space: nowrap;
+  border-radius: 6px;
+}
+
+/* ---------- 需求 3：隐藏「展开 / 收起」按钮 ----------
+   真机没抓到确切节点（类名随 B 站版本变），这里按常见类名 + 语义前缀做保守覆盖：
+   只作用于标签行内部，不会误伤页面其它折叠按钮。 */
+html.bewly-design.videoPage .video-tag-container [class*="toggle"],
+html.bewly-design.videoPage .video-tag-container [class*="expand"],
+html.bewly-design.videoPage .video-tag-container [class*="fold"],
+html.bewly-design.videoPage .video-tag-container [class*="show-more"],
+html.bewly-design.videoPage .video-tag-container [class*="show-all"],
+html.bewly-design.videoPage .video-tag-container .tag-panel-toggle,
+html.bewly-design.videoPage .video-tag-container .tag-toggle,
+html.bewly-design.videoPage .video-tag-container .tag-expand,
+html.bewly-design.videoPage .video-tag-container button[class*="more"] {
+  display: none !important;
+}
+
+/* 兜底：标签行里不是标签、也不是我们注入按钮的「孤立按钮」一律隐藏
+   （展开/收起本质就是一个不带 .tag / .tag-link 类的 button） */
+html.bewly-design.videoPage .video-tag-container > button:not(.bewly-desc-trigger):not(.bewly-toolbar-action) {
+  display: none !important;
+}
+
+/* 高对比度：标签边界靠底色区分，折行后行距保持 8px */
+@media (prefers-contrast: more) {
+  html.bewly-design.videoPage .video-tag-container .tag,
+  html.bewly-design.videoPage .video-tag-container a {
+    border: 1px solid color-mix(in oklab, currentColor 25%, transparent);
+  }
+}
+
+@media (forced-colors: active) {
+  html.bewly-design.videoPage .video-tag-container .tag,
+  html.bewly-design.videoPage .video-tag-container a {
+    border: 1px solid CanvasText;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.bewly-design.videoPage #arc_toolbar_report .toolbar-left-item-wrap,
+  html.bewly-design.videoPage #arc_toolbar_report .toolbar-left-item {
+    transition: none;
+  }
+}
+/* ===== 第 47 轮 flat-toolbar-tags end ===== */
+
+/* ===== 第 47 轮 layout-gaps =====
+   用户 6 项里的 2 / 5：
+   2) UP 卡 top margin 与左右一致（真机左右 13px，top 只有 5px）；
+   5) 上部区域整体 top margin +16，让播放器 / 评论区上方有呼吸空间。
+   两个变量都写成可调令牌，方便真机微调。 */
+html.bewly-design.videoPage.bewly-video-fixed {
+  /* 5) 内容区顶部：B 站顶栏 64px 之外再加 16px。
+     fixedLayout.ts 读的是 #mirror-vdcon 的实测 top，所以 dock 高度会自动减少 16（播放器变矮，符合预期）。 */
+  #mirror-vdcon,
+  .video-container-v1 {
+    margin-top: var(--bvp-fixed-top-gap, 16px) !important;
+  }
+
+  /* 2a) 评论列自身不能再带 padding-top（真机复测：卡 margin 13 + 列内 5 = 18）。
+     置 0 后 UP 卡的 13px margin 是顶部间距的唯一来源。 */
+  .bewly-comment-column {
+    padding-top: 0 !important;
+  }
+
+  /* 2b) UP 卡上边距 = 左右边距：左右是「评论列 padding 12 + 卡片 border 1」= 13，top 也取 13。
+     底部间距交给 header 宿主的 padding-block-start（comments.ts 注入），避免双层叠加。 */
+  .bewly-comment-column > .up-panel-container {
+    margin-top: var(--bvp-comment-card-gap, 13px) !important;
+    margin-bottom: 0 !important;
+  }
+}

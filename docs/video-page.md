@@ -916,3 +916,47 @@ document.querySelector('#commentapp').querySelector('bili-comments').shadowRoot.
 - 打开设置页：宿主 z-index 9999 < 10002、轨道 `display:none`，设置页完整可见可点 ✅
 - 关闭设置页：类 / 属性 / 行内样式全部移除，轨道恢复、z-index 回到 2147483200 ✅
 - 期间固定布局变量未变，播放器 / 评论区无跳变 ✅
+
+## 第 43 轮：iframe 内预览（首页空格抽屉）整体降级
+
+现象：首页按空格打开「标签页内预览」→ 抽屉 iframe 里加载视频页，但增强层仍按**整页视口**做固定布局，
+评论列被塞到抽屉右侧、轨道贴底、播放器被压缩。
+
+根因：抽屉 iframe 的视口远小于整页视口，而 `fixedLayout` / `commentColumn` / `recommendRail`
+（以及工具栏、简介按钮、播放器模式）都以 `window.innerWidth/innerHeight` 为基准分配空间。
+
+### 实现
+
+`src/contentScripts/videoPage/index.ts`：
+
+- 引入 `isInIframe()`（`~/utils/main`），**每拍重算**（抽屉随时可能打开 / 关闭）；
+- `mount()` 时若在 iframe 内：
+  - 不 setup `fixedLayout`（不写 `--bvp-fixed-*`、不加 `html.bewly-video-fixed`）；
+  - 不 setup `commentColumn`（不搬 `#commentapp`）；
+  - 不 setup `toolbarActions` / `descPopover`（不往原生工具栏塞按钮）；
+  - 不 setup 快捷键（iframe 内会和抽屉外层抢空格 / 方向键）；
+  - 不调用 `syncPlayerScreenMode`（早退路径不写 `bewly-player-*` 类）；
+- `sync()` 每拍调用 `syncIframeDegradation()`：状态变化时执行 `degradeForIframe()` / `restoreFromIframe()`；
+- iframe 内 `sync()` 在完成基础状态（`ui.ready` / 舞台标记）后**提前返回**，只保留 `syncComments()`；
+- `degradeForIframe()`：dispose 各功能 + `clearFixedLayout()` + `restoreCommentColumn()` +
+  `teardownToolbarActions()` / `teardownDescPopover()` / `teardownRecommendRail()` / `teardownPlayerScreenMode()`；
+- `restoreFromIframe()`：重新 setup 被跳过的功能（正常播放页永远走这条之外的路径）；
+- `settings` watch 里的 `syncFixedLayout()` 也加 `!iframeDegraded` 守卫；
+- `unmount()` 复位 `iframeDegraded`。
+
+### 保留的功能
+
+| 功能 | iframe 内 | 原因 |
+| --- | --- | --- |
+| 评论增强（只看 UP / 折叠 / 登录入口） | 保留 | 不搬 DOM、不写布局，无副作用 |
+| 广告清理 | 保留 | 纯 CSS |
+| 快捷键 | **关闭** | 空格 / 方向键在 iframe 内会与抽屉外层冲突（空格正是打开抽屉的键） |
+| 迷你播放器 | 不进入 | 早退路径不跑迷你态逻辑 |
+
+### 验收对应
+
+- iframe 内：`html.bewly-video-fixed` 不存在（`clearFixedLayout()` + 不 setup）；
+- `[data-bewly-comment-column]` 为 null（不搬列 + `restoreCommentColumn()`）；
+- `.bvp-rail` 为 null（不 setup 轨道 + `teardownRecommendRail()` 清 `railState`，Vue 不渲染）；
+- 原生 `#commentapp` 留在原位、原生推荐列表正常显示；
+- 关闭抽屉 / 非 iframe 页面：所有功能照常（`bewly-video-fixed` 存在、轨道存在）。

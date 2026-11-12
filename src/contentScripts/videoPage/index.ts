@@ -12,6 +12,7 @@ import type { SelectionItemView } from './state'
 import { createApp, watch } from 'vue'
 
 import { settings } from '~/logic'
+import { isInIframe } from '~/utils/main'
 
 import { hasNativeOverlay, mountNativeOverlay, unmountNativeOverlay } from '../nativeOverlay'
 import {
@@ -24,7 +25,7 @@ import {
   setMini,
 } from './actions'
 import { setupAdGuard, teardownAdGuard } from './adGuard'
-import { setupCommentColumn, syncCommentColumn } from './commentColumn'
+import { restoreCommentColumn, setupCommentColumn, syncCommentColumn } from './commentColumn'
 import { getCommentStyleStat, setupComments, syncComments } from './comments'
 import PlaylistPanel from './components/PlaylistPanel.vue'
 import VideoPageOverlay from './components/VideoPageOverlay.vue'
@@ -45,7 +46,7 @@ import {
   isNativeVideoPage,
   markPlayerStage,
 } from './dom'
-import { setupFixedLayout, syncFixedLayout } from './fixedLayout'
+import { clearFixedLayout, setupFixedLayout, syncFixedLayout } from './fixedLayout'
 import { syncPlayerScreenMode, teardownPlayerScreenMode } from './playerMode'
 import selectionPanelCss from './playlistPanel.shadow.scss?inline'
 import { bindRailHost, railState, syncRecommendRail, teardownRecommendRail } from './recommendRail'
@@ -124,6 +125,65 @@ let disposeShortcuts: (() => void) | null = null
 let disposeComments: (() => void) | null = null
 let disposeCommentColumn: (() => void) | null = null
 let disposeFixedLayout: (() => void) | null = null
+
+/** iframe 内（首页空格预览的抽屉）是否处于降级状态（第 43 轮） */
+let iframeDegraded = false
+
+/**
+ * 进入 iframe 降级：把可能已经写入过的布局 / 轨道 / 工具栏全部还原。
+ *
+ * 触发场景：正常播放页先挂载、随后被放进 iframe（少见，但 teardown 必须能还原）。
+ */
+function degradeForIframe(): void {
+  if (disposeShortcuts) {
+    disposeShortcuts()
+    disposeShortcuts = null
+  }
+  if (disposeCommentColumn) {
+    disposeCommentColumn()
+    disposeCommentColumn = null
+  }
+  restoreCommentColumn()
+  if (disposeFixedLayout) {
+    disposeFixedLayout()
+    disposeFixedLayout = null
+  }
+  clearFixedLayout()
+  teardownToolbarActions()
+  teardownDescPopover()
+  teardownRecommendRail()
+  teardownPlayerScreenMode()
+  if (ui.mini)
+    setMini(false)
+}
+
+/** 退出 iframe 降级：恢复被跳过的功能 */
+function restoreFromIframe(): void {
+  setupDescPopover()
+  setupToolbarActions()
+  if (!disposeCommentColumn)
+    disposeCommentColumn = setupCommentColumn()
+  if (!disposeFixedLayout)
+    disposeFixedLayout = setupFixedLayout()
+  if (settings.value.videoPageShortcuts && !disposeShortcuts)
+    disposeShortcuts = setupShortcuts()
+}
+
+/**
+ * 每拍重算 iframe 状态（第 43 轮）。
+ *
+ * 抽屉随时可能被打开 / 关闭，所以不做一次性判断；只在状态变化时动作，避免每拍抖动。
+ */
+function syncIframeDegradation(): void {
+  const inIframe = isInIframe()
+  if (inIframe === iframeDegraded)
+    return
+  iframeDegraded = inIframe
+  if (inIframe)
+    degradeForIframe()
+  else
+    restoreFromIframe()
+}
 let stopSettingsWatch: (() => void) | null = null
 let syncTimer: number | null = null
 let scrollFrame = 0
@@ -172,7 +232,12 @@ function mount(): void {
   vueApp = createApp(VideoPageOverlay)
   vueApp.mount(mountPoint)
 
-  if (settings.value.videoPageShortcuts)
+  // iframe 内（首页空格预览的抽屉）整体降级（第 43 轮）：
+  // 抽屉视口远小于整页，fixedLayout / commentColumn / 轨道 / 工具栏都按整页视口分配，
+  // 在抽屉里必然挤压错乱 —— 这里不 setup 这些功能，只保留评论增强与广告清理。
+  iframeDegraded = isInIframe()
+  // 快捷键在 iframe 内也会和外层抽屉抢空格 / 方向键，一并关闭。
+  if (!iframeDegraded && settings.value.videoPageShortcuts)
     disposeShortcuts = setupShortcuts()
 
   // 评论区增强（排序 / 只看 UP / 长评论折叠）：没有评论区时组件自身不渲染
@@ -184,20 +249,24 @@ function mount(): void {
   // window 钩子保留给 content script 自身调试用。
   ;(window as unknown as Record<string, unknown>).__bewlyCommentsStyleStat = getCommentStyleStat
 
-  // 简介收拢为工具栏按钮 + 自绘 tooltip（第 32 轮）：没有简介时自身不注入
-  setupDescPopover()
+  if (!iframeDegraded) {
+    // 简介收拢为工具栏按钮 + 自绘 tooltip（第 32 轮）：没有简介时自身不注入
+    setupDescPopover()
 
-  // 工具栏原生入口「选集 / 快捷键」（第 33 轮）：把右下角浮动按钮挪进原生工具栏
-  setupToolbarActions()
+    // 工具栏原生入口「选集 / 快捷键」（第 33 轮）：把右下角浮动按钮挪进原生工具栏
+    setupToolbarActions()
 
-  // 评论区移到播放器右侧、与播放器同高（第 27 轮）：找不到结构 / 窄屏会自动回退
-  disposeCommentColumn = setupCommentColumn()
+    // 评论区移到播放器右侧、与播放器同高（第 27 轮）：找不到结构 / 窄屏会自动回退
+    disposeCommentColumn = setupCommentColumn()
+  }
 
   // 广告清理（第 28 轮）：CSS 清单 + MutationObserver 兜底动态插入
   setupAdGuard()
 
-  // 固定单页布局（第 28 轮）：窗口太小 / 番剧页 / 迷你态会自动回退到原生可滚动布局
-  disposeFixedLayout = setupFixedLayout()
+  // 固定单页布局（第 28 轮）：窗口太小 / 番剧页 / 迷你态会自动回退到原生可滚动布局。
+  // iframe 内不启用（抽屉视口不是整页视口）。
+  if (!iframeDegraded)
+    disposeFixedLayout = setupFixedLayout()
 
   window.addEventListener('scroll', handleScroll, { passive: true })
   window.addEventListener('resize', handleScroll, { passive: true })
@@ -231,8 +300,9 @@ function mount(): void {
 
       updateScrollState()
       safeSync('syncRecommendRail', () => syncRecommendRail({ enabled: settings.value.videoPageRecommendRail }))
-      // 固定布局开关：立刻生效 / 立刻还原
-      syncFixedLayout()
+      // 固定布局开关：立刻生效 / 立刻还原（iframe 内不写布局）
+      if (!iframeDegraded)
+        syncFixedLayout()
     },
   )
 
@@ -295,6 +365,7 @@ function unmount(): void {
     endedTimer = null
   }
   document.documentElement.classList.remove('bewly-video-mini')
+  iframeDegraded = false
   document.documentElement.style.removeProperty('--bvp-mini-placeholder')
   clearStagePlaceholder()
   clearPlayerStage()
@@ -326,6 +397,9 @@ function sync(): void {
 
   ui.isBangumi = kind === 'bangumi'
 
+  // iframe 内（抽屉预览）整体降级：每拍重算，抽屉开 / 关都能正确切换（第 43 轮）。
+  safeSync('syncIframeDegradation', syncIframeDegradation)
+
   if (document.hidden)
     return
 
@@ -338,6 +412,13 @@ function sync(): void {
   if (wrap !== stageEl) {
     stageEl = wrap
     markPlayerStage(wrap)
+  }
+
+  // iframe 内只保留「不写布局」的增强（评论折叠按钮 / 只看 UP / 登录入口），
+  // 其余固定布局、轨道、工具栏、播放器模式一律不写入。
+  if (iframeDegraded) {
+    safeSync('syncComments', syncComments)
+    return
   }
 
   // 番剧 / 电影才有集数列表；没有时切集快捷键与帮助项都隐藏

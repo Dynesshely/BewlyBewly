@@ -630,7 +630,7 @@
     #viewbox_report h1 {
       display: -webkit-box;
       overflow: hidden;
-      font-size: 17px;
+      font-size: var(--bvp-fs-title, 20px);
       line-height: 22px;
       -webkit-box-orient: vertical;
       -webkit-line-clamp: 1;
@@ -801,8 +801,8 @@
     border: 1px solid var(--bew-border-color);
     border-radius: 12px;
     transition:
-      background-color 200ms ease,
-      border-color 200ms ease;
+      background-color var(--bvp-dur-fast, 120ms) var(--bvp-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1)),
+      border-color var(--bvp-dur-fast, 120ms) var(--bvp-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1));
   }
 
   .up-panel-container:hover {
@@ -822,7 +822,7 @@
   .up-panel-container .up-name,
   .up-panel-container .up-info--name {
     overflow: hidden;
-    font-size: 13px;
+    font-size: var(--bvp-fs-upname, 18px);
     font-weight: 600;
     line-height: 1.4;
     text-overflow: ellipsis;
@@ -833,7 +833,7 @@
   .up-panel-container .up-info--desc,
   .up-panel-container .fan,
   .up-panel-container .attention-btn-ctnr {
-    font-size: 11px;
+    font-size: var(--bvp-fs-meta, 12.5px);
     line-height: 1.4;
     color: var(--bew-text-3);
   }
@@ -865,7 +865,7 @@
   /* 固定布局下信息栏被压成一行；这里只保证字号 / 行高可读（≥15px / 1.4），不写高度 */
   &.bewly-video-fixed #viewbox_report .video-title,
   &.bewly-video-fixed #viewbox_report h1 {
-    font-size: 15px;
+    font-size: var(--bvp-fs-title, 20px);
     line-height: 1.4;
     letter-spacing: 0.01em;
   }
@@ -873,7 +873,7 @@
   /* 标题与 UP / 播放量之间的分隔：用一条短竖线替代紧凑排布 */
   &.bewly-video-fixed #viewbox_report .video-info-meta,
   &.bewly-video-fixed #viewbox_report .video-info-detail {
-    font-size: 12px;
+    font-size: var(--bvp-fs-meta, 12.5px);
     line-height: 1.4;
     color: var(--bew-text-3);
   }
@@ -903,7 +903,7 @@
   &.bewly-video-fixed #arc_toolbar_report .toolbar-left-item-wrap,
   &.bewly-video-fixed #arc_toolbar_report .video-toolbar-left-item {
     border-radius: 8px;
-    transition: background-color 160ms ease;
+    transition: background-color var(--bvp-dur-fast, 120ms) var(--bvp-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1));
   }
 
   &.bewly-video-fixed #arc_toolbar_report .toolbar-left-item-wrap:hover {
@@ -978,9 +978,9 @@
     align-items: center;
     justify-content: center;
     height: 28px;
-    padding: 0 10px;
+    padding: 0 8px;
     margin-inline-start: 8px;
-    font-size: 13px;
+    font-size: var(--bvp-fs-meta, 12.5px);
     line-height: 1;
     color: var(--bew-text-2);
     cursor: pointer;
@@ -988,9 +988,9 @@
     border: 1px solid var(--bew-border-color);
     border-radius: 8px;
     transition:
-      color 160ms ease,
-      background-color 160ms ease,
-      border-color 160ms ease;
+      color var(--bvp-dur-fast, 120ms) var(--bvp-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1)),
+      background-color var(--bvp-dur-fast, 120ms) var(--bvp-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1)),
+      border-color var(--bvp-dur-fast, 120ms) var(--bvp-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1));
   }
 
   .bewly-desc-trigger:hover,
@@ -1009,7 +1009,7 @@
   &.bewly-video-fixed .bewly-desc-trigger {
     height: 26px;
     padding-inline: 8px;
-    font-size: 12px;
+    font-size: var(--bvp-fs-meta, 12.5px);
   }
 }
 
@@ -1024,7 +1024,7 @@
   padding: 12px 14px;
   overflow: auto;
   overscroll-behavior: contain;
-  font-size: 13px;
+  font-size: var(--bvp-fs-body, 14px);
   line-height: 1.6;
   color: var(--bew-text-1);
   white-space: pre-wrap;
@@ -1100,8 +1100,8 @@
   .bewly-desc-tooltip {
     max-width: min(360px, calc(100vw - 16px));
     max-height: min(240px, calc(100vh - 16px));
-    padding: 10px 12px;
-    font-size: 12px;
+    padding: 12px;
+    font-size: var(--bvp-fs-meta, 12.5px);
   }
 }
 /* #endregion */
@@ -1153,9 +1153,9 @@
     align-items: center;
     justify-content: center;
     height: 28px;
-    padding: 0 10px;
+    padding: 0 8px;
     margin-inline-start: 8px;
-    font-size: 13px;
+    font-size: var(--bvp-fs-meta, 12.5px);
     line-height: 1;
     color: var(--bew-text-2);
     white-space: nowrap;
@@ -1164,9 +1164,9 @@
     border: 1px solid var(--bew-border-color);
     border-radius: 8px;
     transition:
-      color 160ms ease,
-      background-color 160ms ease,
-      border-color 160ms ease;
+      color var(--bvp-dur-fast, 120ms) var(--bvp-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1)),
+      background-color var(--bvp-dur-fast, 120ms) var(--bvp-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1)),
+      border-color var(--bvp-dur-fast, 120ms) var(--bvp-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1));
   }
 
   .bewly-toolbar-action:hover {
@@ -1195,17 +1195,17 @@
   &.bewly-video-fixed .bewly-toolbar-action {
     height: 26px;
     padding-inline: 8px;
-    margin-inline-start: 6px;
-    font-size: 12px;
+    margin-inline-start: 8px;
+    font-size: var(--bvp-fs-meta, 12.5px);
     border-radius: 6px;
   }
 
   /* 极窄屏：只保留文字，内边距再收一点（不换行、不省略，避免看不懂） */
   @media (max-width: 1024px) {
     .bewly-toolbar-action {
-      padding-inline: 6px;
+      padding-inline: 4px;
       margin-inline-start: 4px;
-      font-size: 11px;
+      font-size: var(--bvp-fs-badge, 11px);
     }
   }
 
@@ -1283,8 +1283,8 @@
   @media (max-width: 1024px) {
     #bewly-toolbar-actions,
     .bewly-toolbar-actions {
-      gap: 6px;
-      margin-inline-start: 6px;
+      gap: 8px;
+      margin-inline-start: 8px;
     }
   }
 
@@ -1760,12 +1760,12 @@ html.bewly-design.videoPage.bewly-video-fixed {
 @media (max-width: 1280px) {
   .bewly-design.videoPage #viewbox_report .video-title,
   .bewly-design.videoPage #viewbox_report h1 {
-    font-size: 18px;
+    font-size: var(--bvp-fs-upname, 18px);
   }
 
   .bewly-design.videoPage .bewly-comment-column .reply-header .title,
   .bewly-design.videoPage .bewly-comment-column .comm-header {
-    font-size: 15px;
+    font-size: var(--bvp-fs-section, 16px);
   }
 }
 
@@ -1861,7 +1861,7 @@ html.bewly-design.videoPage .video-tag-container .tag-link {
   html.bewly-design.videoPage #viewbox_report h1,
   html.bewly-design.videoPage.bewly-video-fixed #viewbox_report .video-title,
   html.bewly-design.videoPage.bewly-video-fixed #viewbox_report h1 {
-    font-size: 18px;
+    font-size: var(--bvp-fs-upname, 18px);
   }
 }
 
@@ -1906,7 +1906,7 @@ html.bewly-design.videoPage #arc_toolbar_report .video-toolbar-left-item {
   box-sizing: border-box;
   background: transparent;
   border-radius: 6px;
-  transition: background-color 160ms ease;
+  transition: background-color var(--bvp-dur-fast, 120ms) var(--bvp-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1));
 }
 
 html.bewly-design.videoPage #arc_toolbar_report .toolbar-left-item-wrap:hover,
@@ -1979,7 +1979,7 @@ html.bewly-design.videoPage .video-tag-container .tag-link {
   white-space: nowrap;
   text-overflow: ellipsis;
   border-radius: 6px;
-  transition: background-color 160ms ease;
+  transition: background-color var(--bvp-dur-fast, 120ms) var(--bvp-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1));
 }
 
 html.bewly-design.videoPage .video-tag-container .tag:hover,
@@ -2157,7 +2157,7 @@ html.bewly-design.videoPage {
     height: 24px;
     padding: 0 8px;
     margin: 0 0 0 auto;
-    font-size: 12.5px;
+    font-size: var(--bvp-fs-meta, 12.5px);
     line-height: 1;
     color: var(--bew-text-3);
     white-space: nowrap;
@@ -2166,8 +2166,8 @@ html.bewly-design.videoPage {
     border: 0;
     border-radius: 6px;
     transition:
-      background-color 160ms ease,
-      color 160ms ease;
+      background-color var(--bvp-dur-fast, 120ms) var(--bvp-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1)),
+      color var(--bvp-dur-fast, 120ms) var(--bvp-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1));
   }
 
   .up-panel-container .send-msg:hover,
@@ -2188,7 +2188,7 @@ html.bewly-design.videoPage {
     flex: 1 1 100%;
     min-width: 0;
     margin: 0; /* 已在 .up-info--right 右列内，天然与名字左对齐（头像 48 + gap 12 由父级 flex 提供） */
-    font-size: 12.5px;
+    font-size: var(--bvp-fs-meta, 12.5px);
     font-weight: 400;
     line-height: 1.5;
     color: var(--bew-text-3);
@@ -2240,14 +2240,14 @@ html.bewly-design.videoPage {
     padding: 0 12px;
     margin: 0;
     overflow: hidden;
-    font-size: 13px;
+    font-size: var(--bvp-fs-meta, 12.5px);
     font-weight: 500;
     line-height: 1;
     white-space: nowrap;
     text-overflow: ellipsis;
     /* 颜色沿用 B 站原有主色（不在这里覆盖 background / color，避免新增颜色与主题冲突） */
     border-radius: 8px;
-    transition: filter 160ms ease;
+    transition: filter var(--bvp-dur-fast, 120ms) var(--bvp-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1));
   }
 
   .up-panel-container .default-btn:hover,
@@ -2830,14 +2830,14 @@ html.bewly-design.videoPage .bewly-comment-column .comment-pictures {
   /* 缩进跟随 32px 头像 + 8 gap */
   html.bewly-design.videoPage .bewly-comment-column .sub-reply-container,
   html.bewly-design.videoPage .bewly-comment-column .sub-reply-item {
-    padding-left: 40px;
+    padding-left: calc(32px + 8px);
   }
 
   /* 操作按钮允许换行，不横向溢出 */
   html.bewly-design.videoPage .bewly-comment-column .reply-actions,
   html.bewly-design.videoPage .bewly-comment-column .reply-btn-wrap {
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 8px;
   }
 
   /* 多图网格在窄列里两列就够 */
@@ -2896,7 +2896,7 @@ html.bewly-design.videoPage .bewly-comment-column .comment-pictures {
   touch-action: none;
   background: transparent;
   border-radius: 3px;
-  transition: background-color 120ms ease;
+  transition: background-color var(--bvp-dur-fast, 120ms) var(--bvp-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1));
 }
 
 #bewly-video-splitter:hover,
@@ -2940,8 +2940,8 @@ html.bewly-design.videoPage #arc_toolbar_report .video-toolbar-left-item {
   background: transparent !important;
   background-color: transparent !important;
   transition:
-    opacity 160ms ease,
-    color 160ms ease;
+    opacity var(--bvp-dur-fast, 120ms) var(--bvp-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1)),
+    color var(--bvp-dur-fast, 120ms) var(--bvp-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1));
 }
 
 /* hover / focus 仍然是透明的：只有轻微的透明度与文字色变化 */
@@ -3135,3 +3135,188 @@ html.bewly-design.videoPage.bewly-video-fixed.bewly-video-narrow {
     display: none !important;
   }
 }
+
+/* ===== 第 50 轮 shadow-skeleton =====
+   3 级 elevation 的页面级部分：同值 token（shadow 内外各一份）+ 评论列阴影 + tooltip 阴影
+   + 评论区骨架 / 空态样式。颜色只用 rgba(0,0,0,·)，骨架用 --bew-fill-1/2，不引入新颜色。 */
+html.bewly-design.videoPage {
+  --bvp-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.18);
+  --bvp-shadow-2: 0 4px 12px rgba(0, 0, 0, 0.24);
+  --bvp-shadow-3: 0 12px 32px rgba(0, 0, 0, 0.36);
+}
+
+html.bewly-design.videoPage.bewly-video-fixed {
+  /* 评论列是独立面板（与播放器 dock 并列），给它 1 级静态阴影 */
+  .bewly-comment-column {
+    box-shadow: var(--bvp-shadow-1);
+  }
+
+  /* 自绘简介 tooltip（页面级原生 DOM） */
+  #bewly-desc-tooltip,
+  .bewly-desc-tooltip {
+    box-shadow: var(--bvp-shadow-3);
+  }
+}
+
+/* 评论区骨架：3 条（头像 40 圆 + 两行灰块），仅在没有真实线程时出现 */
+#bewly-comment-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 12px;
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.bewly-comment-skeleton__row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.bewly-comment-skeleton__avatar {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--bew-fill-1);
+}
+
+.bewly-comment-skeleton__lines {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.bewly-comment-skeleton__line {
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(100deg, var(--bew-fill-1) 30%, var(--bew-fill-2) 50%, var(--bew-fill-1) 70%);
+  background-size: 200% 100%;
+  animation: bvp-skeleton-breathe 1var (--bvp-dur-fast, 120ms)
+    var(--bvp-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1))-in-out infinite;
+}
+
+.bewly-comment-skeleton__line--title {
+  width: 60%;
+}
+
+.bewly-comment-skeleton__line--body {
+  width: 40%;
+}
+
+@keyframes bvp-skeleton-breathe {
+  from {
+    background-position: 150% 0;
+    opacity: 0.7;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  to {
+    background-position: -50% 0;
+    opacity: 0.7;
+  }
+}
+
+/* 评论区空态：图标 32 + 12.5px 次要色文案，居中、gap 8、padding 24 */
+#bewly-comment-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  flex: 0 0 auto;
+  color: var(--bew-text-3);
+  font-size: var(--bvp-fs-meta, 12.5px);
+  line-height: 1.5;
+  text-align: center;
+}
+
+#bewly-comment-empty svg {
+  width: 32px;
+  height: 32px;
+  color: var(--bew-text-3);
+  opacity: 0.6;
+}
+
+/* 降低动效：骨架静止 */
+@media (prefers-reduced-motion: reduce) {
+  #bewly-comment-skeleton .bewly-comment-skeleton__line {
+    animation: none;
+    background: var(--bew-fill-1);
+  }
+}
+
+/* 高对比：阴影换描边 */
+@media (prefers-contrast: more) {
+  html.bewly-design.videoPage {
+    --bvp-shadow-1: 0 0 0 1px rgba(0, 0, 0, 0.6);
+    --bvp-shadow-2: 0 0 0 1px rgba(0, 0, 0, 0.7);
+    --bvp-shadow-3: 0 0 0 1px rgba(0, 0, 0, 0.8);
+  }
+}
+
+/* ===== 第 50 轮 motion-tokens ===== */
+/* 字阶 / 间距 / 动效收口（第 50 轮 A 工作流，只追加在文件末尾）
+
+   一、字阶：第 34 轮定的 5 档 + 第 37 轮登记的「卡片标题」第 6 档
+      title 20 / section 16 / body 14 / meta 12.5 / badge 11 / upname 18（UP 名等卡片标题，唯一例外）
+      本段把所有硬编码 font-size 换成对应 token（用 var(..., 默认值) 写法，非固定布局下也有兜底）。
+      查找口径：`font-size:\s*[0-9]` 在页面级 scss 里已 0 命中。
+
+   二、间距：8px 体系（4 / 8 / 12 / 16 / 24 / 32 / 48）
+      6px → 4 或 8、10px → 8 或 12、40px → calc(32px + 8px)（子评论缩进 = 头像 32 + gap 8，保留语义）。
+
+   三、动效 token：三档时长 + 两个缓动，页面级所有 transition 都消费它们：
+      hover / focus / 颜色      → --bvp-dur-fast (120ms)
+      展开收起 / 位移 / 尺寸    → --bvp-dur-base (200ms)
+      面板进出                  → --bvp-dur-slow (320ms)
+      reduced-motion 下三档统一压到 0.01ms（不逐个规则关动效，避免漏）。
+
+   令牌同时定义在 `.bewly-design.videoPage`（非固定布局也能解析）与
+   `html.bewly-video-fixed`（固定布局作用域，与第 34/37 轮令牌放一起）。
+   shadow 侧只需要同名变量的兜底值（见 videoPage.shadow.scss 的 :host），规则由 B 工作流统一改。 */
+
+.bewly-design.videoPage {
+  /* 动效三档 + 两缓动 */
+  --bvp-dur-fast: 120ms;
+  --bvp-dur-base: 200ms;
+  --bvp-dur-slow: 320ms;
+  --bvp-ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --bvp-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html.bewly-design.videoPage.bewly-video-fixed {
+  /* 固定布局内重复一份，保证只在 fixed 作用域里写的规则也能直接消费 */
+  --bvp-dur-fast: 120ms;
+  --bvp-dur-base: 200ms;
+  --bvp-dur-slow: 320ms;
+  --bvp-ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --bvp-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 第 6 档「卡片标题」登记：UP 名 / 播放器内卡片标题等，
+   20px 在卡片里过大、14px 又太弱，因此固定 18px —— 这是 5 档字阶的唯一例外。 */
+.bewly-design.videoPage {
+  --bvp-fs-upname: 18px;
+  --bvp-lh-upname: 1.4;
+}
+
+/* 统一动效开关：reduced-motion 下三档时长全部压到 0.01ms。
+   用变量覆盖而不是逐条 transition: none —— 任何消费了 token 的规则都会自动归零，不会漏。 */
+@media (prefers-reduced-motion: reduce) {
+  .bewly-design.videoPage,
+  html.bewly-design.videoPage.bewly-video-fixed {
+    --bvp-dur-fast: 0.01ms;
+    --bvp-dur-base: 0.01ms;
+    --bvp-dur-slow: 0.01ms;
+  }
+}
+/* ===== 第 50 轮 motion-tokens end ===== */

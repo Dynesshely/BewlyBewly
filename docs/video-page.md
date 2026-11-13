@@ -753,159 +753,37 @@ commentColumn.bottom = 播放器 bottom < rail.top - 8
 ### 5. 分工与未做项
 
 ## 第 32 轮：简介收拢到工具栏 + 自绘 tooltip
-## 第 47 轮：轨道四角圆角 + 工具栏去 hover 背景 + 标签全部展开
+## 第 50 轮：字阶 / 间距 / 动效令牌收口
 
 ### 改动点 → 理由
 
 | 改动点 | 理由 |
 | --- | --- |
-| `.bvp-rail { border-radius: 14px }`（四角） | 第 46 轮为了衔接已删除的标题行只做了底部圆角（`0 0 14px 14px`）；标题行现在已彻底删除、轨道是独立浮层，四角圆最自然 |
-| `@media (max-width: 1024px)` → 12px；`prefers-contrast` / `forced-colors` 下保持 14px | 小视口圆角略收；高对比与强制色彩模式不能把圆角丢掉（会被系统色覆盖成直角） |
-| 工具栏单项 `background / background-color: transparent !important`（默认 + `:hover`） | 用户要求去掉 hover 背景；第 36 轮加的 `--bew-fill-1` 要压平 |
-| hover 保留 `opacity: 0.9` + `cursor: pointer`，`:focus-visible` 保留主题色 outline | 「不要完全没有反馈」——用透明度与焦点环替代底色 |
-| 额外压平「项内子节点」的 hover 底色（`:hover *`） | B 站常给项内图标 / 文字节点单独挂 hover 背景，只压外层会漏 |
-| 我们自己的「简介 / 选集 / 快捷键」按钮同样去底色（`background-color: transparent` + `border-color: transparent`） | 与原生工具栏单项保持一致；边框宽度不删，避免 layout 跳动 |
-| 标签行 `flex-wrap: wrap !important` + `height: auto` + `max-height: none` + `overflow: visible` | 用户要求「取消隐藏、默认全部展示」；第 36 轮的 nowrap + 横向滚动 + 锁 28px 全部覆盖 |
-| 标签保持 24px 高 / `0 8px` / 11px / 6px 圆角 | 尺寸不变，只改折行行为 |
-| 隐藏「展开 / 收起」按钮：`[class*="toggle"]` / `[class*="expand"]` / `[class*="fold"]` / `[class*="show-more"]` / `[class*="show-all"]` + `> button:not(.bewly-desc-trigger):not(.bewly-toolbar-action)` 兜底 | 真机没抓到确切的展开按钮节点（类名随版本变），用「语义前缀 + 孤立 button」双保险；后者只作用于标签行内部，不会误伤页面其它折叠按钮 |
-| 高对比度 / forced-colors 给标签补 1px 边框 | 折行后标签之间靠底色区分不明显，高对比下需要边界 |
-| `reduced-motion` 关闭工具栏单项过渡 | 动效可关 |
+| 18 处硬编码 `font-size`（17 / 18 / 15 / 13 / 12.5 / 12 / 11px）全部换成 `var(--bvp-fs-*, 兜底值)` | 第 34 轮定了 5 档 + 第 37 轮的「卡片标题」第 6 档；页面级 scss 里不再出现裸数值 |
+| 17px → `--bvp-fs-title`（20px）；15px → `--bvp-fs-section`（16px） | 视频标题与分区标题各归其档 |
+| 18px → `--bvp-fs-upname`（18px） | 第 37 轮登记的「卡片标题」第 6 档：20px 在卡片内过大、14px 太弱，18px 是唯一例外 |
+| 13px / 12px / 12.5px → `--bvp-fs-meta`（12.5px） | 次要信息（工具栏按钮、元信息、UP 签名、关注按钮文字）统一 |
+| 11px → `--bvp-fs-badge`（11px） | 徽章 / 标签档 |
+| tooltip 正文 13px → `--bvp-fs-body`（14px） | tooltip 是正文语境，不是次要信息 |
+| 间距 6px → 4 或 8、10px → 8 或 12 | 归到 8px 体系（4 / 8 / 12 / 16 / 24 / 32 / 48） |
+| 子评论缩进 `40px` → `calc(32px + 8px)` | 40 不是体系值；用 calc 表达「头像 32 + gap 8」的语义，同时满足「无裸 40px」 |
+| 新增 `--bvp-dur-fast/base/slow` + `--bvp-ease-out/in-out` 五个 token（`.bewly-design.videoPage` 与 `html.bewly-video-fixed` 各一份） | 非固定布局也能解析；固定布局作用域与第 34/37 轮令牌放在一起 |
+| 10 处带值 `transition` 全部改为 `var(--bvp-dur-fast, 120ms) var(--bvp-ease-out, ...)` | 页面级动效只有「颜色 / 边框 / 透明度 / 滤镜」四类，统一 fast 档 |
+| `reduced-motion` 用变量覆盖把三档时长压到 `0.01ms` | 统一覆盖所有消费 token 的动效，不会出现「只关了一部分」 |
+| shadow 的 `:host` 追加同五个 token 兜底值（**不改其 17 处 transition**） | 供 B 工作流统一迁移；旧 `--bvp-duration: 200ms` / `--bvp-ease` 保持可用，迁移前不会失效 |
 
-### 交接 / 依赖
+### grep 复查结果
 
-- 标签行高度现在**由内容决定**（可能多行），dock 高度需要 video-page 的 JS 实测标签行高度后分配 —— 该逻辑他已实现（第 46 轮以后），所以我这边**没有锁任何高度**；
-- 真机诊断显示 21 个标签都在 DOM 里（`scrollWidth == clientWidth == 888`），所以 `wrap` 后应能全部可见；若个别视频的标签行只渲染了前 N 个（B 站 JSON 里带 `show_more`），那属于原生数据层，CSS 无法补出未渲染的标签。
+| 检查项 | 结果 |
+| --- | --- |
+| `font-size:\s*[0-9]`（page scss） | **0 命中** |
+| `(padding / margin / gap)[a-z-]*: ... [6/10/40]px`（page scss） | **0 命中** |
+| 裸时长 `\d+ms ease`（page scss） | **0 命中** |
+| `var(--bvp-dur-` 使用次数（page scss） | **17 处**（10 处带值 transition 覆盖 17 个属性项） |
+| shadow scss `transition:` 行数 | **17 处，未动**（按约定交给 B 工作流） |
+| shadow `:host` token 定义 | 已追加（5 个变量） |
 
 ### 已知限制
 
-- 展开/收起按钮是「按类名/结构兜底隐藏」，若 B 站改成文字按钮且类名不含上述前缀，需要再补一条精确选择器（真机给我节点即可）；
-- 工具栏 hover 压平用的是 `.toolbar-left-item-wrap / .toolbar-left-item / .video-toolbar-left-item` 三类，若某次改版换了类名，hover 底色会回来（默认态仍是透明）。
-
-## 第 47 轮：布局三项（UP 卡上边距 / 评论区最小 20% / 上部区域 +16）
-
-### 需求 2：UP 卡 top margin 与左右一致
-
-真机：UP 卡 `topGap=5`、`leftGap/rightGap=13`。
-13px 的来源：评论列内距 12（`--bvp-space-3`）+ 卡片自身 border 1 → 13。
-
-```scss
-.bewly-comment-column > .up-panel-container {
-  margin-top: var(--bvp-comment-card-gap, 13px) !important;
-  margin-bottom: 0 !important;
-}
-```
-
-- 卡片底部到「评论 N」那一行的间距交给 `bili-comments-header-renderer` 的 `padding-block-start: 13px`
-  （在 `comments.ts` 的 `COMMENTS_STYLE` 里注入），避免卡片 margin-bottom 与 header padding 叠成 24；
-- 两个量都是变量 / 单点定义，真机差 1px 直接调。
-
-### 需求 4：拖拽时评论区最小 = 页面宽 1/5
-
-- 分隔条比例上限从 0.75 → **0.80**（`MAX_SPLIT_RATIO`），下限仍 0.35；
-- 新增 `MIN_COMMENT_WIDTH_RATIO_DRAG = 0.2`：拖拽模式下评论区只保证 ≥ `ceil(innerWidth × 0.2)`；
-- 拖拽模式下 `leftAvailW`（播放器可用宽）也按 20% 口径放宽，所以评论区能压到 320（1600 宽时正好 20%）；
-- 自动模式不变：40% 兜底 + `MIN_COMMENT_WIDTH = 400` 绝对下限；**拖拽后（`splitRatio > 0`）不再走 40% 兜底**，以用户为准。
-
-### 需求 5：上部区域 top margin +16
-
-```scss
-#mirror-vdcon,
-.video-container-v1 {
-  margin-top: var(--bvp-fixed-top-gap, 16px) !important;
-}
-```
-
-- `fixedLayout.ts` 读的是 `#mirror-vdcon` 的**实测 top**，所以 `--bvp-fixed-top` 自动从 64 → **80**，
-  dock 高度相应减少 16（播放器变矮，预期）；
-- 用实测而不是硬编码：若 B 站改顶栏高度，这里自动跟随，只需保证「+16」这个呼吸空间常量。
-
-### 预期数值（1600×1000，新轨道公式 212）
-
-| 场景 | 播放器 | 比例 | 评论列 | colPct(/1600) |
-| --- | --- | --- | --- | --- |
-| 自动（splitRatio=0） | 885×498 | 1.7771 | 643 | 40.19% |
-| 拖到最左（0.35） | 543×305 | 1.7803 | 985 | 61.56% |
-| 拖到最右（0.80） | 885×498（高度受限，拖不动） | 1.7771 | 643 | 40.19% |
-| 1600×1200 拖到最右 | 1208×680 | 1.7765 | **320** | **20.00%** |
-| 2200×1000 拖到最右 | 800×450 | 1.7778 | 1328 | 60.36% |
-
-说明：1600×1000 下播放器宽度受 16:9 + dock 高度限制，拖到最右只能停在 885（评论区 40.19%，仍远高于 20% 下限）；
-视口更高（≥1200）时才能把评论区压到 20%。这满足「评论区 ≥20%」的验收，但不是「一定能拖到 20%」。
-
-## 第 48 轮：降低增强层层级 + iframe 预览启用自定义布局
-
-### 需求 1：宿主 z-index 2147483200 → 1000
-
-真机：轨道 `rect = 952..1205` 与 B 站「更多」下拉 `rect = 928..972` 重叠 20px，
-下拉 `z-index = 2`，但我们的增强层宿主是**全屏 fixed 容器**且 `z-index = 2147483200`，
-于是整个页面区域都压在 B 站浮层之上。
-
-- `videoPage.shadow.scss`：`:host { z-index: 1000 }`（高于页面内容 / 播放器控件，低于 B 站下拉与设置页 2147483600）；
-- 页面级分隔条 `#bewly-video-splitter`：`z-index` 2147483000 → **1001**（与宿主同量级，不再盖住下拉）；
-- 设置页 `z-index: 2147483600` 不动（Lead 改的 App.vue 仍高于一切）；
-- shadow 内部的 `--bvp-z-*` 层级保持原值：宿主已创建层叠上下文，内部层级只在宿主内比较，不影响外部。
-
-### 需求 2：iframe 预览窗口启用自定义布局
-
-第 43 轮的「iframe 内一刀切降级」撤销，改为**按视口尺寸分级**（每拍重算）：
-
-| 视口 | 行为 |
-| --- | --- |
-| 宽 ≥1280 且 高 ≥700 | 完整三区 dock（同主页面） |
-| 1280/700 以下，但 ≥900×600 | **上下分区**：上播放器（左列）、下评论区，轨道隐藏；新增 `html.bewly-video-narrow` |
-| <900 宽 或 <600 高 | 退回第 43 轮降级：只保留评论增强 + 广告清理 |
-
-实现：
-
-- `fixedLayout.ts` 阈值 `MIN_VIEWPORT_*` 1280/700 → **900/600**；
-- 新增窄屏常量与分支：`NARROW_VIEWPORT_WIDTH/HEIGHT`、`NARROW_COMMENT_MIN_HEIGHT = 220`、
-  `NARROW_CLASS = bewly-video-narrow`、`NARROW_COMMENT_VAR = --bvp-fixed-narrow-comment-height`；
-- 窄屏分支：`dockH = innerHeight − top − 36`、播放器优先按内容宽 16:9、超出高度预算则按高度反算宽，
-  评论区高 = dock 剩余；轨道 `railSpace = 0`；写变量 + 加类后 return；
-- 页面 CSS：`html.bewly-video-fixed.bewly-video-narrow` 下 `#mirror-vdcon` 单列两行、
-  评论区（右列）高度 = 窄屏变量、内部滚动；隐藏分隔条；
-- `recommendRail/index.ts`：窄屏不渲染轨道（同网页全屏 / 宽屏的守卫）；
-- `index.ts`：`isInIframe()` 一刀切改为 `shouldDegradeForViewport()`（<900 宽或 <600 高）；
-  **快捷键仍在 iframe 内关闭**（避免和外层抽屉抢空格 / 方向键）；
-- 「偶尔不生效」排查辅助：`safeSync` 的 warn 现在打印**堆栈**，真机 console 能定位是哪个模块抛错；
-  若 iframe 内根本没宿主元素，说明 `contentScripts/index.ts` 的 `isVideoOrBangumiPage()` 判定在 iframe 下失败，
-  需要下一步查 `location` / UA 分支（本轮范围外，已列入交接）。
-
-## 第 49 轮：iframe 预览里宿主不存在 / 布局不生效
-
-用户反馈：首页空格预览抽屉的 iframe 里，视频页布局不生效，宿主 `#bewly-video-page` 都不存在。
-
-### 根因（两条叠加）
-
-1. **`setupVideoPage()` 一次性判定后永不重试**：旧实现是 `if (!isNativeVideoPage()) return`。
-   `match_about_blank: true` 让 content script 在 iframe 还是 `about:blank` 时就注入，
-   此时 `isNativeVideoPage()`（只看 URL）为 false → 直接 return，之后 URL 变成视频页也**没有任何补挂**；
-   抽屉先建空白 iframe 再设 `src`（或 `srcdoc` / SPA 改 URL）时同理。
-2. **样式类可能缺失**：`contentScripts/index.ts` 顶层的 `isSupportedPages() || isSupportedIframePages()`
-   判定在 `about:blank` 时为 false → 跳过 `bewly-design` 类；`adaptedStyles` 也可能没跑 → 缺 `videoPage` 类。
-   页面级 CSS 全部以 `html.bewly-design.videoPage...` 为前缀 —— 缺类就会「布局变量写了但视觉不生效」。
-
-### 修复（`videoPage/index.ts`）
-
-- 新增 `startMountRetry()`：URL 不是视频页时不再放弃，而是 **500ms 轮询 + popstate/hashchange 立即触发**，
-  URL 一变成视频页就 `mount()`，成功后自动停表；
-- `sync()` 里 `kind === "none"`（跳离视频页）时 teardown 后重新 `startMountRetry()`，支持后续再切回；
-- `teardownVideoPage()` / `unmount()` 都会 `stopMountRetry()`，不留定时器；
-- `mount()` 补齐样式类：`adaptToOtherPageStyles` 开启时加 `bewly-design`，并加 `videoPage`，
-  保证在 iframe 早期注入、contentScripts 顶层判定为 false 的文档里，页面级 CSS 依然命中。
-
-### 验收对应
-
-- iframe 1200×800：宿主创建、`html.bewly-video-fixed` 存在、`data-bewly-fixed-metrics` 有值
-  （1200 宽 <1280 → 走上下分区：`bewly-video-narrow`）
-- iframe 900×700：同样 <1280 → 上下分区
-- 主页面不受影响（URL 就绪时依旧同步 mount，不经过轮询）
-
-### 需要 Lead（contentScripts/index.ts 独占）评估的改动（非必须）
-
-`const currentUrl = document.URL` 是**模块顶层快照**，`isSupportedPages() / isSupportedIframePages()` 用的都是它。
-若抽屉 iframe 通过 `srcdoc` 或 `history.pushState` 换 URL（不触发重新注入），这类判定会一直停在旧 URL。
-建议（二选一，低风险）：
-1. 把 `currentUrl` 改成 `location.href` 的 getter（同步改各调用点）；
-2. 或保留快照，但监听 `popstate/hashchange` 后重新执行一次类切换。
-我在 `mount()` 里已经做了样式类兜底，所以即使不改也能用；改了能让 `bewly-design` 更早生效、避免首帧无样式。
+- shadow 侧旧的两档 token（`--bvp-duration` / `--bvp-ease`）与新的三档并存，B 迁移完成后可删旧的两个（本工作流不删，避免打断 B 的在途改动）；
+- 第 34 轮 typography 段里还有 `@media (max-width: 1280px)` 的降档值（现在也走 `--bvp-fs-upname` / `--bvp-fs-section`），窄屏的档位切换依赖这两个 token 的值，不再单独写裸值。

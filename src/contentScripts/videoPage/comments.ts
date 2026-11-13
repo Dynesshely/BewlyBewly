@@ -841,6 +841,109 @@ function syncCommentsScrollbarVar(): void {
     target.style.setProperty(COMMENTS_SCROLLBAR_VAR, value)
 }
 
+/** 评论区骨架 / 空态（第 50 轮） */
+const SKELETON_ID = 'bewly-comment-skeleton'
+const EMPTY_ID = 'bewly-comment-empty'
+/** 骨架最多显示多久（之后仍无线程 → 切空态） */
+const SKELETON_HOLD_MS = 4000
+/** 骨架开始显示的时间戳；null 表示当前没有骨架 */
+let skeletonMountedAt: number | null = null
+
+/** 评论列容器（不搬列时回退到 #commentapp 的父级） */
+function getCommentColumnContainer(): HTMLElement | null {
+  const column = document.querySelector<HTMLElement>('[data-bewly-comment-column], #bewly-comment-column')
+  if (column)
+    return column
+  const app = document.getElementById('commentapp')
+  return app?.parentElement instanceof HTMLElement
+    ? app.parentElement
+    : null
+}
+
+function removeCommentPlaceholder(): void {
+  document.getElementById(SKELETON_ID)?.remove()
+  document.getElementById(EMPTY_ID)?.remove()
+  skeletonMountedAt = null
+}
+
+function buildSkeleton(): HTMLElement {
+  const root = document.createElement('div')
+  root.id = SKELETON_ID
+  root.setAttribute('aria-hidden', 'true')
+  for (let i = 0; i < 3; i++) {
+    const row = document.createElement('div')
+    row.className = 'bewly-comment-skeleton__row'
+    const avatar = document.createElement('div')
+    avatar.className = 'bewly-comment-skeleton__avatar'
+    const lines = document.createElement('div')
+    lines.className = 'bewly-comment-skeleton__lines'
+    const title = document.createElement('div')
+    title.className = 'bewly-comment-skeleton__line bewly-comment-skeleton__line--title'
+    const body = document.createElement('div')
+    body.className = 'bewly-comment-skeleton__line bewly-comment-skeleton__line--body'
+    lines.append(title, body)
+    row.append(avatar, lines)
+    root.appendChild(row)
+  }
+  return root
+}
+
+function buildEmpty(): HTMLElement {
+  const root = document.createElement('div')
+  root.id = EMPTY_ID
+  root.setAttribute('role', 'status')
+  root.innerHTML = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v7a2.5 2.5 0 0 1-2.5 2.5H9l-5 4V5.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+  </svg>
+  <span>还没有评论</span>`
+  return root
+}
+
+/**
+ * 评论区骨架 / 空态（第 50 轮）。
+ *
+ * 数据源是「当前线程数」，每拍调用：
+ * - 有线 lookup → 立刻移除骨架与空态；
+ * - 线程数 0 且未登录提示不存在 → 先显示 3 条骨架（1200ms 呼吸）；
+ * - 骨架显示超过 4s 仍无线程 → 换成「还没有评论」空态（图标 + 12.5px 次要色）；
+ * - 未登录（B 站自己的「登录后查看」提示存在）→ 两者都不加，避免和它抢位置。
+ *
+ * 值不变不写：骨架 / 空态节点存在与否就是状态，不做无意义 DOM 操作。
+ */
+function syncCommentPlaceholder(threadCount: number): void {
+  const host = getCommentsHost()
+  const app = document.getElementById('commentapp')
+  const column = getCommentColumnContainer()
+  if (!host || !app || !column || column.offsetWidth === 0 || column.offsetHeight === 0) {
+    removeCommentPlaceholder()
+    return
+  }
+
+  if (threadCount > 0 || findLoginOrigin()) {
+    removeCommentPlaceholder()
+    return
+  }
+
+  if (skeletonMountedAt === null) {
+    if (!document.getElementById(SKELETON_ID)) {
+      const skeleton = buildSkeleton()
+      if (app.parentElement === column)
+        column.insertBefore(skeleton, app)
+      else
+        column.appendChild(skeleton)
+    }
+    skeletonMountedAt = Date.now()
+    document.getElementById(EMPTY_ID)?.remove()
+    return
+  }
+
+  if (Date.now() - skeletonMountedAt >= SKELETON_HOLD_MS) {
+    document.getElementById(SKELETON_ID)?.remove()
+    if (!document.getElementById(EMPTY_ID) && app.parentElement === column)
+      column.insertBefore(buildEmpty(), app)
+  }
+}
+
 function ensureCommentsStyle(): void {
   const shadow = getCommentsShadow()
   if (!shadow)
@@ -1262,6 +1365,8 @@ export function syncComments(): void {
   observeCommentsShadow()
 
   const threads = getThreads()
+  // 第 50 轮：评论区骨架 / 空态（0 线程显示骨架，4s 后仍空则空态；有线程立即移除）
+  syncCommentPlaceholder(threads.length)
   for (const thread of threads)
     processThread(thread)
 
@@ -1448,6 +1553,7 @@ export function setupComments(): () => void {
     getCommentsHost()?.removeAttribute(ONLY_UP_HOST_ATTR)
     document.documentElement.classList.remove(ONLY_UP_ROOT_CLASS)
     document.documentElement.removeAttribute(STYLE_STAT_ATTR)
+    removeCommentPlaceholder()
     document.documentElement.removeAttribute('data-bewly-comments-state')
     document.querySelector<HTMLElement>('[data-bewly-comment-column], #bewly-comment-column')
       ?.style

@@ -1405,3 +1405,92 @@
   }
 }
 /* ===== 第 47 轮 rail-corners end ===== */
+
+/* ===== 第 50 轮 shadow-skeleton =====
+   3 级 elevation（只用黑色 alpha，不引入新颜色）+ 轨道封面骨架微光。
+   token 定义在 :host，页面级同名 token 在 pages/videoPage.scss 第 50 轮段，
+   两处数值保持一致。 */
+:host {
+  --bvp-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.18);
+  --bvp-shadow-2: 0 4px 12px rgba(0, 0, 0, 0.24);
+  --bvp-shadow-3: 0 12px 32px rgba(0, 0, 0, 0.36);
+}
+
+/* 轨道整体：浮于内容之上 */
+.bvp-rail {
+  box-shadow: var(--bvp-shadow-2);
+}
+
+/* 卡片：静止 1 级，hover / 激活升到 2 级（替换原有 --bew-shadow-2） */
+.bvp-rail__card {
+  box-shadow: var(--bvp-shadow-1);
+}
+
+.bvp-rail__card:hover,
+.bvp-rail__card.is-active {
+  box-shadow: var(--bvp-shadow-2);
+}
+
+/* 浮层：帮助面板 / toast（选集面板是独立 shadow，另见交接） */
+.bvp-help__dialog,
+.bvp-toast {
+  box-shadow: var(--bvp-shadow-3);
+}
+
+/* 高对比：阴影换成 1px 描边，不依赖阴影区分层级 */
+@media (prefers-contrast: more) {
+  :host {
+    --bvp-shadow-1: 0 0 0 1px rgba(0, 0, 0, 0.6);
+    --bvp-shadow-2: 0 0 0 1px rgba(0, 0, 0, 0.7);
+    --bvp-shadow-3: 0 0 0 1px rgba(0, 0, 0, 0.8);
+  }
+}
+
+/* 轨道封面占位：微光扫过（1600ms 循环） */
+.bvp-rail__cover-fallback {
+  background: linear-gradient(100deg, var(--bew-fill-1) 30%, var(--bew-fill-2) 50%, var(--bew-fill-1) 70%);
+  background-size: 200% 100%;
+  animation: bvp-cover-shimmer 1600ms ease-in-out infinite;
+}
+
+@keyframes bvp-cover-shimmer {
+  from {
+    background-position: 150% 0;
+  }
+
+  to {
+    background-position: -50% 0;
+  }
+}
+
+/* 降低动效：骨架 / 微光全部静态化 */
+@media (prefers-reduced-motion: reduce) {
+  .bvp-rail__cover-fallback {
+    animation: none;
+    background: var(--bew-fill-1);
+  }
+}
+
+/* ===== 第 50 轮 motion-tokens ===== */
+/* 动效令牌兜底（第 50 轮 A 工作流）
+   只**定义变量**，不改本文件里任何既有 transition（shadow 侧 17 处由 B 工作流统一改）。
+
+   现状说明：本文件里旧的 `--bvp-duration: 200ms` / `--bvp-ease` 仍在用（17 处 transition），
+   那是第 27 轮的两档 token。本轮新增的三档 token 是**补充**：
+     hover / focus / 颜色   → var(--bvp-dur-fast) var(--bvp-ease-out)
+     展开收起 / 位移 / 尺寸 → var(--bvp-dur-base) var(--bvp-ease-out)
+     面板进出               → var(--bvp-dur-slow) var(--bvp-ease-in-out)
+   B 工作流迁移时把 `var(--bvp-duration) var(--bvp-ease)` 换成对应档位即可；
+   迁移完成前旧 token 保持可用，不会因为本段而失效。
+
+   reduced-motion：页面级统一把三档压到 0.01ms，shadow 继承同一组变量，
+   因此这里不重复写覆盖（写了也不会被消费）。 */
+
+:host {
+  --bvp-dur-fast: 120ms;
+  --bvp-dur-base: 200ms;
+  --bvp-dur-slow: 320ms;
+  --bvp-ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --bvp-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+}
+/* ===== 第 50 轮 motion-tokens end ===== */

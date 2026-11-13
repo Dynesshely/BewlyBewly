@@ -3320,3 +3320,355 @@ html.bewly-design.videoPage.bewly-video-fixed {
   }
 }
 /* ===== 第 50 轮 motion-tokens end ===== */
+
+/* ===== 第 51 轮 borderless-rhythm ===== */
+/* 降低边框依赖 + 评论列表视觉节奏（第 51 轮 A 工作流，只追加在文件末尾）
+
+   一、去边框：我们自己的容器 → 背景 + 阴影，不再「border + background」双装饰。
+      层级用现有变量：页面底 < --bew-content / --bew-fill-1（面板）< --bew-elevated（悬浮）。
+      B 站原生元素（工具栏、标签、播放器）的边框一律不动。
+
+   二、评论节奏：楼层间距 / 嵌套竖线 / UP 主色条 / 头像与首行对齐。
+      ⚠️ 评论正文在 bili-comments 的 shadow root 内，页面级只能改宿主容器；
+      shadow 内部的规则清单见 `docs/video-page.md` 第 51 轮「需要 B 注入的 CSS」。 */
+
+.bewly-design.videoPage {
+  /* ---------- UP 主卡：fill-1 底 + 1 级阴影，去 1px 边框 ---------- */
+  .up-panel-container {
+    border-color: transparent;
+    box-shadow: var(--bvp-shadow-1, var(--bew-shadow-1, 0 1px 2px rgb(0 0 0 / 18%)));
+  }
+
+  /* hover 只提亮背景（第 31 轮已有），不再改边框颜色 */
+  .up-panel-container:hover {
+    border-color: transparent;
+  }
+
+  /* ---------- 评论列：content 底 + 阴影，去 1px 边框 ---------- */
+  .bewly-comment-column {
+    border-color: transparent;
+    box-shadow: var(--bvp-shadow-1, var(--bew-shadow-1, 0 1px 2px rgb(0 0 0 / 18%)));
+  }
+
+  /* 评论列内部不做二次描边：宿主与列表都不用边框分隔 */
+  .bewly-comment-column > #commentapp,
+  .bewly-comment-column bili-comments {
+    border: 0;
+    box-shadow: none;
+  }
+
+  /* ---------- 工具栏里的两个自绘按钮：有背景差，去边框 ---------- */
+  .bewly-desc-trigger,
+  .bewly-toolbar-action {
+    border-color: transparent;
+  }
+
+  .bewly-desc-trigger:hover,
+  .bewly-toolbar-action:hover {
+    border-color: transparent;
+    background: var(--bew-fill-2);
+  }
+
+  /* ---------- 简介 tooltip：elevated + shadow-3，去边框 ---------- */
+  .bewly-desc-tooltip {
+    border-color: transparent;
+  }
+
+  /* ---------- 信息栏与播放器之间：无背景差，保留一条 8% 细分隔线 ---------- */
+  #viewbox_report {
+    border-bottom: 1px solid color-mix(in oklab, currentColor 8%, transparent);
+  }
+
+  /* ---------- 评论节奏：楼层间距用 8px 空隙替代分割线 ---------- */
+  .bewly-comment-column > #commentapp {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-block: 8px;
+  }
+
+  /* 宿主内可能存在的分割线：去掉（用空隙表达节奏） */
+  .bewly-comment-column .comment-list-divider,
+  .bewly-comment-column .reply-item-divider,
+  .bewly-comment-column hr {
+    display: none;
+  }
+
+  /* ---------- UP 主评论色条（light DOM 标记；shadow 内清单见 docs） ---------- */
+  /* video-page 若在评论宿主或楼层上打 `data-bewly-comment-up="1"`，这里给左侧 2px 主题色条 */
+  .bewly-comment-column [data-bewly-comment-up="1"] {
+    position: relative;
+  }
+
+  .bewly-comment-column [data-bewly-comment-up="1"]::before {
+    content: "";
+    position: absolute;
+    inset-block: 4px;
+    inset-inline-start: 0;
+    width: 2px;
+    background: var(--bew-theme-color);
+    border-radius: 2px;
+  }
+
+  /* ---------- 嵌套回复竖线（light DOM 容器；shadow 内清单见 docs） ---------- */
+  .bewly-comment-column .sub-reply-container,
+  .bewly-comment-column .sub-reply-list {
+    padding-left: 0;
+    margin-left: calc(32px + 8px);
+    border-left: 2px solid color-mix(in oklab, currentColor 12%, transparent);
+    padding-inline-start: 12px;
+    transition: background-color var(--bvp-dur-fast, 120ms) var(--bvp-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1));
+  }
+
+  .bewly-comment-column .sub-reply-container:hover,
+  .bewly-comment-column .sub-reply-list:hover {
+    background: var(--bew-fill-1);
+  }
+
+  /* ---------- 头像与首行文字视觉对齐 ---------- */
+  .bewly-comment-column .reply-item .content-warp,
+  .bewly-comment-column .reply-item .reply-content {
+    padding-top: 2px;
+  }
+
+  .bewly-comment-column .comment-avatar,
+  .bewly-comment-column .bili-avatar {
+    margin-top: 0;
+  }
+}
+
+/* ---------- 容器查询：列宽变化时节奏不变形 ---------- */
+@container bewly-comments (max-width: 519px) {
+  html.bewly-design.videoPage .bewly-comment-column > #commentapp {
+    gap: 6px;
+  }
+
+  /* 窄列里嵌套竖线的缩进跟随 32px 头像 */
+  html.bewly-design.videoPage .bewly-comment-column .sub-reply-container,
+  html.bewly-design.videoPage .bewly-comment-column .sub-reply-list {
+    margin-left: calc(32px + 8px);
+  }
+}
+
+@container bewly-comments (min-width: 901px) {
+  html.bewly-design.videoPage .bewly-comment-column > #commentapp {
+    gap: 12px;
+  }
+}
+
+/* ---------- 高对比度 / 强制色彩：边框回来（阴影在这些模式下不可见） ---------- */
+@media (prefers-contrast: more) {
+  .bewly-design.videoPage .up-panel-container,
+  .bewly-design.videoPage .bewly-comment-column {
+    border: 1px solid var(--bew-text-3);
+    box-shadow: none;
+  }
+
+  .bewly-design.videoPage .bewly-comment-column .sub-reply-container,
+  .bewly-design.videoPage .bewly-comment-column .sub-reply-list {
+    border-left-color: currentColor;
+  }
+}
+
+@media (forced-colors: active) {
+  .bewly-design.videoPage .up-panel-container,
+  .bewly-design.videoPage .bewly-comment-column {
+    border: 1px solid CanvasText;
+    box-shadow: none;
+  }
+
+  .bewly-design.videoPage .bewly-desc-trigger,
+  .bewly-design.videoPage .bewly-toolbar-action,
+  .bewly-design.videoPage .bewly-desc-tooltip {
+    border: 1px solid ButtonText;
+  }
+
+  .bewly-design.videoPage .bewly-comment-column [data-bewly-comment-up="1"]::before {
+    background: Highlight;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bewly-design.videoPage .bewly-comment-column .sub-reply-container,
+  .bewly-design.videoPage .bewly-comment-column .sub-reply-list {
+    transition: none;
+  }
+}
+/* ===== 第 51 轮 borderless-rhythm end ===== */
+
+/* ===== 第 51 轮 splitter-polish =====
+   拖拽分隔条反馈强化：静态细线 / hover 把手 / 拖拽实心 + 两侧内高光 / 松手闪烁 / 双击 toast。
+   全部用第 50 轮的 motion token（--bvp-dur-fast），prefers-reduced-motion 下只保留颜色变化。 */
+#bewly-video-splitter {
+  /* 命中区加宽到 12px，但视觉线仍是居中 2px（margin-left 抵消，线中心仍在 gutter 中线） */
+  width: 12px;
+  margin-left: -3px;
+  background: transparent !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0;
+}
+
+#bewly-video-splitter::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: color-mix(in oklab, currentColor 10%, transparent);
+  border-radius: 1px;
+  transition: background-color var(--bvp-dur-fast, 120ms) ease;
+}
+
+#bewly-video-splitter:hover::before,
+#bewly-video-splitter:focus-visible::before {
+  background: color-mix(in oklab, var(--bew-theme-color, var(--bew-bili-blue, #00a1d6)) 40%, transparent);
+}
+
+/* 拖拽中：线变主题色实心 2px */
+#bewly-video-splitter[data-dragging]::before {
+  background: var(--bew-theme-color, var(--bew-bili-blue, #00a1d6));
+}
+
+/* 把手：3 个竖点，hover / 拖拽时显示 */
+.bvp-splitter__handle {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--bvp-dur-fast, 120ms) ease;
+}
+
+#bewly-video-splitter:hover .bvp-splitter__handle,
+#bewly-video-splitter:focus-visible .bvp-splitter__handle,
+#bewly-video-splitter[data-dragging] .bvp-splitter__handle {
+  opacity: 1;
+}
+
+.bvp-splitter__dot {
+  width: 3px;
+  height: 3px;
+  background: var(--bew-theme-color, var(--bew-bili-blue, #00a1d6));
+  border-radius: 2px;
+}
+
+/* 拖拽中：播放器列与评论列各 1px 内高光，明确「正在调整的两块」 */
+body.bewly-video-resizing #playerWrap,
+body.bewly-video-resizing .bewly-comment-column {
+  box-shadow: inset 0 0 0 1px
+    color-mix(in oklab, var(--bew-theme-color, var(--bew-bili-blue, #00a1d6)) 25%, transparent) !important;
+}
+
+/* 松手确认：300ms 高亮闪烁一次 */
+#bewly-video-splitter.is-just-saved::before {
+  animation: bvp-splitter-saved 300ms ease-out;
+}
+
+@keyframes bvp-splitter-saved {
+  from {
+    background: color-mix(in oklab, var(--bew-theme-color, var(--bew-bili-blue, #00a1d6)) 60%, transparent);
+  }
+
+  to {
+    background: color-mix(in oklab, currentColor 10%, transparent);
+  }
+}
+
+/* 降低动效：只保留颜色变化，去掉动画与过渡 */
+@media (prefers-reduced-motion: reduce) {
+  #bewly-video-splitter.is-just-saved::before {
+    animation: none;
+  }
+
+  #bewly-video-splitter::before,
+  .bvp-splitter__handle {
+    transition: none;
+  }
+}
+
+/* ===== 第 51 轮 borderless-fix ===== */
+/* 真机复测修正：上一轮只写了 `border-color: transparent` —— 边框颜色透明但**宽度仍在**，
+   computed `borderTopWidth` 仍是 0.667px。验收口径是 `borderTopWidth === '0px'`，
+   所以必须把 `border-width` 也归零（`border: 0`）。
+
+   做法：高特异性（html + 双类 + 固定布局变体）+ `!important`，压过第 28~37 轮所有既有边框；
+   高对比 / 强制色彩模式再用 `!important` 把 1px 边框加回来（这两种模式阴影不可见，必须有边界）。 */
+
+html.bewly-design.videoPage .bewly-comment-column,
+html.bewly-design.videoPage.bewly-video-fixed .bewly-comment-column,
+html.bewly-design.videoPage .bewly-comment-column > .up-panel-container,
+html.bewly-design.videoPage.bewly-video-fixed .bewly-comment-column > .up-panel-container,
+html.bewly-design.videoPage .up-panel-container,
+html.bewly-design.videoPage.bewly-video-fixed .up-panel-container {
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: var(--bvp-shadow-1, var(--bew-shadow-1, 0 1px 2px rgb(0 0 0 / 18%)));
+}
+
+/* 工具栏里的两个自绘按钮 / 简介 tooltip：同样把宽度归零 */
+html.bewly-design.videoPage .bewly-desc-trigger,
+html.bewly-design.videoPage.bewly-video-fixed .bewly-desc-trigger,
+html.bewly-design.videoPage .bewly-toolbar-action,
+html.bewly-design.videoPage.bewly-video-fixed .bewly-toolbar-action,
+html.bewly-design.videoPage .bewly-desc-tooltip {
+  border: 0 !important;
+}
+
+/* 评论宿主不要自带描边 */
+html.bewly-design.videoPage .bewly-comment-column > #commentapp,
+html.bewly-design.videoPage .bewly-comment-column bili-comments {
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* 高对比度：边框必须回来（阴影在 high contrast 下几乎不可见），用 !important 压过上面的 0 */
+@media (prefers-contrast: more) {
+  html.bewly-design.videoPage .bewly-comment-column,
+  html.bewly-design.videoPage.bewly-video-fixed .bewly-comment-column,
+  html.bewly-design.videoPage .up-panel-container,
+  html.bewly-design.videoPage.bewly-video-fixed .up-panel-container {
+    border: 1px solid var(--bew-text-3) !important;
+    box-shadow: none !important;
+  }
+
+  html.bewly-design.videoPage .bewly-desc-trigger,
+  html.bewly-design.videoPage .bewly-toolbar-action,
+  html.bewly-design.videoPage .bewly-desc-tooltip {
+    border: 1px solid var(--bew-text-3) !important;
+  }
+}
+
+/* 强制色彩：同样用 !important 加回系统色边框 */
+@media (forced-colors: active) {
+  html.bewly-design.videoPage .bewly-comment-column,
+  html.bewly-design.videoPage.bewly-video-fixed .bewly-comment-column,
+  html.bewly-design.videoPage .up-panel-container,
+  html.bewly-design.videoPage.bewly-video-fixed .up-panel-container {
+    border: 1px solid CanvasText !important;
+    box-shadow: none !important;
+  }
+
+  html.bewly-design.videoPage .bewly-desc-trigger,
+  html.bewly-design.videoPage .bewly-toolbar-action,
+  html.bewly-design.videoPage .bewly-desc-tooltip {
+    border: 1px solid ButtonText !important;
+  }
+}
+/* ===== 第 51 轮 borderless-fix end ===== */
+
+/* ===== 第 51 轮 border-clean =====
+   A 的页面级去边框规则特异性不够（真机 border-top-width 仍 0.666667px，评论列 / UP 卡都在）。
+   这两个是我的文件里的元素，这里用固定布局作用域 + !important 压掉，保留 box-shadow（已生效）。
+   轨道卡片在 shadow 内，由 A 负责。 */
+html.bewly-design.videoPage.bewly-video-fixed .bewly-comment-column,
+html.bewly-design.videoPage.bewly-video-fixed .bewly-comment-column > .up-panel-container {
+  border-width: 0 !important;
+  border-color: transparent !important;
+}

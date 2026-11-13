@@ -163,54 +163,159 @@ const FILTER_STYLE = `
  */
 const COMMENTS_RESPONSIVE_STYLE_ID = 'bewly-comments-responsive-style'
 const COMMENTS_RESPONSIVE_STYLE = `
-.reply-item {
-  display: flex;
-  gap: 8px;
+/* ===== 第 46/51 轮：评论内容宽度自适应（真机结构版） =====
+   真机结构（CDP 核对）：renderer shadow = #body > (#user-avatar > bili-avatar) + #main > (#header / #content / #footer)。
+   旧版 .reply-item / .reply-list / .sub-reply-container 在当前 B 站版本不存在，已全部移除。
+   头像尺寸由 bili-avatar 的 --avatar-width/height 内联变量控制（真机 48px），这里覆盖为 40 / 窄列 32。 */
+#body {
   align-items: flex-start;
   min-width: 0;
+  gap: 8px;
 }
-.reply-item .root-reply-avatar,
-.reply-item .sub-user-avatar {
+
+#user-avatar {
   flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
+  margin-top: 0;
 }
-.reply-item #content,
-.reply-content {
+
+#user-avatar bili-avatar {
+  --avatar-width: 40px;
+  --avatar-height: 40px;
+}
+
+#main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+#content {
   flex: 1 1 auto;
   min-width: 0;
   max-width: 420px;
   overflow-wrap: anywhere;
+  padding-top: 2px;
 }
-.sub-reply-container {
-  padding-left: 48px;
-}
-.reply-item img,
-.reply-content img {
+
+#content img,
+bili-rich-text img {
   max-width: 100%;
   height: auto;
 }
-.picture-container {
+
+/* 多图网格：新版容器类名带哈希，用属性选择器兜底 */
+[class*='picture'] {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 8px;
 }
+
+/* ===== 第 51 轮：楼层节奏（真机结构：楼层列表是 #contents #feed） =====
+   楼层间距用 #feed 的 gap 替代分割线；UP 主色条用我们自己打的 data-bewly-comment-up 标记。 */
+#contents #feed {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#contents bili-comment-thread-renderer {
+  margin-block: 0;
+  padding-block: 0;
+  border-bottom: 0;
+}
+
+#contents bili-comment-thread-renderer + bili-comment-thread-renderer {
+  border-top: 0;
+}
+
+[class*='divider'] {
+  display: none;
+}
+
+#contents bili-comment-thread-renderer[data-bewly-comment-up='1'] {
+  position: relative;
+}
+
+#contents bili-comment-thread-renderer[data-bewly-comment-up='1']::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  background: var(--bew-theme-color, currentColor);
+  border-radius: 1px;
+}
+
+/* 容器查询：窄列收紧间距与头像，宽列放松 */
 @container bewly-comments (max-width: 519px) {
-  .reply-item .root-reply-avatar,
-  .reply-item .sub-user-avatar {
-    width: 32px;
-    height: 32px;
+  #user-avatar bili-avatar {
+    --avatar-width: 32px;
+    --avatar-height: 32px;
   }
-  .sub-reply-container {
-    padding-left: 40px;
-  }
-  .picture-container {
+  [class*='picture'] {
     grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
   }
+  #contents #feed {
+    gap: 6px;
+  }
 }
+
 @container bewly-comments (min-width: 901px) {
-  .picture-container {
+  [class*='picture'] {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+  #contents #feed {
+    gap: 10px;
+  }
+}
+
+@media (prefers-contrast: more) {
+  #contents bili-comment-thread-renderer[data-bewly-comment-up='1']::before {
+    background: currentColor;
+  }
+}
+
+@media (forced-colors: active) {
+  #contents bili-comment-thread-renderer[data-bewly-comment-up='1']::before {
+    background: Highlight;
+  }
+}
+`
+
+/**
+ * 注入到每个 `bili-comment-thread-renderer` shadow：楼层内的嵌套回复与分割线（第 51 轮）。
+ *
+ * 真机结构（CDP 核对）：thread shadow 里是 `bili-comment-renderer#comment` + `div#replies`
+ * （`#replies` 包着 `bili-comment-replies-renderer`）+ `div#reply-container`。
+ * 旧版类名（`.reply-item` / `.sub-reply-container`）在当前 B 站版本**不存在**，不要再用它们做主选择器。
+ */
+const THREAD_STYLE_ID = 'bewly-comment-thread-style'
+const THREAD_STYLE = `
+/* 嵌套回复：2px 竖线 + 12px 内缩，hover 给浅底 */
+#replies {
+  border-left: 2px solid color-mix(in oklab, currentColor 12%, transparent);
+  margin-left: 8px;
+  padding-left: 12px;
+  border-radius: 2px;
+}
+
+#replies:hover {
+  background: var(--bew-fill-1);
+}
+
+#reply-container {
+  border-top: 0;
+}
+
+@media (prefers-contrast: more) {
+  #replies {
+    border-left-color: currentColor;
+  }
+}
+
+@media (forced-colors: active) {
+  #replies {
+    border-left-color: CanvasText;
   }
 }
 `
@@ -1247,7 +1352,24 @@ function updateToolbarPosition(): void {
  * 全量扫描与增量路径都调用它，因此「翻页 / 加载更多 / 容器重建」后新线程会被自动
  * 套用用户已有的选择（只看 UP 通过宿主属性 + 注入样式生效，折叠通过 renderer 属性生效）。
  */
+/**
+ * 给线程的 shadow 注入楼层内样式（第 51 轮：嵌套回复竖线 / #replies / #reply-container）。
+ *
+ * 真机结构（CDP 核对）：thread shadow = bili-comment-renderer#comment + div#replies
+ * （内层 bili-comment-replies-renderer）+ div#reply-container + 一个无类名 div。
+ * 这些节点在 thread shadow 里，COMMENTS_RESPONSIVE_STYLE 注入不到，必须单独注入。
+ */
+function ensureThreadStyle(thread: HTMLElement): void {
+  const shadow = thread.shadowRoot
+  if (!shadow)
+    return
+  ensureStyleInShadow(shadow, THREAD_STYLE_ID, THREAD_STYLE)
+  styledShadows.add(shadow)
+}
+
 function processThread(thread: HTMLElement): void {
+  // 第 51 轮：楼层内嵌套回复竖线（thread shadow 里的 #replies）
+  ensureThreadStyle(thread)
   touchedThreads.add(thread)
 
   if (threadHasUpBadge(thread)) {
@@ -1531,6 +1653,7 @@ export function setupComments(): () => void {
       removeStyleFromShadow(shadow, FOLD_STYLE_ID)
       removeStyleFromShadow(shadow, TEXT_STYLE_ID)
       removeStyleFromShadow(shadow, COMMENTS_RESPONSIVE_STYLE_ID)
+      removeStyleFromShadow(shadow, THREAD_STYLE_ID)
     }
     styledShadows.clear()
 

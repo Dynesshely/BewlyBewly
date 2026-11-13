@@ -18,9 +18,14 @@
  */
 import { settings } from '~/logic'
 
+import { showToast } from './actions'
 import { MAX_SPLIT_RATIO, MIN_SPLIT_RATIO, previewSplitRatio, syncFixedLayout } from './fixedLayout'
+import { useMessages } from './i18n'
 
 const SPLITTER_ID = 'bewly-video-splitter'
+/** 松手后高亮闪烁的类（300ms 后移除） */
+const JUST_SAVED_CLASS = 'is-just-saved'
+const JUST_SAVED_MS = 300
 /** 拖拽期间挂在 body 上：禁用文本选中（页面级样式负责） */
 const RESIZING_CLASS = 'bewly-video-resizing'
 
@@ -98,6 +103,20 @@ function endDrag(): void {
   // 回到持久值（与刚写入的一致，不会跳动）
   previewSplitRatio(null)
   syncFixedLayout()
+
+  // 松手后 300ms 高亮闪烁一次，确认「已保存」
+  flashJustSaved()
+}
+
+/** 松手确认：加 is-just-saved 类播放 300ms 闪烁动画，动画结束自动移除 */
+function flashJustSaved(): void {
+  if (!el)
+    return
+  el.classList.remove(JUST_SAVED_CLASS)
+  // 强制重排，保证连续两次拖拽都能重新触发动画
+  void el.offsetWidth
+  el.classList.add(JUST_SAVED_CLASS)
+  window.setTimeout(() => el?.classList.remove(JUST_SAVED_CLASS), JUST_SAVED_MS)
 }
 
 /** 双击 / Home / End：回到自动比例（settings = 0 → 自动计算 + 40% 兜底） */
@@ -107,6 +126,7 @@ function resetSplit(): void {
   pendingRatio = null
   previewSplitRatio(null)
   syncFixedLayout()
+  showToast(useMessages().value.splitReset)
 }
 
 function onPointerDown(event: PointerEvent): void {
@@ -183,6 +203,17 @@ export function setupSplitter(): () => void {
   el.setAttribute('aria-valuemin', String(Math.round(MIN_SPLIT_RATIO * 100)))
   el.setAttribute('aria-valuemax', String(Math.round(MAX_SPLIT_RATIO * 100)))
   el.setAttribute('title', '双击重置宽度比例')
+
+  // 把手：3 个竖点，hover / 拖拽时显示（样式在 pages/videoPage.scss 第 51 轮段）
+  const handle = document.createElement('div')
+  handle.className = 'bvp-splitter__handle'
+  handle.setAttribute('aria-hidden', 'true')
+  for (let i = 0; i < 3; i++) {
+    const dot = document.createElement('span')
+    dot.className = 'bvp-splitter__dot'
+    handle.appendChild(dot)
+  }
+  el.appendChild(handle)
 
   el.addEventListener('pointerdown', onPointerDown)
   el.addEventListener('pointermove', onPointerMove)

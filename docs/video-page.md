@@ -787,3 +787,150 @@ commentColumn.bottom = 播放器 bottom < rail.top - 8
 
 - shadow 侧旧的两档 token（`--bvp-duration` / `--bvp-ease`）与新的三档并存，B 迁移完成后可删旧的两个（本工作流不删，避免打断 B 的在途改动）；
 - 第 34 轮 typography 段里还有 `@media (max-width: 1280px)` 的降档值（现在也走 `--bvp-fs-upname` / `--bvp-fs-section`），窄屏的档位切换依赖这两个 token 的值，不再单独写裸值。
+
+## 第 51 轮：降低边框依赖 + 评论列表视觉节奏
+
+### 改动点 → 理由
+
+| 改动点 | 理由 |
+| --- | --- |
+| UP 卡 `.up-panel-container`：`border-color: transparent` + `shadow-1`（保留 `--bew-fill-1` 底） | 原来是「底色 + 1px 边框」双装饰，深色下描边过多；改成「底色 + 阴影」表达层级 |
+| 评论列 `.bewly-comment-column`：同样去边框 + `shadow-1` | 同上 |
+| 评论宿主 `#commentapp` / `bili-comments`：`border: 0; box-shadow: none` | 避免宿主再套一层描边 |
+| 自绘按钮 `.bewly-desc-trigger` / `.bewly-toolbar-action`：去边框，hover 改用 `--bew-fill-2` 提亮 | 有背景差就够了；hover 反馈从「边框变色」换成「背景提亮」 |
+| 简介 tooltip：去边框（保留 elevated 底 + shadow-3） | 已有阴影表达悬浮层，不需要再描边 |
+| 信息栏 `#viewbox_report` 加 `border-bottom: 1px solid color-mix(in oklab, currentColor 8%, transparent)` | 信息栏与播放器之间**没有背景差**，属「需要明确分隔但无背景差」的第 3 类，保留一条 8% 细线 |
+| shadow 侧：``bvp-help__dialog` / ``bvp-rail__card` / ``bvp-rail__nav` / ``bvp-rail__close` / ``bvp-fab` / ``bvp-icon-btn` / ``bvp-toast` / ``bvp-compact` / ``bvp-comment-toolbar` 去边框 + 阴影 | 我们自己的容器全部按同一规则收口 |
+| `.bvp-kbd` 保留 1px 边框（显式注释） | 键帽语义依赖边框，去掉就不像按键 |
+| 焦点环统一：`:focus-visible` → 2px 主题色 outline | 「去掉边框不等于去掉焦点可见性」 |
+| `prefers-contrast: more` / `forced-colors` 下把 1px 边框全部加回来（阴影不可见） | 高对比与强制色彩必须靠边框表达边界 |
+| 评论楼层间距：`#commentapp` `display:flex; flex-direction:column; gap:8px`（窄列 6 / 宽列 12） | 用空隙替代分割线，节奏统一 |
+| 嵌套回复竖线：`border-left: 2px solid color-mix(in oklab, currentColor 12%, transparent)` + `margin-left: calc(32px + 8px)` + hover `--bew-fill-1` | 竖线只在有子评论时出现（容器存在即出现）；缩进跟随头像 |
+| UP 主评论色条：`[data-bewly-comment-up="1"]::before` 2px `--bew-theme-color` | 与置顶标签共存（色条在左边缘，标签在文本流内） |
+| 头像与首行对齐：内容区 `padding-top: 2px` | 40px 头像与 12.5px 首行的视觉基线对齐 |
+| 容器查询里保持节奏（`@container bewly-comments`） | 列宽拖动时 gap / 缩进不变形 |
+
+### 需要 B 注入到评论 shadow 的 CSS 清单
+
+评论正文在 `bili-comments` / `bili-comment-renderer` 的 shadow root 内，页面级选不到。
+请把下面这段并入 `comments.ts` 已有的注入 style（与第 46 轮 `COMMENTS_RESPONSIVE_STYLE` 同一通道）：
+
+```css
+/* 楼层间距：去掉分割线，用 8px 空隙 */
+.reply-item,
+.list-item {
+  border-bottom: 0;
+  margin-block: 0;
+  padding-block: 8px;
+}
+.reply-item .divider,
+.comment-divider,
+.list-item hr {
+  display: none;
+}
+.reply-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* 嵌套回复竖线：仅在有子评论的容器上出现 */
+.sub-reply-container {
+  border-left: 2px solid color-mix(in oklab, currentColor 12%, transparent);
+  padding-left: 12px;
+  margin-left: 48px;
+  border-radius: 2px;
+}
+.sub-reply-container:hover {
+  background: var(--bew-fill-1);
+}
+
+/* UP 主评论左侧 2px 主题色条（B 站通常给楼层加 .up 或 data 标记，二选一命中即可） */
+.reply-item.up,
+.reply-item[data-up="1"],
+.reply-item[data-bewly-comment-up="1"] {
+  position: relative;
+}
+.reply-item.up::before,
+.reply-item[data-up="1"]::before,
+.reply-item[data-bewly-comment-up="1"]::before {
+  content: "";
+  position: absolute;
+  inset-block: 4px;
+  inset-inline-start: 0;
+  width: 2px;
+  background: var(--bew-theme-color);
+  border-radius: 2px;
+}
+
+/* 头像与首行文字对齐 */
+.reply-item .root-reply-avatar,
+.reply-item .sub-user-avatar {
+  margin-top: 0;
+}
+.reply-item #content,
+.reply-content {
+  padding-top: 2px;
+}
+
+/* 高对比 / 强制色彩：竖线换成可辨识颜色 */
+@media (prefers-contrast: more) {
+  .sub-reply-container {
+    border-left-color: currentColor;
+  }
+}
+@media (forced-colors: active) {
+  .sub-reply-container {
+    border-left-color: CanvasText;
+  }
+  .reply-item.up::before {
+    background: Highlight;
+  }
+}
+```
+
+### 已知限制
+
+- 页面级只能改宿主容器（评论列、`#commentapp`）；楼层间距 / 竖线 / 色条 / 头像对齐的**深层效果**依赖上面那段注入；
+- 去边框后层级完全靠背景差 + 阴影，深色下阴影对比度低时可能出现「面板与页面融在一起」，此时 `prefers-contrast: more` 会自动加回 1px 边框；
+- 未动 B 站原生元素（工具栏、标签、播放器）的边框。
+
+## 第 51 轮：分隔条交互强化 + 选集面板 elevation 统一
+
+### 任务 1：拖拽分隔条反馈
+
+| 状态 | 表现 |
+| --- | --- |
+| 静态 | 居中 2px 半透明细线（`color-mix(in oklab, currentColor 10%, transparent)`），命中区 12px |
+| hover / focus | 细线变主题色 40%，显示 3 个竖点把手（3×3、圆角 2、gap 3） |
+| 拖拽中 | 细线变主题色实心 2px；把手保持可见；播放器列与评论列各加 1px 主题色 25% 内高光 |
+| 松手 | `is-just-saved` 类播放 300ms 高亮闪烁（主题色 60% → 10%），确认「已保存」 |
+| 双击 / Home / End | 重置为自动比例 + toast「已重置为自动比例」（1.5s，复用 `showToast`） |
+
+- 命中区从 6px 加宽到 12px（`margin-left: -3px` 抵消，视觉线中心仍在 gutter 中线）；
+- 过渡全部用第 50 轮的 `--bvp-dur-fast`；`prefers-reduced-motion` 下动画与过渡移除，只保留颜色变化；
+- 新增 i18n key `splitReset`（中 / 英 / 繁三语）。
+
+### 任务 2：选集面板统一 elevation
+
+- `playlistPanel.shadow.scss` 的 `:host` 补同一组 `--bvp-shadow-1/2/3`（数值与主 shadow 一致）；
+- 面板容器：去边框（「有背景就不加边框」）+ `box-shadow: var(--bvp-shadow-3)`；
+- 条目 hover：`box-shadow: var(--bvp-shadow-1)` 抬升；
+- 提示文案统一 12.5px / 1.5；面板无条目时整个 host 不渲染（既有行为，无需空态）；
+- 高对比：三层 token 换 1px 描边；
+- `videoPage.shadow.scss` 的帮助面板同样去边框，只留 shadow-3。
+
+### 补充（native-style 交接）：评论 shadow 内的「去边框 + 节奏」规则
+
+已并入 `comments.ts` 的 `COMMENTS_RESPONSIVE_STYLE`（与第 46 轮同一注入通道，同时注入 `bili-comments` 与每个 `bili-comment-renderer` 的 shadow）：
+
+- 楼层间距：`.reply-item / .list-item` 去 `border-bottom`、`padding-block: 8px`；`.reply-item .divider / .comment-divider / .list-item hr` 隐藏；`.reply-list` 用 flex + gap 8；
+- 嵌套回复：`.sub-reply-container` 2px `currentColor 12%` 左竖线 + `margin-left: 48px` / `padding-left: 12px`，hover 用 `--bew-fill-1`；
+- 窄列（`@container bewly-comments (max-width: 519px)`）：缩进跟头像 32 → `margin-left: 40px` / `padding-left: 10px`；
+- UP 主评论：`.reply-item.up / [data-up="1"] / [data-bewly-comment-up="1"]` 左侧 2px 主题色条；
+- 头像与正文首行对齐：头像 `margin-top: 0`、正文 `padding-top: 2px`；
+- 高对比：竖线换 `currentColor`；强制色彩：竖线 `CanvasText`、UP 条 `Highlight`。
+
+关于边框移除的影响（native-style 已确认评论区容器尺寸没变）：
+- 第 45 轮的 header 对齐依赖「列 padding 12 + 卡片 border 1 = 13」，去边框后 UP 卡 leftGap 变 12，与 header 的 12 仍对齐（差异 ≤1）；
+- `fixedLayout` 只按 `clientWidth − padding` 与 rect 顶边计算，边框 ±1px 在容差内；`splitter` 用 CSS 变量定位，不受边框影响。

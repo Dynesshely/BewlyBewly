@@ -1494,3 +1494,187 @@
   --bvp-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 }
 /* ===== 第 50 轮 motion-tokens end ===== */
+
+/* ===== 第 51 轮 borderless-rhythm ===== */
+/* 降低边框依赖（第 51 轮 A 工作流，只追加在文件末尾，不重排既有规则）
+   现状：卡片 / 面板普遍「border + background」双装饰，深色下描边过多。
+   规则：内容容器 = 背景 + 阴影，不再要 1px 边框；
+        边框只保留「焦点环 / forced-colors / 无背景差时的细分隔线」。
+
+   只处理**我们自己的**容器（.bvp-*）；B 站原生元素（工具栏、标签）不动。
+
+   层级映射（全部用现有变量，不新增色值）：
+     页面底  < 面板 surface(--bew-content / --bew-fill-1)  <  悬浮 elevated(--bew-elevated / --bew-elevated-solid) */
+
+/* ---------- 帮助面板：对话框靠 elevated + shadow-3 ---------- */
+.bvp-help__dialog {
+  border-color: transparent;
+  box-shadow: var(--bvp-shadow-3, var(--bew-shadow-3));
+}
+
+/* 帮助面板的遮罩保持原样（它本来就不是边框） */
+
+/* ---------- 轨道卡片：elevated + 1 级阴影 ---------- */
+.bvp-rail__card {
+  border-color: transparent;
+  box-shadow: var(--bvp-shadow-1, var(--bew-shadow-1, 0 1px 2px rgb(0 0 0 / 18%)));
+}
+
+/* hover / 激活：升到 2 级阴影（不再用边框变色表达状态） */
+.bvp-rail__card:hover,
+.bvp-rail__card.is-active {
+  border-color: transparent;
+  box-shadow: var(--bvp-shadow-2, var(--bew-shadow-2));
+}
+
+/* ---------- 轨道箭头 / 关闭按钮：圆形浮钮，靠阴影区分 ---------- */
+.bvp-rail__nav,
+.bvp-rail__close {
+  border-color: transparent;
+  box-shadow: var(--bvp-shadow-1, var(--bew-shadow-1, 0 1px 2px rgb(0 0 0 / 18%)));
+}
+
+.bvp-rail__nav:hover:not(:disabled),
+.bvp-rail__close:hover {
+  border-color: transparent;
+  box-shadow: var(--bvp-shadow-2, var(--bew-shadow-2));
+}
+
+/* ---------- 浮层按钮组 / 图标按钮：有背景差，去掉 1px 边框 ---------- */
+.bvp-fab,
+.bvp-icon-btn {
+  border-color: transparent;
+  box-shadow: var(--bvp-shadow-1, var(--bew-shadow-1, 0 1px 2px rgb(0 0 0 / 18%)));
+}
+
+/* ---------- toast / 紧凑信息条 / 评论工具条（若仍渲染） ---------- */
+.bvp-toast,
+.bvp-compact,
+.bvp-comment-toolbar {
+  border-color: transparent;
+  box-shadow: var(--bvp-shadow-2, var(--bew-shadow-2));
+}
+
+/* ---------- kbd 保边框：它是「键帽」，没有边框就没有键帽语义 ---------- */
+/* .bvp-kbd 保持 1px 边框，这里显式写明以免后续误删 */
+
+/* ---------- 焦点边界：去掉边框不等于去掉焦点可见性 ---------- */
+.bvp-fab:focus-visible,
+.bvp-icon-btn:focus-visible,
+.bvp-rail__card:focus-visible,
+.bvp-rail__nav:focus-visible,
+.bvp-rail__close:focus-visible,
+.bvp-help__dialog :focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+
+/* ---------- 强制色彩：边框必须回来（系统色模式下阴影不可见） ---------- */
+@media (forced-colors: active) {
+  .bvp-fab,
+  .bvp-icon-btn,
+  .bvp-toast,
+  .bvp-compact,
+  .bvp-comment-toolbar,
+  .bvp-help__dialog,
+  .bvp-rail__card,
+  .bvp-rail__nav,
+  .bvp-rail__close {
+    border: 1px solid CanvasText;
+    box-shadow: none;
+  }
+}
+
+/* ---------- 高对比度：用 1px 描边替代阴影（阴影在 high contrast 下几乎不可见） ---------- */
+@media (prefers-contrast: more) {
+  .bvp-fab,
+  .bvp-icon-btn,
+  .bvp-toast,
+  .bvp-compact,
+  .bvp-comment-toolbar,
+  .bvp-help__dialog,
+  .bvp-rail__card,
+  .bvp-rail__nav,
+  .bvp-rail__close {
+    border: 1px solid var(--bew-text-3);
+    box-shadow: none;
+  }
+}
+/* ===== 第 51 轮 borderless-rhythm end ===== */
+
+/* 第 51 轮：帮助面板「有背景就不加边框」，层级只用 shadow-3（第 50 轮已设） */
+.bvp-help__dialog {
+  border: 0;
+  box-shadow: var(--bvp-shadow-3);
+}
+
+/* ===== 第 51 轮 borderless-fix ===== */
+/* shadow 侧的同类修正：上一轮只写 `border-color: transparent`，computed borderTopWidth 仍是 0.667px。
+   验收口径是 `borderTopWidth === '0px'` → 必须 `border: 0`。
+
+   受影响容器：轨道卡片 / 轨道箭头与关闭按钮 / 帮助面板对话框 / toast / 紧凑信息条 /
+   评论工具条 / 浮层按钮与图标按钮。kbd 例外（键帽语义依赖边框，保留）。 */
+
+.bvp-rail__card,
+.bvp-rail__nav,
+.bvp-rail__close,
+.bvp-help__dialog,
+.bvp-toast,
+.bvp-compact,
+.bvp-comment-toolbar,
+.bvp-fab,
+.bvp-icon-btn {
+  border: 0 !important;
+}
+
+/* 阴影恢复到第 50/51 轮的层级（border: 0 不会影响阴影，这里只是保证不被上一条覆盖） */
+.bvp-rail__card {
+  box-shadow: var(--bvp-shadow-1, 0 1px 2px rgb(0 0 0 / 18%));
+}
+
+.bvp-rail__card:hover,
+.bvp-rail__card.is-active {
+  box-shadow: var(--bvp-shadow-2, 0 4px 12px rgb(0 0 0 / 24%));
+}
+
+.bvp-help__dialog {
+  box-shadow: var(--bvp-shadow-3, 0 12px 32px rgb(0 0 0 / 36%));
+}
+
+/* kbd 例外：保留边框（键帽语义） */
+.bvp-kbd {
+  border: 1px solid var(--bew-border-color) !important;
+}
+
+/* 高对比度：边框回来 */
+@media (prefers-contrast: more) {
+  .bvp-rail__card,
+  .bvp-rail__nav,
+  .bvp-rail__close,
+  .bvp-help__dialog,
+  .bvp-toast,
+  .bvp-compact,
+  .bvp-comment-toolbar,
+  .bvp-fab,
+  .bvp-icon-btn {
+    border: 1px solid var(--bew-text-3) !important;
+    box-shadow: none !important;
+  }
+}
+
+/* 强制色彩：边框回来（系统色） */
+@media (forced-colors: active) {
+  .bvp-rail__card,
+  .bvp-rail__nav,
+  .bvp-rail__close,
+  .bvp-help__dialog,
+  .bvp-toast,
+  .bvp-compact,
+  .bvp-comment-toolbar,
+  .bvp-fab,
+  .bvp-icon-btn {
+    border: 1px solid CanvasText !important;
+    box-shadow: none !important;
+  }
+}
+/* ===== 第 51 轮 borderless-fix end ===== */

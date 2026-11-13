@@ -259,3 +259,37 @@
   }
 }
 /* #endregion */
+
+/* ===== 第 51 轮 elevation-empty =====
+  第 50 轮的 elevation 只覆盖了主增强层 shadow，选集面板是独立 shadow，这里补齐同一组 token。
+  同时按「有背景就不加边框」的原则去掉面板边框，层级只用 shadow 表达。 */
+:host {
+  --bvp-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.18);
+  --bvp-shadow-2: 0 4px 12px rgba(0, 0, 0, 0.24);
+  --bvp-shadow-3: 0 12px 32px rgba(0, 0, 0, 0.36);
+}
+
+.bvp-playlist {
+  border: 0;
+  box-shadow: var(--bvp-shadow-3);
+}
+
+/* 条目 hover：1 级抬升，替代边框反馈 */
+.bvp-playlist__item:hover {
+  box-shadow: var(--bvp-shadow-1);
+}
+
+/* 提示文案与主界面统一为 12.5px */
+.bvp-playlist__hint {
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* 高对比：阴影换描边 */
+@media (prefers-contrast: more) {
+  :host {
+    --bvp-shadow-1: 0 0 0 1px rgba(0, 0, 0, 0.6);
+    --bvp-shadow-2: 0 0 0 1px rgba(0, 0, 0, 0.7);
+    --bvp-shadow-3: 0 0 0 1px rgba(0, 0, 0, 0.8);
+  }
+}

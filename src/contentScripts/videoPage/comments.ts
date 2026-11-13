@@ -252,6 +252,35 @@ bili-rich-text img {
   border-top: 0;
 }
 
+/* ===== 第 55 轮：子评论子页 ===== */
+/* 子页模式只留被选中的主评论 */
+#contents.bewly-comment-subpage #feed > bili-comment-thread-renderer:not(.bewly-subpage-active) {
+  display: none !important;
+}
+
+/* 返回按钮：与评论按钮同规格（高 36 / 圆角 / 主色描边） */
+#bewly-comment-subpage-back {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  height: 36px !important;
+  margin: 8px 12px !important;
+  padding: 0 16px !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: var(--bew-theme-color, currentColor) !important;
+  background: transparent !important;
+  border: 1px solid var(--bew-theme-color, currentColor) !important;
+  border-radius: 18px !important;
+  cursor: pointer;
+  white-space: nowrap !important;
+}
+
+#bewly-comment-subpage-back:hover {
+  background: color-mix(in oklab, var(--bew-theme-color, currentColor) 12%, transparent) !important;
+}
+
 [class*='divider'] {
   display: none;
 }
@@ -395,6 +424,13 @@ const THREAD_STYLE = `
 
 #replies:hover {
   background: var(--bew-fill-1);
+}
+
+/* 第 55 轮：子页模式下去掉缩进与竖线，子回复与主评论同宽平铺 */
+:host(.bewly-subpage-active) #replies {
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+  border-left: 0 !important;
 }
 
 #reply-container {
@@ -1143,6 +1179,140 @@ function syncCommentPlaceholder(threadCount: number): void {
   }
 }
 
+/** 子评论子页（第 55 轮）：状态类 / 返回按钮 id / 自动展开上限 */
+const SUBPAGE_CLASS = 'bewly-comment-subpage'
+const SUBPAGE_ACTIVE_CLASS = 'bewly-subpage-active'
+const SUBPAGE_BACK_ID = 'bewly-comment-subpage-back'
+const SUBPAGE_EXPAND_INTERVAL = 300
+const SUBPAGE_EXPAND_MAX = 10
+
+let subpageThread: HTMLElement | null = null
+let subpageScrollTop = 0
+let subpageExpandTimer: number | null = null
+let subpageExpandCount = 0
+let subpageClickBound = false
+
+/** 递归收集元素及其 shadow 树里的可点击节点 */
+function collectClickable(root: ParentNode): HTMLElement[] {
+  const out: HTMLElement[] = []
+  const walk = (node: ParentNode): void => {
+    for (const el of Array.from(node.querySelectorAll<HTMLElement>('*'))) {
+      if (el.shadowRoot)
+        walk(el.shadowRoot)
+    }
+  }
+  for (const el of Array.from(root.querySelectorAll<HTMLElement>('button, a, [role="button"], bili-text-button'))) {
+    out.push(el)
+    if (el.shadowRoot)
+      out.push(...collectClickable(el.shadowRoot))
+  }
+  walk(root)
+  return out
+}
+
+/** 点开子回复里的「查看更多 / 展开」直到全部展开（有上限，避免死循环） */
+function startSubpageExpand(thread: HTMLElement): void {
+  stopSubpageExpand()
+  subpageExpandCount = 0
+  const tick = (): void => {
+    if (!subpageThread || subpageThread !== thread || subpageExpandCount >= SUBPAGE_EXPAND_MAX) {
+      stopSubpageExpand()
+      return
+    }
+    const threadShadow = thread.shadowRoot
+    if (!threadShadow) {
+      stopSubpageExpand()
+      return
+    }
+    const repliesRoot = threadShadow.querySelector<HTMLElement>('#replies') ?? threadShadow
+    const target = collectClickable(repliesRoot)
+      .find(el => /查看更多|更多回复|展开更多|点击展开/.test((el.textContent ?? '').trim()))
+    if (!target) {
+      stopSubpageExpand()
+      return
+    }
+    target.click()
+    subpageExpandCount += 1
+  }
+  tick()
+  subpageExpandTimer = window.setInterval(tick, SUBPAGE_EXPAND_INTERVAL)
+}
+
+function stopSubpageExpand(): void {
+  if (subpageExpandTimer !== null) {
+    window.clearInterval(subpageExpandTimer)
+    subpageExpandTimer = null
+  }
+}
+
+/** 进入子页：只留被选中的主评论 + 平铺子回复 + 顶部返回按钮 */
+function enterSubpage(thread: HTMLElement): void {
+  const shadow = getCommentsShadow()
+  const contents = shadow?.querySelector<HTMLElement>('#contents')
+  if (!shadow || !contents || subpageThread === thread)
+    return
+
+  exitSubpage(true)
+  subpageThread = thread
+  subpageScrollTop = document.getElementById('commentapp')?.scrollTop ?? 0
+
+  contents.classList.add(SUBPAGE_CLASS)
+  for (const item of Array.from(contents.querySelectorAll<HTMLElement>(THREAD_EL_SELECTOR)))
+    item.classList.toggle(SUBPAGE_ACTIVE_CLASS, item === thread)
+
+  const back = document.createElement('button')
+  back.id = SUBPAGE_BACK_ID
+  back.type = 'button'
+  back.className = 'bewly-subpage-back'
+  back.textContent = '← 返回评论列表'
+  back.addEventListener('click', () => exitSubpage())
+  contents.insertBefore(back, contents.firstChild)
+
+  startSubpageExpand(thread)
+}
+
+/** 退出子页：清类 / 返回按钮 / 定时器，恢复滚动位置 */
+function exitSubpage(keepScroll = false): void {
+  stopSubpageExpand()
+  const shadow = getCommentsShadow()
+  const contents = shadow?.querySelector<HTMLElement>('#contents')
+  contents?.classList.remove(SUBPAGE_CLASS)
+  if (contents) {
+    for (const item of Array.from(contents.querySelectorAll<HTMLElement>(`.${SUBPAGE_ACTIVE_CLASS}`)))
+      item.classList.remove(SUBPAGE_ACTIVE_CLASS)
+  }
+  shadow?.getElementById(SUBPAGE_BACK_ID)?.remove()
+  const hadThread = subpageThread !== null
+  subpageThread = null
+  if (hadThread && !keepScroll) {
+    const app = document.getElementById('commentapp')
+    if (app)
+      app.scrollTop = subpageScrollTop
+  }
+}
+
+/**
+ * 全局 click 捕获：识别「共 N 条回复」/「查看更多」点击 → 切到子页。
+ *
+ * 事件从 shadow 内冒泡出来，用 composedPath 找到 thread 与来源元素；
+ * 只处理来源位于 bili-comment-replies-renderer 内、文本含「回复/更多」的点击，避免误伤其它按钮。
+ * 不 preventDefault：让 B 站自己展开子回复，我们再切视图。
+ */
+function onDocumentClickCapture(event: MouseEvent): void {
+  const path = event.composedPath()
+  const thread = path.find(el => (el as HTMLElement).matches?.(THREAD_EL_SELECTOR)) as HTMLElement | undefined
+  if (!thread)
+    return
+  const inReplies = path.some(el => (el as HTMLElement).tagName === 'BILI-COMMENT-REPLIES-RENDERER')
+  if (!inReplies)
+    return
+  const source = path[0] as HTMLElement | undefined
+  const text = (source?.textContent ?? '').trim()
+  if (!/回复|更多/.test(text))
+    return
+  window.setTimeout(enterSubpage, 350, thread)
+}
+
 function ensureCommentsStyle(): void {
   const shadow = getCommentsShadow()
   if (!shadow)
@@ -1592,6 +1762,9 @@ export function syncComments(): void {
   const threads = getThreads()
   // 第 50 轮：评论区骨架 / 空态（0 线程显示骨架，4s 后仍空则空态；有线程立即移除）
   syncCommentPlaceholder(threads.length)
+  // 第 55 轮：子页里的线程被 B 站重建 / 移除时自动退出子页
+  if (subpageThread && !subpageThread.isConnected)
+    exitSubpage()
   for (const thread of threads)
     processThread(thread)
 
@@ -1717,10 +1890,20 @@ export function setupComments(): () => void {
 
   window.addEventListener('scroll', schedulePositionUpdate, { passive: true })
   window.addEventListener('resize', schedulePositionUpdate, { passive: true })
+  // 第 55 轮：子评论子页 —— 捕获「共 N 条回复」点击
+  if (!subpageClickBound) {
+    document.addEventListener('click', onDocumentClickCapture, true)
+    subpageClickBound = true
+  }
   syncComments()
   observeCommentsShadow()
 
   disposeListeners = () => {
+    if (subpageClickBound) {
+      document.removeEventListener('click', onDocumentClickCapture, true)
+      subpageClickBound = false
+    }
+    exitSubpage(true)
     window.removeEventListener('scroll', schedulePositionUpdate)
     window.removeEventListener('resize', schedulePositionUpdate)
 

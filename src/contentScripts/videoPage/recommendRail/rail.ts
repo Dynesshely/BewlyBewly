@@ -564,6 +564,21 @@ const RAIl_FIXED_BOTTOM_GAP = 12
  *
  * 轨道在增强层 shadow root 里，只读它不影响我们写的位置，因此可以每拍读。
  */
+/**
+ * 已渲染**卡片**的高度（没有渲染时返回 0）。
+ *
+ * 第 55 轮：轨道高度公式漏算 UP 名行（约 19px），1400 宽下算出 199 < 实际 215 → 卡片底部被裁。
+ * 卡片高度由内容（封面 + gap + 标题 + UP 名）实际撑开，直接量它最可靠：
+ * `railHeight = cardHeight + railPadding*2`。
+ */
+export function getRenderedCardHeight(): number {
+  const host = document.getElementById('bewly-video-page')
+  const card = host?.shadowRoot?.querySelector<HTMLElement>('.bvp-rail__card')
+  return card
+    ? Math.round(card.getBoundingClientRect().height)
+    : 0
+}
+
 export function getRenderedRailHeight(): number {
   const host = document.getElementById('bewly-video-page')
   const rail = host?.shadowRoot?.querySelector<HTMLElement>('.bvp-rail')

@@ -1148,3 +1148,52 @@ footer 侧补：`#footer bili-comment-action-buttons-renderer { flex: 0 0 auto; 
 
 注意：`@container` 跨到 action-buttons 的 shadow 是否生效取决于 Chromium 的容器上下文；
 若不生效，间距统一为 4px（仍远小于 362px），在报告里已说明。
+
+## 第 55 轮：推荐轨道高度按实测卡片高度修正
+
+真机：1600 宽轨道 215 = 卡片 191 + padding 24 ✅；1400 宽轨道 199 < 卡片 191 + 24 = 215 → 卡片底部被裁 16px。
+根因：`computeRailHeight` 公式漏算 UP 名行（约 19px）。
+
+修法：
+
+1. `recommendRail/rail.ts` 新增 `getRenderedCardHeight()`：量 `.bvp-rail__card` 的实际高度；
+2. `recommendRail/index.ts`：
+   - 导出 `getRailPadding()`（按密度 8 / 12 / 14，与 shadow scss 密度段同源）；
+   - 公式补 UP 名行（`+ 19`）作为**回退值**；
+3. `fixedLayout.ts`：`railSpace = max(computeRailHeight(width), renderedRailHeight, cardHeight + railPadding*2)`，
+   卡片量不到时回退公式；
+4. 值不变不写仍由 `setVar` 保证（收敛后不会每拍抖）。
+
+预期：1600 与 1400 都得到 `rail ≈ 卡片 191 + 24 = 215`，卡片不再被裁；dock 相应减 16，播放器按 16:9 变矮。
+
+## 第 55 轮 B：子评论改为「评论区子页」
+
+用户建议：窄评论区里树状展开的子评论太乱，改成在评论区内的子页查看。
+
+### 交互
+
+1. 点击主评论底部「共 N 条回复」→ 不拦截 B 站展开，350ms 后进入子页；
+2. 子页：`#contents` 加 `bewly-comment-subpage`，只有被点的主评论留 `bewly-subpage-active`，
+   其余 thread 由注入样式 `display: none`；
+3. 子页下 `#replies`（thread shadow 内）去 `margin-left / padding-left / border-left`，子回复与主评论同宽平铺；
+4. `#contents` 顶部插入 `#bewly-comment-subpage-back`（`← 返回评论列表`，高 36、主色描边、hover 12% 主色底）；
+5. 返回：移除 class / 按钮 / 定时器，恢复 `#commentapp.scrollTop`；
+6. 自动展开：进入子页后每 300ms 找「查看更多 / 更多回复」按钮并点击，最多 10 次；
+7. 线程被 B 站重建 / 移除（`!isConnected`）时自动退出子页；
+8. 卸载时解绑 document click 捕获并退出子页。
+
+### 识别方式（真机 DOM 不稳定）
+
+- 用 document 级 **click 捕获** + `composedPath()`：路径里同时有 `bili-comment-thread-renderer` 与
+  `bili-comment-replies-renderer`，且源元素文本含「回复 / 更多」才触发；
+- 不 preventDefault（让 B 站自己展开子回复），我们只切视图。
+
+### 顺带核查（CDP 临时视口实测，当前构建）
+
+| 视口 | html 类 | rail | 卡片 | #body | #content | #footer | #more↔#reply | 评论列 | #commentapp |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1400×900 | fixed（三区） | 199 | 175 | flex / padL 0 | 420 | flex / flex-start | 0px | 606×576 | 467 |
+| 1210×866 | fixed + **narrow** | 隐藏 | — | flex / padL 0 | 420 | flex / flex-start | 0px | **1162×220** | 111 |
+
+结论：第 52 轮窄屏高度修复已生效（1210 下评论列 220px）；第 53 轮的 `#body` flex / `#content` 420 /
+`#footer` 紧凑 / `#more` 间距 0 全部生效；1400 下 rail 199 = 卡片 175 + padding 24，无裁切。

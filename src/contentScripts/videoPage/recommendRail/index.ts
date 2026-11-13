@@ -22,7 +22,7 @@ import {
 } from './rail'
 import { RAIL_MIN_CARD_WIDTH } from './types'
 
-export { getRenderedRailHeight } from './rail'
+export { getRenderedCardHeight, getRenderedRailHeight } from './rail'
 
 /**
  * 推荐轨道的状态与生命周期（第 27 轮）。
@@ -87,7 +87,20 @@ export function computeRailHeight(width: number): number {
       : 34
 
   const coverHeight = Math.round((cardWidth - cardPadding * 2) * 9 / 16)
-  return railPadding * 2 + cardPadding * 2 + coverHeight + 8 + titleLine + 4 + 16
+  // 第 55 轮：公式补上 UP 名行（真机实测约 19px），否则 1400 宽下会少算 16px、卡片底部被裁。
+  // 这是**回退值**：能渲染时优先用 getRenderedCardHeight() 实测（见 fixedLayout 的 railSpace 计算）。
+  const upNameLine = 19
+  return railPadding * 2 + cardPadding * 2 + coverHeight + 8 + titleLine + 4 + upNameLine + 16
+}
+
+/** 轨道上下 padding（按密度取值，与 shadow scss 的密度段同源，第 55 轮导出给 fixedLayout 实测补偿用） */
+export function getRailPadding(): number {
+  const density = settings.value.videoPageDensity || 'comfortable'
+  return density === 'compact'
+    ? 8
+    : density === 'relaxed'
+      ? 14
+      : 12
 }
 
 function sameSequence(a: RailCard[], b: RailCard[]): boolean {

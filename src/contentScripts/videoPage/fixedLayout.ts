@@ -51,7 +51,7 @@ import { settings } from '~/logic'
 
 import { getPlayerWrapEl } from './dom'
 import { getPlayerScreenMode } from './playerMode'
-import { computeRailHeight, getRenderedRailHeight, railState } from './recommendRail'
+import { computeRailHeight, getRailPadding, getRenderedCardHeight, getRenderedRailHeight, railState } from './recommendRail'
 import { ui } from './state'
 
 /** 固定布局生效时挂在 <html> 上的类（页面级样式与 e2e 都靠它） */
@@ -298,6 +298,16 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
     ? getRenderedRailHeight()
     : 0
 
+  // 第 55 轮：卡片高度由内容实际撑开（封面 + gap + 标题 + UP 名），公式容易漏项。
+  // 渲染后直接量第一张卡片，`railHeight = cardHeight + railPadding*2`，与公式取较大值。
+  const railPadding = getRailPadding()
+  const measuredCardHeight = railVisible
+    ? getRenderedCardHeight()
+    : 0
+  const cardRailHeight = measuredCardHeight > 0
+    ? measuredCardHeight + railPadding * 2
+    : 0
+
   // 左列其它块的实测高度（不含播放器）
   const blocks = leftCol
     ? measureDockBlocks(leftCol, playerWrap)
@@ -388,6 +398,7 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
       0,
       Math.round(computeRailHeight(width)),
       renderedRailHeight,
+      cardRailHeight,
     )
     const converged = Math.abs(nextRailSpace - railSpace) < 1
     railSpace = nextRailSpace

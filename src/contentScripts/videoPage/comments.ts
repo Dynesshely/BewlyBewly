@@ -168,9 +168,13 @@ const COMMENTS_RESPONSIVE_STYLE = `
    旧版 .reply-item / .reply-list / .sub-reply-container 在当前 B 站版本不存在，已全部移除。
    头像尺寸由 bili-avatar 的 --avatar-width/height 内联变量控制（真机 48px），这里覆盖为 40 / 窄列 32。 */
 #body {
-  align-items: flex-start;
+  /* 第 53 轮：B 站原生是 block + padding: 22px 0 0 80px（内容被右推 80px）。
+     必须显式 flex 化并清 padding，否则 #main 可用宽只剩 398、#footer 也被挤成 block。 */
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 12px !important;
+  padding: 0 !important;
   min-width: 0;
-  gap: 8px;
 }
 
 #user-avatar {
@@ -188,10 +192,31 @@ const COMMENTS_RESPONSIVE_STYLE = `
   min-width: 0;
 }
 
+
+/* 第 53 轮：#footer 紧凑排布 —— B 站用 block + 定位把操作按钮推到右边，产生大空隙。
+   改成 flex + wrap + 小间距，禁止任何子项被拉伸，也不允许 space-between。 */
+#footer {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 4px 12px !important;
+}
+
+#footer > * {
+  flex: 0 0 auto !important;
+}
+
+/* 时间 / IP 属地不折行 */
+#footer time,
+#footer [class*='time'] {
+  white-space: nowrap !important;
+}
+
 #content {
   flex: 1 1 auto;
   min-width: 0;
-  max-width: 420px;
+  max-width: min(420px, 100%) !important;
   overflow-wrap: anywhere;
   padding-top: 2px;
 }
@@ -247,6 +272,29 @@ bili-rich-text img {
 }
 
 /* 容器查询：窄列收紧间距与头像，宽列放松 */
+/* 第 53 轮窄列（列宽 < 560）：更紧的正文宽度 / 头像 / footer 间距，避免行宽与空隙失衡 */
+@container bewly-comments (max-width: 559px) {
+  #body {
+    gap: 8px !important;
+  }
+
+  #user-avatar bili-avatar {
+    --avatar-width: 32px;
+    --avatar-height: 32px;
+  }
+
+  #content,
+  #content * {
+    font-size: 13.5px !important;
+    line-height: 1.6 !important;
+  }
+
+  #footer {
+    gap: 4px 8px !important;
+    font-size: 12px !important;
+  }
+}
+
 @container bewly-comments (max-width: 519px) {
   #user-avatar bili-avatar {
     --avatar-width: 32px;
@@ -289,7 +337,53 @@ bili-rich-text img {
  * （`#replies` 包着 `bili-comment-replies-renderer`）+ `div#reply-container`。
  * 旧版类名（`.reply-item` / `.sub-reply-container`）在当前 B 站版本**不存在**，不要再用它们做主选择器。
  */
+/**
+ * 注入到 `bili-comment-action-buttons-renderer` 自己的 shadow（第 53 轮）。
+ *
+ * 真机 dump：footer 里的「时间 / 点赞 / 回复 / 更多」都在 action-buttons 的 shadow 内，
+ * 且 #more 带 `margin-left: auto`（B 站把「更多」推到行尾）→ #reply 与 #more 之间 362px 空隙。
+ * 注入到 bili-comment-renderer 的样式选不到这些节点，必须单独注入。
+ */
+const ACTION_BUTTONS_STYLE_ID = 'bewly-comment-actions-style'
 const THREAD_STYLE_ID = 'bewly-comment-thread-style'
+const ACTION_BUTTONS_STYLE = `
+/* 第 53 轮：footer 紧凑排布 —— #more 的 margin-left:auto 是 360px 空隙的根因 */
+#more {
+  margin-left: 0 !important;
+}
+
+#pubdate {
+  margin-right: 4px !important;
+}
+
+#like,
+#dislike,
+#reply {
+  margin-left: 4px !important;
+}
+
+/* 允许换行，避免窄列溢出 */
+:host {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  row-gap: 4px !important;
+}
+
+/* 窄列：间距再收一档（容器在页面级，若该 shadow 内 container 查询不生效则沿用上面的 4px） */
+@container bewly-comments (max-width: 559px) {
+  #pubdate {
+    margin-right: 2px !important;
+  }
+
+  #like,
+  #dislike,
+  #reply {
+    margin-left: 2px !important;
+  }
+}
+`
+
 const THREAD_STYLE = `
 /* 嵌套回复：2px 竖线 + 12px 内缩，hover 给浅底 */
 #replies {
@@ -1074,6 +1168,15 @@ function ensureRendererStyle(renderer: HTMLElement): void {
   ensureStyleInShadow(shadow, FOLD_STYLE_ID, FOLD_STYLE)
   ensureStyleInShadow(shadow, TEXT_STYLE_ID, TEXT_STYLE)
   ensureStyleInShadow(shadow, COMMENTS_RESPONSIVE_STYLE_ID, COMMENTS_RESPONSIVE_STYLE)
+  // 第 53 轮：footer 的操作按钮在 bili-comment-action-buttons-renderer 自己的 shadow 里，
+  // 从 renderer shadow 查它的 shadowRoot 单独注入（#more 的 margin-left:auto 是 360px 空隙根因）。
+  for (const actionButtons of Array.from(shadow.querySelectorAll('bili-comment-action-buttons-renderer'))) {
+    const actionShadow = (actionButtons as HTMLElement).shadowRoot
+    if (!actionShadow)
+      continue
+    ensureStyleInShadow(actionShadow, ACTION_BUTTONS_STYLE_ID, ACTION_BUTTONS_STYLE)
+    styledShadows.add(actionShadow)
+  }
   // B 站可能在我们的 style 之后又插入 <style>（同特异性后写胜）——把我们的挪到最后，
   // 每次调用都是幂等的，移动成本可以忽略（只是 appendChild 已有节点）。
   for (const id of [FOLD_STYLE_ID, TEXT_STYLE_ID]) {
@@ -1654,6 +1757,7 @@ export function setupComments(): () => void {
       removeStyleFromShadow(shadow, TEXT_STYLE_ID)
       removeStyleFromShadow(shadow, COMMENTS_RESPONSIVE_STYLE_ID)
       removeStyleFromShadow(shadow, THREAD_STYLE_ID)
+      removeStyleFromShadow(shadow, ACTION_BUTTONS_STYLE_ID)
     }
     styledShadows.clear()
 

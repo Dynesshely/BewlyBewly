@@ -1081,3 +1081,70 @@ html.bewly-design.videoPage.bewly-video-fixed.bewly-video-narrow .right-containe
 ```
 
 预期（1024×800）：`inner` padding-bottom = 0、高度 220；评论列 220；UP 卡 ~84；`#commentapp` ~128 内部滚动。
+
+## 第 53 轮：评论区窄宽度适配
+
+真机诊断（1280 视口，renderer shadow）：`#body` 是 **block**、`padding: 22px 0 0 80px`，
+`#content` 可用宽只剩 398（478 − 80），`#footer` 也是 block、操作按钮被推到右侧 → 中间大空隙。
+
+### 改动（`comments.ts` 的 `COMMENTS_RESPONSIVE_STYLE`）
+
+| 改动点 | 理由 |
+| --- | --- |
+| `#body { display: flex; align-items: flex-start; gap: 12px; padding: 0 }` | 清掉 B 站原生 80px 左 padding 与 22px 上 padding，让头像与正文按 flex 排 |
+| `#user-avatar { flex: 0 0 auto }`、`#main { flex: 1 1 auto; min-width: 0 }` | 头像不缩、正文吃掉剩余宽 |
+| `#content { max-width: min(420px, 100%) !important }` | 宽列仍是 420 行长，窄列取 100% 不溢出 |
+| `#footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 4px 12px }` + `#footer > * { flex: 0 0 auto }` | 消除 block 布局造成的中间大空隙，禁止子项被拉伸 / space-between |
+| `#footer time, #footer [class*=time] { white-space: nowrap }` | 时间与 IP 属地不折成两行 |
+| `@container bewly-comments (max-width: 559px)`：`#body` gap 8、头像 32、正文 13.5/1.6、footer 12 + gap 4/8 | 窄列下行宽与间距协调（头像到正文间距缩小） |
+
+### 预期（1280 / 1024）
+
+- `#body.display === "flex"`、`paddingLeft === "0px"`；
+- `#content` 宽 = min(420, 可用宽)；窄列 ≤ 列宽 − 头像 − gap；
+- `#footer.display === "flex"`、`justify-content: flex-start`、子项空隙 ≤ 12px；
+- 时间与 IP 同一行；第 51 轮的 `#replies` 竖线规则未改动。
+
+### 第 53 轮补充：`#more` 的 `margin-left: auto`（360px 空隙真凶）
+
+真机 dump：footer 内的「时间 / 点赞 / 回复 / 更多」都在 `bili-comment-action-buttons-renderer` 的**自己的 shadow** 里，
+`#more` 带 `margin-left: auto` 被推到行尾（`#reply` x=1158、`#more` x=1520）。
+注入到 `bili-comment-renderer` 的样式选不到这些节点。
+
+新增注入目标：`bili-comment-action-buttons-renderer` 的 shadowRoot（style id `#bewly-comment-actions-style`），
+在 `ensureRendererStyle()` 里从 renderer shadow 查询后注入：
+
+```css
+#more {
+  margin-left: 0 !important;
+}
+#pubdate {
+  margin-right: 4px !important;
+}
+#like,
+#dislike,
+#reply {
+  margin-left: 4px !important;
+}
+:host {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  row-gap: 4px !important;
+}
+@container bewly-comments (max-width: 559px) {
+  #pubdate {
+    margin-right: 2px !important;
+  }
+  #like,
+  #dislike,
+  #reply {
+    margin-left: 2px !important;
+  }
+}
+```
+
+footer 侧补：`#footer bili-comment-action-buttons-renderer { flex: 0 0 auto; max-width: 100% }`。
+
+注意：`@container` 跨到 action-buttons 的 shadow 是否生效取决于 Chromium 的容器上下文；
+若不生效，间距统一为 4px（仍远小于 362px），在报告里已说明。

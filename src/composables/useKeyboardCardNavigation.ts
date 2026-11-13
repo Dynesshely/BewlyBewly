@@ -134,9 +134,36 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
     }
   }
 
-  /** 弹出对话框（设置、确认框等）打开时不接管 */
+  /**
+   * 应用内浮层选择器（与 App.vue 的 hasShadowOverlay 口径保持一致）。
+   *
+   * 注意：设置页的根元素是 #settings-window，并没有 .dialog 类，
+   * 旧实现只认 .dialog，导致设置页 / 命令面板 / 帮助面板 / iframe 抽屉打开时
+   * 键盘导航仍接管滚轮与方向键（设置页因此滚不动）。
+   */
+  const OVERLAY_SELECTOR = '.dialog, #settings-window, .command-palette-mask, .keyboard-help-mask, .bewly-iframe-drawer'
+
+  /** 有浮层打开时不接管滚轮 / 键盘：把事件完全放行给浮层自己处理 */
   function hasOpenModal(): boolean {
-    return !!shadowRootEl?.querySelector('.dialog')
+    return !!shadowRootEl?.querySelector(OVERLAY_SELECTOR)
+  }
+
+  /**
+   * 事件路径里是否包含浮层。
+   *
+   * shadow DOM 里的事件冒泡到 document 时 target 会被重定向到宿主元素，
+   * 光靠 event.target + isEditableTarget 会漏判（例如在设置页搜索框里打字），
+   * 因此用 composedPath() 逐个检查祖先节点。
+   */
+  function isEventInsideOverlay(event: Event): boolean {
+    const path = typeof event.composedPath === 'function'
+      ? event.composedPath()
+      : []
+    for (const node of path) {
+      if (node instanceof Element && node.closest(OVERLAY_SELECTOR))
+        return true
+    }
+    return false
   }
 
   function isEditableTarget(target: EventTarget | null): boolean {
@@ -527,7 +554,19 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
     // 键盘模式关闭：不接管其他按键，恢复原版鼠标点选
     if (!settings.value.keyboardNavEnabled)
       return
-    if (hasOpenModal() || isEditableTarget(event.target))
+    // 帮助面板自身的开关必须在面板打开时也能生效，否则打开后按同一个键关不掉。
+    // 注意：这段必须放在浮层判断之前；面板没开时由下面 action switch 的 toggleHelp 负责打开。
+    const helpPanelOpen = Boolean(
+      shadowRootEl?.querySelector('.keyboard-help-mask, .keyboard-help-panel'),
+    )
+    if (helpPanelOpen && comboMatches(resolveShortcut('toggleHelp', overrides), event)) {
+      event.preventDefault()
+      emitter.emit('toggle-keyboard-help')
+      return
+    }
+    // 浮层打开时放行所有导航键（方向键 / PageDown / Space / Enter 交给原生行为）；
+    // 同时用 composedPath 兜底（shadow DOM 的 target 会被重定向到宿主，isEditableTarget 可能失效）。
+    if (hasOpenModal() || isEventInsideOverlay(event) || isEditableTarget(event.target))
       return
 
     const cards = getVisibleCards()
@@ -663,6 +702,10 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
   }
 
   function handleWheel(event: WheelEvent) {
+    // 浮层（设置 / 命令面板 / 帮助 / iframe 抽屉）打开时完全放行滚轮：
+    // 交给浮层自己的滚动容器，键盘卡片导航既不 preventDefault 也不切换卡片。
+    if (hasOpenModal() || isEventInsideOverlay(event))
+      return
     // 聚焦浏览模式自己处理滚轮
     if (isFocusBrowseMode())
       return
@@ -674,7 +717,7 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
       requestAnimationFrame(followActiveToViewport)
       return
     }
-    if (hasOpenModal() || isEditableTarget(event.target))
+    if (isEditableTarget(event.target))
       return
 
     const cards = getCards()

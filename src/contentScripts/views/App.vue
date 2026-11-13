@@ -126,6 +126,7 @@ const reachTop = ref<boolean>(true)
 
 const iframeDrawerURL = ref<string>('')
 const showIframeDrawer = ref<boolean>(false)
+const iframeDrawerRef = ref<{ navigateTo: (url: string) => void } | null>(null)
 
 const iframePageRef = ref()
 useEventListener(window, 'message', ({ data }) => {
@@ -533,6 +534,19 @@ function openIframeDrawer(url: string) {
     return
   }
 
+  // 禁止抽屉嵌套：在 iframe 内（抽屉里的视频页）再点视频时，直接在当前 iframe 内导航，
+  // 不再叠加第二层抽屉（叠加会让两套 fixed 布局互相干扰、关闭后前一层也失效）。
+  if (isInIframe()) {
+    location.href = url
+    return
+  }
+
+  // 抽屉已打开：交给抽屉做内部导航（保留前进/后退栈），不重建 iframe
+  if (showIframeDrawer.value) {
+    iframeDrawerRef.value?.navigateTo(url)
+    return
+  }
+
   iframeDrawerURL.value = url
   showIframeDrawer.value = true
 }
@@ -711,6 +725,7 @@ onUnmounted(() => {
 
     <IframeDrawer
       v-if="showIframeDrawer"
+      ref="iframeDrawerRef"
       :url="iframeDrawerURL"
       @close="showIframeDrawer = false"
     />

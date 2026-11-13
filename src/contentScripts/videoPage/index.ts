@@ -221,23 +221,87 @@ let endedTimer: number | null = null
 /** 自动连播偏好是否已经从 sessionStorage 还原过 */
 let autoplayPreferenceLoaded = false
 
+/** URL 就绪监听：iframe about:blank / srcdoc / SPA 路由切换时，URL 变成视频页后补挂（第 49 轮） */
+let mountRetryTimer: number | null = null
+let disposeMountRetryWatcher: (() => void) | null = null
+
+function stopMountRetry(): void {
+  if (mountRetryTimer !== null) {
+    window.clearInterval(mountRetryTimer)
+    mountRetryTimer = null
+  }
+  if (disposeMountRetryWatcher) {
+    disposeMountRetryWatcher()
+    disposeMountRetryWatcher = null
+  }
+}
+
+/**
+ * 等待「URL 变成视频播放页」后再补跑 mount（第 49 轮）。
+ *
+ * 触发场景（首页空格预览的 iframe 抽屉最典型）：
+ * - `match_about_blank` 让 content script 在 iframe 还是 `about:blank` 时就注入，
+ *   此时 `isNativeVideoPage()` 为 false，旧实现直接 return 且**再也没有重试** → 宿主不存在、布局不生效；
+ * - 抽屉先建空白 iframe 再设 `src`（或 `srcdoc` / SPA 改 URL）时同理。
+ *
+ * 这里 500ms 轮询 + popstate/hashchange 立即触发，URL 一变成视频页就 mount，成功后自动停表。
+ */
+function startMountRetry(): void {
+  if (mountRetryTimer !== null || hostEl)
+    return
+
+  const tryMount = () => {
+    if (hostEl) {
+      stopMountRetry()
+      return
+    }
+    if (!isNativeVideoPage())
+      return
+    stopMountRetry()
+    if (!document.body)
+      return
+    mount()
+  }
+
+  mountRetryTimer = window.setInterval(tryMount, 500)
+  window.addEventListener('popstate', tryMount)
+  window.addEventListener('hashchange', tryMount)
+  disposeMountRetryWatcher = () => {
+    window.removeEventListener('popstate', tryMount)
+    window.removeEventListener('hashchange', tryMount)
+  }
+}
+
 export function setupVideoPage(): void {
   if (hostEl)
     return
-  if (!isNativeVideoPage())
-    return
   if (!document.body) {
     document.addEventListener('DOMContentLoaded', () => setupVideoPage(), { once: true })
+    return
+  }
+  if (!isNativeVideoPage()) {
+    // 第 49 轮：不再直接放弃，等 URL 变成视频页后补挂（iframe 抽屉 / about:blank 场景）
+    startMountRetry()
     return
   }
   mount()
 }
 
 export function teardownVideoPage(): void {
+  stopMountRetry()
   unmount()
 }
 
 function mount(): void {
+  // 第 49 轮：iframe 早期注入（about:blank / srcdoc）时，contentScripts/index.ts 顶层的
+  // `isSupportedPages() || isSupportedIframePages()` 判定为 false，会**跳过** bewly-design 类与
+  // adaptedStyles 的 videoPage 类；之后 URL 变成视频页也不会重跑那段逻辑。
+  // 页面级 CSS 全部以 `html.bewly-design.videoPage...` 为前缀，缺类 = 布局变量写了但视觉不生效。
+  // 这里在 mount 时补齐（与主流程条件一致：仅当用户开启「适配其它页面样式」时加 bewly-design）。
+  if (settings.value.adaptToOtherPageStyles)
+    document.documentElement.classList.add('bewly-design')
+  document.documentElement.classList.add('videoPage')
+
   hostEl = document.createElement('div')
   hostEl.id = HOST_ID
 
@@ -342,6 +406,7 @@ function mount(): void {
 }
 
 function unmount(): void {
+  stopMountRetry()
   if (!hostEl)
     return
 
@@ -423,6 +488,8 @@ function sync(): void {
   const kind = getNativePlaybackKind()
   if (kind === 'none') {
     teardownVideoPage()
+    // 第 49 轮：本页暂时不是视频页，但可能稍后变成（iframe 抽屉 / SPA 跳转）→ 继续等 URL 就绪
+    startMountRetry()
     return
   }
 

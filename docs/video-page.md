@@ -870,3 +870,42 @@ commentColumn.bottom = 播放器 bottom < rail.top - 8
 - 「偶尔不生效」排查辅助：`safeSync` 的 warn 现在打印**堆栈**，真机 console 能定位是哪个模块抛错；
   若 iframe 内根本没宿主元素，说明 `contentScripts/index.ts` 的 `isVideoOrBangumiPage()` 判定在 iframe 下失败，
   需要下一步查 `location` / UA 分支（本轮范围外，已列入交接）。
+
+## 第 49 轮：iframe 预览里宿主不存在 / 布局不生效
+
+用户反馈：首页空格预览抽屉的 iframe 里，视频页布局不生效，宿主 `#bewly-video-page` 都不存在。
+
+### 根因（两条叠加）
+
+1. **`setupVideoPage()` 一次性判定后永不重试**：旧实现是 `if (!isNativeVideoPage()) return`。
+   `match_about_blank: true` 让 content script 在 iframe 还是 `about:blank` 时就注入，
+   此时 `isNativeVideoPage()`（只看 URL）为 false → 直接 return，之后 URL 变成视频页也**没有任何补挂**；
+   抽屉先建空白 iframe 再设 `src`（或 `srcdoc` / SPA 改 URL）时同理。
+2. **样式类可能缺失**：`contentScripts/index.ts` 顶层的 `isSupportedPages() || isSupportedIframePages()`
+   判定在 `about:blank` 时为 false → 跳过 `bewly-design` 类；`adaptedStyles` 也可能没跑 → 缺 `videoPage` 类。
+   页面级 CSS 全部以 `html.bewly-design.videoPage...` 为前缀 —— 缺类就会「布局变量写了但视觉不生效」。
+
+### 修复（`videoPage/index.ts`）
+
+- 新增 `startMountRetry()`：URL 不是视频页时不再放弃，而是 **500ms 轮询 + popstate/hashchange 立即触发**，
+  URL 一变成视频页就 `mount()`，成功后自动停表；
+- `sync()` 里 `kind === "none"`（跳离视频页）时 teardown 后重新 `startMountRetry()`，支持后续再切回；
+- `teardownVideoPage()` / `unmount()` 都会 `stopMountRetry()`，不留定时器；
+- `mount()` 补齐样式类：`adaptToOtherPageStyles` 开启时加 `bewly-design`，并加 `videoPage`，
+  保证在 iframe 早期注入、contentScripts 顶层判定为 false 的文档里，页面级 CSS 依然命中。
+
+### 验收对应
+
+- iframe 1200×800：宿主创建、`html.bewly-video-fixed` 存在、`data-bewly-fixed-metrics` 有值
+  （1200 宽 <1280 → 走上下分区：`bewly-video-narrow`）
+- iframe 900×700：同样 <1280 → 上下分区
+- 主页面不受影响（URL 就绪时依旧同步 mount，不经过轮询）
+
+### 需要 Lead（contentScripts/index.ts 独占）评估的改动（非必须）
+
+`const currentUrl = document.URL` 是**模块顶层快照**，`isSupportedPages() / isSupportedIframePages()` 用的都是它。
+若抽屉 iframe 通过 `srcdoc` 或 `history.pushState` 换 URL（不触发重新注入），这类判定会一直停在旧 URL。
+建议（二选一，低风险）：
+1. 把 `currentUrl` 改成 `location.href` 的 getter（同步改各调用点）；
+2. 或保留快照，但监听 `popstate/hashchange` 后重新执行一次类切换。
+我在 `mount()` 里已经做了样式类兜底，所以即使不改也能用；改了能让 `bewly-design` 更早生效、避免首帧无样式。

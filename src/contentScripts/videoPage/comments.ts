@@ -178,8 +178,17 @@ const COMMENTS_RESPONSIVE_STYLE = `
 }
 
 #user-avatar {
-  flex: 0 0 auto;
+  /* 第 57 轮：B 站原生把 #user-avatar 设成 position:absolute（靠 #body padding-left:80 预留位置）。
+     第 53 轮把 #body 改成 flex + padding 0 后头像脱离 flex 流，正文左移 68px 压在头像上。
+     这里把头像拉回 flex 流；B 站也可能把 absolute 挂在子元素（bili-avatar）上，一并归位。 */
+  position: static !important;
+  flex: 0 0 auto !important;
+  margin: 0 !important;
   margin-top: 0;
+}
+
+#user-avatar > * {
+  position: static !important;
 }
 
 #user-avatar bili-avatar {
@@ -216,7 +225,9 @@ const COMMENTS_RESPONSIVE_STYLE = `
 #content {
   flex: 1 1 auto;
   min-width: 0;
-  max-width: min(420px, 100%) !important;
+  /* 第 57 轮：420 → min(640px, 100%)。826 宽列里 420 左侧贴头像、右侧空 382px；
+     640 左对齐后右侧只剩 ~102px，行宽仍 ≤ ~45 汉字（不在 826 里居中，保持头像旁对齐）。 */
+  max-width: min(640px, 100%) !important;
   overflow-wrap: anywhere;
   padding-top: 2px;
 }

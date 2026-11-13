@@ -1197,3 +1197,45 @@ footer 侧补：`#footer bili-comment-action-buttons-renderer { flex: 0 0 auto; 
 
 结论：第 52 轮窄屏高度修复已生效（1210 下评论列 220px）；第 53 轮的 `#body` flex / `#content` 420 /
 `#footer` 紧凑 / `#more` 间距 0 全部生效；1400 下 rail 199 = 卡片 175 + padding 24，无裁切。
+
+## 第 57 轮：正文与头像重叠（第 53 轮 flex 化的连带问题）
+
+真机（1600 视口，评论列 826）：`#body` flex、`#user-avatar` 是 **position:absolute**（`<a>`），
+`#main` 从 body 最左开始 → `gapAvatarToContent = -68`（正文压在头像上），右侧空 382。
+
+根因：B 站靠 `#body { padding-left: 80px }` 给 absolute 头像预留位置；第 53 轮改成 flex + padding 0 后
+头像脱离 flex 流，`#main` 左移到 body 起点。
+
+### 修法（`comments.ts` 注入样式）
+
+```css
+#user-avatar {
+  position: static !important;
+  flex: 0 0 auto !important;
+  margin: 0 !important;
+}
+#user-avatar > * {
+  position: static !important;
+} /* B 站也可能把 absolute 挂在 bili-avatar 上 */
+#content {
+  max-width: min(640px, 100%) !important;
+} /* 420 → 640，消除右侧大空白 */
+```
+
+`#body` / `#main` / `#footer` 沿用第 53 轮规则（flex / flex-start / gap）。
+
+### CDP 现场注入验证（同一页面临时 style，测完已移除）
+
+| 指标 | 修复前 | 修复后 |
+| --- | --- | --- |
+| `#user-avatar` position | absolute | **static** |
+| `gapAvatarToContent` | **-68** | **12** |
+| `#content` 宽 | 420 | **640** |
+| `rightEmptyInBody` | 382 | **102** |
+| `#main` 左 − 头像右 | 0 | 12 |
+| 头像宽 | 48（完整但被压） | 48（完整可见） |
+
+### 行长说明
+
+正文上限从 420 → 640（约 45 汉字，Lead 给的上限），826 宽列下左对齐、右侧只剩 ~102px；
+559 以下窄列由 `min(640px, 100%)` 自动退化为 100%。没有居中（居中会让正文左边缘离开头像 63px，不满足「正文左边缘 = 头像右 + gap」）。

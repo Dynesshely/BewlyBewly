@@ -293,3 +293,28 @@
     --bvp-shadow-3: 0 0 0 1px rgba(0, 0, 0, 0.8);
   }
 }
+
+/* ===== 第 52 轮 contrast-focus ===== */
+/* 选集 / 播放列表面板的焦点环统一（第 52 轮，只追加在文件末尾）
+   面板条目是列表项（`.bvp-playlist__item`），早期只有 `:host :focus-visible` 一层兜底；
+   这里把面板内所有可交互元素的焦点环统一成 2px 主题色 + 2px offset，
+   并给 forced-colors 用系统色。 */
+
+.bvp-playlist__item:focus-visible,
+.bvp-playlist__btn:focus-visible,
+.bvp-playlist :focus-visible,
+:host :focus-visible {
+  outline: 2px solid var(--bew-theme-color) !important;
+  outline-offset: 2px !important;
+}
+
+@media (forced-colors: active) {
+  .bvp-playlist__item:focus-visible,
+  .bvp-playlist__btn:focus-visible,
+  .bvp-playlist :focus-visible,
+  :host :focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px !important;
+  }
+}
+/* ===== 第 52 轮 contrast-focus end ===== */

@@ -3101,7 +3101,9 @@ html.bewly-design.videoPage.bewly-video-fixed.bewly-video-narrow {
   #mirror-vdcon,
   .video-container-v1 {
     grid-template-columns: minmax(0, 1fr) !important;
-    grid-template-rows: auto auto !important;
+    grid-template-rows: auto var(--bvp-fixed-narrow-comment-height, 220px) !important;
+    /* 行按内容，不拉伸：第 52 轮修「评论列只剩 4px」 */
+    align-content: start !important;
     column-gap: 0 !important;
     row-gap: var(--bvp-fixed-gap, 8px) !important;
   }
@@ -3110,24 +3112,65 @@ html.bewly-design.videoPage.bewly-video-fixed.bewly-video-narrow {
   .left-container.scroll-sticky {
     width: 100% !important;
     max-width: 100% !important;
+    /* 覆盖第 31 轮固定布局的 height:100%：窄屏下左列按内容高度占第一行 */
+    height: auto !important;
+    max-height: none !important;
   }
 
   #playerWrap {
     margin-inline: auto !important;
   }
 
-  /* 评论区变成第二行：高度 = dock 剩余（fixedLayout 实测写入），内部继续滚动 */
-  .right-container,
+  /* 评论区变成第二行（第 52 轮二次修复）：右列（grid 行）定高 220，
+     inner 撑满右列并转 flex column，评论列 flex:1 吃掉剩余高度 ——
+     旧写法把三个容器都写死同一高度，inner 被内容撑到 250 溢出，评论列被 flex 压成 4px。 */
+  .right-container {
+    height: var(--bvp-fixed-narrow-comment-height, 220px) !important;
+    max-height: var(--bvp-fixed-narrow-comment-height, 220px) !important;
+    overflow: hidden !important;
+  }
+
   .right-container-inner,
   .right-container-inner.scroll-sticky {
-    height: var(--bvp-fixed-narrow-comment-height, 240px) !important;
-    max-height: var(--bvp-fixed-narrow-comment-height, 240px) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    /* 第 52 轮三次修复：B 站原生给右列底部留了 padding-bottom: 250px，
+       border-box 下把 220px 行高全吃掉（评论列塌成 4px）。这里归零上下 padding。 */
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
     overflow: hidden !important;
   }
 
   .bewly-comment-column {
-    height: 100% !important;
-    max-height: 100% !important;
+    /* 关键：从 flex: 0 1 auto 改成 1 1 auto，让它吃掉右列剩余高度 */
+    flex: 1 1 auto !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* 评论列内部：UP 卡固定、列表滚动（宽屏规则已有，窄屏重复保证） */
+  .bewly-comment-column > .up-panel-container {
+    flex: 0 0 auto !important;
+  }
+
+  .bewly-comment-column > #commentapp,
+  .bewly-comment-column #commentapp {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+  }
+
+  /* 右列里其它会撑高的原生块：窄屏隐藏，避免 inner 超出 220 */
+  .right-container .video-pod-above-modules,
+  .right-container .rcmd-tab,
+  .right-container-inner .video-pod-above-modules,
+  .right-container-inner .rcmd-tab {
+    display: none !important;
   }
 
   /* 窄屏上下分区没有分隔条（左右两列结构不存在） */
@@ -3672,3 +3715,140 @@ html.bewly-design.videoPage.bewly-video-fixed .bewly-comment-column > .up-panel-
   border-width: 0 !important;
   border-color: transparent !important;
 }
+
+/* ===== 第 52 轮 density =====
+   视频页密度（settings.videoPageDensity）：relaxed / comfortable / compact。
+   index.ts 每拍把值写到 html 的 data-bewly-video-density，这里按属性覆盖间距令牌。
+   **只改间距，不改字号**（字号是 5 档字阶体系，密度不应破坏字阶）。
+   特异性带 .bewly-video-fixed，确保压过第 34 轮定义的基础令牌。 */
+html.bewly-design.videoPage.bewly-video-fixed[data-bewly-video-density="relaxed"] {
+  --bvp-space-2: 12px;
+  --bvp-space-3: 16px;
+  --bvp-space-4: 20px;
+  --bvp-toolbar-h: 56px;
+  --bvp-comment-card-gap: 16px;
+}
+
+html.bewly-design.videoPage.bewly-video-fixed[data-bewly-video-density="compact"] {
+  --bvp-space-2: 6px;
+  --bvp-space-3: 8px;
+  --bvp-space-4: 12px;
+  --bvp-toolbar-h: 48px;
+  --bvp-comment-card-gap: 10px;
+}
+
+/* UP 卡内距与评论列内距跟随密度（A 的视觉段写死 16，这里用更高特异性覆盖） */
+html.bewly-design.videoPage.bewly-video-fixed[data-bewly-video-density="compact"] .up-panel-container {
+  padding: 12px !important;
+}
+
+html.bewly-design.videoPage.bewly-video-fixed[data-bewly-video-density="relaxed"] .up-panel-container {
+  padding: 20px !important;
+}
+
+html.bewly-design.videoPage.bewly-video-fixed[data-bewly-video-density="compact"] .bewly-comment-column {
+  padding-inline: 8px !important;
+}
+
+html.bewly-design.videoPage.bewly-video-fixed[data-bewly-video-density="relaxed"] .bewly-comment-column {
+  padding-inline: 16px !important;
+}
+
+/* ===== 第 52 轮 contrast-focus ===== */
+/* 对比度修复 + 焦点环统一（第 52 轮，只追加在文件末尾）
+
+   一、对比度：我们设过颜色的次要文字统一改用 `--bew-text-2`（不新增颜色）。
+      B 站原生元素（view-text / dm-text 等）不改 —— 那是 B 站自己的配色。
+      涉及的我们自己产出的 12.5px 文字：UP 卡签名、信息栏元信息、评论次要信息、评论空态、简介按钮。
+      高对比度模式再提到 `--bew-text-1`。
+
+   二、焦点环：统一 2px 主题色 + 2px offset（`!important` 压过历史上 1px / 3px / 无 offset 的写法），
+      强制色彩模式用系统色 Highlight。 */
+
+/* ---------- 1. 对比度 ---------- */
+/* UP 卡签名（我们样式化的 B 站内容，12.5px 次要文字） */
+html.bewly-design.videoPage .up-panel-container .up-description,
+html.bewly-design.videoPage .up-panel-container .up-info--desc {
+  color: var(--bew-text-2);
+}
+
+/* 信息栏元信息（我们设置了 color: text-3，同档提一档） */
+html.bewly-design.videoPage #viewbox_report .video-info-meta,
+html.bewly-design.videoPage.bewly-video-fixed #viewbox_report .video-info-meta,
+html.bewly-design.videoPage #viewbox_report .video-info-detail,
+html.bewly-design.videoPage.bewly-video-fixed #viewbox_report .video-info-detail {
+  color: var(--bew-text-2);
+}
+
+/* 评论里的次要信息（时间 / 楼层 / 回复数） */
+html.bewly-design.videoPage .bewly-comment-column .reply-info,
+html.bewly-design.videoPage .bewly-comment-column .reply-time,
+html.bewly-design.videoPage .bewly-comment-column .sub-reply-info {
+  color: var(--bew-text-2);
+}
+
+/* 评论空态 / 诊断类文字（我们自己的） */
+html.bewly-design.videoPage #bewly-comment-empty,
+html.bewly-design.videoPage #bewly-comment-empty * {
+  color: var(--bew-text-2);
+}
+
+/* 简介按钮 / 工具栏按钮文字（12.5px 小字，原 text-2 已达 4.5，保持不变但显式声明） */
+html.bewly-design.videoPage .bewly-desc-trigger,
+html.bewly-design.videoPage .bewly-toolbar-action {
+  color: var(--bew-text-2);
+}
+
+/* 高对比度：再提一档 */
+@media (prefers-contrast: more) {
+  html.bewly-design.videoPage .up-panel-container .up-description,
+  html.bewly-design.videoPage #viewbox_report .video-info-meta,
+  html.bewly-design.videoPage #viewbox_report .video-info-detail,
+  html.bewly-design.videoPage .bewly-comment-column .reply-info,
+  html.bewly-design.videoPage .bewly-comment-column .reply-time,
+  html.bewly-design.videoPage #bewly-comment-empty {
+    color: var(--bew-text-1);
+  }
+}
+
+/* ---------- 2. 焦点环统一 ---------- */
+html.bewly-design.videoPage .bewly-desc-trigger:focus-visible,
+html.bewly-design.videoPage .bewly-toolbar-action:focus-visible,
+html.bewly-design.videoPage .up-panel-container .send-msg:focus-visible,
+html.bewly-design.videoPage .up-panel-container .send-msg-btn:focus-visible,
+html.bewly-design.videoPage .up-panel-container .default-btn:focus-visible,
+html.bewly-design.videoPage .up-panel-container .follow-btn:focus-visible,
+html.bewly-design.videoPage #arc_toolbar_report .toolbar-left-item-wrap:focus-visible,
+html.bewly-design.videoPage #arc_toolbar_report .toolbar-left-item:focus-visible,
+html.bewly-design.videoPage #arc_toolbar_report .video-toolbar-left-item:focus-visible,
+html.bewly-design.videoPage #bewly-video-splitter:focus-visible {
+  outline: 2px solid var(--bew-theme-color) !important;
+  outline-offset: 2px !important;
+}
+
+/* 分隔条本身是 6px 的细长元素：offset 2px 会离得太远，这里用 0 offset 但仍 2px 主题色 */
+html.bewly-design.videoPage #bewly-video-splitter:focus-visible {
+  outline-offset: 0 !important;
+}
+
+/* 页面级兜底：我们注入的按钮 / 链接统一焦点环 */
+html.bewly-design.videoPage #bewly-video-page:focus-visible,
+html.bewly-design.videoPage .bewly-desc-tooltip :focus-visible {
+  outline: 2px solid var(--bew-theme-color) !important;
+  outline-offset: 2px !important;
+}
+
+/* 强制色彩：系统色 */
+@media (forced-colors: active) {
+  html.bewly-design.videoPage .bewly-desc-trigger:focus-visible,
+  html.bewly-design.videoPage .bewly-toolbar-action:focus-visible,
+  html.bewly-design.videoPage .up-panel-container .send-msg:focus-visible,
+  html.bewly-design.videoPage .up-panel-container .default-btn:focus-visible,
+  html.bewly-design.videoPage .up-panel-container .follow-btn:focus-visible,
+  html.bewly-design.videoPage #arc_toolbar_report .toolbar-left-item-wrap:focus-visible,
+  html.bewly-design.videoPage #bewly-video-splitter:focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px !important;
+  }
+}
+/* ===== 第 52 轮 contrast-focus end ===== */

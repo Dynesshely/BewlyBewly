@@ -313,9 +313,11 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
       window.innerHeight - topOffset - DOCK_BOTTOM_MARGIN,
     )
     const gaps = DOCK_GAP * blocks.count
+    // 两行之间还有 grid row-gap（= DOCK_GAP），必须预留，否则「左列内容 + row-gap + 评论」会超 dock 高，
+    // 评论列被 overflow 裁掉（第 52 轮真机 4px 的根因）。
     const heightBudget = Math.max(
       MIN_DOCK_PLAYER_HEIGHT,
-      dockH - blocks.total - gaps - NARROW_COMMENT_MIN_HEIGHT,
+      dockH - blocks.total - gaps - DOCK_GAP - NARROW_COMMENT_MIN_HEIGHT,
     )
     let narrowWidth = totalWidth
     let narrowHeight = Math.round(narrowWidth * 9 / 16)
@@ -323,7 +325,7 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
       narrowHeight = heightBudget
       narrowWidth = Math.round(narrowHeight * 16 / 9)
     }
-    const commentHeight = Math.max(120, dockH - blocks.total - gaps - narrowHeight)
+    const commentHeight = Math.max(120, dockH - blocks.total - gaps - DOCK_GAP - narrowHeight)
 
     setVar(TOP_VAR, `${topOffset}px`)
     setVar(INFO_VAR, `${INFO_BAR_HEIGHT}px`)

@@ -934,3 +934,150 @@ commentColumn.bottom = 播放器 bottom < rail.top - 8
 关于边框移除的影响（native-style 已确认评论区容器尺寸没变）：
 - 第 45 轮的 header 对齐依赖「列 padding 12 + 卡片 border 1 = 13」，去边框后 UP 卡 leftGap 变 12，与 header 的 12 仍对齐（差异 ≤1）；
 - `fixedLayout` 只按 `clientWidth − padding` 与 rect 顶边计算，边框 ±1px 在容差内；`splitter` 用 CSS 变量定位，不受边框影响。
+
+## 第 52 轮：主页面启用 900~1280 窄屏断点 + 视频页密度切换
+
+### 任务 1：主页面窄屏断点
+
+- `fixedLayout.ts` 的 `MIN_VIEWPORT_WIDTH/HEIGHT` 已是 **900 / 600**（第 48 轮就统一了，主页面与 iframe 同一套阈值）；
+  宽 <1280 或高 <700 会走 `narrowLayout` 分支：轨道隐藏、单列上下分区、写 `--bvp-fixed-narrow-comment-height` 并加 `html.bewly-video-narrow`；
+- 第 52 轮把 `commentColumn.ts` 的 `MIN_COLUMN_WIDTH` 从 1280 降到 **900**，让 900~1280 的主窗口也把评论搬进右列，
+  这样「下评论区」的高度由 `--bvp-fixed-narrow-comment-height` 受控（否则评论留在原生位置、高度不可控）；
+- 锚点缺失时自动回退：`syncFixedLayout()` 里 `!mirror || !playerWrap` 会 `clearFixedLayout()`，
+  `<900×600` 由 `shouldDegradeForViewport()` 完全降级（只留评论增强 + 广告清理）；
+- 1024×800 预期：`bewly-video-narrow` 存在、播放器 `976×549` 被高度预算压到 `516×290`（16:9）、评论区 220px、无横向滚动。
+
+### 任务 2：密度切换
+
+`settings.videoPageDensity`（relaxed / comfortable / compact，默认 comfortable）：
+
+- `index.ts` 每拍同步到 `document.documentElement.dataset.bewlyVideoDensity`，**值不变不写**，卸载时 `delete`；
+- 页面级按属性覆盖间距令牌（特异性带 `.bewly-video-fixed`）：
+
+| token | relaxed | comfortable | compact |
+| --- | --- | --- | --- |
+| `--bvp-space-2` | 12 | 8 | 6 |
+| `--bvp-space-3` | 16 | 12 | 8 |
+| `--bvp-space-4` | 20 | 16 | 12 |
+| `--bvp-toolbar-h` | 56 | 52 | 48 |
+| `--bvp-comment-card-gap` | 16 | 13 | 10 |
+
+- **不动字号**（字阶是 5 档体系，密度只改间距）；
+- UP 卡内距：compact 12 / relaxed 20（comfortable 沿用 A 的 16）；
+- 评论列内距：compact 8 / relaxed 16；
+- 轨道：`:host-context(html[data-bewly-video-density=…])` 覆盖 `.bvp-rail` padding（compact 8/12、relaxed 14/20）与 `.bvp-rail__card` padding（compact 6、relaxed 10）；
+- `recommendRail/index.ts` 的 `computeRailHeight` 同步按密度算：`railPadding*2 + cardPadding*2 + cover + 8 + titleLine(30/34/36) + 4 + 16`，与 shadow 的 CSS 数值一致；
+- `fixedLayout` 无需改公式：它实测左列块高度，密度变化自动进入预算。
+
+## 第 52 轮：焦点环统一 + 对比度修复
+
+### 一、对比度（我们自己的文字必须 ≥ 4.5:1）
+
+真机审计发现`.bvp-rail__up`（12.5px 次要文字）用 `--bew-text-3` 时比值 **3.24:1**，低于小字要求。
+同一档的 `.bvp-rail__views` / `.bvp-rail__meta` 等一并核对并提档。
+
+| 元素 | 修复前 | 修复后 |
+| --- | --- | --- |
+| `.bvp-rail__up` / `__views` / `__meta` | `--bew-text-3`（深色主题约 4.5:1，真机叠半透明底后 3.24:1） | `--bew-text-2` → **8.38:1**（elevated 底）/ **9.31:1**（content 底） |
+| `.bvp-help__hint` / `__separator` / `.bvp-kbd` / `.bvp-compact__up` / `.bvp-toast` / `.bvp-comment-expand` | `--bew-text-3` | `--bew-text-2` |
+| UP 卡签名 `.up-description`（页面级 12.5px） | `--bew-text-3` | `--bew-text-2` |
+| 信息栏元信息 `.video-info-meta` / `.video-info-detail` | `--bew-text-3` | `--bew-text-2` |
+| 评论次要信息（时间 / 楼层 / 回复数） | `--bew-text-3` | `--bew-text-2` |
+| 评论空态 `#bewly-comment-empty` | `--bew-text-3` | `--bew-text-2` |
+
+**对比度计算（深色主题，WCAG 2.1 相对亮度）**：
+
+| token | alpha | 在 `--bew-elevated`（hsl 230 12% 15%）上 | 在 `--bew-content`（hsl 230 12% 10%）上 |
+| --- | --- | --- | --- |
+| `--bew-text-1` | 1.0 | 14.92:1 | 17.02:1 |
+| `--bew-text-2` | 0.8 | **8.38:1** | **9.31:1** |
+| `--bew-text-3` | 0.6 | 4.54:1 | 4.87:1 |
+
+→ 提档到 `--bew-text-2` 后，12.5px 小字在两种背景上都远超 4.5:1。
+`prefers-contrast: more` 下再提到 `--bew-text-1`（14.9~17:1）。
+B 站原生元素（view-text / dm-text / pubdate-ip-text 等）**未改配色**。
+
+### 二、焦点环统一
+
+统一规格：`outline: 2px solid var(--bew-theme-color); outline-offset: 2px`（outline 自动跟随元素圆角）。
+
+| 文件 | 覆盖对象 |
+| --- | --- |
+| `videoPage.shadow.scss` | `.bvp-fab` / `.bvp-icon-btn` / `.bvp-rail__card` / `.bvp-rail__nav` / `.bvp-rail__close` / `.bvp-comment-btn` / `.bvp-comment-expand` / 帮助面板与紧凑条内所有可聚焦元素 / `:host :focus-visible` 兜底 |
+| `playlistPanel.shadow.scss` | `.bvp-playlist__item` / `.bvp-playlist__btn` / 面板内所有可聚焦元素 / `:host :focus-visible` |
+| `pages/videoPage.scss` | `.bewly-desc-trigger` / `.bewly-toolbar-action` / UP 卡的发消息与关注按钮 / 原生工具栏项（`.toolbar-left-item-wrap` 等）/ 分隔条 `#bewly-video-splitter` |
+
+- 全部用 `!important` 收口，压过历史上 1px / 3px / 缺 offset 的写法；
+- 分隔条是 6px 细长元素，单独用 `outline-offset: 0`（2px offset 会离太远）；
+- `forced-colors: active` 下统一用 `2px solid Highlight`；
+- 帮助/选集面板内的条目由 shadow 的 `:host :focus-visible` 兜底，逐个类名也显式列了一份。
+
+### 已知限制
+
+- 对比度数值是按深色主题变量计算的（未计入实际半透明叠层与背景图），真机以 DOM 计算色为准；
+- 轨道卡片的 `--bew-text-2` 在浅色主题下同样是 B 站既有的次要文字色（hsl 215 19% 24% / 80%），对比度更高；
+- 焦点环用 `!important` 收口，若后续某元素需要不同规格，需在更后面用同特异性覆盖。
+
+### 第 52 轮复测修复：窄屏下评论列只有 4px
+
+真机（1024×800）：`narrow=1;dock=684;player=294x523;comment=220`，但评论列实测只有 4px 高。
+
+两个根因：
+
+1. **第一行吃满整行**：`#mirror-vdcon` 在窄屏用 `grid-template-rows: auto auto`，
+   但第 31 轮固定布局里 `.left-container { height: 100% !important }` —— 第一行高度 = 整个 dock，
+   第二行被压成 0，评论列（220）溢出后被 `overflow: hidden` 裁掉，只剩边角 4px；
+2. **两行之间的 row-gap 没进预算**：`commentHeight = dock − blocks − gaps − playerHeight`，
+   没扣 grid `row-gap: 8px`，所以「左列内容 + gap + 评论」会比 dock 多 8px。
+
+修法：
+
+- 窄屏段 `grid-template-rows: auto var(--bvp-fixed-narrow-comment-height, 220px)` + `align-content: start`；
+- 窄屏段覆盖 `.left-container { height: auto !important; max-height: none !important }`（按内容占第一行）；
+- `fixedLayout.ts` 窄屏分支的 `heightBudget` 与 `commentHeight` 都扣 `DOCK_GAP`（= row-gap），
+  保证「blocks + gaps + player + row-gap + comment = dock」。
+
+预期数值（1024×800）：dock 684、播放器 **523×294**（1.7789）、评论列 **220**、两行和 684。
+
+### 第 52 轮二次修复：窄屏评论列 4px（右列内部 flex 问题）
+
+真机链条证据（1024×800）：
+
+```
+#mirror-vdcon           1080x684  grid rows: 456px 220px gap:8   ✅
+  .left-container       1032x456  height:456 max-height:none  ✅
+  .right-container      1032x220  ✅ 第二行高度正确
+    .right-container-inner  1032x250  <- 被内容撑高，超出父级 30px
+      .bewly-comment-column 1032x4    <- flex: 0 1 auto + max-height:100% 被压塌
+```
+
+所以问题不在 grid，而在右列内部：inner 是 flex 纵向容器、被 `.video-pod-above-modules` / `.rcmd-tab` 撑到 250，
+评论列 `flex: 0 1 auto` 只能分到残渣。
+
+修法（窄屏专用，宽屏不动）：
+
+- `.right-container`：`height/max-height: var(--bvp-fixed-narrow-comment-height, 220px)` + `overflow: hidden`；
+- `.right-container-inner`：`display: flex; flex-direction: column; height/max-height: 100%; min-height: 0; overflow: hidden`；
+- `.bewly-comment-column`：`flex: 1 1 auto; height: auto; max-height: none; min-height: 0; overflow: hidden`（关键：从 `0 1 auto` 改 `1 1 auto`）；
+- 评论列内部：UP 卡 `flex: 0 0 auto`、`#commentapp` `flex: 1 1 auto; min-height: 0; overflow-y: auto`；
+- 右列内其它原生块（`.video-pod-above-modules` / `.rcmd-tab`）窄屏 `display: none`，避免再把 inner 撑高。
+
+预期（1024×800）：`.right-container` 220、`inner` 220、评论列 220、UP 卡 ~84、`#commentapp` ~128 内部滚动；
+播放器 523×294（1.7789）、两行和 684 = dock 高。
+
+### 第 52 轮三次修复：真凶是 B 站的 `padding-bottom: 250px`
+
+真机证据：`.right-container-inner` 的 `padding: 0 0 250px`（B 站原生给右列底部留位），
+`box-sizing: border-box` 下直接把窄屏 220px 的行高吃光，评论列只能塌成 4px。
+上一轮的 flex 修复（`1 1 auto` / inner flex column）全部正确，只差这一条。
+
+窄屏段补：
+
+```scss
+html.bewly-design.videoPage.bewly-video-fixed.bewly-video-narrow .right-container-inner {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+```
+
+预期（1024×800）：`inner` padding-bottom = 0、高度 220；评论列 220；UP 卡 ~84；`#commentapp` ~128 内部滚动。

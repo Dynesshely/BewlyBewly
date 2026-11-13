@@ -1900,7 +1900,7 @@ test.describe('评论区右列布局（与播放器同高）', () => {
     }
   })
 
-  test('窄屏（<1280px）自动回退原生布局，恢复宽度后重新接管', async () => {
+  test('窄屏（900~1280px）切到上下分区，恢复宽度后回到左右两列', async () => {
     const context = await launchExtension({ allowPopups: true })
     const page = await context.newPage()
 
@@ -1919,36 +1919,47 @@ test.describe('评论区右列布局（与播放器同高）', () => {
 
       await expect(page.locator('[data-bewly-comment-column]')).toHaveCount(1, { timeout: 10_000 })
 
+      // 第 52 轮起：900~1280 宽不再回退原生布局，而是切到「上播放器 + 下评论区」上下分区
       await page.setViewportSize({ width: 1024, height: 800 })
-      await expect(page.locator('[data-bewly-comment-column]')).toHaveCount(0, { timeout: 10_000 })
-      expect(await page.evaluate(() => {
-        const host = document.querySelector('#commentapp')
-        const left = document.querySelector('.left-container')
-        return Boolean(host && left && left.contains(host))
-      })).toBe(true)
-      await expect(page.locator('html')).not.toHaveClass(/bewly-comment-column/)
+      await expect(page.locator('html.bewly-video-narrow')).toHaveCount(1, { timeout: 10_000 })
+      await expect(page.locator('[data-bewly-comment-column]')).toHaveCount(1, { timeout: 10_000 })
+      const narrowLayout = await page.evaluate(() => {
+        const column = document.querySelector('[data-bewly-comment-column]')?.getBoundingClientRect()
+        const player = document.querySelector('#playerWrap')?.getBoundingClientRect()
+        return {
+          columnVisible: Boolean(column && column.height > 100 && column.width > 100),
+          stacked: Boolean(column && player && column.top >= player.bottom - 4),
+          noHorizontalScroll: document.documentElement.scrollWidth <= window.innerWidth + 1,
+        }
+      })
+      expect(narrowLayout.columnVisible).toBe(true)
+      expect(narrowLayout.stacked).toBe(true)
+      expect(narrowLayout.noHorizontalScroll).toBe(true)
 
       await page.setViewportSize({ width: 1440, height: 900 })
       await expect(page.locator('[data-bewly-comment-column]')).toHaveCount(1, { timeout: 10_000 })
+      await expect(page.locator('html.bewly-video-narrow')).toHaveCount(0, { timeout: 10_000 })
     }
     finally {
       await context.close()
     }
   })
 
-  test('窄宽度（<1280px）回退原生布局，恢复宽度后重新接管', async () => {
+  test('窄宽度（900~1280px）走上下分区，恢复宽度后回到左右两列', async () => {
     const { context, page } = await openCommentColumnPage()
 
     try {
       await ensureOverlay(page)
       await expect(page.locator('[data-bewly-comment-column]')).toHaveCount(1, { timeout: 10_000 })
 
-      // 第 28 轮把「影院模式回退」换成了「固定布局在视口过矮时回退」
+      // 第 52 轮起：900~1280 宽走窄屏上下分区（不再回退原生布局）
       await page.setViewportSize({ width: 1024, height: 900 })
-      await expect(page.locator('[data-bewly-comment-column]')).toHaveCount(0, { timeout: 10_000 })
+      await expect(page.locator('html.bewly-video-narrow')).toHaveCount(1, { timeout: 10_000 })
+      await expect(page.locator('[data-bewly-comment-column]')).toHaveCount(1, { timeout: 10_000 })
 
       await page.setViewportSize({ width: 1440, height: 900 })
       await expect(page.locator('[data-bewly-comment-column]')).toHaveCount(1, { timeout: 10_000 })
+      await expect(page.locator('html.bewly-video-narrow')).toHaveCount(0, { timeout: 10_000 })
     }
     finally {
       await context.close()

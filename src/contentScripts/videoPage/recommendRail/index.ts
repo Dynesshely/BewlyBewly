@@ -2,6 +2,8 @@ import type { RailCard, RailPlacement } from './types'
 
 import { computed, reactive } from 'vue'
 
+import { settings } from '~/logic'
+
 import { useMessages } from '../i18n'
 import { getPlayerScreenMode } from '../playerMode'
 import {
@@ -65,8 +67,27 @@ export function computeRailHeight(width: number): number {
   const visible = Math.min(7, Math.max(4, Math.floor(width / RAIL_MIN_CARD_WIDTH)))
   const gaps = 12 * (visible - 1)
   const cardWidth = Math.max(148, Math.floor((width - gaps) / visible))
-  const coverHeight = Math.round((cardWidth - 16) * 9 / 16)
-  return 12 * 2 + 8 * 2 + coverHeight + 8 + 34 + 4 + 16
+
+  // 第 52 轮：密度影响轨道上下 padding、卡片内边距与标题行高（字号不变）。
+  const density = settings.value.videoPageDensity || 'comfortable'
+  const railPadding = density === 'compact'
+    ? 8
+    : density === 'relaxed'
+      ? 14
+      : 12
+  const cardPadding = density === 'compact'
+    ? 6
+    : density === 'relaxed'
+      ? 10
+      : 8
+  const titleLine = density === 'compact'
+    ? 30
+    : density === 'relaxed'
+      ? 36
+      : 34
+
+  const coverHeight = Math.round((cardWidth - cardPadding * 2) * 9 / 16)
+  return railPadding * 2 + cardPadding * 2 + coverHeight + 8 + titleLine + 4 + 16
 }
 
 function sameSequence(a: RailCard[], b: RailCard[]): boolean {

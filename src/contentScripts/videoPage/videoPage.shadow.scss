@@ -1678,3 +1678,108 @@
   }
 }
 /* ===== 第 51 轮 borderless-fix end ===== */
+
+/* ===== 第 52 轮 density =====
+   宿主内看不到页面级 class，用 :host-context 读 html 上的密度属性。
+   轨道 padding / 卡片内距与 recommendRail/index.ts 的 computeRailHeight 保持一致：
+   comfortable（默认）12 / 8、compact 8 / 6、relaxed 14 / 10。 */
+:host-context(html[data-bewly-video-density="compact"]) {
+  .bvp-rail {
+    padding: 8px 12px;
+  }
+
+  .bvp-rail__card {
+    padding: 6px;
+  }
+}
+
+:host-context(html[data-bewly-video-density="relaxed"]) {
+  .bvp-rail {
+    padding: 14px 20px;
+  }
+
+  .bvp-rail__card {
+    padding: 10px;
+  }
+}
+
+/* ===== 第 52 轮 contrast-focus ===== */
+/* 对比度修复 + 焦点环统一（第 52 轮，只追加在文件末尾）
+
+   一、对比度：真机审计（深色主题）发现我们自己的次要文字用了 `--bew-text-3`，
+      在卡片/半透明底上跌到 3.24:1（12.5px 属小字，要求 ≥4.5）。
+      修法：统一改用 `--bew-text-2`（不新增颜色）；高对比度模式再提到 `--bew-text-1`。
+
+   二、焦点环：`:host :focus-visible` 早先已有 2px + offset 2px 的基础版，
+      但个别组件（fab / icon-btn / 轨道卡）另有各自规格；这里统一用 `!important` 收口，
+      保证 Tab 遍历到任何可交互元素都是同一套 2px 主题色环。 */
+
+/* ---------- 1. 次要文字对比度（我们自己的 bvp-* 元素） ---------- */
+.bvp-rail__up,
+.bvp-rail__views,
+.bvp-rail__meta,
+.bvp-help__hint,
+.bvp-help__separator,
+.bvp-kbd,
+.bvp-compact__up,
+.bvp-toast,
+.bvp-comment-expand {
+  color: var(--bew-text-2);
+}
+
+/* 轨道卡片标题本来就是 --bew-text-1，显式写死避免被上面误伤 */
+.bvp-rail__card-title {
+  color: var(--bew-text-1);
+}
+
+/* 高对比度：再提一档到主文字色 */
+@media (prefers-contrast: more) {
+  .bvp-rail__up,
+  .bvp-rail__views,
+  .bvp-rail__meta,
+  .bvp-help__hint,
+  .bvp-help__separator,
+  .bvp-kbd,
+  .bvp-compact__up,
+  .bvp-toast,
+  .bvp-comment-expand {
+    color: var(--bew-text-1);
+  }
+}
+
+/* ---------- 2. 焦点环统一：2px 主题色 + 2px offset ---------- */
+.bvp-fab:focus-visible,
+.bvp-icon-btn:focus-visible,
+.bvp-rail__card:focus-visible,
+.bvp-rail__nav:focus-visible,
+.bvp-rail__close:focus-visible,
+.bvp-comment-btn:focus-visible,
+.bvp-comment-expand:focus-visible,
+.bvp-help__dialog :focus-visible,
+.bvp-compact :focus-visible {
+  outline: 2px solid var(--bew-theme-color) !important;
+  outline-offset: 2px !important;
+}
+
+/* 键盘焦点在所有可聚焦元素上的兜底（:host 级别） */
+:host :focus-visible {
+  outline: 2px solid var(--bew-theme-color) !important;
+  outline-offset: 2px !important;
+}
+
+/* 强制色彩：用系统色（主题色在 High Contrast 下不可靠） */
+@media (forced-colors: active) {
+  .bvp-fab:focus-visible,
+  .bvp-icon-btn:focus-visible,
+  .bvp-rail__card:focus-visible,
+  .bvp-rail__nav:focus-visible,
+  .bvp-rail__close:focus-visible,
+  .bvp-comment-btn:focus-visible,
+  .bvp-comment-expand:focus-visible,
+  .bvp-help__dialog :focus-visible,
+  :host :focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px !important;
+  }
+}
+/* ===== 第 52 轮 contrast-focus end ===== */

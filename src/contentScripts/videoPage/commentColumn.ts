@@ -37,7 +37,11 @@ export const COMMENT_COLUMN_WRAPPER_ID = 'bewly-comment-column'
 const HEIGHT_VAR = '--bewly-comment-column-height'
 const OFFSET_VAR = '--bewly-comment-column-offset'
 /** 窄于这个宽度放不下「主栏 + 评论区」两列，自动回退原生布局 */
-const MIN_COLUMN_WIDTH = 1280
+/**
+ * 评论列搬运的最小视口宽（第 52 轮：1280 → 900，与 fixedLayout 的 MIN_VIEWPORT_WIDTH 对齐）。
+ * 900~1280 的主窗口现在也走「上下分区」，评论列需要搬进右列才能在第二行给出受控高度。
+ */
+const MIN_COLUMN_WIDTH = 900
 
 interface LayoutParts {
   mirror: HTMLElement

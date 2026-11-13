@@ -461,6 +461,7 @@ function unmount(): void {
     endedTimer = null
   }
   document.documentElement.classList.remove('bewly-video-mini')
+  delete document.documentElement.dataset.bewlyVideoDensity
   viewportDegraded = false
   document.documentElement.style.removeProperty('--bvp-mini-placeholder')
   clearStagePlaceholder()
@@ -494,6 +495,14 @@ function sync(): void {
   }
 
   ui.isBangumi = kind === 'bangumi'
+
+  // 第 52 轮：视频页密度（relaxed / comfortable / compact）→ html 属性，页面与 shadow 用属性选择器覆盖间距令牌。
+  // 每拍同步、值不变不写；密度只改间距不改字号（字阶是另一套体系）。
+  {
+    const density = settings.value.videoPageDensity || 'comfortable'
+    if (document.documentElement.dataset.bewlyVideoDensity !== density)
+      document.documentElement.dataset.bewlyVideoDensity = density
+  }
 
   // iframe 内（抽屉预览）整体降级：每拍重算，抽屉开 / 关都能正确切换（第 43 轮）。
   safeSync('syncViewportDegradation', syncViewportDegradation)

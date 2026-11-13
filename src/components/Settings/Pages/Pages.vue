@@ -43,6 +43,16 @@ const densityOptions = computed(() => [
   { label: t.value.densityCompact, value: 'compact' },
 ])
 
+/**
+ * 视频页密度三档（第 52 轮）：宽松 / 舒适 / 紧凑。
+ * 与上面的两档密度不同，视频页多一档「宽松」，因此单独定义选项。
+ */
+const videoPageDensityOptions = computed(() => [
+  { label: t.value.densityRelaxed, value: 'relaxed' },
+  { label: t.value.densityComfortable, value: 'comfortable' },
+  { label: t.value.densityCompact, value: 'compact' },
+])
+
 /** 视频卡片悬停操作条开关（第 9 轮起直接读写 settings，卡片侧响应式跟随） */
 const quickActionsModel = computed({
   get: () => settings.value.enableVideoCardQuickActions !== false,
@@ -89,6 +99,7 @@ const groups = computed<SettingGroupDef[]>(() => [
     title: t.value.groupVideoPage,
     desc: t.value.groupVideoPageDesc,
     items: [
+      'videoPageDensity',
       'videoPageFixedLayout',
       'videoPageMiniPlayer',
       'videoPageShortcuts',
@@ -97,6 +108,7 @@ const groups = computed<SettingGroupDef[]>(() => [
       'videoPageRecommendRail',
     ],
     reset: () => {
+      settings.value.videoPageDensity = originalSettings.videoPageDensity
       settings.value.videoPageFixedLayout = originalSettings.videoPageFixedLayout
       settings.value.videoPageMiniPlayer = originalSettings.videoPageMiniPlayer
       settings.value.videoPageShortcuts = originalSettings.videoPageShortcuts
@@ -238,6 +250,13 @@ const groups = computed<SettingGroupDef[]>(() => [
  * 用 getter 而不是固定字符串：切换语言后搜索索引立刻跟着变。
  */
 const itemSearchText: Record<string, () => string[]> = {
+  videoPageDensity: () => [
+    t.value.videoPageDensity,
+    t.value.videoPageDensityDesc,
+    t.value.densityRelaxed,
+    t.value.densityComfortable,
+    t.value.densityCompact,
+  ],
   videoPageFixedLayout: () => [t.value.videoPageFixedLayout, t.value.videoPageFixedLayoutDesc],
   videoPageMiniPlayer: () => [t.value.videoPageMiniPlayer, t.value.videoPageMiniPlayerDesc],
   videoPageShortcuts: () => [t.value.videoPageShortcuts, t.value.videoPageShortcutsDesc],
@@ -825,6 +844,10 @@ onBeforeUnmount(() => {
       :reset-done="resetDoneGroup === 'videoPage'"
       @reset="resetGroup('videoPage')"
     >
+      <SettingsItem v-if="itemVisible('videoPageDensity')" :title="t.videoPageDensity" :desc="t.videoPageDensityDesc">
+        <Select v-model="settings.videoPageDensity" :options="videoPageDensityOptions" w="full" />
+      </SettingsItem>
+
       <SettingsItem v-if="itemVisible('videoPageFixedLayout')" :title="t.videoPageFixedLayout">
         <template #desc>
           <span id="pages-desc-video-fixed-layout">{{ t.videoPageFixedLayoutDesc }}</span>

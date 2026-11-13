@@ -144,6 +144,8 @@ export interface Settings {
 
   /** 视频页：播放器占内容宽的自定义比例（0 = 未设置，按自动计算 + 评论≥40% 兜底；0.35~0.75 为用户拖拽值），第 46 轮 */
   videoPageSplitRatio: number
+  /** 视频页视觉密度（第 52 轮）：宽松 / 舒适 / 紧凑，影响视频页的间距档位 */
+  videoPageDensity: 'relaxed' | 'comfortable' | 'compact'
 
   // 站点净化（第 40 轮，内化自 Make BiliBili Great Again 油猴脚本）
   /** 清理 URL 里的追踪参数（buvid / spm / vd_source / share_* 等） */
@@ -324,6 +326,7 @@ export const originalSettings: Settings = {
   videoPageFixedLayout: true,
   // 站点净化：默认开启前四项（无副作用/纯净化），P2P 与裁切默认关闭（可能影响播放行为）
   videoPageSplitRatio: 0,
+  videoPageDensity: 'comfortable',
   siteTweaksCleanUrlParams: true,
   siteTweaksDisableP2P: false,
   siteTweaksAllowArticleCopy: true,

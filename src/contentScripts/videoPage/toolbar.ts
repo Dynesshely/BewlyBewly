@@ -9,6 +9,9 @@
  * `--bvp-toolbar-h` 固定 52，fixedLayout 的 `measureDockBlocks()` 量到的仍是同一个左列子元素）。
  * 原生 `.video-toolbar-left` / `.video-toolbar-right` 隐藏但保留（可程序化 click）。
  */
+
+import { showToast } from './actions'
+
 const TOOLBAR_ID = 'bewly-toolbar'
 const TOOLBAR_HOST_SELECTOR = '#arc_toolbar_report'
 
@@ -174,12 +177,41 @@ function buildActions(host: HTMLElement): ActionSpec[] {
   ]
 }
 
-function forwardToNative(host: HTMLElement, spec: ActionSpec): void {
-  const target = findNative(host, spec.nativeSelectors)
+/** 真机结构（CDP）：举报 / 笔记在「更多」下拉（`.video-tool-more`）里，先点开菜单再按文案点 */
+async function openMoreMenuAndFind(re: RegExp): Promise<HTMLElement | null> {
+  const more = document.querySelector<HTMLElement>('.video-tool-more.video-toolbar-right-item')
+    ?? document.querySelector<HTMLElement>('.video-tool-more')
+  if (!more)
+    return null
+  more.click()
+  for (let attempt = 0; attempt < 8; attempt++) {
+    await new Promise(resolve => window.setTimeout(resolve, 120))
+    // 菜单可能被 teleport 到 body，所以从 document 里找最内层的匹配项
+    const found = findNativeByText(document.body, re)
+    if (found && !found.closest('#bewly-toolbar'))
+      return found
+  }
+  return null
+}
+
+async function forwardToNative(host: HTMLElement, spec: ActionSpec): Promise<void> {
+  const direct = findNative(host, spec.nativeSelectors)
     ?? (spec.nativeTextRe
       ? findNativeByText(host, spec.nativeTextRe)
       : null)
-  target?.click()
+  if (direct) {
+    direct.click()
+    return
+  }
+  // 举报 / 笔记：走「更多」下拉
+  if (spec.nativeTextRe) {
+    const inMenu = await openMoreMenuAndFind(spec.nativeTextRe)
+    if (inMenu) {
+      inMenu.click()
+      return
+    }
+  }
+  showToast(`没找到原生的「${spec.label}」按钮，请在原生工具栏操作`)
 }
 
 function renderToolbar(host: HTMLElement): void {
@@ -205,12 +237,13 @@ function renderToolbar(host: HTMLElement): void {
         : ''}`
       button.addEventListener('click', (event) => {
         event.stopPropagation()
-        forwardToNative(host, action)
-        // 原生按钮状态稍后变化，延迟同步一次
-        window.setTimeout(() => {
-          lastSignature = ''
-          syncToolbar()
-        }, 400)
+        void forwardToNative(host, action).then(() => {
+          // 原生按钮状态稍后变化，延迟同步一次
+          window.setTimeout(() => {
+            lastSignature = ''
+            syncToolbar()
+          }, 400)
+        })
       })
       bar.appendChild(button)
     }

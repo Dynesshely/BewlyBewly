@@ -1469,3 +1469,37 @@ footer 侧补：`#footer bili-comment-action-buttons-renderer { flex: 0 0 auto; 
 4. 子页自动加载用 `rcount` 与 `is_end` 双重判断，若接口不返回 `is_end`，靠「返回条数 < ps」终止；
 5. 发表成功后的列表刷新是整页重载（`loadPage(1)`），会丢滚动位置；后续可改成「插到列表顶部」；
 6. 自绘评论区的点赞/回复成功后未同步原生评论区（原生已隐藏，暂不影响）。
+
+## 第 82 轮：发表后本地插入 / 图片预览 / 工具栏细节 / 表情映射
+
+### 1. 发表与回复成功后不再整页重载（`commentList.ts`）
+
+- `submitComment()` 改为返回 `{ ok, rpid, message }`（rpid 取 `data.rpid`）；
+- 主列表发表成功：`state.items.unshift(本地评论)` → `renderList()` → 清空输入框（重渲染后新 composer 天然为空）→ `revealNewComment(rpid)`（滚动到新评论 + 2.2s 高亮 `.is-new`）；
+- 回复成功：子页内 `subpage.items.push(...)` 且 `root.rcount += 1`；主列表内只把目标主评论 `rcount += 1`（展开子页即可看到）；
+- 本地评论的头像/昵称/等级来自 `/x/web-interface/nav`（缓存一次；失败时用「我」占位），接口返回不完整也能先显示，下次刷新自然校准；
+- 失败仍 toast 且不插入。
+
+### 2. 评论图片点击放大（新增 `videoPage/imageViewer.ts`）
+
+- 缩略图从 `<a>` 改成 `<button data-action="preview-image">`，点击调 `openImageViewer(item.pictures, index)`；
+- 全屏遮罩：Esc / 点击空白关闭、多图左右切换（按钮 / ←→ 键）、滚轮缩放（0.4~4 倍，也可 +/- 键）、计数器；
+- 纯前端实现，无新依赖；overlay 挂 `document.body`（z-index 100000），卸载时 `closeImageViewer()`。
+
+### 3. 工具栏举报 / 笔记（`toolbar.ts`）
+
+真机结构（CDP 实测）：`.video-toolbar-right` 里**只有 `.video-tool-more.video-toolbar-right-item`（更多）**，举报 / 笔记在它的下拉菜单里。
+
+- 改为：先 `click()` 更多按钮 → 最多等 8×120ms → 在 `document.body` 里按文案找「举报 / 笔记」（排除自绘按钮）→ 点击；
+- 仍找不到 → `showToast("没找到原生的「X」按钮，请在原生工具栏操作")`，不再静默失败。
+
+### 4. 激活态（已赞 / 已投币 / 已收藏）
+
+实测未登录状态：`.video-like` / `.video-coin` / `.video-fav` 的 class 只有 `video-*-left-item`，无激活类。
+代码读 `on / active / is-active / liked / selected` 其中任一（类名兜底），点击后 400ms 再同步一次；登录态下的真实类名需真机确认。
+
+### 5. 表情映射
+
+- `content.emote` 是 `{ "[表情]": { url } }`，渲染时把正文里的每个 key 替换成 `<img class="bvp-cmt__emote">`；
+- 映射不到的表情文本保留原文（不破坏正文）；
+- 真机样本评论没有表情，未验证视觉效果。

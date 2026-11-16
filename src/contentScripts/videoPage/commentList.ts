@@ -11,6 +11,7 @@
  * 兜底：拿不到 aid / 列表 API 失败 → 恢复原生评论区，绝不白屏。
  */
 import { showToast } from './actions'
+import { closeImageViewer, openImageViewer } from './imageViewer'
 
 const LIST_ID = 'bewly-comment-list'
 const COLUMN_SELECTOR = '[data-bewly-comment-column], #bewly-comment-column'
@@ -234,6 +235,45 @@ function normalizeReply(raw: Record<string, any>): CommentItem {
   }
 }
 
+/** 当前登录用户信息（发表后本地插入评论用）；失败时用一个占位 */
+let selfProfile: { uname: string, face: string, level: number } | null = null
+let selfProfileRequested = false
+
+async function fetchSelfProfile(): Promise<{ uname: string, face: string, level: number }> {
+  if (selfProfile)
+    return selfProfile
+  if (selfProfileRequested)
+    return { uname: '我', face: '', level: 0 }
+  selfProfileRequested = true
+  const data = await fetchJson<{ code: number, data?: { uname?: string, face?: string, level_info?: { current_level?: number } } }>(
+    'https://api.bilibili.com/x/web-interface/nav',
+  )
+  if (data?.code === 0 && data.data?.uname)
+    selfProfile = { uname: data.data.uname, face: data.data.face ?? '', level: data.data.level_info?.current_level ?? 0 }
+  return selfProfile ?? { uname: '我', face: '', level: 0 }
+}
+
+/** 本地构造一条刚发表的评论（接口返回数据不完整时也能先显示，下次刷新自然校准） */
+function makeLocalItem(rpid: string, message: string, self: { uname: string, face: string, level: number }): CommentItem {
+  return {
+    rpid,
+    mid: readCookie('DedeUserID'),
+    uname: self.uname,
+    face: self.face,
+    level: self.level,
+    message,
+    emote: {},
+    ctime: Math.floor(Date.now() / 1000),
+    like: 0,
+    liked: false,
+    rcount: 0,
+    location: '',
+    isUp: false,
+    isTop: false,
+    pictures: [],
+  }
+}
+
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
@@ -284,7 +324,7 @@ function itemHtml(item: CommentItem, depth: number): string {
   const upBadge = item.isUp ? '<span class="bvp-cmt__badge bvp-cmt__badge--up">UP</span>' : ''
   const topBadge = item.isTop ? '<span class="bvp-cmt__badge">置顶</span>' : ''
   const pictures = item.pictures.length
-    ? `<div class="bvp-cmt__pictures">${item.pictures.map(src => `<a class="bvp-cmt__picture" href="${escapeHtml(src)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(src)}" loading="lazy" referrerpolicy="no-referrer"></a>`).join('')}</div>`
+    ? `<div class="bvp-cmt__pictures">${item.pictures.map((src, index) => `<button type="button" class="bvp-cmt__picture" data-action="preview-image" data-rpid="${item.rpid}" data-index="${index}"><img src="${escapeHtml(src)}" alt="" loading="lazy" referrerpolicy="no-referrer"></button>`).join('')}</div>`
     : ''
   const subReplies = depth === 0 && item.rcount > 0
     ? `<button type="button" class="bvp-cmt__more" data-action="open-subpage" data-rpid="${item.rpid}">共 ${item.rcount} 条回复</button>`
@@ -441,21 +481,21 @@ async function toggleLike(rpid: string): Promise<void> {
   }
 }
 
-async function submitComment(message: string, target?: { root: string, parent: string }): Promise<boolean> {
+async function submitComment(message: string, target?: { root: string, parent: string }): Promise<{ ok: boolean, rpid: string, message: string }> {
   const text = message.trim()
   if (!text)
-    return false
+    return { ok: false, rpid: '', message: '' }
   if (!detectLogin()) {
     showToast('请先登录后再发评论')
-    return false
+    return { ok: false, rpid: '', message: '' }
   }
   if (text.length > MAX_MESSAGE_LENGTH) {
     showToast(`评论不能超过 ${MAX_MESSAGE_LENGTH} 字`)
-    return false
+    return { ok: false, rpid: '', message: '' }
   }
   const aid = await resolveAid()
   if (!aid)
-    return false
+    return { ok: false, rpid: '', message: '' }
   const body: Record<string, string> = {
     oid: String(aid),
     type: '1',
@@ -469,10 +509,27 @@ async function submitComment(message: string, target?: { root: string, parent: s
   const result = await postForm('https://api.bilibili.com/x/v2/reply/add', body)
   if (!result || result.code !== 0) {
     showToast(errorTip(result?.code ?? -1, result?.message))
-    return false
+    return { ok: false, rpid: '', message: text }
   }
-  showToast('发布成功')
-  return true
+  const rpid = String((result.data as { rpid?: number | string } | undefined)?.rpid ?? '')
+  return { ok: true, rpid, message: text }
+}
+
+/** 插入本地评论后：高亮 + 滚动到它 */
+function revealNewComment(rpid: string): void {
+  const container = document.getElementById(LIST_ID)
+  const listEl = container?.querySelector<HTMLElement>('.bvp-cmt__list')
+  const node = rpid
+    ? container?.querySelector<HTMLElement>(`.bvp-cmt[data-rpid="${rpid}"]`)
+    : null
+  if (node) {
+    node.classList.add('is-new')
+    node.scrollIntoView({ block: 'nearest' })
+    window.setTimeout(() => node.classList.remove('is-new'), 2200)
+  }
+  else if (listEl) {
+    listEl.scrollTop = 0
+  }
 }
 
 function bindContainerActions(container: HTMLElement): void {
@@ -517,6 +574,17 @@ function bindContainerActions(container: HTMLElement): void {
       await loadPage(state.page + 1)
       return
     }
+    if (action === 'preview-image') {
+      const index = Number(target.dataset.index ?? 0)
+      const owner = state.items.find(entry => String(entry.rpid) === rpid)
+        ?? state.subpage?.items.find(entry => String(entry.rpid) === rpid)
+        ?? (state.subpage && String(state.subpage.root.rpid) === rpid
+          ? state.subpage.root
+          : undefined)
+      if (owner?.pictures.length)
+        openImageViewer(owner.pictures, index)
+      return
+    }
     if (action === 'like' && rpid) {
       await toggleLike(rpid)
       return
@@ -546,16 +614,25 @@ function bindContainerActions(container: HTMLElement): void {
       const parentInfo = state.subpage
         ? { root: state.subpage.root.rpid, parent: rpid }
         : { root: rpid, parent: rpid }
-      const ok = await submitComment(input.value, {
+      const result = await submitComment(input.value, {
         root: String(parentInfo.root),
         parent: String(parentInfo.parent),
       })
-      if (ok) {
+      if (result.ok) {
+        const self = await fetchSelfProfile()
+        const item = makeLocalItem(result.rpid || `local-${Date.now()}`, result.message, self)
+        if (state.subpage) {
+          state.subpage.items.push(item)
+          state.subpage.root.rcount += 1
+        }
+        else {
+          const rootItem = state.items.find(entry => String(entry.rpid) === rpid)
+          if (rootItem)
+            rootItem.rcount += 1
+        }
         state.replyTarget = null
-        if (state.subpage)
-          await openSubpage(String(state.subpage.root.rpid))
-        else
-          await loadPage(1)
+        renderList()
+        revealNewComment(String(item.rpid))
       }
       return
     }
@@ -576,10 +653,13 @@ function bindContainerActions(container: HTMLElement): void {
     const input = form.querySelector<HTMLTextAreaElement>('.bvp-cmt__input')
     if (!input)
       return
-    const ok = await submitComment(input.value)
-    if (ok) {
-      input.value = ''
-      await loadPage(1)
+    const result = await submitComment(input.value)
+    if (result.ok) {
+      const self = await fetchSelfProfile()
+      const item = makeLocalItem(result.rpid || `local-${Date.now()}`, result.message, self)
+      state.items.unshift(item)
+      renderList()
+      revealNewComment(String(item.rpid))
     }
   })
 }
@@ -752,6 +832,7 @@ export function setupCommentList(): () => void {
 
 export function teardownCommentList(): void {
   stopBridge()
+  closeImageViewer()
   restoreNative()
   state.aid = null
   state.bvid = ''

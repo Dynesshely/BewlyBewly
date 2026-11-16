@@ -55,27 +55,14 @@ let autoEnterConsumed = false
 /** 自动进入的轮询（等卡片渲染完） */
 let autoEnterTimer: ReturnType<typeof setInterval> | null = null
 
-/** 切页面 / 路由变化检测：退出聚焦但不改持久化值 */
-let routeCheckTimer: ReturnType<typeof setInterval> | null = null
-let lastLocationKey = ''
+/** 进入聚焦模式时的 pathname：只有这个路径真的变了才退出（search / hash 变化不算） */
+let focusEntryPathname = ''
 
 function stopAutoEnterTimer() {
   if (autoEnterTimer) {
     clearInterval(autoEnterTimer)
     autoEnterTimer = null
   }
-}
-
-function stopRouteCheckTimer() {
-  if (routeCheckTimer) {
-    clearInterval(routeCheckTimer)
-    routeCheckTimer = null
-  }
-}
-
-/** 当前页面标识（pathname + search）：用于识别「切了页面 / 路由」 */
-function currentLocationKey(): string {
-  return `${location.pathname}${location.search}`
 }
 
 /** 写持久化值；settings 尚未加载完成（默认值）时也不报错 */
@@ -499,6 +486,8 @@ export function enterFocusBrowse(options: { persist?: boolean } = {}) {
 
   // 真正进入成功后才写持久化（找不到卡片 / 舞台时不应该「记住已进入」）
   autoEnterConsumed = true
+  // 记录进入时的 pathname：之后只有它真的变了才退出（见 onHistoryChange）
+  focusEntryPathname = location.pathname
   if (persist)
     persistFocusBrowse(true)
 
@@ -981,28 +970,33 @@ export function useFocusBrowse() {
     }, 250)
   }
 
+  /** 预览抽屉是否打开（抽屉打开期间 App / IframeDrawer 会改主页面 URL，那不是路由跳转） */
+  function isIframeDrawerOpen(): boolean {
+    return Boolean(document.querySelector('#bewly')?.shadowRoot?.querySelector('.bewly-iframe-drawer'))
+  }
+
   /**
-   * 切页面 / 路由变化：退出聚焦但不改持久化值。
+   * 路由变化 → 退出聚焦（不改持久化值）。
    *
-   * 第 81 轮修正：原实现比较 pathname+search，任何 URL 变化都会退出聚焦；
-   * 但「打开内嵌预览抽屉」「B 站补追踪参数」等都会改 search，导致聚焦被误退出
-   * （e2e focus-browse.spec.ts 因此失败）。改为**只在 pathname 真正变化**时退出。
+   * 第 82 轮重写：改用 `historyChange` 事件（第 40 轮 inject/index.js 包装了 pushState /
+   * replaceState 并派发该事件；content script 能收到），不再 500ms 轮询。
+   *
+   * 判定只看 **pathname**：
+   * - 打开预览抽屉时 App / IframeDrawer 会 pushState 到视频页、关闭时再 replaceState 回首页，
+   *   这不是路由跳转 → 抽屉打开期间直接忽略；
+   * - B 站给 URL 补追踪参数、锚点变化只改 search / hash → 忽略；
+   * - 真的跳到另一个 pathname（首页 → /history、/video/BVxxx 等）→ 退出聚焦。
+   *
+   * 整页导航不派发 historyChange，但那种情况页面会重载，聚焦状态由持久化值决定。
    */
-  function startRouteCheck() {
-    stopRouteCheckTimer()
-    lastLocationKey = currentLocationKey()
-    routeCheckTimer = setInterval(() => {
-      const key = currentLocationKey()
-      if (key === lastLocationKey)
-        return
-      const prevPath = lastLocationKey.split('?')[0]
-      const nextPath = key.split('?')[0]
-      lastLocationKey = key
-      if (prevPath === nextPath)
-        return
-      if (isFocusBrowseActive())
-        exitFocusBrowse({ persist: false })
-    }, 500)
+  function onHistoryChange() {
+    if (!isFocusBrowseActive())
+      return
+    if (isIframeDrawerOpen())
+      return
+    if (location.pathname === focusEntryPathname)
+      return
+    exitFocusBrowse({ persist: false })
   }
 
   onMounted(() => {
@@ -1016,9 +1010,9 @@ export function useFocusBrowse() {
         scheduleAutoEnter()
     })
     scheduleAutoEnter()
-    // 第 81 轮：路由变化退出的逻辑暂时停用（见 startRouteCheck 注释），
-    // 切页面退出由 Home.vue 的 handleChangeTab 与组件 onUnmounted 负责。
-    void startRouteCheck
+    // 第 82 轮：路由变化（pushState / replaceState / 浏览器前进后退）→ 只在 pathname 变化时退出聚焦
+    window.addEventListener('historyChange', onHistoryChange)
+    window.addEventListener('popstate', onHistoryChange)
   })
 
   onUnmounted(() => {
@@ -1026,8 +1020,9 @@ export function useFocusBrowse() {
     window.removeEventListener('keydown', onKeydown)
     window.removeEventListener('wheel', onWheel, { capture: true })
     emitter.off('command-toggle-focus-browse')
+    window.removeEventListener('historyChange', onHistoryChange)
+    window.removeEventListener('popstate', onHistoryChange)
     stopAutoEnterTimer()
-    stopRouteCheckTimer()
     // 组件卸载（切页面 / 关闭标签页）不属于「用户主动退出」，不改持久化值
     exitFocusBrowse({ persist: false })
   })

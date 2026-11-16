@@ -151,7 +151,81 @@ const drawerNavLabels = computed(() => {
 
 const canNavigate = computed(() => iframeAccessible.value && !isInIframe())
 const canBack = computed(() => canNavigate.value && navIndex.value > 0)
-const canForward = computed(() => canNavigate.value && navIndex.value < navStack.value.length - 1)
+const canForward = computed(() => canNavigate.value && navStack.value.length > 0 && navIndex.value < navStack.value.length - 1)
+
+/* #region 媒体守卫：切视频 / 关抽屉时避免旧视频继续出声 */
+
+/**
+ * 暂停 iframe 内所有 video / audio。
+ *
+ * - 默认全部暂停并静音（用于「即将换文档」「关闭抽屉」：旧媒体不会再被复用）；
+ * - `keepCurrent = true` 时保留「当前正在播放」的那一条，只清理其余（用于打开 / 加载完成时避免多路叠加）；
+ * - 跨域 / iframe 已销毁 / 单个元素异常都静默跳过，绝不抛错。
+ */
+function pauseIframeMedia(options: { keepCurrent?: boolean, mute?: boolean } = {}): void {
+  const { keepCurrent = false, mute = false } = options
+  try {
+    const doc = iframeRef.value?.contentWindow?.document
+    if (!doc)
+      return
+    const medias = Array.from(doc.querySelectorAll<HTMLMediaElement>('video, audio'))
+    if (!medias.length)
+      return
+
+    let current: HTMLMediaElement | undefined
+    if (keepCurrent) {
+      // 没有「正在播」的媒体时什么都不做：
+      // 新文档刚 load、播放器还没开始播放时，把 video 静音会导致新视频从此没声音。
+      const playing = medias.filter(media => !media.paused && !media.ended)
+      if (!playing.length)
+        return
+      // 多路同时在播时保留可见面积最大的那条（通常是主播放器，广告 / 预加载一般很小或隐藏）
+      current = playing.reduce((best, media) => {
+        const areaOf = (el: HTMLMediaElement) => {
+          try {
+            const rect = el.getBoundingClientRect()
+            return Math.max(0, rect.width) * Math.max(0, rect.height)
+          }
+          catch {
+            return 0
+          }
+        }
+        return areaOf(media) > areaOf(best)
+          ? media
+          : best
+      })
+    }
+
+    for (const media of medias) {
+      if (media === current)
+        continue
+      try {
+        if (!media.paused)
+          media.pause()
+        if (mute)
+          media.muted = true
+      }
+      catch {
+        // 单个媒体元素异常（已销毁 / 只读）不影响其它元素
+      }
+    }
+  }
+  catch {
+    // 跨域 iframe 或 contentWindow 已被移除：静默跳过
+  }
+}
+
+/** 取 URL 的 pathname（解析失败时退回原字符串），用于判断「是否真的换了页面」 */
+function pathnameOf(url: string): string {
+  try {
+    return new URL(url).pathname
+  }
+  catch {
+    return url
+  }
+}
+
+/* #endregion */
 
 /** 外部（App.vue）在抽屉已打开时改导航目标：同 iframe 内跳转并记入栈，不重建 iframe */
 function navigateTo(url: string): void {
@@ -166,6 +240,11 @@ function navigateTo(url: string): void {
   clearPendingDirection()
   pendingTargetUrl = normalized
   pendingTargetExpireAt = Date.now() + NAV_PENDING_TIMEOUT
+
+  // 导航前先让旧文档的媒体停声：整页导航时旧文档还会存活一小段时间，
+  // 不暂停会和新文档的播放器叠加成双音轨（用户反馈的真 bug）。
+  // 这里是明确的「换文档」，旧元素不会被复用，因此可以安全地连 muted 一起设。
+  pauseIframeMedia({ mute: true })
 
   try {
     const win = iframe.contentWindow
@@ -253,6 +332,14 @@ function pollIframeUrl(): void {
   }
   clearPendingTarget()
 
+  // 到这里已确认是「真实导航」（不是同页面的参数重定向）：
+  // 用户点 B 站原生推荐 / 评论链接时我们拦不到跳转，只能靠这里兜底停旧音频。
+  // 只有 pathname 变了才暂停：B 站视频页常给同一路径补 ?spm_id_from 等参数，
+  // 那种情况播放器还在正常工作，打断会把正在看的视频暂停。
+  // 只 pause 不 muted —— SPA 同文档导航时新视频可能复用同一个 <video>，静音会变成「新视频没声音」。
+  if (pathnameOf(href) !== pathnameOf(navStack.value[navIndex.value] ?? ''))
+    pauseIframeMedia()
+
   if (pendingDirection.value === 'back') {
     const previous = navStack.value[navIndex.value - 1]
     if (previous === href) {
@@ -310,6 +397,8 @@ onMounted(() => {
   // 每次打开抽屉都从当前地址重新建栈（关闭时已清空）
   resetNavStack(props.url)
   startNavPolling()
+  // 打开时清理一次：若复用已有 iframe（props.url 变化走 watch），避免上一路音频叠加
+  pauseIframeMedia({ keepCurrent: true, mute: true })
   nextTick(() => {
     // 先聚焦 iframe 元素，再把焦点交给其子文档，避免首次按键被父页面截获
     iframeRef.value?.focus()
@@ -335,7 +424,13 @@ onUnmounted(() => {
 function updateCurrentUrl() {
   if (iframeRef.value?.contentWindow) {
     try {
-      currentUrl.value = iframeRef.value.contentWindow.location.href.replace(/\/$/, '')
+      const nextUrl = iframeRef.value.contentWindow.location.href.replace(/\/$/, '')
+      // SPA 导航（B 站视频页内部 pushState）不会触发整页 load，这里补一次停声；
+      // 只有 pathname 真的变了才暂停——同一视频补 ?spm_id_from 等参数时不能打断播放。
+      // 只 pause 不 muted：同一个 video 元素很可能马上被 B 站复用来播新视频。
+      if (pathnameOf(nextUrl) !== pathnameOf(currentUrl.value))
+        pauseIframeMedia()
+      currentUrl.value = nextUrl
       history.pushState(null, '', currentUrl.value.replace(/\/$/, ''))
     }
     catch (error) {
@@ -360,6 +455,8 @@ async function handleClose() {
   if (delayCloseTimer.value) {
     clearTimeout(delayCloseTimer.value)
   }
+  // 关闭抽屉前先静音：旧文档会保留到 300ms 后的卸载，期间不能继续出声
+  pauseIframeMedia({ mute: true })
   // 关闭后栈必须重置：下次打开另一个视频时「后退」应是 disabled
   stopNavPolling()
   resetNavStack()
@@ -408,6 +505,9 @@ async function releaseIframeResources() {
 function onIframeLoad() {
   showIframe.value = true
   bindIframeEscListener()
+  // 新文档加载完成：保留正在播的那一条，其余（隐藏的预加载 / 残留音频）全部 pause + 静音。
+  // 若此时还没有任何媒体在播（播放器尚未 autoplay），这里不会动任何元素，避免把新视频静音。
+  pauseIframeMedia({ keepCurrent: true, mute: true })
 
   // 只在首次 load 时同步栈顶（把 props.url 归一化后 / B 站重定向的最终地址记下来）；
   // 之后的每次 load 都交给 500ms 轮询处理，避免把 back / forward 的结果误记成新条目。
@@ -483,6 +583,11 @@ function bindIframeEscListener() {
   })
 }
 watch(iframeRef, bindIframeEscListener, { immediate: true })
+
+// 抽屉被复用到另一个地址时，先让旧文档的媒体停声，避免与新地址的播放器叠加
+watch(() => props.url, () => {
+  pauseIframeMedia({ keepCurrent: true, mute: true })
+})
 
 watchEffect(() => {
   if (isInIframe())

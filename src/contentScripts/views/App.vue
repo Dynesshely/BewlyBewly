@@ -537,6 +537,18 @@ function openIframeDrawer(url: string) {
   // 禁止抽屉嵌套：在 iframe 内（抽屉里的视频页）再点视频时，直接在当前 iframe 内导航，
   // 不再叠加第二层抽屉（叠加会让两套 fixed 布局互相干扰、关闭后前一层也失效）。
   if (isInIframe()) {
+    // 切视频前先暂停当前页所有媒体：整页导航到新文档前，旧文档的 <video> 会继续出声，
+    // 用户听到的就是「上一个视频还在播」（第 79 轮修复）。
+    try {
+      document.querySelectorAll<HTMLMediaElement>('video, audio').forEach((media) => {
+        try {
+          media.pause()
+          media.muted = true
+        }
+        catch {}
+      })
+    }
+    catch {}
     location.href = url
     return
   }

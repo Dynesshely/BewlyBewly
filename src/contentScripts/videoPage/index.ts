@@ -54,7 +54,9 @@ import { bindRailHost, railState, syncRecommendRail, teardownRecommendRail } fro
 import { setupShortcuts } from './shortcuts'
 import { setupSplitter, syncSplitter } from './splitter'
 import { resetUiState, ui } from './state'
+import { setupTagsBar, syncTagsBar } from './tagsBar'
 import { refreshToolbarActions, setupToolbarActions, teardownToolbarActions } from './toolbarActions'
+import { setupUpCard, syncUpCard } from './upCard'
 import shadowCss from './videoPage.shadow.scss?inline'
 
 const HOST_ID = 'bewly-video-page'
@@ -133,6 +135,10 @@ let disposeFixedLayout: (() => void) | null = null
 let disposeSplitter: (() => void) | null = null
 /** 自绘信息栏（第 78 轮阶段 1）：挂载时返回 teardown */
 let disposeInfoBar: (() => void) | null = null
+/** 自绘标签行（第 79 轮 2a） */
+let disposeTagsBar: (() => void) | null = null
+/** 自绘 UP 卡（第 79 轮 2b） */
+let disposeUpCard: (() => void) | null = null
 
 /**
  * 视口过窄（含极端 iframe 预览）时是否处于降级状态。
@@ -177,6 +183,14 @@ function degradeForNarrowViewport(): void {
     disposeInfoBar()
     disposeInfoBar = null
   }
+  if (disposeTagsBar) {
+    disposeTagsBar()
+    disposeTagsBar = null
+  }
+  if (disposeUpCard) {
+    disposeUpCard()
+    disposeUpCard = null
+  }
   teardownToolbarActions()
   teardownDescPopover()
   teardownRecommendRail()
@@ -198,6 +212,11 @@ function restoreAfterNarrowViewport(): void {
     disposeSplitter = setupSplitter()
   if (!disposeInfoBar)
     disposeInfoBar = setupInfoBar()
+  if (!disposeTagsBar)
+    disposeTagsBar = setupTagsBar()
+  if (!disposeUpCard)
+    disposeUpCard = setupUpCard()
+
   if (!isInIframe() && settings.value.videoPageShortcuts && !disposeShortcuts)
     disposeShortcuts = setupShortcuts()
 }
@@ -364,6 +383,14 @@ function mount(): void {
   if (!viewportDegraded)
     disposeInfoBar = setupInfoBar()
 
+  // 第 79 轮阶段 2：自绘标签行 + UP 卡。
+  // 注意 setup 必须在这里调用（不能只在 restoreAfterNarrowViewport 里）——
+  // setupUpCard() 内部负责 startBridge() 装数据桥监听，漏掉就会永远拿不到 owner.face。
+  if (!viewportDegraded) {
+    disposeTagsBar = setupTagsBar()
+    disposeUpCard = setupUpCard()
+  }
+
   // 固定单页布局（第 28 轮）：窗口太小 / 番剧页 / 迷你态会自动回退到原生可滚动布局。
   // iframe 内不启用（抽屉视口不是整页视口）。
   if (!viewportDegraded)
@@ -465,6 +492,14 @@ function unmount(): void {
   if (disposeInfoBar) {
     disposeInfoBar()
     disposeInfoBar = null
+  }
+  if (disposeTagsBar) {
+    disposeTagsBar()
+    disposeTagsBar = null
+  }
+  if (disposeUpCard) {
+    disposeUpCard()
+    disposeUpCard = null
   }
   teardownAdGuard()
 
@@ -586,8 +621,11 @@ function sync(): void {
   if (ui.recommendRailVisible !== railVisible)
     ui.recommendRailVisible = railVisible
 
-  // 第 78 轮阶段 1：自绘信息栏（必须在布局之前，隐藏原生节点会改变左列块高度实测）
+  // 第 78 轮阶段 1 + 第 79 轮 2a/2b：自绘块必须在布局之前同步
+  // （隐藏原生节点会改变左列块高度实测；UP 卡在评论列内，不影响 dock 预算但保持一致顺序）
   safeSync('syncInfoBar', syncInfoBar)
+  safeSync('syncTagsBar', syncTagsBar)
+  safeSync('syncUpCard', syncUpCard)
 
   // 固定单页布局（第 29 轮）：**唯一**的布局所有者。
   // ⚠️ 第 36 轮起把它提到评论区同步之前：评论区 / 轨道 / 简介任何一处抛异常都不能阻止

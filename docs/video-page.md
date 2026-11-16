@@ -1313,3 +1313,69 @@ footer 侧补：`#footer bili-comment-action-buttons-renderer { flex: 0 0 auto; 
 
 真机核对：主世界 `__INITIAL_STATE__.videoData` 存在，`stat = { view: 10103, danmaku: 192, like: 944, coin: 500, favorite: 2256, share: 504, reply: 20 }`、`pages = 8` —— 与 Lead 给的结构一致。
 当前调试浏览器未 build 最新 `inject/index.js`，所以 `bewly-video-data-request` 现场无响应（`events: 0`）；build 后即可验证。
+
+## 第 79 轮：自绘阶段 2a 标签行 + 2b UP 卡
+
+### 2a 标签行（`videoPage/tagsBar.ts`）
+
+- 真机结构（CDP 核对）：`.video-tag-container > .tag-panel > (.tag.not-btn-tag 话题 + a.tag-link 标签)`；
+  标签链接是 `a.tag-link`（`//search.bilibili.com/all?keyword=xxx&from_source=video_tag`），本视频 9 个；
+- 自绘条 `#bewly-tags-bar` 追加到 `.tag-panel` **末尾**（话题在前、我们的标签在后），只隐藏 `a.tag-link`，
+  话题入口 `.tag` 保留原生；
+- 数据：page-world 桥的 `tags` → DOM 兜底（读 `a.tag-link` 文本）；都没有则不隐藏、不渲染；
+- 视觉沿用第 47 轮规格：24px 高 / 11px（`--bvp-fs-badge`）/ 6px 圆角 / `--bew-fill-1` 背景、单行 nowrap + 横向滚动（隐藏滚动条）；
+- 点击跳转 `https://search.bilibili.com/all?keyword=<tag>&from_source=video_tag`（新标签页、noopener）。
+
+### 2b UP 卡（`videoPage/upCard.ts`）
+
+- 真机结构（CDP 核对）：`.up-panel-container > .up-info-container > (.up-avatar > .bili-avatar > img) + a.up-name + a.send-msg + .up-info__btn-panel > .default-btn.follow-btn.b-gz`；
+  关注状态用 `following` / `not-follow` 类判断，文案「已关注/互相关注」兜底；
+- 自绘卡 `#bewly-up-card` 插进 `.up-panel-container` **内部**（容器本身是 commentColumn 搬进评论列的元素，不能隐藏），
+  只隐藏它的原生子元素；读不到数据（桥无 owner 且 DOM 无昵称）则不渲染、不隐藏；
+- 头像用桥 `owner.face`（`referrerPolicy=no-referrer`），昵称链到 `space.bilibili.com/<mid>`，签名从原生 DOM 兜底；
+- **关注 / 发消息不自己调接口**：点击时 `findNativeButton(panel, [...候选])?.click()` 转发原生按钮（避开 `bili_jct` 与风控），
+  关注后 300ms 重新同步按钮状态；
+- 视觉沿用第 37 轮：头像 40 圆、昵称 18、关注按钮 36 高 / 圆角 18 / 主色底、发消息描边。
+
+### 布局实测（CDP 现场模拟两份自绘块，测完已恢复）
+
+| 指标 | 模拟前 | 模拟中 | 恢复后 |
+| --- | --- | --- | --- |
+| `#viewbox_report` 高 | 70 | **70** | 70 |
+| `.tag-panel` 高 | 24 | **24** | 24 |
+| `.up-panel-container` 高 | 84 | **72**（自绘卡更紧凑，min-height 72） | 84 |
+| 播放器 | 1166×656 | **1166×656** | 1166×656 |
+| 评论列高 | 1101 | **1101** | 1101 |
+| `--bvp-fixed-dock-height` | 1101px | **1101px** | 1101px |
+| 左列子元素数 | 7 | **7** | 7 |
+
+结论：两份自绘块都不改变左列子元素数量与 dock 高度，播放器 16:9 与评论列等高不回归；UP 卡在评论列内部变矮 12px，
+评论列表相应多 12px（评论列高度 = dock 高不变）。
+
+### 第 79 轮补充：UP 卡头像停在「首字兜底」
+
+真机数据：桥 payload `owner = { name, mid, face: "https://i0.hdslb.com/bfs/face/…jpg" }` 正常，
+但 `#bewly-up-card` 里只有 `<a class="bvp-up__avatar">哎</a>`（没有 `<img>`）。
+
+根因（两个叠加）：
+
+1. `syncUpCard()` 失败分支直接调 `teardownUpCard()`，而 teardown 会 `removeEventListener` 桥监听 ——
+   首次 mount 时评论列/UP 卡还没渲染 → 监听被摘掉 → **桥数据到了也没人接**；
+2. 首次渲染用 DOM 兜底（此时 face 为空）走了「昵称首字」，之后 `lastSignature` 让后续渲染认为没变化。
+
+修法（`upCard.ts`）：
+
+- 拆出 `resetUpCard()`（只移除卡片 + 恢复原生，**保留桥监听**）；`syncUpCard` 的失败分支改调它；
+- `onBridgeData` 收到数据时清 `lastSignature` 并**强制重渲染**；
+- 没有桥数据、且原生也读不到头像时不抢原生（`if (!bridgedOwner && !data.face) return false`），避免「首字固化」；
+- 桥数据有 face 时必然渲染 `<img>`（`referrerpolicy=no-referrer`、`decoding=async`、破图回退首字）。
+
+另：`payload.tags` 为 0（B 站 `videoData` 里没有 tags），标签栏继续用原生 `a.tag-link` 兜底，保持现状。
+
+第 79 轮第三次修复（UP 卡完全不渲染）：
+
+- 上一轮加的「无桥数据且原生读不到头像就不渲染」判定用错选择器（真机 UP 卡内部是 `.up-info-container`），
+  导致桥有数据时也被判定为「读不到」→ `#bewly-up-card` 直接不存在；
+- 现在改为：**桥有 `owner.name` / `owner.face` / `owner.mid` 任一值就直接渲染**；桥没有才回退读原生 DOM 的 name
+  （选择器加宽到 `.up-info-container a[href*="space.bilibili.com"]`）；桥只有 face/mid 时 name 用「UP 主」占位；
+- 去掉 syncUpCard 里的额外不渲染判定；渲染后隐藏 `.up-info-container` / `.teleport.hidden`，保留 `.up-panel-container`。

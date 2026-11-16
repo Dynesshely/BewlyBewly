@@ -1,3 +1,6 @@
+import { watch } from 'vue'
+import { settings } from '~/logic'
+
 /**
  * 固定单页布局（第 28 轮引入，第 29 轮改为「单次布局事务」）。
  *
@@ -19,7 +22,7 @@
  * | 变量 | 含义 |
  * | --- | --- |
  * | `--bvp-fixed-top` | `#mirror-vdcon` 距视口顶部的距离 |
- * | `--bvp-fixed-info` | 压缩后的信息栏高度 |
+ * | `--bvp-fixed-info` | 信息栏高度（第 88 轮起绑定播放器下方的自绘信息栏 `#bewly-info-bar`） |
  * | `--bvp-fixed-gap` | 三个 dock 之间统一的 gutter |
  * | `--bvp-fixed-player-width` | 播放器宽度（= 左列宽度，严格 16:9 反算） |
  * | `--bvp-fixed-player-height` | 播放器高度（= 评论列高度） |
@@ -45,9 +48,7 @@
  * - 只读「本模块不修改的量」（`#mirror-vdcon` 的顶边、左列宽度、视口尺寸），
  *   不读自己写过的高度，因此没有反馈路径。
  */
-import { watch } from 'vue'
-
-import { settings } from '~/logic'
+import { isInIframe } from '~/utils/main'
 
 import { getPlayerWrapEl } from './dom'
 import { getPlayerScreenMode } from './playerMode'
@@ -91,8 +92,11 @@ const NARROW_COMMENT_VAR = '--bvp-fixed-narrow-comment-height'
  * 信息栏（标题组）高度：70，与简报 A3 的「标题组 70px」一致。
  *
  * 为什么必须 70：标题 2 行 = 20×1.35×2 = 54，元信息（12.5×1.25）= 15.6，合计 69.6；
- * 若沿用 56 会把第 2 行标题裁掉（第 34 轮真机复测）。此值写入 `--bvp-fixed-info`，
- * 页面级 CSS 的 `#viewbox_report` 高度与它联动。
+ * 若沿用 56 会把第 2 行标题裁掉（第 34 轮真机复测）。此值写入 `--bvp-fixed-info`。
+ *
+ * 第 88 轮：信息栏从播放器上方移到播放器下方（用户要求），`--bvp-fixed-info` 改为绑定
+ * 自绘块 `#bewly-info-bar`；原生 `#viewbox_report` 在自绘成功后 display:none（高度 0），
+ * `measureDockBlocks()` 会自动跳过它、改量新的自绘块 —— 块数与 gap 数不变，预算等价。
  */
 export const INFO_BAR_HEIGHT = 70
 /** 三个 dock 之间统一的 gutter（页面级 CSS 用同一个变量，保证分隔感一致） */
@@ -400,8 +404,14 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
       renderedRailHeight,
       cardRailHeight,
     )
-    const converged = Math.abs(nextRailSpace - railSpace) < 1
-    railSpace = nextRailSpace
+    // 第 88 轮：iframe 抽屉（预览）里视口更矮，轨道预留过高会把推荐卡挤出可视区/超出底部；
+    // 收紧到视口高度的 28%，让轨道完整可见（卡片内部自己滚动）。
+    const iframeRailCap = isInIframe()
+      ? Math.round(window.innerHeight * 0.28)
+      : Number.POSITIVE_INFINITY
+    const cappedRailSpace = Math.min(nextRailSpace, iframeRailCap)
+    const converged = Math.abs(cappedRailSpace - railSpace) < 1
+    railSpace = cappedRailSpace
     if (converged)
       break
   }

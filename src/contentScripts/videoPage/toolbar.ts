@@ -186,6 +186,132 @@ async function postForm(url: string, body: Record<string, string>): Promise<{ co
   }
 }
 
+/** 默认收藏夹 id（收藏 / 取消收藏用，缓存一次） */
+let defaultFavId: number | null = null
+
+async function resolveDefaultFavId(aid: number): Promise<number | null> {
+  if (defaultFavId)
+    return defaultFavId
+  const data = await fetchJson<{ code: number, data?: { list?: Array<{ id: number, media_count?: number }>, count?: number } }>(
+    `https://api.bilibili.com/x/v2/fav/folder/created/list-all?type=2&rid=${aid}`,
+  )
+  if (data?.code === 0 && data.data?.list?.length) {
+    defaultFavId = data.data.list[0].id
+    return defaultFavId
+  }
+  return null
+}
+
+function errorTip(code: number): string {
+  if (code === -101)
+    return '请先登录后再操作'
+  if (code === -111)
+    return 'CSRF 校验失败，请刷新页面重试'
+  if (code === -352)
+    return '触发风控，请稍后再试'
+  if (code === -400)
+    return '请求参数有误'
+  return `操作失败（code ${code}）`
+}
+
+/** 分享：复制链接（不调接口） */
+async function shareVideo(): Promise<void> {
+  const url = location.href
+  try {
+    await navigator.clipboard.writeText(url)
+    showToast('已复制链接')
+  }
+  catch {
+    // 降级：临时 textarea + execCommand
+    const textarea = document.createElement('textarea')
+    textarea.value = url
+    textarea.style.cssText = 'position:fixed;opacity:0'
+    document.body.appendChild(textarea)
+    textarea.select()
+    try {
+      document.execCommand('copy')
+      showToast('已复制链接')
+    }
+    catch {
+      showToast('复制失败，请手动复制地址')
+    }
+    textarea.remove()
+  }
+}
+
+/**
+ * 实装写操作（第 88 轮）：点赞 / 投币 / 收藏直接调接口，不再只做原生转发。
+ * - 点赞可撤销（like=1 / like=2）；
+ * - 投币会消耗硬币 → 二次确认；
+ * - 收藏走默认收藏夹（list-all 取第一个），取消用 del_media_ids；
+ * - 失败回滚乐观状态并 toast。
+ */
+async function performWriteAction(kind: string, host: HTMLElement): Promise<boolean> {
+  const aid = await ensureAid()
+  if (!aid) {
+    showToast('拿不到视频 aid，操作失败')
+    return false
+  }
+  const csrf = csrfToken()
+  const state = effectiveState(host)
+  if (kind === 'like') {
+    const result = await postForm('https://api.bilibili.com/x/web-interface/archive/like', {
+      aid: String(aid),
+      like: state.liked ? '1' : '2',
+      csrf,
+    })
+    if (result?.code !== 0) {
+      showToast(errorTip(result?.code ?? -1))
+      return false
+    }
+    showToast(state.liked ? '点赞成功' : '已取消点赞')
+    return true
+  }
+  if (kind === 'coin') {
+    if (state.coined) {
+      showToast('已投过币，暂不支持取消投币')
+      return false
+    }
+    if (!window.confirm('投币会消耗 1 枚硬币，确定投币吗？'))
+      return false
+    const result = await postForm('https://api.bilibili.com/x/web-interface/coin/add', {
+      aid: String(aid),
+      multiply: '1',
+      csrf,
+    })
+    if (result?.code !== 0) {
+      showToast(errorTip(result?.code ?? -1))
+      return false
+    }
+    showToast('投币成功')
+    return true
+  }
+  if (kind === 'fav') {
+    const favId = await resolveDefaultFavId(aid)
+    if (!favId) {
+      showToast('没有可用的收藏夹，请先在 B 站创建')
+      return false
+    }
+    const body: Record<string, string> = {
+      rid: String(aid),
+      type: '2',
+      csrf,
+    }
+    if (state.favorited)
+      body.del_media_ids = String(favId)
+    else
+      body.add_media_ids = String(favId)
+    const result = await postForm('https://api.bilibili.com/x/v3/fav/resource/deal', body)
+    if (result?.code !== 0) {
+      showToast(errorTip(result?.code ?? -1))
+      return false
+    }
+    showToast(state.favorited ? '已取消收藏' : '收藏成功')
+    return true
+  }
+  return false
+}
+
 function csrfToken(): string {
   return document.cookie.match(/(?:^|;\s*)bili_jct=([^;]+)/)?.[1] ?? ''
 }
@@ -242,55 +368,6 @@ function flipOptimistic(host: HTMLElement, kind: string): void {
     next.favorited = !current.favorited
   }
   optimisticCache.set(key, next)
-  lastSignature = ''
-  syncToolbar()
-}
-
-/**
- * 点击后核实：1.5s 后查服务端；不一致就直接调写接口兜底（不依赖原生按钮是否还在）。
- * 2s 后再重查 relation，一致或乐观已过期就以接口为准。
- */
-async function verifyAction(kind: string): Promise<void> {
-  const aid = await ensureAid()
-  const key = bvidKey()
-  if (!aid || !key)
-    return
-  await new Promise(resolve => window.setTimeout(resolve, 1500))
-  const target = optimisticCache.get(key)
-  if (!target)
-    return
-  if (kind === 'like') {
-    const hasLike = await fetchJson<{ code: number, data?: number }>(
-      `https://api.bilibili.com/x/web-interface/archive/has/like?aid=${aid}`,
-    )
-    if (hasLike?.code === 0 && (Number(hasLike.data) === 1) !== target.liked) {
-      await postForm('https://api.bilibili.com/x/web-interface/archive/like', {
-        aid: String(aid),
-        like: target.liked ? '1' : '2',
-        csrf: csrfToken(),
-      })
-    }
-  }
-  else if (kind === 'coin' && target.coined) {
-    const coins = await fetchJson<{ code: number, data?: { multiply?: number } }>(
-      `https://api.bilibili.com/x/web-interface/archive/coins?aid=${aid}`,
-    )
-    if (coins?.code === 0 && Number(coins.data?.multiply ?? 0) === 0) {
-      await postForm('https://api.bilibili.com/x/web-interface/coin/add', {
-        aid: String(aid),
-        multiply: '1',
-        csrf: csrfToken(),
-      })
-    }
-  }
-  await new Promise(resolve => window.setTimeout(resolve, 700))
-  relationCache.delete(key)
-  const fresh = await loadArchiveRelation()
-  const stillOpt = optimisticCache.get(key)
-  const matches = Boolean(fresh && stillOpt
-    && fresh.liked === target.liked && fresh.coined === target.coined && fresh.favorited === target.favorited)
-  if (matches || !stillOpt || Date.now() - stillOpt.at >= OPTIMISTIC_TTL)
-    optimisticCache.delete(key)
   lastSignature = ''
   syncToolbar()
 }
@@ -517,19 +594,40 @@ function renderToolbar(host: HTMLElement): void {
         : ''}`
       button.addEventListener('click', (event) => {
         event.stopPropagation()
-        // 第 86 轮：三个可切换动作先做乐观更新，让用户立刻看到状态变化
-        if (action.key === 'like' || action.key === 'coin' || action.key === 'fav')
+        if (action.key === 'share') {
+          void shareVideo()
+          return
+        }
+        if (action.key === 'like' || action.key === 'coin' || action.key === 'fav') {
+          // 第 88 轮：直接实装写接口（乐观 → 调接口 → 失败回滚）
           flipOptimistic(host, action.key)
-        void forwardToNative(host, action).then(() => {
-          if (action.key === 'like' || action.key === 'coin' || action.key === 'fav') {
-            void verifyAction(action.key)
-          }
-          else {
-            window.setTimeout(() => {
+          void performWriteAction(action.key, host).then((ok) => {
+            if (!ok) {
+              const key = bvidKey()
+              if (key)
+                optimisticCache.delete(key)
               lastSignature = ''
               syncToolbar()
-            }, 400)
-          }
+              return
+            }
+            const key = bvidKey()
+            if (key)
+              relationCache.delete(key)
+            void loadArchiveRelation().then(() => {
+              lastSignature = ''
+              syncToolbar()
+            })
+            lastSignature = ''
+            syncToolbar()
+          })
+          return
+        }
+        // 举报 / 笔记：仍然转发原生（需要 B 站自己的弹窗）
+        void forwardToNative(host, action).then(() => {
+          window.setTimeout(() => {
+            lastSignature = ''
+            syncToolbar()
+          }, 400)
         })
       })
       bar.appendChild(button)

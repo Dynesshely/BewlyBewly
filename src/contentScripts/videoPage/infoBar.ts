@@ -5,10 +5,13 @@
  * 只从 B 站页面读数据；渲染成功后把原生 `.video-info-title` 与 `.video-info-detail-list` 隐藏
  * （display: none，不删除，留着给后续功能兜底）。
  *
- * 为什么挂在 `#viewbox_report` 内部而不是 shadow 里：
- * `fixedLayout.ts` 的 `measureDockBlocks()` 是**实测左列直接子元素高度**反算播放器高度的，
- * 把自绘块放进 `#viewbox_report`（它的高度由 `--bvp-fixed-info` 固定为 70）内，
- * 子元素数量与既有的高度预算完全不变 —— 播放器高度不会因为自绘而算错。
+ * 挂载位置（第 88 轮改动）：**播放器下方**——插在 `#playerWrap` 之后、工具栏之前。
+ * 用户要求「原生在视频播放器下方而不是上方显示标题、视频信息」，所以自绘块跟着播放器走；
+ * 原生 `#viewbox_report`（标题组容器，位于播放器上方）在自绘成功后整体不显示。
+ *
+ * 为什么高度预算仍然对：`fixedLayout.ts` 的 `measureDockBlocks()` 是**实测左列直接子元素高度**
+ * 反算播放器高度的；`#viewbox_report` 被 display:none（高度 0，自动跳过），自绘块成为新的
+ * 直接子元素并被计入 —— 一进一出，其它块的数量与 gap 数完全不变，播放器高度不会算错。
  *
  * 数据来源（按可靠性排序）：
  * 1. 内联 `<script>` 里的 `window.__INITIAL_STATE__`（content script 在 isolated world，
@@ -16,7 +19,7 @@
  * 2. 原生信息栏的已渲染文本（DOM 兜底，B 站改结构时至少还有文本）；
  * 3. 两者都失败 → **不隐藏原生、不渲染自绘块**，保持现状，绝不出现空白信息栏。
  */
-import { getVideoEl } from './dom'
+import { getPlayerWrapEl, getVideoEl } from './dom'
 
 const INFO_BAR_ID = 'bewly-info-bar'
 /**
@@ -38,6 +41,11 @@ interface VideoInfoData {
   title: string
   view: number | null
   danmaku: number | null
+  /** 互动数（第 88 轮）：桥 stat 提供 */
+  like?: number | null
+  coin?: number | null
+  favorite?: number | null
+  share?: number | null
   /** 秒级时间戳 */
   pubdate: number | null
   /** 1 = 自制，2 = 转载 */
@@ -142,6 +150,11 @@ function parseBridgePayload(detail: unknown): VideoInfoData | null {
     title: payload.title,
     view: num(stat.view),
     danmaku: num(stat.danmaku),
+    // 第 88 轮：互动数（原来渲染代码用了 data.like/coin/favorite/share，但这里漏了映射 → 永远 undefined → 不渲染）
+    like: num(stat.like),
+    coin: num(stat.coin),
+    favorite: num(stat.favorite),
+    share: num(stat.share),
     pubdate: num(payload.pubdate) ?? num(payload.ctime),
     copyright: num(payload.copyright),
     pages: num(payload.pages),
@@ -287,6 +300,10 @@ const ICON_VIEW = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path
 const ICON_DANMAKU = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>'
 const ICON_DATE = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2.5" stroke="currentColor" stroke-width="1.6"/><path d="M4 9.5h16M8.5 3v3.5M15.5 3v3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>'
 const ICON_PAGES = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="6" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M7 3.5h13.5V16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>'
+const ICON_LIKE = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 10.5 11 4c1.4 0 2.4 1.1 2.2 2.5L12.8 9h5.1c1.2 0 2 1.2 1.7 2.3l-1.5 5.5A3 3 0 0 1 15.2 19H7" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><rect x="3.5" y="10" width="3.5" height="9" rx="1" stroke="currentColor" stroke-width="1.6"/></svg>'
+const ICON_COIN = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="7.5" stroke="currentColor" stroke-width="1.6"/><path d="M12 8.5v7M9.5 11h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>'
+const ICON_FAV = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 4.5 2.3 4.7 5.2.8-3.8 3.7.9 5.1-4.6-2.4-4.6 2.4.9-5.1L4.5 10l5.2-.8L12 4.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>'
+const ICON_SHARE = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M14 5.5 20 11l-6 5.5v-3.2c-4 0-6.6 1.2-8.5 3.7.4-4.8 3.1-7.6 8.5-7.9V5.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>'
 const ICON_COPYRIGHT = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6"/><path d="M14.4 10.3a2.9 2.9 0 1 0 0 3.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>'
 
 function makeItem(icon: string, label: string, title: string): HTMLElement {
@@ -324,11 +341,35 @@ function restoreNativeNodes(): void {
 
 /** 渲染 / 更新自绘信息栏（内容不变就不写 DOM） */
 function renderInfoBar(report: HTMLElement, data: VideoInfoData): void {
-  let bar = report.querySelector<HTMLElement>(`#${INFO_BAR_ID}`)
+  let bar = document.querySelector<HTMLElement>(`#${INFO_BAR_ID}`)
   if (!bar) {
     bar = document.createElement('div')
     bar.id = INFO_BAR_ID
-    report.insertBefore(bar, report.firstChild)
+  }
+
+  // 第 88 轮：信息栏显示在**播放器下方**（#playerWrap 之后、工具栏之前）。
+  // 只在位置不对时移动，避免每个同步拍都触发一次 DOM 重排。
+  //
+  // getPlayerWrapEl() 的最后兜底会返回 .left-container 本身 —— 那种情况插到它后面会跑到
+  // 左列外面，必须排除；找不到可靠容器时退回 report 内部，并保持 report 可见。
+  const playerWrap = getPlayerWrapEl()
+  const canPlaceBelowPlayer = Boolean(
+    playerWrap
+    && playerWrap.parentElement
+    && !playerWrap.classList.contains('left-container'),
+  )
+
+  if (canPlaceBelowPlayer && playerWrap) {
+    if (bar.previousElementSibling !== playerWrap)
+      playerWrap.insertAdjacentElement('afterend', bar)
+    // 标记原生容器已空：页面级 CSS 据此把 #viewbox_report 整块隐藏
+    report.dataset.bewlyInfoMoved = '1'
+  }
+  else {
+    if (bar.parentElement !== report)
+      report.insertBefore(bar, report.firstChild)
+    // 放进 report 内部时不能隐藏 report，否则信息栏跟着一起消失
+    report.removeAttribute('data-bewly-info-moved')
   }
 
   const titleText = data.title
@@ -337,6 +378,14 @@ function renderInfoBar(report: HTMLElement, data: VideoInfoData): void {
     makeItem(ICON_DANMAKU, data.danmakuText ?? formatCount(data.danmaku), '弹幕数'),
   ]
   const date = formatDate(data.pubdate)
+  if (data.like)
+    meta.push(makeItem(ICON_LIKE, formatCount(data.like), '点赞数'))
+  if (data.coin)
+    meta.push(makeItem(ICON_COIN, formatCount(data.coin), '投币数'))
+  if (data.favorite)
+    meta.push(makeItem(ICON_FAV, formatCount(data.favorite), '收藏数'))
+  if (data.share)
+    meta.push(makeItem(ICON_SHARE, formatCount(data.share), '分享数'))
   if (date)
     meta.push(makeItem(ICON_DATE, date, '发布日期'))
   const copyright = copyrightText(data)
@@ -391,6 +440,8 @@ export function setupInfoBar(): () => void {
 export function teardownInfoBar(): void {
   stopBridgeListening()
   document.getElementById(INFO_BAR_ID)?.remove()
+  // 清掉「原生容器已空」标记：原生 #viewbox_report 重新显示（读不到数据时绝不出现空白信息栏）
+  document.querySelector<HTMLElement>('#viewbox_report[data-bewly-info-moved]')?.removeAttribute('data-bewly-info-moved')
   restoreNativeNodes()
   cachedData = null
   cachedBvid = ''

@@ -2,8 +2,11 @@
  * 视频页「自绘标签行」阶段 2a（第 79 轮）。
  *
  * 数据：page-world 桥的 `bewly-video-data.tags`（精确标签名）→ 原生 DOM 文本兜底。
- * 渲染：`#bewly-tags-bar` 插进 `.video-tag-container` 内部（容器高度仍由既有 CSS 固定 28px，
+ * 渲染：`#bewly-tags-bar` 插进 `.tag-panel` **最前面**（容器高度仍由既有 CSS 固定，
  * fixedLayout 的 `measureDockBlocks()` 量到的仍是这一个左列子元素 → 高度预算不变）。
+ *
+ * 第 88 轮：此前追加在 `.tag-panel` 末尾，原生话题 / 折叠按钮占位把标签推到 left=192；
+ * 用户要求「标签区域靠左」，改为插到最前，标签从容器左边缘开始，话题等原生元素排在后面。
  * 原生标签子元素在渲染成功后 `display:none`（可恢复）；读不到数据就完全不隐藏。
  */
 const TAGS_BAR_ID = 'bewly-tags-bar'
@@ -91,9 +94,10 @@ function renderTags(container: HTMLElement, tags: string[]): void {
   if (!bar) {
     bar = document.createElement('div')
     bar.id = TAGS_BAR_ID
-    // 追加在 .tag-panel 末尾：话题（.tag）在前，我们的标签在后
-    container.appendChild(bar)
   }
+  // 第 88 轮：标签靠左 —— 自绘条始终放在 .tag-panel 最前（原生话题 / 折叠按钮排在它后面）
+  if (container.firstElementChild !== bar)
+    container.insertBefore(bar, container.firstElementChild)
   const signature = tags.join('|')
   if (lastSignature !== signature) {
     lastSignature = signature

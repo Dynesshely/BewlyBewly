@@ -1584,3 +1584,35 @@ dispatch 后立即读取 `is-active` 会读不到（需要等 ≥700ms）。
 
 接口实测（已登录）：`POST /x/web-interface/archive/like` → `code 0`；点赞后 `has/like` 立即变 1；
 取消点赞后有约 1s+ 的延迟才会在 `has/like` 上体现（所以乐观状态必须保留到接口追上）。
+
+## 第 88 轮 A：评论头像 / 滚动 / 信息栏互动数 / 工具栏实装 / 轨道 iframe
+
+### 1. 评论头像不渲染（根因）
+
+真机实测接口：/x/v2/reply 的 member 字段里没有 face，头像是 member.avatar（字符串 URL）。
+之前代码只读 member.face，恒为 undefined，头像走昵称首字兜底。
+修正：face = member.face || member.avatar || ""。
+
+### 2. 评论区滚不动
+
+实测：.bvp-cmt__list overflow-y auto、clientHeight 540、scrollHeight 1877，程序设置 scrollTop 有效（0→200）；
+但父级 #bewly-comment-list 是 overflow visible，且卡片上有 content-visibility auto（滚动时重算高度，偶发滚不动/跳回）。
+
+修法：父级 overflow hidden；.bvp-cmt__list height 100% + overflow-y auto + overscroll-behavior contain；
+卡片去掉 content-visibility，改 contain: layout style；滚到底自动加载下一页（500ms 防抖）。
+
+### 3. 信息栏互动数
+
+meta 行新增 点赞 / 投币 / 收藏 / 分享（桥 stat，formatCount 格式化，12.5px 次要色）。
+
+### 4. 工具栏实装
+
+- 点赞：POST /x/web-interface/archive/like（like=1/2 + csrf），乐观 + 可撤销 + 失败回滚；
+- 投币：window.confirm 二次确认 → POST /x/web-interface/coin/add（multiply=1）；已投过提示不支持取消；
+- 收藏：默认收藏夹 /x/v2/fav/folder/created/list-all?type=2&rid=aid → POST /x/v3/fav/resource/deal（add_media_ids / del_media_ids）；
+- 分享：navigator.clipboard.writeText + toast 已复制链接（降级 execCommand）；
+- 举报 / 笔记：仍转发原生；错误码 -101/-111/-352/-400 有明确 toast。
+
+### 5. iframe 抽屉里轨道被挤出
+
+fixedLayout 里 iframe 内 railSpace 上限收紧到 innerHeight * 0.28（isInIframe 判断），卡片内部自己滚动。

@@ -16,26 +16,86 @@
   }
 }
 
+/* ===== 第 88 轮 C：全站自定义滚动条 =====
+   目标：B 站全站（含 #bewly shadow 内 / 视频页 / 评论自绘区 / 设置页）统一滚动条外观。
+   说明：本文件打包进 dist/contentScripts/esm/style.css，
+   该 CSS 同时被文档与 #bewly 的 shadow <link> 引入，所以这里的规则会自动覆盖 shadow 内部。
+
+   原则：
+   1. 只用现有 --bew-* 变量派生颜色（color-mix），不新增硬编码色；
+   2. 纯 CSS，不接管滚动行为（保留原生滚轮 / 拖拽 / 键盘）；
+   3. 深色 / 浅色主题自动适配：thumb 颜色由 --bew-text-3 / --bew-text-2 派生；
+   4. 隐藏滚动条两端按钮与角落；
+   5. 另外给 Firefox 写 scrollbar-width / scrollbar-color。 */
+
+html.bewly-design {
+  /* 滚动条令牌：尺寸 6px（6~8px 区间），颜色随主题 */
+  --bew-scroll-size: 6px;
+  --bew-scroll-thumb: color-mix(in oklab, var(--bew-text-3), transparent 40%);
+  --bew-scroll-thumb-hover: color-mix(in oklab, var(--bew-text-2), transparent 20%);
+  --bew-scroll-thumb-active: color-mix(in oklab, var(--bew-text-2), transparent 5%);
+  --bew-scroll-track: transparent;
+
+  /* Firefox：细滚动条 + 主题色 */
+  scrollbar-width: thin;
+  scrollbar-color: var(--bew-scroll-thumb) var(--bew-scroll-track);
+}
+
+/* Chrome / Edge：细、圆角、半透明；hover / 拖拽时加深 */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: var(--bew-scroll-size, 6px);
+  height: var(--bew-scroll-size, 6px);
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--bew-scroll-track, transparent);
 }
 
+/* 页面根滚动条轨道：与页面底色一致，避免滚动时出现色带 */
 html.bewly-design > ::-webkit-scrollbar-track {
   background: var(--bew-bg);
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: rgba(120, 120, 140, 0.44);
+  background-color: var(--bew-scroll-thumb, rgb(120 120 140 / 44%));
   border-radius: 20px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--bew-scroll-thumb-hover, rgb(120 120 140 / 60%));
+}
+
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--bew-scroll-thumb-active, rgb(120 120 140 / 72%));
+}
+
+/* 隐藏两端按钮（老式滚动条的上下箭头 / 双箭头）与角落 */
+::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 ::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+/* 高对比度：thumb 用实色，保证能看见 */
+@media (prefers-contrast: more) {
+  html.bewly-design {
+    --bew-scroll-thumb: var(--bew-text-2);
+    --bew-scroll-thumb-hover: var(--bew-text-1);
+    --bew-scroll-thumb-active: var(--bew-text-1);
+  }
+}
+
+/* 强制色彩：交给系统色（滚动条由浏览器高对比模式接管，这里只保证可见） */
+@media (forced-colors: active) {
+  html.bewly-design {
+    --bew-scroll-thumb: CanvasText;
+    --bew-scroll-thumb-hover: Highlight;
+    --bew-scroll-thumb-active: Highlight;
+  }
 }
 
 html.bewly-design,

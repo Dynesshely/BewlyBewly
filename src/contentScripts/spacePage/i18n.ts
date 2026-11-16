@@ -59,6 +59,15 @@ export interface SpacePageMessages {
   /** 页面上还没有内容卡 */
   noCards: string
 
+  /** 第 92 轮：自绘头部信息卡（昵称 / 认证 / 粉丝 / 关注 / 关注按钮 / 加载更多） */
+  profileVerified: string
+  profileFollowers: string
+  profileFollowing: string
+  profileFollow: string
+  loadMore: string
+  loadMoreBusy: string
+  loadMoreDone: string
+
   shortcut: ShortcutLabels
 }
 
@@ -103,6 +112,13 @@ const CMN_CN: SpacePageMessages = {
   noUrl: '这条内容没有可打开的链接',
   noCards: '页面上还没有可浏览的内容',
 
+  profileVerified: '已认证',
+  profileFollowers: '粉丝',
+  profileFollowing: '关注',
+  profileFollow: '关注 TA',
+  loadMore: '加载更多',
+  loadMoreBusy: '加载中…',
+  loadMoreDone: '已全部加载',
   shortcut: {
     next: '下一条内容',
     prev: '上一条内容',
@@ -152,6 +168,13 @@ const EN: SpacePageMessages = {
   noUrl: 'This item has no link to open',
   noCards: 'No content to browse on this page yet',
 
+  profileVerified: 'Verified',
+  profileFollowers: 'followers',
+  profileFollowing: 'following',
+  profileFollow: 'Follow',
+  loadMore: 'Load more',
+  loadMoreBusy: 'Loading…',
+  loadMoreDone: 'All loaded',
   shortcut: {
     next: 'Next item',
     prev: 'Previous item',
@@ -201,6 +224,13 @@ const CMN_TW: SpacePageMessages = {
   noUrl: '這條內容沒有可開啟的連結',
   noCards: '頁面上還沒有可瀏覽的內容',
 
+  profileVerified: '已認證',
+  profileFollowers: '粉絲',
+  profileFollowing: '關注',
+  profileFollow: '關注 TA',
+  loadMore: '載入更多',
+  loadMoreBusy: '載入中…',
+  loadMoreDone: '已全部載入',
   shortcut: {
     next: '下一條內容',
     prev: '上一條內容',
@@ -211,6 +241,13 @@ const CMN_TW: SpacePageMessages = {
 
 const JYUT: SpacePageMessages = {
   ...CMN_TW,
+  profileVerified: '已認證',
+  profileFollowers: '粉絲',
+  profileFollowing: '關注',
+  profileFollow: '關注 TA',
+  loadMore: '載入多啲',
+  loadMoreBusy: '載入緊…',
+  loadMoreDone: '全部載入晒',
   filterUnavailable: '呢頁冇呢類內容',
   filterNoMatch: '呢頁冇呢類內容，轉返「全部」喇',
   jumpHome: '主頁',

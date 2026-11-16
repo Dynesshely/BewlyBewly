@@ -4815,3 +4815,17 @@ html.bewly-design.videoPage.bewly-video-fixed #viewbox_report {
   color: var(--bew-text-3);
   text-align: center;
 }
+
+/* ===== 第 92 轮 C ===== */
+/* 评论列可接收滚轮/点击：B 站原生 .right-container / .right-container-inner 是 pointer-events: none，
+   评论列继承为 none 后，滚轮落在列内非 #commentapp 区域会穿透到页面（表现为「评论区滚不动」）。 */
+html.bewly-design.videoPage #bewly-comment-column,
+html.bewly-design.videoPage .right-container-inner {
+  pointer-events: auto;
+}
+
+/* 评论列内的原生评论区保持唯一滚动容器（无内容溢出时不出现滚动条，属正常） */
+html.bewly-design.videoPage #bewly-comment-column #commentapp {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}

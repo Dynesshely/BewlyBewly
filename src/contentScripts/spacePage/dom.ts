@@ -315,3 +315,213 @@ export const probeSelectors: string[] = [
   '.nav-bar',
   '#navigator',
 ]
+
+// #region 第 92 轮：空间页自绘（头部信息 + 视频网格）
+//
+// 目标：UP 主空间页的「头部信息卡 + 视频网格」由我们自绘，原生头部在我们接管成功后隐藏。
+//
+// 设计原则（无法真机验证时的安全策略）：
+// - 所有选择器都是**候选集合 + 文本启发**，任一关键字段（昵称）取不到就返回 null，
+//   调用方据此**完全回退原生**（不隐藏、不插卡），保证最坏情况下页面与改动前一致；
+// - 只读取 DOM，不改原生节点（除了给列表容器打标记），卸载时清理干净。
+
+/** 自绘头部卡需要的字段（全部来自原生 DOM，不请求 API） */
+export interface SpaceProfile {
+  /** 昵称（必填；取不到就不接管） */
+  name: string
+  /** 头像地址（可能为空） */
+  avatar: string
+  /** 签名（可能为空） */
+  signature: string
+  /** 粉丝数文本（可能为空） */
+  followers: string
+  /** 关注数文本（可能为空） */
+  following: string
+  /** 等级（如 `LV6`，可能为空） */
+  level: string
+  /** 是否有认证徽标 */
+  verified: boolean
+  /** 原生关注按钮（点击时转发给它，保留 B 站自己的关注弹层/校验） */
+  followButton: HTMLElement | null
+}
+
+/** 头部区域候选（按优先级） */
+const HEADER_SELECTORS = [
+  '.header.space-header',
+  '.space-header',
+  '.header',
+  '.upinfo.header-upinfo',
+  '[class*="header-content"]',
+] as const
+
+/** 昵称候选（先具体类名，再 h1，最后退回「头部里最大的粗体文本」） */
+const NAME_SELECTORS = [
+  '.upinfo-name',
+  '.upinfo [class*="name"]',
+  '[class*="upinfo-name"]',
+  '[class*="up-name"]',
+  '[class*="nickname"]',
+  '.header h1',
+  '.header [class*="name"]',
+] as const
+
+/** 签名候选 */
+const SIGNATURE_SELECTORS = [
+  '.upinfo-desc',
+  '[class*="upinfo-desc"]',
+  '[class*="sign"]',
+  '[class*="desc"]',
+] as const
+
+/** 关注按钮候选（B 站空间页头部按钮） */
+const FOLLOW_BUTTON_SELECTORS = [
+  '.header .default-btn',
+  '.header [class*="follow"] button',
+  '.header button[class*="follow"]',
+  '.header .follow-btn',
+  '.header .btn-follow',
+] as const
+
+function firstMatch<T extends Element>(selectors: readonly string[], root: ParentNode = document): T | null {
+  for (const selector of selectors) {
+    const el = root.querySelector<T>(selector)
+    if (el)
+      return el
+  }
+  return null
+}
+
+function textOf(el: Element | null): string {
+  return (el?.textContent ?? '').replace(/\s+/g, ' ').trim()
+}
+
+/** 从头部区域文本里抓「N 粉丝 / N 关注」（中英混排都能命中） */
+function pickCount(text: string, keyword: RegExp): string {
+  const matched = text.match(new RegExp(`([\\d.,]+\\s*[万亿]?)\\s*(?:${keyword.source})`, 'i'))
+  return matched?.[1]?.trim() ?? ''
+}
+
+/** 头像：头部里第一个尺寸足够大的 img */
+function pickAvatar(header: Element | null): string {
+  if (!header)
+    return ''
+  const preferred = header.querySelector<HTMLImageElement>('.upinfo-avatar img, .space-avatar img, .bili-avatar img, [class*="avatar"] img, img')
+  if (!preferred)
+    return ''
+  const src = preferred.getAttribute('src') ?? preferred.getAttribute('data-src') ?? ''
+  return src.startsWith('//')
+    ? `https:${src}`
+    : src
+}
+
+/** 等级：优先 `[class*="level"]` 里的文本 / img alt */
+function pickLevel(header: Element | null): string {
+  if (!header)
+    return ''
+  const node = header.querySelector<HTMLElement>('[class*="level"]')
+  if (!node)
+    return ''
+  const text = textOf(node)
+  if (text)
+    return text
+  const img = node.querySelector<HTMLImageElement>('img')
+  return img?.alt?.replace(/\s+/g, ' ').trim() ?? ''
+}
+
+/**
+ * 读取空间页头部信息。
+ *
+ * @returns 关键字段（昵称）拿不到时返回 null —— 调用方必须回退原生
+ */
+export function readSpaceProfile(): SpaceProfile | null {
+  const header = firstMatch<HTMLElement>(HEADER_SELECTORS)
+  if (!header)
+    return null
+
+  const name = textOf(firstMatch<HTMLElement>(NAME_SELECTORS, header))
+  if (!name)
+    return null
+
+  const headerText = textOf(header)
+  const followButton = firstMatch<HTMLElement>(FOLLOW_BUTTON_SELECTORS, header)
+
+  return {
+    name,
+    avatar: pickAvatar(header),
+    signature: textOf(firstMatch<HTMLElement>(SIGNATURE_SELECTORS, header)),
+    followers: pickCount(headerText, /粉丝|fans/i),
+    following: pickCount(headerText, /关注|following/i),
+    level: pickLevel(header),
+    verified: Boolean(header.querySelector('[class*="verify"], [class*="vip"], [class*="auth"]')),
+    followButton,
+  }
+}
+
+/** 原生头部容器（自绘卡插入位置 / 隐藏对象） */
+export function findSpaceHeader(): HTMLElement | null {
+  return firstMatch<HTMLElement>(HEADER_SELECTORS)
+}
+
+/**
+ * 视频卡片选择器（第 92 轮真机实测）：B 站新版空间页用 `.bili-video-card`，
+ * 首屏卡片数为 0，滚动到约 y=800 后才懒加载出 25 张。旧类名（`.large-item` 等）保留兜底。
+ */
+export const VIDEO_CARD_SELECTOR = '.bili-video-card'
+
+/**
+ * 收集视频卡：优先用实测的 `.bili-video-card`，没有再回退到旧类名。
+ *
+ * @returns 视频卡元素（去掉互相嵌套的重复项）
+ */
+export function collectVideoCards(): HTMLElement[] {
+  const primary = Array.from(document.querySelectorAll<HTMLElement>(VIDEO_CARD_SELECTOR))
+  const fallback = primary.length
+    ? []
+    : collectCards().filter(card => card.kind === 'video').map(card => card.el)
+  const all = primary.length ? primary : fallback
+
+  // 去嵌套：外层卡片优先（`.bili-video-card` 里可能还嵌着一张卡）
+  return all.filter((el, index) => !all.some((other, otherIndex) => otherIndex !== index && other.contains(el)))
+}
+
+/** 网格标记属性：加在「所有卡片的共同父容器」上，供页面级 CSS 做 grid 重排 */
+export const GRID_ATTR = 'data-bewly-space-grid'
+/** 卡片标记属性：给每张卡片打上，便于统一卡片内部视觉 */
+export const CARD_ATTR = 'data-bewly-space-card'
+
+/**
+ * 给视频卡列表的共同父容器打网格标记。
+ *
+ * 为什么用「共同父容器」而不是猜类名：空间页列表容器的类名随 B 站版本变化，
+ * 而从已扫到的卡片反推父容器是稳定的（卡片选择器已经在 `CARD_GROUPS` 里维护）。
+ *
+ * @returns 打上标记的容器（没有 ≥2 张卡时返回 null，不做任何标记）
+ */
+export function markGridContainer(): HTMLElement | null {
+  const cards = collectVideoCards()
+  if (cards.length < 2)
+    return null
+
+  // 找所有卡片的共同祖先：从第一张卡往上爬，直到包含全部卡片
+  let candidate: HTMLElement | null = cards[0]
+  while (candidate && !cards.every(card => candidate!.contains(card)))
+    candidate = candidate.parentElement
+  // 共同祖先可能就是卡片自己（嵌套情况）：退一级
+  if (candidate && cards.includes(candidate))
+    candidate = candidate.parentElement
+  if (!candidate || candidate === document.body)
+    return null
+
+  candidate.setAttribute(GRID_ATTR, '')
+  cards.forEach((card) => {
+    card.setAttribute(CARD_ATTR, '')
+  })
+  return candidate
+}
+
+/** 清除网格标记（卸载 / 切换 tab 时） */
+export function clearGridMarks(): void {
+  document.querySelectorAll(`[${GRID_ATTR}]`).forEach(el => el.removeAttribute(GRID_ATTR))
+  document.querySelectorAll(`[${CARD_ATTR}]`).forEach(el => el.removeAttribute(CARD_ATTR))
+}
+// #endregion

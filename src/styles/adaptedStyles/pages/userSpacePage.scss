@@ -1102,3 +1102,380 @@ html.bewly-design.userSpacePage.dark {
   }
 }
 // #endregion
+
+// #region 第 92 轮：空间页自绘（头部信息卡 + 视频网格 + 加载更多）
+//
+// 数据与 DOM 由 src/contentScripts/spacePage/profileCard.ts 生成：
+//   - 接管成功时 <html> 上有 data-bewly-space-profile="ready"，此时隐藏原生头部、显示自绘卡；
+//   - 接管失败时该属性不存在，本区块所有规则都不生效 → 页面与改动前一致（安全回退）。
+// 网格容器与卡片由 dom.ts 打标记（data-bewly-space-grid / data-bewly-space-card），
+// 不依赖 B 站列表容器的类名。
+//
+// 颜色全部用 --bew-* 变量；尺寸用 8px 体系。
+
+html[data-bewly-space-profile="ready"] {
+  // 原生头部让位给自绘卡
+  .header {
+    display: none !important;
+  }
+
+  // ---------- 头部信息卡 ----------
+  .bsp-profile {
+    box-sizing: border-box;
+    max-width: 1440px;
+    margin: 16px auto 8px;
+    padding: 16px;
+    background: var(--bew-content);
+    border-radius: 12px;
+    box-shadow: var(--bew-shadow-1, 0 1px 2px rgb(0 0 0 / 12%));
+    container-type: inline-size;
+    container-name: bsp-profile;
+  }
+
+  .bsp-profile__main {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  // 头像 64 圆
+  .bsp-profile__avatar {
+    flex: 0 0 auto;
+    width: 64px;
+    height: 64px;
+    overflow: hidden;
+    background: var(--bew-fill-1);
+    border-radius: 50%;
+  }
+
+  .bsp-profile__avatar img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .bsp-profile__avatar-fallback {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    font-size: var(--bvp-fs-title, 20px);
+    font-weight: 600;
+    color: var(--bew-text-2);
+  }
+
+  .bsp-profile__info {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .bsp-profile__name-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .bsp-profile__name {
+    margin: 0;
+    overflow: hidden;
+    font-size: var(--bvp-fs-title, 20px);
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--bew-text-1);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .bsp-profile__level {
+    flex: 0 0 auto;
+    padding: 0 6px;
+    font-size: var(--bvp-fs-badge, 11px);
+    font-weight: 500;
+    line-height: 18px;
+    color: var(--bew-theme-color);
+    background: var(--bew-theme-color-20, var(--bew-fill-1));
+    border-radius: 6px;
+  }
+
+  .bsp-profile__verified {
+    flex: 0 0 auto;
+    padding: 0 6px;
+    font-size: var(--bvp-fs-badge, 11px);
+    line-height: 18px;
+    color: var(--bew-text-2);
+    background: var(--bew-fill-2);
+    border-radius: 6px;
+  }
+
+  .bsp-profile__signature {
+    display: -webkit-box;
+    margin: 0;
+    overflow: hidden;
+    font-size: var(--bvp-fs-meta, 12.5px);
+    line-height: 1.5;
+    color: var(--bew-text-2);
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow-wrap: anywhere;
+  }
+
+  .bsp-profile__stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 4px;
+    font-size: var(--bvp-fs-meta, 12.5px);
+    color: var(--bew-text-2);
+  }
+
+  .bsp-profile__stat {
+    display: inline-flex;
+    gap: 4px;
+    align-items: baseline;
+  }
+
+  .bsp-profile__stat-value {
+    font-size: var(--bvp-fs-body, 14px);
+    font-weight: 600;
+    color: var(--bew-text-1);
+    font-variant-numeric: tabular-nums;
+  }
+
+  // 关注按钮：沿用 B 站主色（不覆盖 background），只调尺寸与圆角
+  .bsp-profile__follow {
+    flex: 0 0 auto;
+    align-self: center;
+    min-width: 96px;
+    height: 36px;
+    padding: 0 16px;
+    font-size: var(--bvp-fs-body, 14px);
+    font-weight: 500;
+    line-height: 1;
+    color: var(--bew-text-1);
+    cursor: pointer;
+    background: var(--bew-fill-1);
+    border: 0;
+    border-radius: 8px;
+    transition: background-color var(--bvp-dur-fast, 120ms) var(--bvp-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1));
+  }
+
+  .bsp-profile__follow:hover {
+    background: var(--bew-fill-2);
+  }
+
+  .bsp-profile__follow:focus-visible {
+    outline: 2px solid var(--bew-theme-color);
+    outline-offset: 2px;
+  }
+
+  // ---------- 视频网格 ----------
+  [data-bewly-space-grid] {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 0 16px 16px;
+  }
+
+  [data-bewly-space-card] {
+    display: flex !important;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+    background: var(--bew-content);
+    border-radius: 12px;
+    box-shadow: var(--bew-shadow-1, 0 1px 2px rgb(0 0 0 / 12%));
+    transition:
+      transform var(--bvp-dur-fast, 120ms) var(--bvp-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1)),
+      box-shadow var(--bvp-dur-fast, 120ms) var(--bvp-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1));
+  }
+
+  [data-bewly-space-card]:hover {
+    box-shadow: var(--bew-shadow-2, 0 4px 12px rgb(0 0 0 / 18%));
+    transform: translateY(-2px);
+  }
+
+  // 真机实测：B 站新版空间页卡片是 .bili-video-card（首屏 0 张，滚动后懒加载 25 张）
+  .bili-video-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+    background: var(--bew-content);
+    border-radius: 12px;
+    box-shadow: var(--bew-shadow-1, 0 1px 2px rgb(0 0 0 / 12%));
+  }
+
+  // 真实卡片内部类名（B 站视频卡通用命名：__cover / __info--tit / 时长徽标）
+  .bili-video-card [class*="cover"] {
+    overflow: hidden;
+    aspect-ratio: 16 / 9;
+    border-radius: 12px 12px 0 0;
+  }
+
+  .bili-video-card [class*="cover"] img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .bili-video-card [class*="tit"] {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: var(--bvp-fs-body, 14px);
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--bew-text-1);
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow-wrap: anywhere;
+  }
+
+  .bili-video-card [class*="count"],
+  .bili-video-card [class*="duration"],
+  .bili-video-card [class*="meta"] {
+    font-size: var(--bvp-fs-meta, 12.5px);
+    color: var(--bew-text-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  // 卡片内封面：统一 16:9 + cover（复用首页卡片的视觉语言）
+  [data-bewly-space-card] .cover,
+  [data-bewly-space-card] [class*="cover"] {
+    overflow: hidden;
+    aspect-ratio: 16 / 9;
+    border-radius: 12px 12px 0 0;
+  }
+
+  [data-bewly-space-card] .cover img,
+  [data-bewly-space-card] [class*="cover"] img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  // 标题：两行截断
+  [data-bewly-space-card] .title,
+  [data-bewly-space-card] [class*="title"] {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: var(--bvp-fs-body, 14px);
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--bew-text-1);
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow-wrap: anywhere;
+  }
+
+  // 元信息：播放量 / 时长
+  [data-bewly-space-card] [class*="meta"],
+  [data-bewly-space-card] [class*="count"],
+  [data-bewly-space-card] [class*="duration"] {
+    font-size: var(--bvp-fs-meta, 12.5px);
+    color: var(--bew-text-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  // ---------- 加载更多 ----------
+  .bsp-load-more {
+    display: block;
+    width: min(320px, calc(100% - 32px));
+    height: 40px;
+    margin: 8px auto 24px;
+    font-size: var(--bvp-fs-body, 14px);
+    color: var(--bew-text-1);
+    cursor: pointer;
+    background: var(--bew-fill-1);
+    border: 0;
+    border-radius: 8px;
+    transition: background-color var(--bvp-dur-fast, 120ms) var(--bvp-ease-out, cubic-bezier(0.22, 0.61, 0.36, 1));
+  }
+
+  .bsp-load-more:hover:not(:disabled) {
+    background: var(--bew-fill-2);
+  }
+
+  .bsp-load-more:disabled {
+    cursor: default;
+    opacity: 0.6;
+  }
+
+  .bsp-load-more:focus-visible {
+    outline: 2px solid var(--bew-theme-color);
+    outline-offset: 2px;
+  }
+
+  // ---------- 窄屏 ----------
+  @media (max-width: 720px) {
+    .bsp-profile {
+      margin: 8px 8px 4px;
+      padding: 12px;
+    }
+
+    .bsp-profile__avatar {
+      width: 48px;
+      height: 48px;
+    }
+
+    .bsp-profile__name {
+      font-size: 18px;
+    }
+
+    [data-bewly-space-grid] {
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 12px;
+      padding: 0 8px 12px;
+    }
+  }
+
+  // ---------- 高对比度 / 强制色彩 / 减少动效 ----------
+  @media (prefers-contrast: more) {
+    .bsp-profile,
+    [data-bewly-space-card],
+    .bsp-load-more {
+      border: 1px solid var(--bew-text-3);
+      box-shadow: none;
+    }
+  }
+
+  @media (forced-colors: active) {
+    .bsp-profile,
+    [data-bewly-space-card],
+    .bsp-load-more {
+      border: 1px solid CanvasText;
+      box-shadow: none;
+    }
+
+    .bsp-profile__level {
+      color: CanvasText;
+      background: Canvas;
+      border: 1px solid CanvasText;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-bewly-space-card],
+    .bsp-load-more,
+    .bsp-profile__follow {
+      transition: none;
+    }
+
+    [data-bewly-space-card]:hover {
+      transform: none;
+    }
+  }
+}
+// #endregion

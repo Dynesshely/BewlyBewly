@@ -1584,3 +1584,39 @@ dispatch 后立即读取 `is-active` 会读不到（需要等 ≥700ms）。
 
 接口实测（已登录）：`POST /x/web-interface/archive/like` → `code 0`；点赞后 `has/like` 立即变 1；
 取消点赞后有约 1s+ 的延迟才会在 `has/like` 上体现（所以乐观状态必须保留到接口追上）。
+
+## 第 92 轮 C：只修两个交互 bug（评论区滚动 / 分隔条拖拽下限）
+
+### 问题 1：评论区滚轮不生效
+
+CDP 实测（视频页 2064×1217，评论列 754,80 1286×1101）：
+
+- 评论列 rect 内「顶部空隙」位置 `document.elementFromPoint` 命中的是 `#mirror-vdcon`，不是评论列；
+- 注入临时样式 `#bewly-comment-column { pointer-events: auto }` 后，同一位置命中 `#bewly-comment-column`；
+- `#commentapp` 区域本来就命中 `bili-comments`（可滚）。
+
+根因：B 站原生 `.right-container` / `.right-container-inner` 是 `pointer-events: none`，评论列继承后，
+滚轮落在列内非 `#commentapp` 区域时会穿透到页面，表现为「评论区滚不动」。
+
+修法（只改 CSS，不动渲染）：`html.bewly-design.videoPage #bewly-comment-column, .right-container-inner { pointer-events: auto }`，
+并保持 `#commentapp` 为唯一滚动容器（`overflow-y: auto; overscroll-behavior: contain`）。
+
+### 问题 2：分隔条拖到 2/5 就挪不动
+
+CDP 派发 PointerEvent 复现（页面当时 hidden，真实鼠标事件无法注入，见下）：
+
+```
+pointerdown → dragging=true（handler 正常）
+pointermove 目标 0.25 → 松手后 metrics: player=397x706, colPct=63.79
+```
+
+706 = 0.35 × (2064-48) → **被 `MIN_SPLIT_RATIO = 0.35` 钳住**（播放器最小 35% 内容宽），所以拖到约 2/5 就停。
+
+修法：`MIN_SPLIT_RATIO` 0.35 → **0.2**（与「评论列最窄 20% 视口」对称），用户可以把播放器拖得更小、评论列更大；
+`MAX_SPLIT_RATIO = 0.8` 不动（往右拖仍是评论列最小 20%）。
+
+### 真机验证限制
+
+- 调试浏览器窗口在 hidden 状态时，Chrome **丢弃 CDP `Input.dispatchMouseEvent`**（实测 `document.visibilityState = hidden`，`Input` 事件不产生 pointerdown），
+  所以拖拽用 `PointerEvent` dispatch 验证 handler 链路与 clamp 结果；
+- 验证过程中页面被切到搜索页，分屏比例可能停在 0.35（双击分隔条可复位）。

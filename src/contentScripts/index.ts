@@ -21,6 +21,8 @@ import { setupSiteTweaks, syncSiteTweaks, teardownSiteTweaks } from './siteTweak
 import { setupSpacePage } from './spacePage'
 import { setupVideoPage } from './videoPage'
 import App from './views/App.vue'
+// 搜索结果页整体自绘（第 92 轮 A）：自绘层挂载失败会自动回退原生页面
+import { setupSearchDrawnPage, teardownSearchDrawnPage } from './views/SearchPage'
 
 import '~/styles'
 import 'uno.css'
@@ -263,6 +265,9 @@ async function onDOMLoaded() {
   // 搜索结果页增强层（j/k 浏览、密度、快速筛选）
   setupSearchEnhance()
 
+  // 搜索结果页整体自绘（第 92 轮 A）：解析原生结果后用我们的卡片渲染，失败回退原生
+  setupSearchDrawnPage()
+
   // 用户空间增强层（筛选、密度、j/k、快速跳转）
   setupSpacePage()
 
@@ -285,6 +290,7 @@ async function onDOMLoaded() {
       siteTweaksTimer = null
     }
     teardownSiteTweaks()
+    teardownSearchDrawnPage()
   }, { once: true })
 
   // Reset the original Bilibili top bar display style

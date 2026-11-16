@@ -1,0 +1,158 @@
+/**
+ * 搜索结果页视觉改造（第 92 轮 A，按 Lead 真机 dump 后的方案调整）。
+ *
+ * 结论：搜索页结果卡就是 `.bili-video-card`（与首页同一套 B 站组件），
+ * 所以**不重写卡片**，只做「样式 + 网格布局」层面的改造：
+ *
+ * 1. `.video-list.row` 由 B 站 col_* 栅格改成我们的响应式网格（忽略 col_1_5 / col_md_1_7 等列宽类）；
+ * 2. 隐藏骨架屏与多余装饰；
+ * 3. 卡片圆角 / 标题两行 / 元信息层级沿用既有 `styles/adaptedStyles/pages/searchPage.scss`
+ *    的变量化样式，这里只补网格化之后必须调整的盒模型（float / width / margin）；
+ * 4. 筛选栏 `.vui_tabs` 做成 pill（既有样式限定在 `.search-tabs` 下，这里补不限定父级的兜底）；
+ * 5. 分页 `.vui_pagenation` 做成胶囊按钮。
+ *
+ * 前缀 `html.bewly-search-drawn` 由 ./index.ts 注入时加到 <html>，卸载时移除，
+ * 因此关掉自绘只影响搜索页，且不会残留样式。
+ */
+
+html.bewly-search-drawn {
+  /* #region 结果列表：响应式网格（替代 B 站 col_* 栅格） */
+  .search-layout .video-list.row,
+  .video-list.row {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
+    gap: 20px 16px !important;
+    /* row 类自带负 margin 做栅格 gutter，改 grid 后必须归零，否则右侧会溢出 */
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .search-layout .video-list.row > .video-list-item,
+  .video-list.row > .video-list-item {
+    /* col_* 栅格用 float + 百分比宽度，grid 下全部失效 */
+    float: none !important;
+    display: block !important;
+    width: auto !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* UP 主卡内部的视频小网格不是搜索结果，保持 B 站原本的横向排布 */
+  .b-user-video-card .video-list.row {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+  /* #endregion */
+
+  /* #region 骨架屏 / 装饰清理 */
+  .bili-video-card__skeleton,
+  .bili-video-card__skeleton--wrap {
+    display: none !important;
+  }
+
+  .bili-video-card__mask {
+    border-radius: var(--bew-radius-half, 8px);
+  }
+  /* #endregion */
+
+  /* #region 网格化后卡片的盒模型 */
+  .bili-video-card {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .bili-video-card .bili-video-card__wrap {
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* 封面保持 16:9，避免列宽变化时高度抖动 */
+  .bili-video-card .bili-video-card__image--wrap {
+    aspect-ratio: 16 / 9;
+    border-radius: var(--bew-radius-half, 8px);
+    overflow: hidden;
+  }
+  /* #endregion */
+
+  /* #region 筛选栏：pill（兜底既有 .search-tabs 限定规则） */
+  .vui_tabs .vui_tabs--nav-item .vui_tabs--nav-link {
+    padding-inline: 12px;
+    border-radius: 999px;
+    transition:
+      background-color 150ms ease,
+      color 150ms ease;
+  }
+
+  .vui_tabs .vui_tabs--nav-item:hover .vui_tabs--nav-link {
+    background-color: var(--bew-fill-1, rgb(0 0 0 / 4%));
+  }
+
+  .vui_tabs .vui_tabs--nav-item-active .vui_tabs--nav-text {
+    color: var(--bew-theme-color, #00aeec);
+    font-weight: 600;
+  }
+
+  .vui_tabs .vui_tabs--nav-slider {
+    border-radius: 999px;
+    background-color: var(--bew-theme-color, #00aeec);
+  }
+
+  .vui_tabs .vui_tabs--nav-num {
+    min-width: 18px;
+    height: 16px;
+    padding: 0 4px;
+    font-size: 11px;
+    line-height: 16px;
+    color: var(--bew-text-3, #9499a0);
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    background-color: var(--bew-fill-1, rgb(0 0 0 / 4%));
+    border-radius: 999px;
+  }
+  /* #endregion */
+
+  /* #region 分页：胶囊按钮 */
+  .vui_pagenation .vui_pagenation--btn,
+  .vui_pagenation .vui_pagenation--btn-side {
+    min-width: 34px;
+    height: 34px;
+    padding: 0 10px;
+    font-size: 13px;
+    color: var(--bew-text-2, #61666d);
+    background-color: var(--bew-elevated, #f6f7f8);
+    border: none;
+    border-radius: var(--bew-radius-half, 8px);
+    transition:
+      background-color 150ms ease,
+      color 150ms ease;
+  }
+
+  .vui_pagenation .vui_pagenation--btn:hover,
+  .vui_pagenation .vui_pagenation--btn-side:hover {
+    color: var(--bew-text-1, #18191c);
+    background-color: var(--bew-fill-2, rgb(0 0 0 / 8%));
+  }
+
+  .vui_pagenation .vui_pagenation--btn.vui_pagenation--btn-active {
+    color: #fff;
+    background-color: var(--bew-theme-color, #00aeec);
+  }
+
+  .vui_pagenation .vui_pagenation--btn:disabled {
+    cursor: default;
+    opacity: 0.45;
+  }
+  /* #endregion */
+}
+
+/* 窄屏：卡片至少 2 列，不要变成一根很长的单列 */
+@media (max-width: 720px) {
+  html.bewly-search-drawn .search-layout .video-list.row,
+  html.bewly-search-drawn .video-list.row {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important;
+    gap: 14px 10px !important;
+  }
+}

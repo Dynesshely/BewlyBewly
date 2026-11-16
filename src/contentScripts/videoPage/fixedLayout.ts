@@ -144,7 +144,7 @@ const MIN_COMMENT_WIDTH_RATIO = 0.4
 /** 触发 40% 兜底时，播放器宽度占视口宽的比例（0.6 = 1 − 0.4，与评论区 40% 对称） */
 const MAX_PLAYER_WIDTH_RATIO = 0.6
 /** 分隔条拖拽比例范围（第 46 轮：播放器占内容宽比例；第 47 轮上限放到 80%） */
-export const MIN_SPLIT_RATIO = 0.35
+export const MIN_SPLIT_RATIO = 0.2
 export const MAX_SPLIT_RATIO = 0.8
 /**
  * 拖拽时评论区相对**视口宽**的下限（第 47 轮：用户要求评论区最小 = 页面宽 1/5）。

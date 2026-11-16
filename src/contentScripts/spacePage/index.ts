@@ -24,6 +24,7 @@ import SpaceEnhanceOverlay from './components/SpaceEnhanceOverlay.vue'
 import { HOST_ID } from './constants'
 import { isSpacePage } from './dom'
 import { setupKeyboard } from './keyboard'
+import { mountProfileCard, unmountProfileCard } from './profileCard'
 import shadowCss from './spacePage.shadow.scss?inline'
 import { resetUiState } from './state'
 
@@ -58,6 +59,8 @@ export function setupSpacePage(): void {
 
   restorePreferences()
   scanCards()
+  // 第 92 轮：头部信息卡 + 视频网格自绘（失败自动回退原生）
+  mountProfileCard()
   stopWatching = watchSpacePage()
   disposeKeyboard = setupKeyboard()
 
@@ -92,6 +95,7 @@ export function teardownSpacePage(): void {
   }
 
   unmountNativeOverlay(HOST_ID)
+  unmountProfileCard()
   cleanupDom()
   resetUiState()
 }

@@ -196,30 +196,6 @@ function restoreNativeChildren(): void {
   hiddenChildren.clear()
 }
 
-/** 发消息图标（信封 / 聊天气泡风，与第 79 轮自绘按钮同一线条风格） */
-const ICON_MESSAGE = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="13" rx="2.5" stroke="currentColor" stroke-width="1.6"/><path d="m4 7 8 6 8-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-
-/**
- * 图标按钮（第 88 轮）。
- *
- * 用户要求「发消息」改成图标按钮：方形、无文字、hover 显示 tooltip。
- * 点击行为与之前的文字按钮完全一致（转发原生按钮），不新增接口调用。
- */
-function buildIconButton(title: string, className: string, icon: string, onClick: () => void): HTMLButtonElement {
-  const button = document.createElement('button')
-  button.type = 'button'
-  button.className = className
-  button.innerHTML = icon
-  button.title = title
-  button.setAttribute('aria-label', title)
-  button.addEventListener('click', (event) => {
-    event.preventDefault()
-    event.stopPropagation()
-    onClick()
-  })
-  return button
-}
-
 function buildButton(label: string, className: string, onClick: () => void): HTMLButtonElement {
   const button = document.createElement('button')
   button.type = 'button'
@@ -321,8 +297,7 @@ function renderUpCard(panel: HTMLElement, data: OwnerData): void {
       findNativeButton(panel, FOLLOW_SELECTORS)?.click()
       window.setTimeout(syncUpCard, 300)
     })
-    // 第 88 轮：发消息改为图标按钮（32×32 方形 + tooltip），关注按钮保持文字
-    const message = buildIconButton('发消息', 'bvp-up__btn bvp-up__btn--message bvp-up__btn--icon', ICON_MESSAGE, () => {
+    const message = buildButton('发消息', 'bvp-up__btn bvp-up__btn--message', () => {
       findNativeButton(panel, MESSAGE_SELECTORS)?.click()
     })
     actions.append(follow, message)

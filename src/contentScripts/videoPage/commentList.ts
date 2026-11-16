@@ -228,8 +228,7 @@ function normalizeReply(raw: Record<string, any>): CommentItem {
     rpid: raw.rpid,
     mid,
     uname: member.uname ?? '',
-    // 真机实测（第 88 轮）：新版接口 member 里是 `avatar` 字符串，没有 `face` 字段
-    face: member.face || member.avatar || '',
+    face: member.face ?? '',
     level: member.level_info?.current ?? 0,
     message: content.message ?? '',
     emote,
@@ -446,9 +445,6 @@ function renderList(): void {
   }
 }
 
-/** 滚到底自动加载下一页的防抖定时器（第 88 轮：滚到底也能翻页） */
-let autoLoadTimer = 0
-
 /** 滚动接近底部时把下一批已加载评论渲染出来（不请求接口） */
 function bindAutoRender(container: HTMLElement): void {
   const listEl = container.querySelector<HTMLElement>('.bvp-cmt__list')
@@ -464,26 +460,13 @@ function bindAutoRender(container: HTMLElement): void {
     const nearBottom = listEl.scrollTop + listEl.clientHeight >= listEl.scrollHeight - 240
     if (!nearBottom)
       return
-    if (state.renderedCount < visible.length) {
-      // 还有已加载未渲染的数据 → 渲染下一批
-      const scrollTop = listEl.scrollTop
-      state.renderedCount += RENDER_BATCH
-      renderList()
-      const nextList = container.querySelector<HTMLElement>('.bvp-cmt__list')
-      if (nextList)
-        nextList.scrollTop = scrollTop
-      return
-    }
-    // 已加载全部渲染完，但接口还有下一页 → 滚到底自动加载更多（500ms 防抖）
-    if (state.hasMore && !state.loading) {
-      if (autoLoadTimer)
-        window.clearTimeout(autoLoadTimer)
-      autoLoadTimer = window.setTimeout(() => {
-        autoLoadTimer = 0
-        if (!state.loading && state.hasMore)
-          void loadPage(state.page + 1)
-      }, 500)
-    }
+    const scrollTop = listEl.scrollTop
+    state.renderedCount += RENDER_BATCH
+    renderList()
+    // 渲染后恢复滚动位置（避免跳动）
+    const nextList = container.querySelector<HTMLElement>('.bvp-cmt__list')
+    if (nextList)
+      nextList.scrollTop = scrollTop
   }, { passive: true })
 }
 

@@ -701,10 +701,36 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
     }
   }
 
+  /**
+   * 事件是否来自「自带滚动条的自绘容器」——视频页评论区 / 推荐轨道 / 视频页增强层。
+   *
+   * 第 91 轮修：视频页的推荐轨道卡片带 data-video-card，getCards() 因此非空，
+   * 开启「锁定滚动」时 handleWheel 会 preventDefault 接管滚轮 → 评论区完全滚不动。
+   * 这些容器内部的滚轮必须归它们自己。
+   */
+  function isEventInsideScrollableSurface(event: WheelEvent): boolean {
+    const path = typeof event.composedPath === 'function'
+      ? event.composedPath()
+      : []
+    for (const node of path) {
+      if (!(node instanceof HTMLElement))
+        continue
+      if (node.id === 'bewly-comment-list' || node.id === 'bewly-video-page' || node.id === 'bewly-video-splitter')
+        return true
+      const cls = node.className
+      if (typeof cls === 'string' && (cls.includes('bvp-cmt__list') || cls.includes('bvp-rail') || cls.includes('bvp-playlist') || cls.includes('bvp-cmt__composer')))
+        return true
+    }
+    return false
+  }
+
   function handleWheel(event: WheelEvent) {
     // 浮层（设置 / 命令面板 / 帮助 / iframe 抽屉）打开时完全放行滚轮：
     // 交给浮层自己的滚动容器，键盘卡片导航既不 preventDefault 也不切换卡片。
     if (hasOpenModal() || isEventInsideOverlay(event))
+      return
+    // 视频页自绘滚动容器（评论区 / 推荐轨道 / 选集）里的滚轮交给它们自己
+    if (isEventInsideScrollableSurface(event))
       return
     // 聚焦浏览模式自己处理滚轮
     if (isFocusBrowseMode())

@@ -17,26 +17,37 @@
 
 html.bewly-search-drawn {
   /* #region 结果列表：响应式网格（替代 B 站 col_* 栅格） */
+  /* 第 93 轮回退：B 站当前搜索结果用 __wrap 绝对定位 + col_* 栅格，
+     grid 改造会让卡片高度塌成 0（真机确认 42 张全 0 高）。
+     保留原生 flex/col 布局，只做视觉层改造（卡片样式 / 筛选 pill / 分页胶囊）。 */
   .search-layout .video-list.row,
   .video-list.row {
-    display: grid !important;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
-    gap: 20px 16px !important;
-    /* row 类自带负 margin 做栅格 gutter，改 grid 后必须归零，否则右侧会溢出 */
     margin: 0 !important;
     padding: 0 !important;
   }
 
   .search-layout .video-list.row > .video-list-item,
-  .video-list.row > .video-list-item {
+  .video-list.row > .video-list-item,
+  /* 第 93 轮修：B 站现在的直接子级是 div.col_3.col_xs_1_5.col_md_2.col_xl_1_7 这类
+     col_* 包装层（不是 .video-list-item），它们是 float + 百分比宽度 →
+     放到 grid 里被压成 42px 宽 / 0 高。必须按 [class*="col_"] 重置。 */
+  .search-layout .video-list.row > div[class*="col_"],
+  .video-list.row > div[class*="col_"] {
     /* col_* 栅格用 float + 百分比宽度，grid 下全部失效 */
     float: none !important;
     display: block !important;
-    width: auto !important;
+    width: 100% !important;
     max-width: none !important;
     min-width: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
+  }
+
+  /* col_* 包装层内部的卡片要撑满包装层宽度 */
+  .video-list.row > div[class*="col_"] > .bili-video-card,
+  .video-list.row > div[class*="col_"] .bili-video-card {
+    width: 100% !important;
+    max-width: 100% !important;
   }
 
   /* UP 主卡内部的视频小网格不是搜索结果，保持 B 站原本的横向排布 */

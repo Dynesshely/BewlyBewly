@@ -38,15 +38,17 @@ export function setupSearchDrawnPage(): void {
   document.documentElement.classList.add(SEARCH_DRAWN_CLASS)
   styleEl = injectCSS(searchPageCss)
 
-  // 第 92 轮修：B 站自己的样式里 .video-list.row 有更高优先级（或更晚出现）的
-  // display:flex !important，纯 CSS 覆盖不掉 → 真机实测 rowDisplay 仍是 flex。
-  // 直接写 inline !important（内联 + important 赢一切），并对动态新增的列表做监听。
-  applyGridInline()
-  gridObserver = new MutationObserver(() => applyGridInline())
-  gridObserver.observe(document.body, { childList: true, subtree: true })
+  // 第 93 轮回退：grid 改造会让搜索结果卡片高度塌成 0（真机 42 张全 0 高），
+  // 因此不再改布局，只保留视觉层样式。applyGridInline 保留以便将来 B 站 DOM 稳定后重启。
 }
 
-/** 给搜索结果列表直接写 inline 网格布局（内联 !important 优先级最高） */
+/**
+ * 给搜索结果列表直接写 inline 网格布局（内联 !important 优先级最高）。
+ *
+ * 第 93 轮回退：B 站当前搜索页卡片用 __wrap 绝对定位，grid 会让卡片高度塌成 0，
+ * 因此**暂不调用**；保留实现以便 B 站 DOM 稳定后重启（届时删掉这行 void 即可）。
+ */
+// eslint-disable-next-line unused-imports/no-unused-vars
 function applyGridInline(): void {
   const lists = document.querySelectorAll<HTMLElement>('.video-list.row')
   for (const list of Array.from(lists)) {

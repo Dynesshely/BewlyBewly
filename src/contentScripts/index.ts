@@ -27,7 +27,7 @@ import { setupMessageDrawn } from './views/Message'
 import { setupMomentsDrawnPage, teardownMomentsDrawnPage } from './views/Moments/native'
 import { isPopularPage, setupPopularPage, teardownPopularPage } from './views/Popular'
 import { setupReadDrawnPage, teardownReadDrawnPage } from './views/Read'
-import { setupSearchDrawnPage, teardownSearchDrawnPage } from './views/SearchPage'
+import { teardownSearchDrawnPage } from './views/SearchPage'
 
 import '~/styles'
 import 'uno.css'
@@ -270,8 +270,11 @@ async function onDOMLoaded() {
   // 搜索结果页增强层（j/k 浏览、密度、快速筛选）
   setupSearchEnhance()
 
-  // 搜索结果页整体自绘（第 92 轮 A）：解析原生结果后用我们的卡片渲染，失败回退原生
-  setupSearchDrawnPage()
+  // 搜索结果页视觉改造（第 92 轮 A）。
+  // 第 93 轮真机回退：B 站当前搜索页卡片用 __wrap 绝对定位，任何布局层改造都会让
+  // 42 张结果卡高度塌成 0（即使只改视觉层也复现）。在找到成因前**不启用**，
+  // 保证搜索页保持原生可用；模块与样式保留，修好后删掉这行注释即可。
+  // setupSearchDrawnPage()
 
   // 消息中心页自绘（第 93 轮 E）：会话列表与聊天气泡覆盖层，8s 等不到骨架则完全不接管
   setupMessageDrawn()

@@ -63,6 +63,8 @@ let cachedData: VideoInfoData | null = null
 let cachedBvid = ''
 /** page-world 桥（`bewly-video-data` 事件）推送的最新数据 */
 let bridgedData: VideoInfoData | null = null
+/** 是否已成功把信息栏放到播放器下方（第 89 轮：锁定以避免布局振荡） */
+let infoBarPlacedAfterPlayer = false
 /** 是否已注册桥监听（避免重复注册） */
 let bridgeListening = false
 /** 被隐藏的原生节点的原始 display（卸载时恢复） */
@@ -359,13 +361,18 @@ function renderInfoBar(report: HTMLElement, data: VideoInfoData): void {
     && !playerWrap.classList.contains('left-container'),
   )
 
+  // 第 89 轮修闪烁：一旦成功放到播放器下方就**锁定**，不再因为某拍取不到 playerWrap 就迁回
+  // report 内部。原来两处迁移互斥且每拍都可能翻转（playerWrap 某拍尺寸为 0 / 兜底返回
+  // .left-container），导致「播放器+评论区」与「仅推荐视频」两种布局以 ~500ms 周期来回切换。
   if (canPlaceBelowPlayer && playerWrap) {
-    if (bar.previousElementSibling !== playerWrap)
+    if (bar.previousElementSibling !== playerWrap || bar.parentElement !== playerWrap.parentElement)
       playerWrap.insertAdjacentElement('afterend', bar)
+    infoBarPlacedAfterPlayer = true
     // 标记原生容器已空：页面级 CSS 据此把 #viewbox_report 整块隐藏
     report.dataset.bewlyInfoMoved = '1'
   }
-  else {
+  else if (!infoBarPlacedAfterPlayer) {
+    // 只有**从未**成功放置过时才退回 report 内部（兜底路径），避免来回迁移
     if (bar.parentElement !== report)
       report.insertBefore(bar, report.firstChild)
     // 放进 report 内部时不能隐藏 report，否则信息栏跟着一起消失
@@ -440,6 +447,7 @@ export function setupInfoBar(): () => void {
 export function teardownInfoBar(): void {
   stopBridgeListening()
   document.getElementById(INFO_BAR_ID)?.remove()
+  infoBarPlacedAfterPlayer = false
   // 清掉「原生容器已空」标记：原生 #viewbox_report 重新显示（读不到数据时绝不出现空白信息栏）
   document.querySelector<HTMLElement>('#viewbox_report[data-bewly-info-moved]')?.removeAttribute('data-bewly-info-moved')
   restoreNativeNodes()

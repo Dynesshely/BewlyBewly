@@ -1533,3 +1533,32 @@ footer 侧补：`#footer bili-comment-action-buttons-renderer { flex: 0 0 auto; 
 
 选择：**热门排序下插到「置顶」之后**（无置顶则顶部第二条），最新排序下插顶部；并标记「刚刚发表」徽标。
 理由：热门首条通常是置顶公告，新评论紧随其后最显眼，又不会挤掉置顶；徽标说明它不在严格热度序列里，下次刷新自然校准。
+
+## 第 85 轮：工具栏初始状态（刷新后丢失）
+
+真机问题：已登录状态下，点赞成功后刷新页面，**连 B 站原生按钮都没有 `on` 类** → 「从原生 class 读状态」拿不到。
+
+### 接口实测（已登录 profile）
+
+| 接口 | 结果 | 结论 |
+| --- | --- | --- |
+| `GET /x/web-interface/archive/relation?aid=` | code 0，`data = { like, favorite, coin, attention, season_fav, dislike }` | ✅ 一次拿全三项状态，首选 |
+| `GET /x/web-interface/archive/has/like?aid=` | code 0，`data: 0/1` | ✅ 点赞兜底 |
+| `GET /x/web-interface/archive/coins?aid=` | code 0，`data.multiply: 0` | ✅ 投币兜底（multiply > 0 即已投） |
+| `GET /x/v2/fav/video?aid=` | code 0，但返回的是收藏夹分页列表（不是该视频的收藏关系） | ❌ 不适用 |
+
+### 实现（`toolbar.ts`）
+
+- `loadArchiveRelation()`：未登录（cookie 无 `DedeUserID`）直接不发请求；已登录时 `relation` 为主，`has/like` + `coins` 分别兜底；全失败 → 回退读原生 class；
+- aid 来源：桥 `payload.aid` → 兜底 `/x/web-interface/view?bvid=`；
+- 按 bvid 缓存（`relationCache`），切视频（桥 bvid 变化）清缓存重查；
+- 点击任一按钮后 600ms 清缓存重查（接口为准）再重渲染；
+- `buildActions()` 里 `active = relation ? relation.liked/coined/favorited : isActive(native)`；
+- 同一套 `is-active` class 渲染已赞 / 已投币 / 已收藏。
+
+### 关于「dispatch click 对自绘按钮无效」
+
+代码里没有任何 `event.isTrusted` 判断，也不依赖 pointerdown：按钮是 `<button>` + `addEventListener("click")`，
+`element.click()` 与 `dispatchEvent(new MouseEvent("click"))` 都会触发。
+看起来「无效」的原因是转发是异步的：点赞 → 原生按钮 click → 状态变化 → 600ms 后重查接口再同步，
+dispatch 后立即读取 `is-active` 会读不到（需要等 ≥700ms）。

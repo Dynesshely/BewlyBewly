@@ -27,22 +27,141 @@ interface StatData {
 
 let bridgedStat: StatData | null = null
 let bridgedBvid = ''
+let bridgedAid: number | null = null
 let bridgeListening = false
 let lastSignature = ''
+
+/** 已登录用户的互动状态（点赞 / 投币 / 收藏），来自接口而不是原生 class */
+interface RelationState {
+  liked: boolean
+  coined: boolean
+  favorited: boolean
+}
+
+const relationCache = new Map<string, RelationState>()
+let relationLoading = false
+
+function bvidFromUrl(): string {
+  return location.pathname.match(/\/video\/(BV[0-9A-Za-z]+)/)?.[1] ?? ''
+}
+
+function hasLoginCookie(): boolean {
+  return /(?:^|;\s*)DedeUserID=/.test(document.cookie)
+}
+
+/**
+ * 主动查初始互动状态（第 85 轮）。
+ *
+ * 真机问题：刷新后连 B 站原生按钮都没有 `on` 类，所以「从原生 class 读」拿不到状态。
+ * 实测可用的最省接口是 `/x/web-interface/archive/relation?aid=` → `{ like, favorite, coin, ... }` 一次拿全；
+ * 失败时用 `has/like` 与 `coins` 分别兜底；三者都失败 → 回退读原生 class。
+ */
+async function loadArchiveRelation(): Promise<RelationState | null> {
+  if (!hasLoginCookie())
+    return null
+  const bvid = bvidFromUrl() || bridgedBvid
+  if (!bvid)
+    return null
+  const cached = relationCache.get(bvid)
+  if (cached)
+    return cached
+  if (relationLoading)
+    return null
+  relationLoading = true
+  try {
+    let aid = bridgedAid
+    if (!aid) {
+      const view = await fetchJson<{ code: number, data?: { aid?: number } }>(
+        `https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`,
+      )
+      if (view?.code === 0 && view.data?.aid)
+        aid = view.data.aid
+    }
+    if (!aid)
+      return null
+    const relation = await fetchJson<{
+      code: number
+      data?: { like?: boolean, favorite?: boolean, coin?: number }
+    }>(`https://api.bilibili.com/x/web-interface/archive/relation?aid=${aid}`)
+    if (relation?.code === 0 && relation.data) {
+      const state: RelationState = {
+        liked: Boolean(relation.data.like),
+        coined: Number(relation.data.coin ?? 0) > 0,
+        favorited: Boolean(relation.data.favorite),
+      }
+      relationCache.set(bvid, state)
+      return state
+    }
+    // 兜底：分别查
+    const [hasLike, coins] = await Promise.all([
+      fetchJson<{ code: number, data?: number }>(`https://api.bilibili.com/x/web-interface/archive/has/like?aid=${aid}`),
+      fetchJson<{ code: number, data?: { multiply?: number } }>(`https://api.bilibili.com/x/web-interface/archive/coins?aid=${aid}`),
+    ])
+    if (hasLike?.code === 0 || coins?.code === 0) {
+      const state: RelationState = {
+        liked: hasLike?.code === 0 && Number(hasLike.data) === 1,
+        coined: coins?.code === 0 && Number(coins.data?.multiply ?? 0) > 0,
+        favorited: false,
+      }
+      relationCache.set(bvid, state)
+      return state
+    }
+    return null
+  }
+  finally {
+    relationLoading = false
+  }
+}
+
+async function fetchJson<T>(url: string): Promise<T | null> {
+  try {
+    const response = await fetch(url, { credentials: 'include' })
+    if (!response.ok)
+      return null
+    return await response.json() as T
+  }
+  catch {
+    return null
+  }
+}
+
+function currentRelation(): RelationState | null {
+  const bvid = bvidFromUrl() || bridgedBvid
+  return bvid
+    ? relationCache.get(bvid) ?? null
+    : null
+}
 
 const NATIVE_HIDE_SELECTORS = ['.video-toolbar-left', '.video-toolbar-right']
 const hiddenNatives = new Map<HTMLElement, string>()
 
 function onBridgeData(event: Event): void {
-  const detail = (event as CustomEvent).detail as { bvid?: string, stat?: StatData } | null
+  const detail = (event as CustomEvent).detail as { bvid?: string, aid?: number, stat?: StatData } | null
   if (!detail || !detail.stat)
     return
   const changed = detail.bvid !== bridgedBvid
   bridgedBvid = detail.bvid ?? ''
   bridgedStat = detail.stat
+  if (typeof detail.aid === 'number')
+    bridgedAid = detail.aid
   if (changed)
     lastSignature = ''
+  // 新视频 → 重新查互动状态
+  if (changed)
+    void refreshRelation()
   syncToolbar()
+}
+
+/** 拉一次关系状态并在成功后重渲染 */
+async function refreshRelation(): Promise<void> {
+  const bvid = bvidFromUrl() || bridgedBvid
+  if (bvid)
+    relationCache.delete(bvid)
+  const state = await loadArchiveRelation()
+  if (state) {
+    lastSignature = ''
+    syncToolbar()
+  }
 }
 
 function startBridge(): void {
@@ -121,6 +240,7 @@ interface ActionSpec {
 
 function buildActions(host: HTMLElement): ActionSpec[] {
   const stat = bridgedStat ?? {}
+  const relation = currentRelation()
   const likeBtn = findNative(host, ['.video-like'])
   const coinBtn = findNative(host, ['.video-coin'])
   const favBtn = findNative(host, ['.video-fav'])
@@ -130,7 +250,9 @@ function buildActions(host: HTMLElement): ActionSpec[] {
       label: '点赞',
       icon: ICON_LIKE,
       count: formatStat(stat.like),
-      active: isActive(likeBtn),
+      active: relation
+        ? relation.liked
+        : isActive(likeBtn),
       nativeSelectors: ['.video-like'],
       nativeTextRe: /点赞/,
     },
@@ -139,7 +261,9 @@ function buildActions(host: HTMLElement): ActionSpec[] {
       label: '投币',
       icon: ICON_COIN,
       count: formatStat(stat.coin),
-      active: isActive(coinBtn),
+      active: relation
+        ? relation.coined
+        : isActive(coinBtn),
       nativeSelectors: ['.video-coin'],
       nativeTextRe: /投币/,
     },
@@ -148,7 +272,9 @@ function buildActions(host: HTMLElement): ActionSpec[] {
       label: '收藏',
       icon: ICON_FAV,
       count: formatStat(stat.favorite),
-      active: isActive(favBtn),
+      active: relation
+        ? relation.favorited
+        : isActive(favBtn),
       nativeSelectors: ['.video-fav'],
       nativeTextRe: /收藏/,
     },
@@ -238,11 +364,18 @@ function renderToolbar(host: HTMLElement): void {
       button.addEventListener('click', (event) => {
         event.stopPropagation()
         void forwardToNative(host, action).then(() => {
-          // 原生按钮状态稍后变化，延迟同步一次
+          // 原生按钮状态稍后变化：清缓存后重新查接口（接口为准），再同步
           window.setTimeout(() => {
+            const bvid = bvidFromUrl() || bridgedBvid
+            if (bvid)
+              relationCache.delete(bvid)
             lastSignature = ''
+            void loadArchiveRelation().then(() => {
+              lastSignature = ''
+              syncToolbar()
+            })
             syncToolbar()
-          }, 400)
+          }, 600)
         })
       })
       bar.appendChild(button)
@@ -280,6 +413,16 @@ export function syncToolbar(): boolean {
     return false
   }
   renderToolbar(host)
+  // 已登录但还没拿到关系状态 → 异步查一次（避免每拍重复请求：缓存 + loading 标记）
+  const bvid = bvidFromUrl() || bridgedBvid
+  if (bvid && hasLoginCookie() && !relationCache.has(bvid) && !relationLoading) {
+    void loadArchiveRelation().then((state) => {
+      if (state) {
+        lastSignature = ''
+        syncToolbar()
+      }
+    })
+  }
   return true
 }
 
@@ -300,4 +443,6 @@ export function teardownToolbar(): void {
   resetToolbar()
   bridgedStat = null
   bridgedBvid = ''
+  bridgedAid = null
+  relationCache.clear()
 }

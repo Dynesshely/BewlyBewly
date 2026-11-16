@@ -130,8 +130,9 @@ function setupListPage(): void {
   const mountPoint = document.createElement('div')
   shadow.appendChild(mountPoint)
 
+  let app: App | null = null
   try {
-    const app = createApp(ReadList, { initialCards: data.cards })
+    app = createApp(ReadList, { initialCards: data.cards })
     app.mount(mountPoint)
     document.body.appendChild(host)
 
@@ -146,7 +147,7 @@ function setupListPage(): void {
   catch (error) {
     // 挂载失败：回滚到原生页面（此时原生还没被隐藏）
     try {
-      listApp?.unmount()
+      app?.unmount()
     }
     catch {
       // 组件没挂上时 unmount 会抛错，忽略

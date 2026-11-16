@@ -309,28 +309,62 @@
   color: var(--bew-text-4, var(--bew-text-3));
 }
 
-/* 侧栏推荐用的紧凑卡 */
+/* 侧栏推荐用的紧凑卡：横排（封面在左、文案在右），300px 侧栏里更省高度 */
 .bew-live-card.is-compact {
+  flex-direction: row;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.bew-live-card.is-compact:hover {
+  transform: none;
+}
+
+.bew-live-card.is-compact .bew-live-card__cover {
+  flex-shrink: 0;
+  width: 112px;
+  box-shadow: none;
+}
+
+.bew-live-card.is-compact .bew-live-card__meta {
+  flex: 1;
   gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.bew-live-card.is-compact .bew-live-card__text {
+  flex: 1;
 }
 
 .bew-live-card.is-compact .bew-live-card__title {
   font-size: 13px;
   line-height: 18px;
-  -webkit-line-clamp: 1;
+  -webkit-line-clamp: 2;
 }
 
 .bew-live-card.is-compact .bew-live-card__face {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
+}
+
+.bew-live-card.is-compact .bew-live-card__sub {
+  font-size: 11px;
+  line-height: 16px;
 }
 
 .bew-live-card.is-compact .bew-live-card__badge {
-  top: 6px;
-  left: 6px;
-  padding: 0 6px;
+  top: 5px;
+  left: 5px;
+  padding: 0 5px;
   font-size: 10px;
-  line-height: 15px;
+  line-height: 14px;
+}
+
+.bew-live-card.is-compact .bew-live-card__online {
+  right: 5px;
+  bottom: 3px;
+  font-size: 10px;
 }
 /* #endregion */
 

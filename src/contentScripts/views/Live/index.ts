@@ -64,6 +64,8 @@ let state: DrawnState | null = null
 let domObserver: MutationObserver | null = null
 let observeFrame = 0
 let lastHref = ''
+/** 每次 teardown 自增；异步挂载返回后据此判断「这次接管是否已经被撤销」 */
+let setupToken = 0
 
 /** 站点路由（live 站主要是整页跳转，但分区页内也有 pushState） */
 function currentHref(): string {
@@ -175,8 +177,10 @@ function setupHome(): void {
 
 /** 挂载直播间（顶部信息栏 + 侧栏推荐） */
 async function setupRoom(roomId: number): Promise<void> {
+  const token = setupToken
   const playerColumn = await waitForElement(findRoomPlayerColumn)
-  if (!playerColumn)
+  // 等待期间被卸载 / 路由已切换：放弃这次挂载
+  if (!playerColumn || token !== setupToken)
     return
 
   mountShadow({
@@ -299,6 +303,7 @@ export function setupLiveDrawnPage(): void {
 
 /** 撤销自绘接管，把页面完全还原成原生状态（幂等） */
 export function teardownLiveDrawnPage(): void {
+  setupToken += 1
   stopDomObserver()
 
   unmountShadow(HOME_HOST_ID)

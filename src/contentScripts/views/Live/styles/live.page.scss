@@ -21,6 +21,13 @@ html.bewly-live-home-drawn nav[aria-label="直播分区"] {
 }
 /* #endregion */
 
+/* #region 与既有直播增强层（livePage 影院模式）协同 */
+// 影院模式会把播放器铺满视口：此时自绘信息栏不该再压在画面上
+html.bewly-live-cinema #bewly-live-room-bar {
+  display: none !important;
+}
+/* #endregion */
+
 /* #region 直播间：原生顶部信息栏改用 visibility 让位给自绘栏 */
 html.bewly-live-room-drawn #head-info-vm > .avatar,
 html.bewly-live-room-drawn #head-info-vm > .rows-ctnr,

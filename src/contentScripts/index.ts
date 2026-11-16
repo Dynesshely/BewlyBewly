@@ -21,10 +21,12 @@ import { setupSiteTweaks, syncSiteTweaks, teardownSiteTweaks } from './siteTweak
 import { setupSpacePage } from './spacePage'
 import { setupVideoPage } from './videoPage'
 import App from './views/App.vue'
+import { setupLiveDrawnPage, teardownLiveDrawnPage } from './views/Live'
 // 搜索结果页整体自绘（第 92 轮 A）：自绘层挂载失败会自动回退原生页面
 import { setupMessageDrawn } from './views/Message'
 import { setupMomentsDrawnPage, teardownMomentsDrawnPage } from './views/Moments/native'
 import { isPopularPage, setupPopularPage, teardownPopularPage } from './views/Popular'
+import { setupReadDrawnPage, teardownReadDrawnPage } from './views/Read'
 import { setupSearchDrawnPage, teardownSearchDrawnPage } from './views/SearchPage'
 
 import '~/styles'
@@ -277,6 +279,12 @@ async function onDOMLoaded() {
   // 动态页自绘（第 93 轮 D）：逐条替换原生动态卡片，单条失败只回退该条
   setupMomentsDrawnPage()
 
+  // 专栏页自绘（第 93 轮 G）：列表页整体接管，文章页只注入排版样式
+  setupReadDrawnPage()
+
+  // 直播页自绘（第 93 轮 H）：直播站独立挂载，播放器/弹幕/礼物栏不动
+  setupLiveDrawnPage()
+
   // 用户空间增强层（筛选、密度、j/k、快速跳转）
   setupSpacePage()
 
@@ -308,6 +316,8 @@ async function onDOMLoaded() {
     teardownSearchDrawnPage()
     teardownPopularPage()
     teardownMomentsDrawnPage()
+    teardownReadDrawnPage()
+    teardownLiveDrawnPage()
   }, { once: true })
 
   // Reset the original Bilibili top bar display style

@@ -26,9 +26,11 @@ import {
 } from './actions'
 import { setupAdGuard, teardownAdGuard } from './adGuard'
 import { restoreCommentColumn, setupCommentColumn, syncCommentColumn } from './commentColumn'
+import { setupCommentList, syncCommentList } from './commentList'
 import { getCommentStyleStat, setupComments, syncComments } from './comments'
 import PlaylistPanel from './components/PlaylistPanel.vue'
 import VideoPageOverlay from './components/VideoPageOverlay.vue'
+import { setupDescPanel, syncDescPanel } from './descPanel'
 import { refreshDescPopover, setupDescPopover, teardownDescPopover } from './descPopover'
 import {
   clearPlayerStage,
@@ -55,6 +57,7 @@ import { setupShortcuts } from './shortcuts'
 import { setupSplitter, syncSplitter } from './splitter'
 import { resetUiState, ui } from './state'
 import { setupTagsBar, syncTagsBar } from './tagsBar'
+import { setupToolbar, syncToolbar } from './toolbar'
 import { refreshToolbarActions, setupToolbarActions, teardownToolbarActions } from './toolbarActions'
 import { setupUpCard, syncUpCard } from './upCard'
 import shadowCss from './videoPage.shadow.scss?inline'
@@ -139,6 +142,10 @@ let disposeInfoBar: (() => void) | null = null
 let disposeTagsBar: (() => void) | null = null
 /** 自绘 UP 卡（第 79 轮 2b） */
 let disposeUpCard: (() => void) | null = null
+/** 自绘工具栏 / 简介 / 评论区（第 80 轮阶段 3） */
+let disposeToolbar: (() => void) | null = null
+let disposeDescPanel: (() => void) | null = null
+let disposeCommentList: (() => void) | null = null
 
 /**
  * 视口过窄（含极端 iframe 预览）时是否处于降级状态。
@@ -191,6 +198,18 @@ function degradeForNarrowViewport(): void {
     disposeUpCard()
     disposeUpCard = null
   }
+  if (disposeToolbar) {
+    disposeToolbar()
+    disposeToolbar = null
+  }
+  if (disposeDescPanel) {
+    disposeDescPanel()
+    disposeDescPanel = null
+  }
+  if (disposeCommentList) {
+    disposeCommentList()
+    disposeCommentList = null
+  }
   teardownToolbarActions()
   teardownDescPopover()
   teardownRecommendRail()
@@ -216,6 +235,20 @@ function restoreAfterNarrowViewport(): void {
     disposeTagsBar = setupTagsBar()
   if (!disposeUpCard)
     disposeUpCard = setupUpCard()
+  if (!disposeToolbar)
+    disposeToolbar = setupToolbar()
+  if (!disposeDescPanel)
+    disposeDescPanel = setupDescPanel()
+  if (!disposeCommentList)
+    disposeCommentList = setupCommentList()
+
+  // 第 80 轮阶段 3：自绘工具栏 / 简介 / 评论区（只读）
+  if (!viewportDegraded)
+    disposeToolbar = setupToolbar()
+  if (!viewportDegraded)
+    disposeDescPanel = setupDescPanel()
+  if (!viewportDegraded)
+    disposeCommentList = setupCommentList()
 
   if (!isInIframe() && settings.value.videoPageShortcuts && !disposeShortcuts)
     disposeShortcuts = setupShortcuts()
@@ -501,6 +534,18 @@ function unmount(): void {
     disposeUpCard()
     disposeUpCard = null
   }
+  if (disposeToolbar) {
+    disposeToolbar()
+    disposeToolbar = null
+  }
+  if (disposeDescPanel) {
+    disposeDescPanel()
+    disposeDescPanel = null
+  }
+  if (disposeCommentList) {
+    disposeCommentList()
+    disposeCommentList = null
+  }
   teardownAdGuard()
 
   window.removeEventListener('scroll', handleScroll)
@@ -626,6 +671,10 @@ function sync(): void {
   safeSync('syncInfoBar', syncInfoBar)
   safeSync('syncTagsBar', syncTagsBar)
   safeSync('syncUpCard', syncUpCard)
+  // 第 80 轮阶段 3：工具栏 / 简介会隐藏原生节点（改高度实测），评论区自绘在评论列内
+  safeSync('syncToolbar', syncToolbar)
+  safeSync('syncDescPanel', syncDescPanel)
+  safeSync('syncCommentList', syncCommentList)
 
   // 固定单页布局（第 29 轮）：**唯一**的布局所有者。
   // ⚠️ 第 36 轮起把它提到评论区同步之前：评论区 / 轨道 / 简介任何一处抛异常都不能阻止

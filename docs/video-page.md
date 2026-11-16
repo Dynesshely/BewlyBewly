@@ -1379,3 +1379,50 @@ footer 侧补：`#footer bili-comment-action-buttons-renderer { flex: 0 0 auto; 
 - 现在改为：**桥有 `owner.name` / `owner.face` / `owner.mid` 任一值就直接渲染**；桥没有才回退读原生 DOM 的 name
   （选择器加宽到 `.up-info-container a[href*="space.bilibili.com"]`）；桥只有 face/mid 时 name 用「UP 主」占位；
 - 去掉 syncUpCard 里的额外不渲染判定；渲染后隐藏 `.up-info-container` / `.teleport.hidden`，保留 `.up-panel-container`。
+
+## 第 80 轮：自绘阶段 3 —— 工具栏 / 简介 / 评论区（只读）
+
+### 1. 工具栏（`videoPage/toolbar.ts`）
+
+- `#bewly-toolbar` 插进 `#arc_toolbar_report` 内部（容器高 52 不变，`measureDockBlocks` 预算不变）；
+- 6 个按钮：点赞 / 投币 / 收藏 / 分享 / 举报 / 笔记（顺序与 B 站一致，SVG 图标 + 文字 + 数字）；
+- 数字用桥 `stat` 精确值格式化（1.0万 / 1.2亿）；状态（已赞/已投币/已收藏）从原生按钮 class（`on/active/liked`）读；
+- **点击转发原生按钮**（`.video-like` / `.video-coin` / `.video-fav` / `.video-share` / 按文案找举报、笔记），
+  原生 `.video-toolbar-left`、`.video-toolbar-right` 隐藏但保留；
+- 保留第 36 轮「无 hover 背景」：默认透明，单项 hover 浅底 + 6px 圆角。
+
+### 2. 简介（`videoPage/descPanel.ts`）
+
+- 数据：桥 `desc` → 原生 `#v_desc` 文本兜底；`#bewly-desc` 插进 `#v_desc` 容器内部，原生 `.basic-desc-info` 隐藏；
+- 默认 2 行截断 + 「展开简介」；展开后 `max-height: var(--bvp-fixed-details, 104px)` + 内部滚动，避免撑高 dock；
+- 不再解析 `#v_desc` 的 DOM 结构，切换视频时随桥数据变化重渲染。
+
+### 3. 评论区（`videoPage/commentList.ts`，只读）
+
+- 数据：`GET https://api.bilibili.com/x/v2/reply?type=1&oid=<aid>&pn=<n>&ps=20&sort=<2|0>`（`credentials: include`）；
+  真机实测（未登录）：code 0、返回 3 条主评论（该视频评论本来就少）；子回复 `GET /x/v2/reply/reply?...&root=<rpid>&pn=1&ps=10` 同样 code 0；
+  **不用 wbi**（`/wbi/main` 会 -403）；
+- aid 来源：桥 `payload.aid` → 兜底 `/x/web-interface/view?bvid=` 查一次并缓存（不同 bvid 重查）；
+- 渲染：头像 40 圆 / 昵称 / 等级 / UP 标记 / 置顶 / 正文（转义 + 表情替换 + @ 高亮）/ 时间（相对时间）/ IP 属地 / 点赞数 / 回复按钮（`data-rpid`、`data-action` 预留下一轮）；
+- 分页：底部「加载更多」（pn 递增）；排序：最热(2) / 最新(0)；只看 UP：`member.mid === owner.mid` 客户端过滤；
+- 子回复：点「共 N 条回复」→ 拉子回复 → 子页只显示该主评论 + 平铺子回复 + 顶部「← 返回评论列表」；
+- 图片评论：`content.pictures` → grid，点击开原图；
+- **兜底**：拿不到 aid / API 失败 / code≠0 → `restoreNative()`（移除自绘容器、显示原生 `#commentapp`），不白屏；
+- 位置：`#bewly-comment-list` 插进评论列（`#commentapp` 之前），`flex: 1 1 auto; min-height: 0`，内部滚动。
+
+### 布局实测（CDP 现场模拟自绘列表，测完已恢复）
+
+| 指标 | 模拟前 | 模拟中 | 恢复后 |
+| --- | --- | --- | --- |
+| 评论列高 | 848 | **848** | 848 |
+| 自绘列表高 | — | **751**（= 原生 #commentapp 高） | — |
+| 播放器 | 1166×656 | **1166×656** | 1166×656 |
+| `--bvp-fixed-dock-height` | 848px | **848px** | 848px |
+
+### 本轮未做（下一轮）
+
+1. 评论互动：点赞 / 回复 / 发表（当前只有 `data-rpid`、`data-action` 预留属性）；
+2. 排序/只看 UP 时只过滤「已加载的评论」（API 无 UP 过滤参数，翻页后需继续过滤）；
+3. 置顶字段名未真机确认（用 `reply_control.is_up_top` 兜底）；
+4. 表情映射依赖 `content.emote`（真机样本无表情，未验证）；
+5. 工具栏「举报 / 笔记」的原生触发按钮选择器按文案兜底，需真机确认（`.video-toolbar-right` 内）。

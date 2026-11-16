@@ -4085,3 +4085,338 @@ html.bewly-design.videoPage.bewly-video-fixed #viewbox_report {
 #bewly-up-card .bvp-up__avatar:hover {
   filter: brightness(1.08);
 }
+
+/* ===== 第 80 轮 stage3（自绘工具栏 / 简介 / 评论区） =====
+   三块都遵循「在原生容器内自绘 + 隐藏原生子节点」：工具栏插进 #arc_toolbar_report、
+   简介插进 #v_desc、评论区插进评论列（#commentapp 之前）。
+   容器高度仍由既有 CSS/固定布局变量决定，fixedLayout 预算不变。 */
+#bewly-toolbar {
+  display: flex;
+  flex: 1 1 auto;
+  gap: var(--bvp-space-4, 20px);
+  align-items: center;
+  height: 100%;
+  min-width: 0;
+}
+
+.bvp-toolbar__btn {
+  display: inline-flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  gap: 2px;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  height: 44px;
+  padding: 0 8px;
+  color: var(--bew-text-2);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  transition:
+    background-color var(--bvp-dur-fast, 120ms) ease,
+    color var(--bvp-dur-fast, 120ms) ease;
+}
+
+.bvp-toolbar__btn:hover,
+.bvp-toolbar__btn:focus-visible {
+  color: var(--bew-text-1);
+  background: var(--bew-fill-1);
+}
+
+.bvp-toolbar__btn.is-active {
+  color: var(--bew-theme-color, var(--bew-bili-blue, hsl(195 100% 42%)));
+}
+
+.bvp-toolbar__btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.bvp-toolbar__label {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.bvp-toolbar__count {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--bew-text-3);
+}
+
+/* 简介 */
+#bewly-desc {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+
+.bvp-desc__text {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--bew-text-2);
+  white-space: pre-wrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+/* 展开后高度封顶（内部滚动）：避免撑高 dock 导致播放器跳动 */
+.bvp-desc__text.is-expanded {
+  display: block;
+  max-height: var(--bvp-fixed-details, 104px);
+  overflow-y: auto;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+}
+
+.bvp-desc__toggle {
+  align-self: flex-start;
+  padding: 0;
+  font-size: 12px;
+  color: var(--bew-theme-color, var(--bew-bili-blue, hsl(195 100% 42%)));
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+/* 自绘评论区 */
+#bewly-comment-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+}
+
+.bvp-cmt__toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+}
+
+.bvp-cmt__sort {
+  display: flex;
+  gap: 4px;
+}
+
+.bvp-cmt__tab {
+  height: 24px;
+  padding: 0 8px;
+  font-size: 12.5px;
+  line-height: 1;
+  color: var(--bew-text-2);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+}
+
+.bvp-cmt__tab:hover {
+  background: var(--bew-fill-1);
+}
+
+.bvp-cmt__tab.is-active {
+  color: var(--bew-theme-color, var(--bew-bili-blue, hsl(195 100% 42%)));
+  background: var(--bew-fill-1);
+}
+
+.bvp-cmt__list {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0 12px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.bvp-cmt {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding-block: 12px;
+}
+
+.bvp-cmt__avatar {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  font-size: 14px;
+  color: var(--bew-text-3);
+  background: var(--bew-fill-1);
+  border-radius: 50%;
+}
+
+.bvp-cmt__avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bvp-cmt__main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.bvp-cmt__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.bvp-cmt__name {
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--bew-text-1);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bvp-cmt__level,
+.bvp-cmt__badge {
+  padding: 0 4px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--bew-text-3);
+  background: var(--bew-fill-1);
+  border-radius: 4px;
+}
+
+.bvp-cmt__badge--up {
+  color: #fff;
+  background: var(--bew-theme-color, var(--bew-bili-blue, hsl(195 100% 42%)));
+}
+
+.bvp-cmt__text {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--bew-text-1);
+  overflow-wrap: anywhere;
+}
+
+.bvp-cmt__at {
+  color: var(--bew-theme-color, var(--bew-bili-blue, hsl(195 100% 42%)));
+}
+
+.bvp-cmt__emote {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  vertical-align: text-bottom;
+}
+
+.bvp-cmt__pictures {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.bvp-cmt__picture img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+
+.bvp-cmt__meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--bew-text-3);
+}
+
+.bvp-cmt__spacer {
+  flex: 1 1 auto;
+}
+
+.bvp-cmt__action {
+  padding: 0 6px;
+  font-size: 12px;
+  color: var(--bew-text-3);
+  cursor: pointer;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+}
+
+.bvp-cmt__action:hover {
+  color: var(--bew-text-1);
+  background: var(--bew-fill-1);
+}
+
+.bvp-cmt__more {
+  align-self: flex-start;
+  padding: 0;
+  font-size: 12px;
+  color: var(--bew-theme-color, var(--bew-bili-blue, hsl(195 100% 42%)));
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+.bvp-cmt__footer {
+  flex: 0 0 auto;
+  padding: 12px;
+  text-align: center;
+}
+
+.bvp-cmt__load-more {
+  height: 32px;
+  padding: 0 16px;
+  font-size: 12.5px;
+  color: var(--bew-text-2);
+  cursor: pointer;
+  background: var(--bew-fill-1);
+  border: 0;
+  border-radius: 16px;
+}
+
+.bvp-cmt__end,
+.bvp-cmt__loading,
+.bvp-cmt__empty {
+  padding: 16px 0;
+  font-size: 12.5px;
+  color: var(--bew-text-3);
+  text-align: center;
+}
+
+.bvp-cmt__subpage-head {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+}
+
+/* 窄列：头像/间距收紧 */
+@container bewly-comments (max-width: 559px) {
+  .bvp-cmt {
+    gap: 8px;
+  }
+
+  .bvp-cmt__avatar {
+    width: 32px;
+    height: 32px;
+  }
+
+  .bvp-cmt__text {
+    font-size: 13.5px;
+  }
+
+  .bvp-cmt__list {
+    padding-inline: 8px;
+  }
+}

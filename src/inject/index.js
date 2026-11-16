@@ -267,6 +267,14 @@ function collectBewlyVideoData() {
 
     return {
       bvid: video.bvid || '',
+      // 评论区自绘需要 aid / cid 调接口；两者常挂在 __INITIAL_STATE__ 顶层而不是 videoData 里（真机实测）
+      aid: Number(video.aid || state.aid || 0),
+      cid: Number(video.cid || state.cid || 0),
+      isLogin: Boolean(state.isLogin),
+      // wbi 签名用（B 站评论区主接口 /x/v2/reply/wbi/main 需要 w_rid）
+      wbiKey: typeof state.defaultWbiKey === 'string'
+        ? state.defaultWbiKey
+        : '',
       title: video.title || '',
       pubdate: video.pubdate || 0,
       ctime: video.ctime || 0,

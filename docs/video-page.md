@@ -1562,3 +1562,25 @@ footer 侧补：`#footer bili-comment-action-buttons-renderer { flex: 0 0 auto; 
 `element.click()` 与 `dispatchEvent(new MouseEvent("click"))` 都会触发。
 看起来「无效」的原因是转发是异步的：点赞 → 原生按钮 click → 状态变化 → 600ms 后重查接口再同步，
 dispatch 后立即读取 `is-active` 会读不到（需要等 ≥700ms）。
+
+## 第 86 轮：工具栏点赞乐观更新被重查覆盖（回归修复）
+
+真机问题：点击点赞后 2.5s 仍不变红，且 `has/like` 复核为 0。
+
+根因（两个叠加）：
+
+1. 点击后 600ms 重查 `relation`，接口有延迟 → 返回旧值 `like:false` → 覆盖刚点出来的 `is-active`；
+2. `relation ? relation.x : isActive(native)` 只要 relation 存在就完全忽略原生 class → 乐观状态无处生效。
+
+修法（`toolbar.ts`）：
+
+- 新增 `optimisticCache`（按 bvid）：点击立即翻转 `liked/coined/favorited` 与计数并重绘（**立刻**变红 / 数字 ±1）；
+- 状态优先级：**乐观（2s 内）> relation 接口 > 原生 class**（`effectiveState()`）；
+- 点击后 1.5s 核实：点赞查 `has/like`、投币查 `coins`，与服务端不一致则**直接调写接口兜底**
+  （`POST /x/web-interface/archive/like` `{aid, like: 1|2, csrf}`；`POST /x/web-interface/coin/add` `{aid, multiply: 1, csrf}`），
+  不再依赖原生按钮是否还在；
+- 再等 700ms 重查 relation：与乐观一致（或乐观已超 2s）才清乐观、以接口为准；不一致则**保留乐观**不被旧值覆盖；
+- 重查失败不清乐观状态（保留用户所见）。
+
+接口实测（已登录）：`POST /x/web-interface/archive/like` → `code 0`；点赞后 `has/like` 立即变 1；
+取消点赞后有约 1s+ 的延迟才会在 `has/like` 上体现（所以乐观状态必须保留到接口追上）。

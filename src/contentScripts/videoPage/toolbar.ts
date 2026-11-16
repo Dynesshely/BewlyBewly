@@ -132,6 +132,169 @@ function currentRelation(): RelationState | null {
     : null
 }
 
+/**
+ * 乐观状态（第 86 轮）。
+ *
+ * 问题：点击后重查 relation 时接口可能仍返回旧值 → 把刚点出来的 is-active 覆盖回未激活；
+ * 且 `relation ? relation.x : isActive(native)` 让原生 class 的即时状态完全失效。
+ * 现在：点击立即写乐观状态并重绘（2s 内优先），2s 后以接口为准；不一致时直接调写接口兜底。
+ */
+interface OptimisticState {
+  liked: boolean
+  likeCount: number
+  coined: boolean
+  coinCount: number
+  favorited: boolean
+  at: number
+}
+
+const optimisticCache = new Map<string, OptimisticState>()
+const OPTIMISTIC_TTL = 2000
+
+function bvidKey(): string {
+  return bvidFromUrl() || bridgedBvid
+}
+
+async function ensureAid(): Promise<number | null> {
+  if (bridgedAid)
+    return bridgedAid
+  const bvid = bvidKey()
+  if (!bvid)
+    return null
+  const view = await fetchJson<{ code: number, data?: { aid?: number } }>(
+    `https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`,
+  )
+  if (view?.code === 0 && view.data?.aid)
+    bridgedAid = view.data.aid
+  return bridgedAid
+}
+
+async function postForm(url: string, body: Record<string, string>): Promise<{ code: number } | null> {
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(body).toString(),
+    })
+    if (!response.ok)
+      return null
+    return await response.json() as { code: number }
+  }
+  catch {
+    return null
+  }
+}
+
+function csrfToken(): string {
+  return document.cookie.match(/(?:^|;\s*)bili_jct=([^;]+)/)?.[1] ?? ''
+}
+
+/** 当前生效状态：乐观（2s 内） > relation 接口 > 原生 class */
+function effectiveState(host: HTMLElement): OptimisticState {
+  const key = bvidKey()
+  const opt = key
+    ? optimisticCache.get(key)
+    : undefined
+  if (opt && Date.now() - opt.at < OPTIMISTIC_TTL)
+    return opt
+  const relation = currentRelation()
+  const stat = bridgedStat ?? {}
+  return {
+    liked: relation
+      ? relation.liked
+      : isActive(findNative(host, ['.video-like'])),
+    likeCount: Number(stat.like ?? 0),
+    coined: relation
+      ? relation.coined
+      : isActive(findNative(host, ['.video-coin'])),
+    coinCount: Number(stat.coin ?? 0),
+    favorited: relation
+      ? relation.favorited
+      : isActive(findNative(host, ['.video-fav'])),
+    at: 0,
+  }
+}
+
+/** 点击按钮时立即翻转乐观状态并重绘 */
+function flipOptimistic(host: HTMLElement, kind: string): void {
+  const key = bvidKey()
+  if (!key)
+    return
+  const current = effectiveState(host)
+  const next: OptimisticState = {
+    ...current,
+    at: Date.now(),
+  }
+  if (kind === 'like') {
+    next.liked = !current.liked
+    next.likeCount = Math.max(0, current.likeCount + (next.liked
+      ? 1
+      : -1))
+  }
+  else if (kind === 'coin') {
+    next.coined = !current.coined
+    next.coinCount = Math.max(0, current.coinCount + (next.coined
+      ? 1
+      : -1))
+  }
+  else if (kind === 'fav') {
+    next.favorited = !current.favorited
+  }
+  optimisticCache.set(key, next)
+  lastSignature = ''
+  syncToolbar()
+}
+
+/**
+ * 点击后核实：1.5s 后查服务端；不一致就直接调写接口兜底（不依赖原生按钮是否还在）。
+ * 2s 后再重查 relation，一致或乐观已过期就以接口为准。
+ */
+async function verifyAction(kind: string): Promise<void> {
+  const aid = await ensureAid()
+  const key = bvidKey()
+  if (!aid || !key)
+    return
+  await new Promise(resolve => window.setTimeout(resolve, 1500))
+  const target = optimisticCache.get(key)
+  if (!target)
+    return
+  if (kind === 'like') {
+    const hasLike = await fetchJson<{ code: number, data?: number }>(
+      `https://api.bilibili.com/x/web-interface/archive/has/like?aid=${aid}`,
+    )
+    if (hasLike?.code === 0 && (Number(hasLike.data) === 1) !== target.liked) {
+      await postForm('https://api.bilibili.com/x/web-interface/archive/like', {
+        aid: String(aid),
+        like: target.liked ? '1' : '2',
+        csrf: csrfToken(),
+      })
+    }
+  }
+  else if (kind === 'coin' && target.coined) {
+    const coins = await fetchJson<{ code: number, data?: { multiply?: number } }>(
+      `https://api.bilibili.com/x/web-interface/archive/coins?aid=${aid}`,
+    )
+    if (coins?.code === 0 && Number(coins.data?.multiply ?? 0) === 0) {
+      await postForm('https://api.bilibili.com/x/web-interface/coin/add', {
+        aid: String(aid),
+        multiply: '1',
+        csrf: csrfToken(),
+      })
+    }
+  }
+  await new Promise(resolve => window.setTimeout(resolve, 700))
+  relationCache.delete(key)
+  const fresh = await loadArchiveRelation()
+  const stillOpt = optimisticCache.get(key)
+  const matches = Boolean(fresh && stillOpt
+    && fresh.liked === target.liked && fresh.coined === target.coined && fresh.favorited === target.favorited)
+  if (matches || !stillOpt || Date.now() - stillOpt.at >= OPTIMISTIC_TTL)
+    optimisticCache.delete(key)
+  lastSignature = ''
+  syncToolbar()
+}
+
 const NATIVE_HIDE_SELECTORS = ['.video-toolbar-left', '.video-toolbar-right']
 const hiddenNatives = new Map<HTMLElement, string>()
 
@@ -240,19 +403,14 @@ interface ActionSpec {
 
 function buildActions(host: HTMLElement): ActionSpec[] {
   const stat = bridgedStat ?? {}
-  const relation = currentRelation()
-  const likeBtn = findNative(host, ['.video-like'])
-  const coinBtn = findNative(host, ['.video-coin'])
-  const favBtn = findNative(host, ['.video-fav'])
+  const effective = effectiveState(host)
   return [
     {
       key: 'like',
       label: '点赞',
       icon: ICON_LIKE,
-      count: formatStat(stat.like),
-      active: relation
-        ? relation.liked
-        : isActive(likeBtn),
+      count: formatStat(effective.likeCount),
+      active: effective.liked,
       nativeSelectors: ['.video-like'],
       nativeTextRe: /点赞/,
     },
@@ -260,10 +418,8 @@ function buildActions(host: HTMLElement): ActionSpec[] {
       key: 'coin',
       label: '投币',
       icon: ICON_COIN,
-      count: formatStat(stat.coin),
-      active: relation
-        ? relation.coined
-        : isActive(coinBtn),
+      count: formatStat(effective.coinCount),
+      active: effective.coined,
       nativeSelectors: ['.video-coin'],
       nativeTextRe: /投币/,
     },
@@ -272,9 +428,7 @@ function buildActions(host: HTMLElement): ActionSpec[] {
       label: '收藏',
       icon: ICON_FAV,
       count: formatStat(stat.favorite),
-      active: relation
-        ? relation.favorited
-        : isActive(favBtn),
+      active: effective.favorited,
       nativeSelectors: ['.video-fav'],
       nativeTextRe: /收藏/,
     },
@@ -363,19 +517,19 @@ function renderToolbar(host: HTMLElement): void {
         : ''}`
       button.addEventListener('click', (event) => {
         event.stopPropagation()
+        // 第 86 轮：三个可切换动作先做乐观更新，让用户立刻看到状态变化
+        if (action.key === 'like' || action.key === 'coin' || action.key === 'fav')
+          flipOptimistic(host, action.key)
         void forwardToNative(host, action).then(() => {
-          // 原生按钮状态稍后变化：清缓存后重新查接口（接口为准），再同步
-          window.setTimeout(() => {
-            const bvid = bvidFromUrl() || bridgedBvid
-            if (bvid)
-              relationCache.delete(bvid)
-            lastSignature = ''
-            void loadArchiveRelation().then(() => {
+          if (action.key === 'like' || action.key === 'coin' || action.key === 'fav') {
+            void verifyAction(action.key)
+          }
+          else {
+            window.setTimeout(() => {
               lastSignature = ''
               syncToolbar()
-            })
-            syncToolbar()
-          }, 600)
+            }, 400)
+          }
         })
       })
       bar.appendChild(button)

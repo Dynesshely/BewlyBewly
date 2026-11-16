@@ -4704,3 +4704,114 @@ html.bewly-design.videoPage.bewly-video-fixed #viewbox_report {
     opacity: 1;
   }
 }
+
+/* ===== 第 83 轮 composer-emote-perf（输入框 / 表情面板 / 长列表分批） ===== */
+/* 长列表性能：离屏评论跳过渲染，用固有尺寸占位避免滚动条跳动 */
+#bewly-comment-list .bvp-cmt {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 120px;
+}
+
+/* 输入框底部工具按钮 */
+.bvp-cmt__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  background: var(--bew-fill-1);
+  border: 0;
+  border-radius: 8px;
+}
+
+.bvp-cmt__icon-btn:hover {
+  background: var(--bew-fill-2);
+}
+
+/* 「刚刚发表」徽标 */
+.bvp-cmt__badge--new {
+  color: var(--bew-theme-color, var(--bew-bili-blue, hsl(195 100% 42%)));
+  background: color-mix(in oklab, var(--bew-theme-color, hsl(195 100% 42%)) 14%, transparent);
+}
+
+/* 表情面板 */
+.bvp-emote {
+  position: fixed;
+  z-index: 100001;
+  display: flex;
+  flex-direction: column;
+  width: 336px;
+  max-height: 300px;
+  overflow: hidden;
+  background: var(--bew-bg-1, var(--bew-bg));
+  border-radius: 10px;
+  box-shadow: var(--bvp-shadow-3, 0 8px 28px rgb(0 0 0 / 28%));
+}
+
+.bvp-emote__tabs {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  padding: 8px 8px 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.bvp-emote__tab {
+  flex: 0 0 auto;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--bew-text-2);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+}
+
+.bvp-emote__tab.is-active {
+  color: var(--bew-theme-color, var(--bew-bili-blue, hsl(195 100% 42%)));
+  background: var(--bew-fill-1);
+}
+
+.bvp-emote__body {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+  padding: 8px;
+  overflow-y: auto;
+}
+
+.bvp-emote__item {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  padding: 2px;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+}
+
+.bvp-emote__item:hover {
+  background: var(--bew-fill-1);
+}
+
+.bvp-emote__item img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.bvp-emote__empty,
+.bvp-emote__loading {
+  grid-column: 1 / -1;
+  padding: 16px 0;
+  font-size: 12.5px;
+  color: var(--bew-text-3);
+  text-align: center;
+}

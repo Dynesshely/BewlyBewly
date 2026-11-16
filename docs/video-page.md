@@ -1503,3 +1503,33 @@ footer 侧补：`#footer bili-comment-action-buttons-renderer { flex: 0 0 auto; 
 - `content.emote` 是 `{ "[表情]": { url } }`，渲染时把正文里的每个 key 替换成 `<img class="bvp-cmt__emote">`；
 - 映射不到的表情文本保留原文（不破坏正文）；
 - 真机样本评论没有表情，未验证视觉效果。
+
+## 第 83 轮：评论输入框 + 表情面板 + 长列表性能
+
+### 1. 输入框（新增 `commentComposer.ts` + `emotePanel.ts`）
+
+- 已登录：`textarea`（placeholder「发一条友善的评论」）+ 字数计数（0/1000）+ 表情按钮 + 图片按钮 + 发布；Ctrl/Cmd+Enter 快捷发布（`requestSubmit`）；
+- 未登录：「登录后可以发评论」+ 去登录链接（保持原样）；
+- 内联回复复用同一个 composer（`compact` + `data-rpid` + 取消按钮）；
+- 发表成功后 `resetComposer()` 清空输入与计数、`closeEmotePanel()` 收起面板；
+- 图片按钮本轮未接上传，点击给明确 toast「图片评论暂未支持，可先用 B 站原生评论区上传」（不静默失败）。
+
+### 2. 表情面板
+
+- 数据：`GET /x/emote/user/panel/web?business=reply` → `data.packages[].emote[]`（`text` + `url`），模块级缓存一次；
+- 浮层定位在按钮上方、右对齐、限制视口内；8 列网格 + 包标签页（`.bvp-emote__tab`）；
+- 点表情 → `insertAtCursor()` 把 `[表情]` 插入 textarea 光标处并派发 `input`（字数实时更新）；Esc / 点击空白关闭；
+- 空态：**真机实测未登录返回 `code 0` 但 `packages` 为空**，面板显示「暂无表情（登录后可用）」。
+
+### 3. 长列表分批渲染（方案 A）
+
+- `state.renderedCount` 初始 `RENDER_BATCH = 20`；`renderList()` 只渲染 `visible.slice(0, renderedCount)`；
+- `.bvp-cmt__list` 滚动接近底部（`scrollTop + clientHeight >= scrollHeight - 240`）→ `renderedCount += 20` → 重渲染并**恢复滚动位置**；
+- 底部按钮区分两种情况：「加载更多」（接口分页，已加载项都渲染完了）与「显示更多」（仅渲染已有数据）；
+- 每次 `reload` / `loadPage(1)` 重置 `renderedCount = 20`；
+- 性能兜底：`.bvp-cmt { content-visibility: auto; contain-intrinsic-size: auto 120px }`（离屏评论跳过渲染，占位高度避免滚动条跳动）。
+
+### 4. 热门排序下的本地插入位置
+
+选择：**热门排序下插到「置顶」之后**（无置顶则顶部第二条），最新排序下插顶部；并标记「刚刚发表」徽标。
+理由：热门首条通常是置顶公告，新评论紧随其后最显眼，又不会挤掉置顶；徽标说明它不在严格热度序列里，下次刷新自然校准。

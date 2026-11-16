@@ -11,6 +11,8 @@
  * 兜底：拿不到 aid / 列表 API 失败 → 恢复原生评论区，绝不白屏。
  */
 import { showToast } from './actions'
+import { composerHtml, handleAttachImage, MAX_MESSAGE_LENGTH, openEmoteForForm, syncCount } from './commentComposer'
+import { closeEmotePanel } from './emotePanel'
 import { closeImageViewer, openImageViewer } from './imageViewer'
 
 const LIST_ID = 'bewly-comment-list'
@@ -20,7 +22,8 @@ const PAGE_SIZE = 20
 const SUB_PAGE_SIZE = 20
 const MAX_SUB_PAGES = 10
 const MAX_ONLYUP_PAGES = 5
-const MAX_MESSAGE_LENGTH = 1000
+/** 分批渲染：每批条数（滚动接近底部再加一批，不额外请求接口） */
+const RENDER_BATCH = 20
 
 interface CommentItem {
   rpid: number | string
@@ -38,6 +41,8 @@ interface CommentItem {
   isUp: boolean
   isTop: boolean
   pictures: string[]
+  /** 刚发表（本地插入）：渲染「刚刚发表」徽标（第 83 轮） */
+  justPosted?: boolean
 }
 
 interface CommentState {
@@ -57,6 +62,8 @@ interface CommentState {
   replyTarget: { rpid: string, parent: string, name: string, rootOf: string } | null
   /** 排序切换时记住的滚动位置 */
   scrollMemo: Record<string, number>
+  /** 已渲染到 DOM 的条数（分批渲染，第 83 轮） */
+  renderedCount: number
 }
 
 const state: CommentState = {
@@ -74,6 +81,7 @@ const state: CommentState = {
   subpage: null,
   replyTarget: null,
   scrollMemo: {},
+  renderedCount: RENDER_BATCH,
 }
 
 let bridgeListening = false
@@ -323,6 +331,7 @@ function itemHtml(item: CommentItem, depth: number): string {
     : escapeHtml(item.uname.slice(0, 1))
   const upBadge = item.isUp ? '<span class="bvp-cmt__badge bvp-cmt__badge--up">UP</span>' : ''
   const topBadge = item.isTop ? '<span class="bvp-cmt__badge">置顶</span>' : ''
+  const justBadge = item.justPosted ? '<span class="bvp-cmt__badge bvp-cmt__badge--new">刚刚发表</span>' : ''
   const pictures = item.pictures.length
     ? `<div class="bvp-cmt__pictures">${item.pictures.map((src, index) => `<button type="button" class="bvp-cmt__picture" data-action="preview-image" data-rpid="${item.rpid}" data-index="${index}"><img src="${escapeHtml(src)}" alt="" loading="lazy" referrerpolicy="no-referrer"></button>`).join('')}</div>`
     : ''
@@ -330,13 +339,12 @@ function itemHtml(item: CommentItem, depth: number): string {
     ? `<button type="button" class="bvp-cmt__more" data-action="open-subpage" data-rpid="${item.rpid}">共 ${item.rcount} 条回复</button>`
     : ''
   const replyForm = state.replyTarget && state.replyTarget.rpid === String(item.rpid)
-    ? `<form class="bvp-cmt__compose bvp-cmt__compose--inline" data-action="submit-reply" data-rpid="${item.rpid}">
-        <textarea class="bvp-cmt__input" maxlength="${MAX_MESSAGE_LENGTH}" rows="2" placeholder="回复 @${escapeHtml(item.uname)}"></textarea>
-        <div class="bvp-cmt__compose-actions">
-          <button type="button" class="bvp-cmt__submit" data-action="submit-reply" data-rpid="${item.rpid}">发布</button>
-          <button type="button" class="bvp-cmt__cancel" data-action="cancel-reply">取消</button>
-        </div>
-      </form>`
+    ? composerHtml({
+        placeholder: `回复 @${escapeHtml(item.uname)}`,
+        compact: true,
+        rpid: String(item.rpid),
+        withCancel: true,
+      })
     : ''
   return `<article class="bvp-cmt${depth > 0
     ? ' bvp-cmt--sub'
@@ -348,7 +356,7 @@ function itemHtml(item: CommentItem, depth: number): string {
         ${item.level
           ? `<span class="bvp-cmt__level">Lv${item.level}</span>`
           : ''}
-        ${upBadge}${topBadge}
+        ${upBadge}${topBadge}${justBadge}
       </div>
       <div class="bvp-cmt__text">${renderMessage(item)}</div>
       ${pictures}
@@ -367,20 +375,15 @@ function itemHtml(item: CommentItem, depth: number): string {
   </article>`
 }
 
-function composerHtml(): string {
+/** 已登录：完整输入框；未登录：提示 + 去登录 */
+function composerSection(): string {
   if (!detectLogin()) {
     return `<div class="bvp-cmt__login-tip">
       <span>登录后可以发评论</span>
       <a class="bvp-cmt__login-link" href="https://passport.bilibili.com/login" target="_blank" rel="noopener noreferrer">去登录</a>
     </div>`
   }
-  return `<form class="bvp-cmt__compose bvp-cmt__compose--main" data-action="submit-comment">
-    <textarea class="bvp-cmt__input" maxlength="${MAX_MESSAGE_LENGTH}" rows="2" placeholder="发个友善的评论吧"></textarea>
-    <div class="bvp-cmt__compose-actions">
-      <span class="bvp-cmt__count">0/${MAX_MESSAGE_LENGTH}</span>
-      <button type="submit" class="bvp-cmt__submit" data-action="submit-comment">发布</button>
-    </div>
-  </form>`
+  return composerHtml({ placeholder: '发一条友善的评论' })
 }
 
 function renderList(): void {
@@ -396,15 +399,16 @@ function renderList(): void {
         <button type="button" class="bvp-cmt__tab" data-action="close-subpage">← 返回评论列表</button>
       </div>
       <div class="bvp-cmt__list">${itemHtml(subpage.root, 0)}${subItems}</div>
-      <div class="bvp-cmt__footer">${composerHtml()}</div>`
+      <div class="bvp-cmt__footer">${composerSection()}</div>`
     bindContainerActions(container)
     return
   }
   const visible = state.onlyUp
     ? state.items.filter(item => item.isUp)
     : state.items
-  const itemsHtml = visible.length
-    ? visible.map(item => itemHtml(item, 0)).join('')
+  const shown = visible.slice(0, state.renderedCount)
+  const itemsHtml = shown.length
+    ? shown.map(item => itemHtml(item, 0)).join('')
     : `<div class="bvp-cmt__empty">${state.loading
       ? '加载中…'
       : (state.onlyUp ? '正在查找 UP 主的评论…' : '还没有评论')}</div>`
@@ -423,12 +427,15 @@ function renderList(): void {
     <div class="bvp-cmt__footer" id="bewly-comment-footer">
       ${state.loading
         ? '<div class="bvp-cmt__loading">加载中…</div>'
-        : state.hasMore
+        : state.hasMore && shown.length >= visible.length
           ? '<button type="button" class="bvp-cmt__load-more" data-action="load-more">加载更多</button>'
-          : visible.length ? '<div class="bvp-cmt__end">没有更多了</div>' : ''}
-      ${composerHtml()}
+          : shown.length < visible.length
+            ? '<button type="button" class="bvp-cmt__load-more" data-action="render-more">显示更多</button>'
+            : visible.length ? '<div class="bvp-cmt__end">没有更多了</div>' : ''}
+      ${composerSection()}
     </div>`
   bindContainerActions(container)
+  bindAutoRender(container)
   // 排序切换后恢复滚动位置
   const listEl = container.querySelector<HTMLElement>('.bvp-cmt__list')
   if (listEl) {
@@ -436,6 +443,50 @@ function renderList(): void {
     if (memo)
       listEl.scrollTop = memo
   }
+}
+
+/** 滚动接近底部时把下一批已加载评论渲染出来（不请求接口） */
+function bindAutoRender(container: HTMLElement): void {
+  const listEl = container.querySelector<HTMLElement>('.bvp-cmt__list')
+  if (!listEl || listEl.dataset.autoRender === '1')
+    return
+  listEl.dataset.autoRender = '1'
+  listEl.addEventListener('scroll', () => {
+    const visible = state.onlyUp
+      ? state.items.filter(item => item.isUp)
+      : state.items
+    if (state.renderedCount >= visible.length)
+      return
+    const nearBottom = listEl.scrollTop + listEl.clientHeight >= listEl.scrollHeight - 240
+    if (!nearBottom)
+      return
+    const scrollTop = listEl.scrollTop
+    state.renderedCount += RENDER_BATCH
+    renderList()
+    // 渲染后恢复滚动位置（避免跳动）
+    const nextList = container.querySelector<HTMLElement>('.bvp-cmt__list')
+    if (nextList)
+      nextList.scrollTop = scrollTop
+  }, { passive: true })
+}
+
+/**
+ * 本地插入新发表的评论（第 83 轮）。
+ *
+ * 选择：**热门排序下插到「置顶」之后**（无置顶则顶部第二条），最新排序下插顶部。
+ * 理由：热门排序的首条通常是置顶公告，新评论紧随其后最符合「刚发表就在显眼处」的预期，
+ * 又不会把置顶挤掉；同时给「刚刚发表」徽标说明它不在严格热度序列里。
+ */
+function insertPostedItem(item: CommentItem): void {
+  if (state.sort === 0) {
+    state.items.unshift(item)
+    return
+  }
+  const lastTopIndex = state.items.reduce((acc, entry, index) => (entry.isTop ? index : acc), -1)
+  const insertAt = lastTopIndex >= 0
+    ? lastTopIndex + 1
+    : Math.min(1, state.items.length)
+  state.items.splice(insertAt, 0, item)
 }
 
 function updateItem(rpid: string, patch: Partial<CommentItem>): void {
@@ -540,9 +591,7 @@ function bindContainerActions(container: HTMLElement): void {
     const target = event.target as HTMLElement
     if (!target.classList.contains('bvp-cmt__input'))
       return
-    const counter = target.parentElement?.querySelector('.bvp-cmt__count')
-    if (counter)
-      counter.textContent = `${(target as HTMLTextAreaElement).value.length}/${MAX_MESSAGE_LENGTH}`
+    syncCount(target as HTMLTextAreaElement)
   })
   container.addEventListener('click', async (event) => {
     const target = (event.target as HTMLElement).closest<HTMLElement>('[data-action]')
@@ -572,6 +621,26 @@ function bindContainerActions(container: HTMLElement): void {
     }
     if (action === 'load-more') {
       await loadPage(state.page + 1)
+      return
+    }
+    if (action === 'render-more') {
+      state.renderedCount += RENDER_BATCH
+      renderList()
+      return
+    }
+    if (action === 'open-emote') {
+      const form = target.closest<HTMLElement>('.bvp-cmt__compose')
+      if (form)
+        await openEmoteForForm(form)
+      return
+    }
+    if (action === 'attach-image') {
+      handleAttachImage()
+      return
+    }
+    if (action === 'cancel-reply') {
+      state.replyTarget = null
+      renderList()
       return
     }
     if (action === 'preview-image') {
@@ -606,36 +675,6 @@ function bindContainerActions(container: HTMLElement): void {
       renderList()
       return
     }
-    if (action === 'submit-reply' && rpid) {
-      const form = container.querySelector<HTMLFormElement>(`.bvp-cmt__compose[data-rpid="${rpid}"]`)
-      const input = form?.querySelector<HTMLTextAreaElement>('.bvp-cmt__input')
-      if (!input)
-        return
-      const parentInfo = state.subpage
-        ? { root: state.subpage.root.rpid, parent: rpid }
-        : { root: rpid, parent: rpid }
-      const result = await submitComment(input.value, {
-        root: String(parentInfo.root),
-        parent: String(parentInfo.parent),
-      })
-      if (result.ok) {
-        const self = await fetchSelfProfile()
-        const item = makeLocalItem(result.rpid || `local-${Date.now()}`, result.message, self)
-        if (state.subpage) {
-          state.subpage.items.push(item)
-          state.subpage.root.rcount += 1
-        }
-        else {
-          const rootItem = state.items.find(entry => String(entry.rpid) === rpid)
-          if (rootItem)
-            rootItem.rcount += 1
-        }
-        state.replyTarget = null
-        renderList()
-        revealNewComment(String(item.rpid))
-      }
-      return
-    }
     if (action === 'open-subpage' && rpid) {
       await openSubpage(rpid)
       return
@@ -647,19 +686,55 @@ function bindContainerActions(container: HTMLElement): void {
   })
   container.addEventListener('submit', async (event) => {
     const form = event.target as HTMLFormElement
-    if (!form.matches('.bvp-cmt__compose--main'))
+    if (!form.matches('.bvp-cmt__compose'))
       return
     event.preventDefault()
     const input = form.querySelector<HTMLTextAreaElement>('.bvp-cmt__input')
     if (!input)
       return
-    const result = await submitComment(input.value)
-    if (result.ok) {
-      const self = await fetchSelfProfile()
-      const item = makeLocalItem(result.rpid || `local-${Date.now()}`, result.message, self)
-      state.items.unshift(item)
-      renderList()
-      revealNewComment(String(item.rpid))
+    const replyRpid = form.dataset.rpid ?? ''
+    const isReply = Boolean(replyRpid)
+    const parentInfo = isReply
+      ? (state.subpage
+          ? {
+              root: String(state.subpage.root.rpid),
+              parent: replyRpid,
+            }
+          : { root: replyRpid, parent: replyRpid })
+      : undefined
+    const result = await submitComment(input.value, parentInfo)
+    if (!result.ok)
+      return
+    const self = await fetchSelfProfile()
+    const item = makeLocalItem(result.rpid || `local-${Date.now()}`, result.message, self)
+    item.justPosted = true
+    if (isReply) {
+      if (state.subpage) {
+        state.subpage.items.push(item)
+        state.subpage.root.rcount += 1
+      }
+      else {
+        const rootItem = state.items.find(entry => String(entry.rpid) === replyRpid)
+        if (rootItem)
+          rootItem.rcount += 1
+      }
+      state.replyTarget = null
+    }
+    else {
+      insertPostedItem(item)
+    }
+    renderList()
+    revealNewComment(String(item.rpid))
+  })
+  // Ctrl / Cmd + Enter 快捷发布
+  container.addEventListener('keydown', (event) => {
+    const target = event.target as HTMLElement
+    if (!target.classList.contains('bvp-cmt__input'))
+      return
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+      event.preventDefault()
+      const form = target.closest<HTMLFormElement>('.bvp-cmt__compose')
+      form?.requestSubmit()
     }
   })
 }
@@ -707,6 +782,8 @@ async function fetchMainPage(page: number): Promise<boolean> {
     seen.add(String(item.rpid))
     pageItems.push(item)
   }
+  if (page === 1)
+    state.renderedCount = RENDER_BATCH
   state.items = page === 1
     ? pageItems
     : [
@@ -739,6 +816,7 @@ async function loadPage(page: number): Promise<void> {
 }
 
 async function reloadComments(): Promise<void> {
+  state.renderedCount = RENDER_BATCH
   state.page = 0
   state.items = []
   state.hasMore = false
@@ -833,6 +911,7 @@ export function setupCommentList(): () => void {
 export function teardownCommentList(): void {
   stopBridge()
   closeImageViewer()
+  closeEmotePanel()
   restoreNative()
   state.aid = null
   state.bvid = ''

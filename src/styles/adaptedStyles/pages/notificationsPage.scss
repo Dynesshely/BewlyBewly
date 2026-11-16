@@ -740,3 +740,671 @@ html.bewly-design.notificationsPage.dark {
   }
 }
 // #endregion
+// #region 第 93 轮：消息中心自绘（只新增，不改动上方既有规则）
+//
+// 真机 dump 后的类名分两类：
+//   - 非哈希 BEM：.message-layout / .message-aside / .message-sidebar / .message-main /
+//     .message-header / .message-content / .whisper / .reply / .system /
+//     .message-sidebar__item / .interaction-item / .notify-item 等（稳定）
+//   - CSS Modules 哈希：_SidebarContent_xxxx / _SessionItem_xxxx / _ChatWindow_xxxx /
+//     _Msg_xxxx / _MsgIsMe_xxxx / _MsgText__Content_xxxx / _MessageSendBox_xxxx 等
+//     （后缀随构建变化，一律用 [class*="前缀"] 匹配）
+//
+// 自绘结构：
+//   - 顶部：原生左栏分类 → 自绘 tab pill（.bewly-msg-tabs-host，由 JS 插入 .message-header）
+//   - 左侧：原生会话列表 → 自绘会话列表（.bewly-msg-sessions-host 覆盖在 _SidebarContent_ 上，
+//     原生列表仍保留在 DOM 里提供数据与行为，只把它的可见性隐藏）
+//   - 右侧：保留原生消息区，这里用 CSS 画成自己 / 对方两种气泡
+//
+// 主题：颜色只从 --bew-* 令牌派生，不写死任何十六进制颜色。页面可能出现三种主题状态：
+//   1. 浅色：--bew-* 本身就是浅色，直接映射；
+//   2. Bewly 深色（html.dark）：--bew-* 已经是深色，直接映射；
+//   3. 只有 B 站深色（html.bili_dark 而没有 html.dark，本机实测就是这种）：
+//      --bew-* 仍是浅色，此时用 Bewly 的中性色（--bew-text-1 / --bew-bg）派生一套深色面板，
+//      保证自绘区域跟着页面真正显示的明暗走。
+
+html.bewly-message-drawn {
+  // 浅色 / Bewly 深色：令牌原样映射
+  --bm-bg: var(--bew-bg);
+  --bm-surface: var(--bew-content-solid);
+  --bm-surface-2: var(--bew-fill-1);
+  --bm-surface-3: var(--bew-fill-2);
+  --bm-text-1: var(--bew-text-1);
+  --bm-text-2: var(--bew-text-2);
+  --bm-text-3: var(--bew-text-3);
+  --bm-border: var(--bew-border-color);
+  --bm-accent: var(--bew-theme-color);
+  --bm-accent-weak: var(--bew-theme-color-10);
+  --bm-accent-strong: var(--bew-theme-color-20);
+  --bm-on-accent: var(--bew-text-auto);
+}
+
+// B 站深色主题、但 Bewly 令牌仍是浅色（没有 html.dark）：派生深色面板
+html.bewly-message-drawn.bili_dark:not(.dark) {
+  --bm-bg: color-mix(in oklab, var(--bew-text-1), black 6%);
+  --bm-surface: color-mix(in oklab, var(--bew-text-1), black 2%);
+  --bm-surface-2: color-mix(in oklab, var(--bew-text-1), var(--bew-bg) 10%);
+  --bm-surface-3: color-mix(in oklab, var(--bew-text-1), var(--bew-bg) 16%);
+  --bm-text-1: var(--bew-bg);
+  --bm-text-2: color-mix(in oklab, var(--bew-bg), transparent 22%);
+  --bm-text-3: color-mix(in oklab, var(--bew-bg), transparent 45%);
+  --bm-border: color-mix(in oklab, var(--bew-bg), transparent 86%);
+  --bm-accent-weak: color-mix(in oklab, var(--bew-theme-color), transparent 82%);
+  --bm-accent-strong: color-mix(in oklab, var(--bew-theme-color), transparent 70%);
+  --bm-on-accent: var(--bew-text-auto);
+}
+
+html.bewly-message-drawn {
+  // #region 页面骨架
+  .message-bgc,
+  .message-bg {
+    display: none;
+  }
+
+  .message-layout {
+    width: min(1440px, calc(100vw - 48px));
+    max-width: none;
+    margin-inline: auto;
+    color: var(--bm-text-1);
+  }
+
+  // 分类已经变成顶部 pill，原生左栏整列隐藏
+  .message-aside {
+    display: none !important;
+  }
+
+  .message-main {
+    width: 100%;
+    color: var(--bm-text-2);
+    background: transparent;
+  }
+
+  .message-header {
+    display: flex;
+    align-items: center;
+    height: 48px;
+    padding: 0 6px;
+    background: transparent;
+    border-bottom: 1px solid var(--bm-border);
+    box-shadow: none;
+
+    .message-header__leading,
+    .message-header__actions {
+      display: none;
+    }
+  }
+
+  .message-content,
+  .message-content__wrapper {
+    background: transparent;
+  }
+
+  .message-content__inner,
+  [class*="_IM_"] {
+    background: var(--bm-surface);
+  }
+
+  .message-box-shadow {
+    box-shadow: none;
+  }
+
+  .whisper,
+  .reply,
+  .system {
+    overflow: hidden;
+    background: var(--bm-surface);
+    border-radius: var(--bew-radius);
+    box-shadow: 0 0 0 1px var(--bm-border);
+  }
+  // #endregion
+
+  // #region 顶部 tab pill
+  .bewly-msg-tabs-host {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .bewly-msg-tabs {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .bewly-msg-tabs__list {
+    display: flex;
+    flex: 1;
+    gap: 4px;
+    align-items: center;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  .bewly-msg-tabs__pill {
+    display: inline-flex;
+    flex: none;
+    gap: 6px;
+    align-items: center;
+    height: 30px;
+    padding: 0 12px;
+    font: inherit;
+    font-size: 13px;
+    color: var(--bm-text-2);
+    cursor: pointer;
+    background: transparent;
+    border: 0;
+    border-radius: 999px;
+    appearance: none;
+    transition:
+      color 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
+      background-color 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+
+    &:hover {
+      color: var(--bm-text-1);
+      background: var(--bm-surface-2);
+    }
+
+    &.is-active {
+      font-weight: 600;
+      color: var(--bm-on-accent);
+      background: var(--bm-accent);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--bm-accent);
+      outline-offset: 2px;
+    }
+  }
+
+  .bewly-msg-tabs__label {
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .bewly-msg-tabs__badge {
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 18px;
+    color: var(--bm-accent);
+    text-align: center;
+    background: var(--bm-accent-strong);
+    border-radius: 999px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bewly-msg-tabs__pill.is-active .bewly-msg-tabs__badge {
+    color: var(--bm-on-accent);
+    background: color-mix(in oklab, var(--bm-on-accent), transparent 74%);
+  }
+
+  .bewly-msg-tabs__dot {
+    width: 6px;
+    height: 6px;
+    background: var(--bm-accent);
+    border-radius: 50%;
+  }
+
+  .bewly-msg-tabs__pill.is-active .bewly-msg-tabs__dot {
+    background: var(--bm-on-accent);
+  }
+
+  .bewly-msg-tabs__settings {
+    flex: none;
+    height: 28px;
+    padding: 0 10px;
+    font: inherit;
+    font-size: 12px;
+    color: var(--bm-text-3);
+    cursor: pointer;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    transition:
+      color 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
+      background-color 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+
+    &:hover {
+      color: var(--bm-text-1);
+      background: var(--bm-surface-2);
+    }
+  }
+  // #endregion
+
+  // #region 会话面板外壳
+  [class*="_Sidebar_"] {
+    border-right: 1px solid var(--bm-border);
+  }
+
+  // 会话面板标题由自绘列表自己渲染（「最近消息 + 条数」）
+  [class*="_SidebarHeader_"] {
+    display: none;
+  }
+
+  [class*="_SidebarContent_"] {
+    position: relative;
+  }
+
+  // 原生会话列表保留布局（visibility 仍占位，可编程触发加载更多），只是不可见；
+  // 视觉与交互全部由自绘列表接管
+  [class*="_SidebarContent_"] [class*="_SidebarSlide_"],
+  [class*="_SidebarContent_"] [class*="_InfiniteScroll_"] {
+    visibility: hidden;
+  }
+
+  .bewly-msg-sessions-host {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+  }
+  // #endregion
+
+  // #region 自绘会话列表
+  .bewly-msg-sessions {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--bm-surface);
+  }
+
+  .bewly-msg-sessions__head {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px 8px;
+  }
+
+  .bewly-msg-sessions__title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--bm-text-3);
+    letter-spacing: 0.4px;
+  }
+
+  .bewly-msg-sessions__count {
+    font-size: 11px;
+    color: var(--bm-text-3);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bewly-msg-sessions__scroll {
+    flex: 1;
+    min-height: 0;
+    padding: 0 8px 12px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+
+  .bewly-msg-sessions__empty {
+    padding: 32px 8px;
+    font-size: 12px;
+    color: var(--bm-text-3);
+    text-align: center;
+  }
+
+  .bewly-msg-session {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    width: 100%;
+    padding: 8px;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    background: transparent;
+    border: 0;
+    border-radius: 12px;
+    appearance: none;
+    transition: background-color 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+
+    &:hover {
+      background: var(--bm-surface-2);
+    }
+
+    &.is-active {
+      background: var(--bm-accent-weak);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--bm-accent);
+      outline-offset: -2px;
+    }
+  }
+
+  .bewly-msg-session__avatar-wrap {
+    position: relative;
+    flex: none;
+  }
+
+  .bewly-msg-session__avatar {
+    display: block;
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    background: var(--bm-surface-2);
+    border-radius: 50%;
+  }
+
+  .bewly-msg-session__avatar--fallback {
+    display: grid;
+    place-items: center;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--bm-text-2);
+  }
+
+  .bewly-msg-session__main {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  .bewly-msg-session__row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 0;
+  }
+
+  .bewly-msg-session__name {
+    overflow: hidden;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--bm-text-1);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .bewly-msg-session__time {
+    flex: none;
+    font-size: 11px;
+    color: var(--bm-text-3);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bewly-msg-session__info {
+    display: flex;
+    flex: 1;
+    gap: 4px;
+    align-items: baseline;
+    min-width: 0;
+  }
+
+  .bewly-msg-session__alert {
+    flex: none;
+    max-width: 55%;
+    overflow: hidden;
+    font-size: 12px;
+    color: var(--bm-accent);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .bewly-msg-session__summary {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 12px;
+    color: var(--bm-text-3);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .bewly-msg-session__badge {
+    flex: none;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 18px;
+    color: var(--bm-on-accent);
+    text-align: center;
+    background: var(--bm-accent);
+    border-radius: 999px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bewly-msg-session__dot {
+    flex: none;
+    width: 6px;
+    height: 6px;
+    background: var(--bm-accent);
+    border-radius: 50%;
+  }
+
+  .bewly-msg-session__silent {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border: 1px solid var(--bm-text-3);
+    border-radius: 50%;
+  }
+  // #endregion
+
+  // #region 聊天窗口外壳
+  [class*="_ChatWindow_"] {
+    background: var(--bm-surface);
+  }
+
+  [class*="_ChatHeader_"] {
+    height: 48px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--bm-border);
+  }
+
+  [class*="_ContactName_"] {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--bm-text-1);
+  }
+
+  [class*="_MoreAction_"] {
+    color: var(--bm-text-3);
+    border-radius: 8px;
+
+    &:hover {
+      color: var(--bm-text-1);
+      background: var(--bm-surface-2);
+    }
+  }
+
+  [class*="_MessageList_"] {
+    padding: 4px 0 12px;
+    background: transparent;
+  }
+
+  // 聊天滚动容器由 B 站自己用行内/高优先级规则刷底（--bg1 / --bg2），
+  // 这里用 important 压掉它，让消息区回到自绘表面色
+  [class*="_ChatContent_"],
+  [class*="_ChatContent_"] [class*="_InfiniteScroll_"],
+  [class*="_ChatContent_"] [class*="_MessageList_"] {
+    background: transparent !important;
+  }
+  // #endregion
+
+  // #region 消息气泡（自己 / 对方两种）
+  [class*="MessageList"] > [class*="_Msg_"] {
+    padding: 4px 16px 14px;
+  }
+
+  [class*="_Msg__Time_"] {
+    padding: 14px 0 6px;
+    font-size: 12px;
+    color: var(--bm-text-3);
+    font-variant-numeric: tabular-nums;
+  }
+
+  [class*="_Msg__Avatar_"] {
+    width: 34px;
+    height: 34px;
+    overflow: hidden;
+    border-radius: 50%;
+  }
+
+  [class*="_Msg__Avatar_"] img,
+  [class*="_Msg__Avatar_"] picture,
+  [class*="_Msg__Avatar_"] [class*="b-img"] {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+  }
+
+  // 原生气泡的底色 / 圆角 / 内边距都挂在 _MsgText_（外层，紧贴 _Msg__Content_）上，
+  // 不在 _MsgText__Content_（纯文本层）。这里改外层，内层只负责排版。
+  [class*="_Msg__Content_"] > [class*="_MsgText_"] {
+    max-width: min(72%, 560px);
+    padding: 9px 13px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--bm-text-1);
+    word-break: break-word;
+    background: var(--bm-surface-2);
+    border-radius: 12px 12px 12px 4px;
+  }
+
+  // 自己：主题色气泡，右上角收口
+  [class*="MsgIsMe"] [class*="_Msg__Content_"] > [class*="_MsgText_"] {
+    color: var(--bm-on-accent);
+    background: var(--bm-accent);
+    border-radius: 12px 12px 4px 12px;
+  }
+
+  [class*="_MsgText__Content"] {
+    padding: 0;
+    font-size: inherit;
+    line-height: inherit;
+    color: inherit;
+    background: transparent;
+  }
+
+  [class*="MsgIsMe"] [class*="_Msg__Content_"],
+  [class*="MsgIsMe"] [class*="_Msg__Main_"] {
+    align-items: flex-end;
+  }
+
+  // 分享卡 / 通知卡 / 视频卡：只给消息内容的一级子节点统一圆角，不加气泡底
+  [class*="_Msg__Content_"] > * {
+    border-radius: 12px;
+  }
+  // #endregion
+
+  // #region 发送框
+  [class*="_ChatFooter_"] {
+    padding: 10px 16px 14px;
+    background: var(--bm-surface);
+    border-top: 1px solid var(--bm-border);
+  }
+
+  [class*="_MessageSendBox_"] {
+    padding: 6px 8px 8px;
+    background: var(--bm-surface-2);
+    border-radius: 12px;
+  }
+
+  [class*="_MessageSendBox__Textarea_"] {
+    font-size: 14px;
+    color: var(--bm-text-1);
+  }
+
+  [class*="_MessageSendBox_"] .brt-placeholder {
+    color: var(--bm-text-3);
+  }
+
+  [class*="_MessageSendBox__ToolBtn_"] {
+    color: var(--bm-text-3);
+    border-radius: 8px;
+
+    &:hover {
+      color: var(--bm-text-1);
+      background: var(--bm-surface-3);
+    }
+  }
+
+  [class*="_MessageSendBox__SendBtn_"] {
+    height: 26px;
+    padding: 0 14px;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 26px;
+    color: var(--bm-on-accent);
+    text-align: center;
+    background: var(--bm-accent);
+    border-radius: 8px;
+
+    &[class*="IsDisabled_"] {
+      color: var(--bm-text-3);
+      background: var(--bm-surface-3);
+      opacity: 1;
+    }
+  }
+
+  [class*="_MessageSendBox__Indicator_"] {
+    font-size: 11px;
+    color: var(--bm-text-3);
+    font-variant-numeric: tabular-nums;
+  }
+  // #endregion
+
+  // #region 回复 / @ / 点赞 / 系统通知列表（保持原生结构，只统一表面）
+  .reply-list,
+  .system-list {
+    padding: 8px 12px;
+  }
+
+  .interaction-item,
+  .system-item {
+    border-radius: 12px;
+    transition: background-color 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+
+  .interaction-item:hover {
+    background: var(--bm-surface-2);
+  }
+
+  .interaction-item__uname,
+  .notify-item__title {
+    font-weight: 600;
+    color: var(--bm-text-1);
+  }
+
+  .interaction-item__time,
+  .notify-item__time,
+  .interaction-item__msg,
+  .notify-item__msg {
+    color: var(--bm-text-3);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .notify-item {
+    border-radius: 12px;
+    background: var(--bm-surface-2);
+  }
+  // #endregion
+
+  // #region 动效降级
+  @media (prefers-reduced-motion: reduce) {
+    .bewly-msg-tabs__pill,
+    .bewly-msg-tabs__settings,
+    .bewly-msg-session,
+    .interaction-item {
+      transition: none;
+    }
+  }
+  // #endregion
+}
+// #endregion

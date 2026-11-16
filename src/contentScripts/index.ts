@@ -22,6 +22,9 @@ import { setupSpacePage } from './spacePage'
 import { setupVideoPage } from './videoPage'
 import App from './views/App.vue'
 // 搜索结果页整体自绘（第 92 轮 A）：自绘层挂载失败会自动回退原生页面
+import { setupMessageDrawn } from './views/Message'
+import { setupMomentsDrawnPage, teardownMomentsDrawnPage } from './views/Moments/native'
+import { isPopularPage, setupPopularPage, teardownPopularPage } from './views/Popular'
 import { setupSearchDrawnPage, teardownSearchDrawnPage } from './views/SearchPage'
 
 import '~/styles'
@@ -268,14 +271,26 @@ async function onDOMLoaded() {
   // 搜索结果页整体自绘（第 92 轮 A）：解析原生结果后用我们的卡片渲染，失败回退原生
   setupSearchDrawnPage()
 
+  // 消息中心页自绘（第 93 轮 E）：会话列表与聊天气泡覆盖层，8s 等不到骨架则完全不接管
+  setupMessageDrawn()
+
+  // 动态页自绘（第 93 轮 D）：逐条替换原生动态卡片，单条失败只回退该条
+  setupMomentsDrawnPage()
+
   // 用户空间增强层（筛选、密度、j/k、快速跳转）
   setupSpacePage()
 
   // 专栏 / 文章页阅读模式（沉浸阅读 / 进度 / 目录 / 字号）
   setupArticlePage()
 
+  // 热门 / 排行榜自绘（第 93 轮 F）：覆盖层自挂载，失败不影响原生页
+  setupPopularPage()
+
   // 分区 / 频道页增强层（密度、排序快捷、j/k 浏览）
-  setupChannelPage()
+  // 热门页已由 setupPopularPage() 整体接管，channelPage 的 isChannelPage() 也会匹配 /v/popular*，
+  // 两者同时生效会叠两层浮层 → popular 页跳过。
+  if (!isPopularPage())
+    setupChannelPage()
 
   // 原生页面（搜索页等）的屏蔽词过滤：标记式隐藏，可逆
   if (settings.value.nativeFilterEnabled && !isFullyTakenOverPage())
@@ -291,6 +306,8 @@ async function onDOMLoaded() {
     }
     teardownSiteTweaks()
     teardownSearchDrawnPage()
+    teardownPopularPage()
+    teardownMomentsDrawnPage()
   }, { once: true })
 
   // Reset the original Bilibili top bar display style

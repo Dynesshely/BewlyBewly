@@ -1,0 +1,197 @@
+/**
+ * 专栏文章页（`/read/cv*`、重定向后的 `/opus/*`）的默认排版与互动栏。
+ *
+ * 与既有 `contentScripts/articlePage` 的分工：
+ *   - 那个模块负责「沉浸阅读模式」（用户主动开启），样式全部挂在
+ *     `html.bewly-article-reading` 下，正文按三档字号缩放；
+ *   - 本文件负责**不开阅读模式时的默认观感**：720px 正文列、1.8 行高、
+ *     段落间距、图片圆角 + 可点击放大指针、底部互动栏。
+ *     所以选择器统一带 `:not(.bewly-article-reading)`，两种状态互不打架。
+ *
+ * 所有颜色只用 `--bew-*` 变量（深浅主题自动跟随），只做视觉层调整，
+ * 不移动 / 不删除任何原生节点；找不到正文容器时 index.ts 不会加这个类。
+ */
+html.bewly-read-article:not(.bewly-article-reading) {
+  --brp-content-width: 720px;
+  --brp-line-height: 1.8;
+
+  background-color: var(--bew-bg);
+
+  /* #region 正文列宽：720px 居中 */
+  .opus-module-content,
+  .bili-opus-view,
+  .normal-article-holder,
+  .read-article-holder,
+  .article-container__content,
+  .article-container {
+    box-sizing: border-box;
+    max-width: var(--brp-content-width) !important;
+    min-width: 0 !important;
+    margin-right: auto !important;
+    margin-left: auto !important;
+  }
+
+  .opus-module-title,
+  .article-container .title-container {
+    max-width: var(--brp-content-width);
+    margin-right: auto;
+    margin-left: auto;
+  }
+  /* #endregion */
+
+  /* #region 段落排版：行高 1.8 + 段间距 */
+  .opus-module-content,
+  .normal-article-holder,
+  .read-article-holder,
+  .article-holder {
+    font-size: 16px;
+    line-height: var(--brp-line-height);
+    color: var(--bew-text-1);
+  }
+
+  :is(.opus-module-content, .normal-article-holder, .read-article-holder) :is(p, li, dd, td) {
+    line-height: var(--brp-line-height);
+  }
+
+  :is(.opus-module-content, .normal-article-holder, .read-article-holder) p {
+    margin: 0 0 1em;
+  }
+
+  :is(.opus-module-content, .normal-article-holder, .read-article-holder) p:last-child {
+    margin-bottom: 0;
+  }
+
+  :is(.opus-module-content, .normal-article-holder, .read-article-holder) h1,
+  :is(.opus-module-content, .normal-article-holder, .read-article-holder) h2,
+  :is(.opus-module-content, .normal-article-holder, .read-article-holder) h3 {
+    margin: 1.6em 0 0.7em;
+    line-height: 1.4;
+    color: var(--bew-text-1);
+  }
+
+  :is(.opus-module-content, .normal-article-holder, .read-article-holder) blockquote {
+    margin: 1.2em 0;
+    padding: 12px 16px;
+    color: var(--bew-text-2);
+    background-color: var(--bew-fill-1);
+    border-left: 3px solid var(--bew-theme-color);
+    border-radius: 0 var(--bew-radius-half, 6px) var(--bew-radius-half, 6px) 0;
+  }
+
+  :is(.opus-module-content, .normal-article-holder, .read-article-holder) blockquote p:last-child {
+    margin-bottom: 0;
+  }
+
+  :is(.opus-module-content, .normal-article-holder, .read-article-holder) :is(pre, code) {
+    border-radius: var(--bew-radius-half, 6px);
+  }
+  /* #endregion */
+
+  /* #region 图片：圆角 + 点击放大（放大由 articlePage 的 lightbox 负责，这里只给指针与圆角） */
+  :is(.opus-module-content, .normal-article-holder, .read-article-holder) img {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--bew-radius, 12px);
+    cursor: zoom-in;
+  }
+
+  :is(.opus-module-content, .article-holder) :is(.bili-dyn-pic, .opus-pic-view, .row-video-holder) {
+    overflow: hidden;
+    border-radius: var(--bew-radius, 12px);
+  }
+  /* #endregion */
+
+  /* #region 底部互动栏：把原生右侧竖排工具条改成底部居中的胶囊条
+     真机结构：.right-sidebar-wrap > .side-toolbar
+                 > .side-toolbar__box  > .side-toolbar__action×5（赞/投币/收藏/分享/评论）
+                 > .side-toolbar__bottom > .side-toolbar__btn.backtop（顶部）
+     整条 .side-toolbar 变成胶囊容器，里面两个 groups 各自是透明的 flex 行。 */
+  .right-sidebar-wrap .side-toolbar {
+    position: fixed !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: 20px !important;
+    left: 50% !important;
+    z-index: 60 !important;
+    display: flex !important;
+    gap: 4px;
+    align-items: center;
+    padding: 4px 8px;
+    background-color: var(--bew-elevated-solid);
+    border: 1px solid var(--bew-border-color);
+    border-radius: 999px;
+    box-shadow: var(--bew-shadow-2, 0 10px 15px -3px rgb(0 0 0 / 0.1));
+    transform: translateX(-50%) !important;
+    transition: opacity var(--bew-motion-fast, 140ms) var(--bew-ease-out, ease-out);
+  }
+
+  .right-sidebar-wrap .side-toolbar__box,
+  .right-sidebar-wrap .side-toolbar__bottom {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 2px;
+    align-items: center;
+    padding: 0;
+    margin: 0;
+    background: none;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .right-sidebar-wrap .side-toolbar__bottom {
+    padding-left: 6px;
+    margin-left: 2px;
+    border-left: 1px solid var(--bew-border-color);
+  }
+
+  .right-sidebar-wrap .side-toolbar__action,
+  .right-sidebar-wrap .side-toolbar__btn {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 2px;
+    align-items: center;
+    justify-content: center;
+    min-width: 46px;
+    padding: 5px 8px;
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--bew-text-2);
+    cursor: pointer;
+    border-radius: 16px;
+    transition:
+      color var(--bew-motion-fast, 140ms) var(--bew-ease-out, ease-out),
+      background-color var(--bew-motion-fast, 140ms) var(--bew-ease-out, ease-out);
+  }
+
+  .right-sidebar-wrap .side-toolbar__action:hover,
+  .right-sidebar-wrap .side-toolbar__btn:hover {
+    color: var(--bew-text-1);
+    background-color: var(--bew-fill-1);
+  }
+
+  .right-sidebar-wrap .side-toolbar__action__text {
+    font-size: 11px;
+    line-height: 1.4;
+    color: inherit;
+  }
+
+  /* 文章底部的「分享至」区域：与正文拉开距离，加一条细分隔线 */
+  .opus-module-bottom {
+    margin-top: 32px;
+    padding-top: 20px;
+    border-top: 1px solid var(--bew-border-color);
+  }
+
+  /* 胶囊互动栏是 fixed 的，给正文末尾留出空间，避免压住最后一段 */
+  .bili-opus-view,
+  .article-container__content {
+    padding-bottom: 88px;
+  }
+  /* #endregion */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.bewly-read-article:not(.bewly-article-reading) .right-sidebar-wrap :is(.side-toolbar, .side-toolbar__action) {
+    transition: none;
+  }
+}

@@ -1,0 +1,36 @@
+/**
+ * 专栏列表页自绘层的「页面级」样式（注入到 document.documentElement，卸载时移除）。
+ *
+ * 只在 `<html class="bewly-read-drawn">` 下生效 —— 这个类由 index.ts 在
+ * 自绘层**成功挂载之后**才加上。因此数据源不可用（拿不到任何卡片）、
+ * 或者挂载过程中抛错时，原生专栏页完全不受影响，等于自动回退。
+ *
+ * 为什么要隐藏整个 `#app`：真机 dump 里原生专栏页就是
+ * `body > #article-home-app + #app(#BiliMainHeader + .page-home)`，
+ * 内容区与顶栏都在 `#app` 里；隐藏 `#app` 后由自绘层自己按
+ * `--bew-top-bar-height` 留出顶栏高度，避免「原生留一块空白 + 自绘层再顶一次」。
+ */
+html.bewly-read-drawn {
+  background-color: var(--bew-bg);
+
+  body {
+    background-color: var(--bew-bg) !important;
+    overflow-x: hidden;
+  }
+
+  /* 原生专栏首页（含它自己的顶栏占位）整体让位给自绘层 */
+  #app,
+  #article-home-app {
+    display: none !important;
+  }
+
+  /* 自绘层容器（shadow host），顶栏高度由 CSS 变量给出，顶栏隐藏时自动变 0 */
+  #bewly-read-page {
+    position: relative;
+    box-sizing: border-box;
+    min-height: 100vh;
+    padding-top: var(--bew-top-bar-height, 64px);
+  }
+
+  scrollbar-color: var(--bew-fill-2) transparent;
+}

@@ -1,0 +1,278 @@
+/**
+ * 专栏列表页自绘层的样式（由 index.ts 以 `?inline` 注入独立 shadow root）。
+ *
+ * 约定：
+ *   - 颜色 / 圆角 / 动效只用 `--bew-*` 变量，深浅主题与「减少动效」设置自动跟随；
+ *   - 组件根节点不写死宽度，跟随 Bewly 的 `--bew-page-max-width`；
+ *   - 卡片比例固定 16:9（`aspect-ratio`），标题固定两行（`-webkit-line-clamp`），
+ *     所以不同长度标题的卡片不会互相错位。
+ */
+:host {
+  display: block;
+}
+
+.brl-page {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--bew-page-max-width, 2280px);
+  margin: 0 auto;
+  padding: 24px clamp(16px, 3vw, 48px) 64px;
+  color: var(--bew-text-1);
+  font-family: inherit;
+}
+
+/* #region 页头 */
+.brl-header {
+  margin-bottom: 20px;
+}
+
+.brl-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brl-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--bew-text-1);
+}
+
+.brl-count {
+  flex: none;
+  padding: 2px 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--bew-text-2);
+  background-color: var(--bew-fill-1);
+  border-radius: 999px;
+}
+
+.brl-subtitle {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--bew-text-3);
+}
+/* #endregion */
+
+/* #region 卡片网格 */
+.brl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+  gap: 24px 16px;
+}
+
+.brl-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--bew-radius, 12px);
+  transition:
+    background-color var(--bew-motion-fast, 140ms) var(--bew-ease-out, ease-out),
+    transform var(--bew-motion-fast, 140ms) var(--bew-ease-out, ease-out);
+}
+
+.brl-card:hover,
+.brl-card:focus-visible {
+  background-color: var(--bew-fill-1);
+  transform: translateY(-2px);
+}
+
+.brl-card:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+
+.brl-cover {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background-color: var(--bew-fill-1);
+  border-radius: var(--bew-radius-half, 6px);
+}
+
+.brl-cover__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--bew-motion-slow, 240ms) var(--bew-ease-out, ease-out);
+}
+
+.brl-card:hover .brl-cover__img {
+  transform: scale(1.03);
+}
+
+.brl-cover__placeholder {
+  width: 100%;
+  height: 100%;
+  background-image: linear-gradient(135deg, var(--bew-fill-1), var(--bew-fill-2));
+}
+
+.brl-tag {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 1px 8px;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--bew-text-1);
+  background-color: color-mix(in oklab, var(--bew-bg, white), transparent 15%);
+  backdrop-filter: var(--bew-filter-glass-1, none);
+  border-radius: 999px;
+}
+
+.brl-card__title {
+  display: -webkit-box;
+  min-height: calc(1.45em * 2);
+  margin: 0;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--bew-text-1);
+  word-break: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.brl-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--bew-text-3);
+}
+
+.brl-author {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.brl-avatar {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.brl-author__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.brl-time {
+  flex: none;
+  color: var(--bew-text-4);
+}
+
+.brl-stats {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--bew-text-3);
+}
+
+.brl-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+/* #endregion */
+
+/* #region 状态与翻页 */
+.brl-empty,
+.brl-end {
+  margin: 24px 0;
+  font-size: 13px;
+  color: var(--bew-text-3);
+  text-align: center;
+}
+
+.brl-footer {
+  display: flex;
+  justify-content: center;
+  min-height: 40px;
+  margin-top: 28px;
+}
+
+.brl-sentinel {
+  width: 100%;
+  height: 1px;
+}
+
+.brl-more {
+  padding: 8px 22px;
+  font-size: 13px;
+  color: var(--bew-text-1);
+  cursor: pointer;
+  background-color: var(--bew-fill-1);
+  border: 1px solid var(--bew-border-color);
+  border-radius: 999px;
+  transition:
+    background-color var(--bew-motion-fast, 140ms) var(--bew-ease-out, ease-out),
+    border-color var(--bew-motion-fast, 140ms) var(--bew-ease-out, ease-out);
+}
+
+.brl-more:hover:not(:disabled) {
+  background-color: var(--bew-fill-2);
+}
+
+.brl-more:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.brl-more:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+
+.brl-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+/* #endregion */
+
+@media (prefers-reduced-motion: reduce) {
+  .brl-card,
+  .brl-cover__img,
+  .brl-more {
+    transition: none;
+  }
+
+  .brl-card:hover,
+  .brl-card:focus-visible {
+    transform: none;
+  }
+
+  .brl-card:hover .brl-cover__img {
+    transform: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .brl-card,
+  .brl-more {
+    border: 1px solid CanvasText;
+  }
+}

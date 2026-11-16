@@ -1,0 +1,31 @@
+/**
+ * 直播页自绘的**页面级**样式（注入 document，不在 shadow root 里）。
+ *
+ * 只做两件事：
+ *   1. 用 `<html>` 上的标记类隐藏被接管的原生 DOM；
+ *   2. 给自绘浮层的容器兜底定位（容器本身的定位样式由 `index.ts` 内联设置）。
+ *
+ * 组件外观全部在 `live.scss`（shadow root 内），这里不写任何卡片 / 按钮样式。
+ */
+
+/* #region 首页：隐藏原生内容与原生分区行 */
+html.bewly-live-home-drawn .v2-main-scroll > main,
+html.bewly-live-home-drawn .v2-main-scroll > .container,
+html.bewly-live-home-drawn nav[aria-label="直播分区"] {
+  display: none !important;
+}
+
+/* 被模块逐个标记过的原生节点（结构变体走的补充路径） */
+[data-bewly-live-drawn-hidden] {
+  display: none !important;
+}
+/* #endregion */
+
+/* #region 直播间：原生顶部信息栏改用 visibility 让位给自绘栏 */
+html.bewly-live-room-drawn #head-info-vm > .avatar,
+html.bewly-live-room-drawn #head-info-vm > .rows-ctnr,
+html.bewly-live-room-drawn .head-info-section > .avatar,
+html.bewly-live-room-drawn .head-info-section > .rows-ctnr {
+  visibility: hidden !important;
+}
+/* #endregion */

@@ -1,0 +1,623 @@
+/**
+ * 直播页自绘组件样式（首页网格 / 直播间顶部栏 / 侧栏推荐共用）。
+ *
+ * 由 `index.ts` 通过 `?inline` 读成字符串，注入每个 shadow root；
+ * 颜色 / 圆角 / 阴影全部只用 `--bew-*` 变量，深浅主题自动跟随；
+ * 类名统一 `bew-live-` 前缀，避免和原生页 / 其它 Bewly 模块撞名。
+ */
+
+:host {
+  display: block;
+}
+
+.bew-live-mount-point {
+  width: 100%;
+  height: 100%;
+}
+
+.bew-live-mount-point,
+.bew-live-mount-point *,
+.bew-live-mount-point *::before,
+.bew-live-mount-point *::after {
+  box-sizing: border-box;
+}
+
+/* #region 首页外壳 */
+.bew-live-shell {
+  position: absolute;
+  inset: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  color: var(--bew-text-1);
+  pointer-events: auto;
+  background: var(--bew-bg);
+  font-size: var(--bew-base-font-size, 14.8px);
+  line-height: 1.5;
+  scrollbar-width: thin;
+  scrollbar-color: var(--bew-fill-3) transparent;
+}
+
+.bew-live-inner {
+  width: calc(100% - 40px);
+  max-width: var(--bew-page-max-width, 2280px);
+  margin: 0 auto;
+  padding: 16px 0 48px;
+}
+
+@media (min-width: 1024px) {
+  .bew-live-inner {
+    width: calc(100% - 80px);
+  }
+}
+
+@media (max-width: 720px) {
+  .bew-live-inner {
+    width: calc(100% - 24px);
+  }
+}
+/* #endregion */
+
+/* #region 首页标题与分区 pill */
+.bew-live-home__head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 12px;
+}
+
+.bew-live-home__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--bew-text-1);
+}
+
+.bew-live-home__subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--bew-text-3);
+}
+
+.bew-live-areas {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  margin-bottom: 18px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.bew-live-areas::-webkit-scrollbar {
+  display: none;
+}
+
+.bew-live-area {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--bew-text-2);
+  text-decoration: none;
+  cursor: pointer;
+  background: var(--bew-fill-1);
+  border-radius: 999px;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.bew-live-area:hover {
+  color: var(--bew-theme-color);
+  background: var(--bew-theme-color-10);
+}
+
+.bew-live-area__subs {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 5;
+  display: none;
+  flex-direction: column;
+  min-width: 128px;
+  padding: 8px 6px;
+  margin-top: 8px;
+  background: var(--bew-elevated-solid, var(--bew-bg));
+  border-radius: var(--bew-radius-half, 8px);
+  box-shadow: var(--bew-shadow-3);
+}
+
+.bew-live-area:hover .bew-live-area__subs {
+  display: flex;
+}
+
+.bew-live-area__sub {
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--bew-text-2);
+  text-decoration: none;
+  border-radius: 6px;
+}
+
+.bew-live-area__sub:hover {
+  color: var(--bew-theme-color);
+  background: var(--bew-fill-1);
+}
+/* #endregion */
+
+/* #region 卡片网格 */
+.bew-live-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px 14px;
+}
+
+.bew-live-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: 8px;
+  outline: none;
+  transition: transform 0.2s ease;
+}
+
+.bew-live-card:hover {
+  transform: translateY(-2px);
+}
+
+.bew-live-card__cover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: var(--bew-fill-1);
+  border-radius: 8px;
+  box-shadow: var(--bew-shadow-1);
+}
+
+.bew-live-card__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.bew-live-card:hover .bew-live-card__cover img {
+  transform: scale(1.03);
+}
+
+.bew-live-card__cover-fallback {
+  width: 100%;
+  height: 100%;
+  background: var(--bew-fill-2);
+}
+
+.bew-live-card__badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  color: #fff;
+  background: var(--bew-bili-pink, hsl(343deg 94% 72%));
+  border-radius: 6px;
+}
+
+.bew-live-card__badge-dot {
+  width: 5px;
+  height: 5px;
+  background: currentcolor;
+  border-radius: 50%;
+  animation: bew-live-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes bew-live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.bew-live-card__online {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #fff;
+  text-shadow: 0 1px 4px rgb(0 0 0 / 60%);
+}
+
+.bew-live-card__meta {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.bew-live-card__face {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  background: var(--bew-fill-2);
+  border-radius: 50%;
+}
+
+.bew-live-card__text {
+  min-width: 0;
+}
+
+.bew-live-card__title {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--bew-text-1);
+  transition: color 0.2s ease;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.bew-live-card:hover .bew-live-card__title {
+  color: var(--bew-theme-color);
+}
+
+.bew-live-card__sub {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  margin: 2px 0 0;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--bew-text-3);
+  white-space: nowrap;
+}
+
+.bew-live-card__uname {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bew-live-card__area {
+  flex-shrink: 0;
+  overflow: hidden;
+  color: var(--bew-text-4, var(--bew-text-3));
+  text-overflow: ellipsis;
+}
+
+.bew-live-card__watched {
+  flex-shrink: 0;
+  color: var(--bew-text-4, var(--bew-text-3));
+}
+
+/* 侧栏推荐用的紧凑卡 */
+.bew-live-card.is-compact {
+  gap: 6px;
+}
+
+.bew-live-card.is-compact .bew-live-card__title {
+  font-size: 13px;
+  line-height: 18px;
+  -webkit-line-clamp: 1;
+}
+
+.bew-live-card.is-compact .bew-live-card__face {
+  width: 20px;
+  height: 20px;
+}
+
+.bew-live-card.is-compact .bew-live-card__badge {
+  top: 6px;
+  left: 6px;
+  padding: 0 6px;
+  font-size: 10px;
+  line-height: 15px;
+}
+/* #endregion */
+
+/* #region 骨架 / 状态 / 按钮 */
+.bew-live-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bew-live-skeleton__cover {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--bew-skeleton, var(--bew-fill-1));
+  border-radius: 8px;
+  animation: bew-live-shimmer 1.4s ease-in-out infinite;
+}
+
+.bew-live-skeleton.is-compact .bew-live-skeleton__cover {
+  aspect-ratio: 16 / 9;
+}
+
+.bew-live-skeleton__line {
+  width: 80%;
+  height: 12px;
+  background: var(--bew-skeleton, var(--bew-fill-1));
+  border-radius: 6px;
+  animation: bew-live-shimmer 1.4s ease-in-out infinite;
+}
+
+.bew-live-skeleton__line.is-short {
+  width: 45%;
+}
+
+@keyframes bew-live-shimmer {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.bew-live-state {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 16px;
+  text-align: center;
+}
+
+.bew-live-state__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--bew-text-1);
+}
+
+.bew-live-state__desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--bew-text-3);
+}
+
+.bew-live-btn {
+  padding: 6px 18px;
+  font-size: 13px;
+  color: var(--bew-theme-color);
+  cursor: pointer;
+  background: var(--bew-theme-color-10);
+  border: none;
+  border-radius: 999px;
+  transition: background-color 0.2s ease;
+}
+
+.bew-live-btn:hover {
+  background: var(--bew-theme-color-20);
+}
+
+.bew-live-btn.is-small {
+  padding: 4px 12px;
+  font-size: 12px;
+}
+
+.bew-live-sentinel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  margin-top: 18px;
+}
+
+.bew-live-sentinel__text,
+.bew-live-sentinel__link {
+  font-size: 13px;
+  color: var(--bew-text-3);
+  text-decoration: none;
+}
+
+.bew-live-sentinel__link:hover {
+  color: var(--bew-theme-color);
+}
+/* #endregion */
+
+/* #region 直播间顶部信息栏 */
+.bew-live-bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0 12px;
+  font-size: 13px;
+  color: var(--bew-text-1);
+  background: var(--bew-content, transparent);
+  backdrop-filter: var(--bew-filter-glass-1, blur(20px));
+}
+
+.bew-live-bar__anchor {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.bew-live-bar__face {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  background: var(--bew-fill-2);
+  border: 2px solid var(--bew-bg);
+  border-radius: 50%;
+}
+
+.bew-live-bar__names {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.bew-live-bar__uname {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--bew-text-1);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bew-live-bar__meta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  overflow: hidden;
+  font-size: 11px;
+  color: var(--bew-text-3);
+  white-space: nowrap;
+}
+
+.bew-live-bar__badge {
+  flex-shrink: 0;
+  padding: 0 6px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 15px;
+  color: #fff;
+  background: var(--bew-bili-pink, hsl(343deg 94% 72%));
+  border-radius: 4px;
+}
+
+.bew-live-bar__badge.is-offline {
+  color: var(--bew-text-3);
+  background: var(--bew-fill-2);
+}
+
+.bew-live-bar__area {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bew-live-bar__stats {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-left: auto;
+  font-size: 12px;
+}
+
+.bew-live-bar__stat {
+  display: inline-flex;
+  gap: 4px;
+  align-items: baseline;
+  color: var(--bew-text-3);
+  white-space: nowrap;
+}
+
+.bew-live-bar__stat-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bew-text-1);
+}
+
+.bew-live-bar__stat-label {
+  font-size: 11px;
+  color: var(--bew-text-4, var(--bew-text-3));
+}
+
+.bew-live-bar__follow {
+  flex-shrink: 0;
+  padding: 5px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  background: var(--bew-theme-color);
+  border: none;
+  border-radius: 999px;
+  transition: opacity 0.2s ease;
+}
+
+.bew-live-bar__follow:hover {
+  opacity: 0.85;
+}
+
+.bew-live-bar__follow.is-followed,
+.bew-live-bar__follow.is-unknown {
+  color: var(--bew-text-2);
+  background: var(--bew-fill-2);
+}
+
+.bew-live-bar__follow:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+/* #endregion */
+
+/* #region 直播间侧栏推荐 */
+.bew-live-rec {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  margin-top: 12px;
+  background: var(--bew-content);
+  border-radius: var(--bew-radius, 12px);
+}
+
+.bew-live-rec__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.bew-live-rec__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--bew-text-1);
+}
+
+.bew-live-rec__more {
+  font-size: 12px;
+  color: var(--bew-text-3);
+  text-decoration: none;
+}
+
+.bew-live-rec__more:hover {
+  color: var(--bew-theme-color);
+}
+
+.bew-live-rec__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bew-live-rec__state {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+}
+/* #endregion */

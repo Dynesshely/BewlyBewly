@@ -1,0 +1,497 @@
+/**
+ * 动态页自绘卡片样式（原生 t.bilibili.com）。
+ *
+ * 约束：
+ * - 所有规则都以 `html.bewly-moments-drawn` 为前提（teardown 时一并失效，零残留）；
+ * - 颜色 / 圆角 / 边框只使用 --bew-* 变量，深浅主题自动跟随；
+ * - 只隐藏「已自绘」的原生卡片本体（[data-bewly-moments-drawn]），
+ *   解析失败的条目保持原生外观，天然实现「读不到数据不改 DOM」。
+ */
+
+html.bewly-moments-drawn {
+  /* 已自绘的列表项：去掉原生卡片，保留 wrapper 以维持原生无限滚动 */
+  .bili-dyn-list__item[data-bewly-moments-drawn] {
+    margin: 0 0 12px !important;
+
+    > .bili-dyn-item {
+      display: none !important;
+    }
+  }
+
+  .bewly-moment-slot {
+    display: block;
+  }
+
+  /* #region 卡片骨架 */
+  .bewly-moment {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-sizing: border-box;
+    padding: 16px 20px;
+    border: 1px solid var(--bew-border-color);
+    border-radius: var(--bew-radius);
+    background: var(--bew-content-solid);
+    color: var(--bew-text-1);
+    font-size: 14px;
+    line-height: 1.6;
+    transition: border-color 200ms cubic-bezier(0.22, 0.61, 0.36, 1);
+
+    &:hover {
+      border-color: var(--bew-theme-color-30);
+    }
+  }
+  /* #endregion */
+
+  /* #region 作者行 */
+  .bewly-moment__header {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .bewly-moment__avatar {
+    display: block;
+    flex: none;
+    width: 40px;
+    height: 40px;
+    overflow: hidden;
+    border-radius: 50%;
+    background: var(--bew-fill-2);
+
+    .bewly-picture {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+    }
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  .bewly-moment__meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .bewly-moment__name {
+    overflow: hidden;
+    color: var(--bew-text-1);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.5;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .bewly-moment__time {
+    color: var(--bew-text-3);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  /* #endregion */
+
+  /* #region 正文 / 内容 */
+  .bewly-moment__body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .bewly-moment-text-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .bewly-moment-text {
+    display: -webkit-box;
+    margin: 0;
+    overflow: hidden;
+    color: var(--bew-text-1);
+    font-size: 14px;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: var(--bew-moment-text-lines, 6);
+
+    &.is-expanded {
+      display: block;
+      overflow: visible;
+      -webkit-line-clamp: unset;
+    }
+  }
+
+  .bewly-moment-text__toggle {
+    align-self: flex-start;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--bew-theme-color);
+    font-size: 12px;
+    line-height: 1.5;
+    cursor: pointer;
+
+    &:hover {
+      text-decoration: underline;
+    }
+
+    &:focus-visible {
+      border-radius: 4px;
+      outline: 2px solid var(--bew-theme-color);
+      outline-offset: 2px;
+    }
+  }
+  /* #endregion */
+
+  /* #region 图片网格：1 张大图 / 2–4 两张列 / 5–9 三列 */
+  .bewly-moment-pics {
+    display: grid;
+    gap: 4px;
+    width: 100%;
+    max-width: 560px;
+    overflow: hidden;
+    border-radius: 10px;
+
+    &.is-single {
+      grid-template-columns: minmax(0, 1fr);
+      max-width: 360px;
+    }
+
+    &.is-two {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      max-width: 420px;
+    }
+
+    &.is-three {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      max-width: 540px;
+    }
+  }
+
+  .bewly-moment-pics__cell {
+    display: block;
+    overflow: hidden;
+    aspect-ratio: 1 / 1;
+    border-radius: 8px;
+    background: var(--bew-fill-2);
+
+    .bewly-picture {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  .bewly-moment-pics.is-single .bewly-moment-pics__cell {
+    max-height: 420px;
+  }
+  /* #endregion */
+
+  /* #region 视频卡 */
+  .bewly-moment-video {
+    display: flex;
+    gap: 12px;
+    padding: 10px;
+    border: 1px solid var(--bew-border-color);
+    border-radius: 10px;
+    background: var(--bew-fill-1);
+  }
+
+  .bewly-moment-video__cover {
+    position: relative;
+    display: block;
+    flex: none;
+    width: 200px;
+    overflow: hidden;
+    aspect-ratio: 16 / 9;
+    border-radius: 8px;
+    background: var(--bew-fill-2);
+
+    .bewly-picture {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  .bewly-moment-video__duration {
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    padding: 0 4px;
+    border-radius: 4px;
+    background: var(--bew-content-solid);
+    color: var(--bew-text-1);
+    font-size: 11px;
+    line-height: 16px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bewly-moment-video__body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .bewly-moment-video__badge {
+    align-self: flex-start;
+    padding: 0 6px;
+    border-radius: 6px;
+    background: var(--bew-theme-color-10);
+    color: var(--bew-theme-color);
+    font-size: 11px;
+    line-height: 18px;
+  }
+
+  .bewly-moment-video__title {
+    display: -webkit-box;
+    overflow: hidden;
+    color: var(--bew-text-1);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+    text-decoration: none;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+
+    &:hover {
+      color: var(--bew-theme-color);
+    }
+  }
+
+  .bewly-moment-video__desc {
+    display: -webkit-box;
+    margin: 0;
+    overflow: hidden;
+    color: var(--bew-text-3);
+    font-size: 12px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .bewly-moment-video__stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin-top: auto;
+    color: var(--bew-text-3);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  /* #endregion */
+
+  /* #region 直播预约卡 */
+  .bewly-moment-reserve {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px;
+    border: 1px solid var(--bew-border-color);
+    border-radius: 10px;
+    background: var(--bew-fill-1);
+  }
+
+  .bewly-moment-reserve__label {
+    align-self: flex-start;
+    padding: 0 6px;
+    border-radius: 6px;
+    background: var(--bew-theme-color-10);
+    color: var(--bew-theme-color);
+    font-size: 11px;
+    line-height: 18px;
+  }
+
+  .bewly-moment-reserve__title {
+    color: var(--bew-text-1);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.5;
+  }
+
+  .bewly-moment-reserve__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    color: var(--bew-text-3);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  /* #endregion */
+
+  /* #region 图文 / 文章 */
+  .bewly-moment-opus {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .bewly-moment-opus__title {
+    margin: 0;
+    color: var(--bew-text-1);
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+  /* #endregion */
+
+  /* #region 转发引用块 */
+  .bewly-moment-quote {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--bew-border-color);
+    border-radius: 10px;
+    background: var(--bew-fill-1);
+  }
+
+  .bewly-moment-quote__author {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .bewly-moment-quote__avatar {
+    display: block;
+    flex: none;
+    width: 24px;
+    height: 24px;
+    overflow: hidden;
+    border-radius: 50%;
+    background: var(--bew-fill-2);
+
+    .bewly-picture {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+    }
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  .bewly-moment-quote__name {
+    overflow: hidden;
+    color: var(--bew-text-2);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.5;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 引用块里的内容整体收窄一档 */
+  .bewly-moment-quote .bewly-moment-video__cover {
+    width: 150px;
+  }
+
+  .bewly-moment-quote .bewly-moment-pics.is-single,
+  .bewly-moment-quote .bewly-moment-pics.is-two,
+  .bewly-moment-quote .bewly-moment-pics.is-three {
+    max-width: 300px;
+  }
+  /* #endregion */
+
+  /* #region 操作栏 */
+  .bewly-moment__actions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    padding-top: 10px;
+    border-top: 1px solid var(--bew-border-color);
+  }
+
+  .bewly-moment__action {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    padding: 4px 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--bew-text-3);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.5;
+    cursor: pointer;
+    transition:
+      color 160ms cubic-bezier(0.22, 0.61, 0.36, 1),
+      background-color 160ms cubic-bezier(0.22, 0.61, 0.36, 1);
+
+    &:hover {
+      background: var(--bew-fill-2);
+      color: var(--bew-theme-color);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--bew-theme-color);
+      outline-offset: 2px;
+    }
+
+    &.is-liked {
+      color: var(--bew-theme-color);
+    }
+  }
+
+  .bewly-moment__action-count {
+    color: inherit;
+  }
+  /* #endregion */
+
+  /* #region 窄屏 / 减低动效 */
+  @media (max-width: 640px) {
+    .bewly-moment {
+      padding: 12px 14px;
+    }
+
+    .bewly-moment-video__cover {
+      width: 132px;
+    }
+
+    .bewly-moment-pics.is-single {
+      max-width: 100%;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bewly-moment,
+    .bewly-moment__action {
+      transition: none;
+    }
+  }
+  /* #endregion */
+}

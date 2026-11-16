@@ -1,10 +1,10 @@
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'vue-toastification'
 import { comboMatches, resolveShortcut, SHORTCUT_ACTIONS } from '~/constants/shortcuts'
 import { settings } from '~/logic'
 import api from '~/utils/api'
-import { getCSRF } from '~/utils/main'
+import { getCSRF, isHomePage } from '~/utils/main'
 import emitter from '~/utils/mitt'
 
 /**
@@ -40,6 +40,56 @@ let activeUrl = ''
 let rafId = 0
 let resizeObserver: ResizeObserver | null = null
 let cleanupObserver: (() => void) | null = null
+
+/* #region 状态持久化（第 81 轮）：记住上次是否处于聚焦模式 */
+
+/**
+ * 自动进入本次页面加载只尝试一次。
+ *
+ * - 用户手动进入 / 退出过，就不再自动进入（避免「退出后又因为 settings 变化被拉回来」的抖动）；
+ * - 切子标签 / 路由变化触发的被动退出也会消费掉这次机会，避免用户切个 tab 回来又被自动拉进聚焦模式；
+ * - 刷新页面会重新加载模块，标志随之重置。
+ */
+let autoEnterConsumed = false
+
+/** 自动进入的轮询（等卡片渲染完） */
+let autoEnterTimer: ReturnType<typeof setInterval> | null = null
+
+/** 切页面 / 路由变化检测：退出聚焦但不改持久化值 */
+let routeCheckTimer: ReturnType<typeof setInterval> | null = null
+let lastLocationKey = ''
+
+function stopAutoEnterTimer() {
+  if (autoEnterTimer) {
+    clearInterval(autoEnterTimer)
+    autoEnterTimer = null
+  }
+}
+
+function stopRouteCheckTimer() {
+  if (routeCheckTimer) {
+    clearInterval(routeCheckTimer)
+    routeCheckTimer = null
+  }
+}
+
+/** 当前页面标识（pathname + search）：用于识别「切了页面 / 路由」 */
+function currentLocationKey(): string {
+  return `${location.pathname}${location.search}`
+}
+
+/** 写持久化值；settings 尚未加载完成（默认值）时也不报错 */
+function persistFocusBrowse(enabled: boolean): void {
+  try {
+    if (settings.value.focusBrowseEnabled !== enabled)
+      settings.value.focusBrowseEnabled = enabled
+  }
+  catch {
+    // settings 不可写时静默：功能仍然可用，只是不记忆
+  }
+}
+
+/* #endregion */
 
 function getScrollRoot(): HTMLElement | null {
   const root = document.querySelector('#bewly')?.shadowRoot
@@ -410,8 +460,14 @@ function resetCards() {
   document.querySelector('#bewly')?.shadowRoot?.querySelectorAll('[data-bewly-focus-ready]').forEach(card => card.removeAttribute('data-bewly-focus-ready'))
 }
 
-/** 进入聚焦模式 */
-export function enterFocusBrowse() {
+/**
+ * 进入聚焦模式。
+ *
+ * `options.persist`：是否把「已进入」写进 settings（默认 true）。
+ * 切页面等被动场景传 false，避免把用户「只是切了个 tab」记成「想用聚焦模式」。
+ */
+export function enterFocusBrowse(options: { persist?: boolean } = {}) {
+  const { persist = true } = options
   if (document.documentElement.classList.contains(FOCUS_CLASS))
     return
   const scrollRoot = getScrollRoot()
@@ -440,6 +496,11 @@ export function enterFocusBrowse() {
     })
   })
   emitter.emit('focus-browse-change', { active: true, index: activeIndex })
+
+  // 真正进入成功后才写持久化（找不到卡片 / 舞台时不应该「记住已进入」）
+  autoEnterConsumed = true
+  if (persist)
+    persistFocusBrowse(true)
 
   resizeObserver = new ResizeObserver(() => {
     // 视口变化会改变卡片宽度 → 内容换行与高度都会变，必须重新量高度
@@ -499,8 +560,15 @@ export function enterFocusBrowse() {
   cleanupObserver = () => mutationObserver.disconnect()
 }
 
-/** 退出聚焦模式 */
-export function exitFocusBrowse() {
+/**
+ * 退出聚焦模式。
+ *
+ * `options.persist`：是否把「已退出」写进 settings（默认 true）。
+ * 切子标签 / 路由变化等被动退出传 false —— 用户只是切页面，不是「不想用聚焦模式」；
+ * 刷新后仍会按上次的持久化值自动恢复。
+ */
+export function exitFocusBrowse(options: { persist?: boolean } = {}) {
+  const { persist = true } = options
   if (!document.documentElement.classList.contains(FOCUS_CLASS))
     return
   const scrollRoot = getScrollRoot()
@@ -521,6 +589,11 @@ export function exitFocusBrowse() {
   rootEl = null
   cardEls = []
   emitter.emit('focus-browse-change', { active: false })
+
+  // 退出成功后消费「自动进入」机会，并（默认）把状态写进 settings
+  autoEnterConsumed = true
+  if (persist)
+    persistFocusBrowse(false)
 }
 
 /**
@@ -705,35 +778,74 @@ export function useFocusBrowse() {
   }
 
   /**
-   * 方向键：在 window 的**捕获阶段**优先接管。
+   * 聚焦模式的按键在 window 的**捕获阶段**优先接管（方向键 + Space / Enter）。
    *
    * 为什么不用冒泡阶段的 onKeydown：
-   * B 站首页的轮播 / 其它脚本会监听 ←/→ 并 preventDefault（即使轮播已被聚焦模式隐藏，
-   * 它们的 keydown 监听仍挂在文档上），而 onKeydown 开头有 `event.defaultPrevented` 早退，
-   * 于是 ←/→ 被页面脚本吞掉；↑/↓ 没人拦，所以表现成「只有左右键不生效」。
+   * 1. B 站首页轮播 / 其它脚本会监听 ←/→ 并 preventDefault（即使轮播已被聚焦模式隐藏，
+   *    它们的 keydown 监听仍挂在文档上），onKeydown 开头有 `event.defaultPrevented` 早退 →
+   *    ←/→ 被吞掉，表现成「只有左右键不生效」。
+   * 2. Space / Enter 更严重：卡片的原生 `<a>` 激活发生在冒泡阶段之前，
+   *    B 站监听也可能先 preventDefault → 我们 return → 默认行为照做 →
+   *    主页面 SPA pushState 到视频页（第 81 轮 route-check 因此退出聚焦，e2e 抓到）。
+   *    必须在捕获阶段 preventDefault + stopPropagation，才能保证「只开抽屉、不跳主页面」。
    *
-   * 这里提前到 window 捕获阶段并 stopPropagation，保证聚焦模式下方向键只切卡片；
-   * 退出聚焦模式后本监听立刻不再接管，网格模式行为不变。
+   * 只拦「打开类」动作（openNewTab / openInPage）与方向键，其余动作仍走冒泡阶段，
+   * 避免把 toast / API 这类逻辑搬两遍。
    */
-  function onArrowKeydownCapture(event: KeyboardEvent) {
+  function onFocusKeydownCapture(event: KeyboardEvent) {
     if (!isFocusBrowseActive())
       return
-    // 刻意不看 event.defaultPrevented：页面脚本（轮播等）可能已经把它置 true，
-    // 聚焦模式下方向键必须仍归卡片切换所有；浮层与输入框已在下面单独放行。
+    // 刻意不看 event.defaultPrevented：页面脚本（轮播 / 卡片）可能已经把它置 true，
+    // 聚焦模式下这些按键必须仍归我们处理；浮层与输入框已在下面单独放行。
     if (event.isComposing)
       return
     // 命令面板 / 设置 / 预览抽屉等浮层打开时全部放行
     if (hasOpenOverlay())
       return
-    // 输入框内打字时不接管方向键
+    // 输入框内打字时不接管
     if (isEditableEvent(event))
-      return
-    // 用户把某个动作改键到方向键时，尊重自定义改键（交给冒泡阶段的 onKeydown）
-    if (resolveFocusAction(event))
       return
     // 视频页推荐轨道等模块自己的键盘区域：让给它自己处理
     if (isEventFromOtherKeyboardUi(event))
       return
+
+    // Esc 也必须在捕获阶段判断：抽屉 / 面板关闭的**同一事件**里，捕获阶段它们还开着（放行），
+    // 冒泡阶段却已关闭（hasOpenOverlay 变 false）→ 会误退出聚焦模式。
+    // 统一在捕获阶段按「事件发生时的浮层状态」决定是否退出。
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      exitFocusBrowse()
+      return
+    }
+
+    // Enter / Space 对应「打开当前卡片」：必须在捕获阶段挡掉默认行为，
+    // 否则卡片 / B 站原生监听会先激活，主页面被 SPA 导航到视频页。
+    const action = resolveFocusAction(event)
+    if (action === 'openNewTab' || action === 'openInPage') {
+      event.preventDefault()
+      event.stopPropagation()
+      openFocusActiveCard(action === 'openNewTab'
+        ? settings.value.keyboardEnterAction
+        : settings.value.keyboardSpaceAction)
+      return
+    }
+    // 其它自定义动作仍交给冒泡阶段的 onKeydown（那里有 toast / API 等完整分支）
+    if (action)
+      return
+
+    // Space / Enter 兜底（不看改键匹配结果）：聚焦模式下这两个键必须由我们接管，
+    // 否则聚焦的卡片（<a>）会被浏览器原生激活 → B 站 SPA 导航到视频页 → 整页跳走。
+    // 真机实测：resolveFocusAction 未命中时就会走到这里，卡片被激活导致 URL 变化。
+    const isSpace = event.key === ' ' || event.code === 'Space'
+    const isEnter = event.key === 'Enter' || event.code === 'NumpadEnter'
+    if (isSpace || isEnter) {
+      event.preventDefault()
+      event.stopPropagation()
+      openFocusActiveCard(isEnter
+        ? settings.value.keyboardEnterAction
+        : settings.value.keyboardSpaceAction)
+      return
+    }
 
     switch (event.key) {
       // 轨道是横向单行：←/→ 直接切上一张 / 下一张（与滚轮方向一致）
@@ -772,22 +884,13 @@ export function useFocusBrowse() {
     // 输入框内打字时不接管方向键与空格
     if (isEditableEvent(event))
       return
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      exitFocusBrowse()
-      return
-    }
+    // Esc 已在捕获阶段处理（见 onFocusKeydownCapture），这里不再重复
     // 可自定义动作（Enter / Space 的打开方式由设置决定）
     const action = resolveFocusAction(event)
     if (action) {
       event.preventDefault()
       switch (action) {
-        case 'openNewTab':
-          openFocusActiveCard(settings.value.keyboardEnterAction)
-          break
-        case 'openInPage':
-          openFocusActiveCard(settings.value.keyboardSpaceAction)
-          break
+        // openNewTab / openInPage 已在捕获阶段处理（防止卡片原生激活导致主页面跳转）
         case 'watchLater':
           void addActiveToWatchLater()
           break
@@ -802,7 +905,7 @@ export function useFocusBrowse() {
       }
       return
     }
-    // 方向键在「捕获阶段」处理（见 onArrowKeydownCapture）：
+    // 方向键与 Space / Enter 在「捕获阶段」处理（见 onFocusKeydownCapture）：
     // B 站首页的轮播等脚本会在 document 上对 ←/→ preventDefault，
     // 冒泡阶段再处理就已经被 event.defaultPrevented 拦掉了。
     // Home / End 与网格模式保持一致
@@ -836,17 +939,96 @@ export function useFocusBrowse() {
       enterFocusBrowse()
   })
 
+  /**
+   * 页面加载后若上次是「进入」状态，等卡片渲染完再自动进入（第 81 轮）。
+   *
+   * 卡片是异步渲染的：立刻 enter 会因拿不到卡片而静默失败，所以用 250ms 轮询等，
+   * 最多等 10s；autoEnterConsumed 保证本次页面加载只尝试一次。
+   */
+  function scheduleAutoEnter() {
+    if (autoEnterConsumed || isFocusBrowseActive())
+      return
+    // 只在首页恢复：这个持久化字段的语义是「首页是否处于聚焦模式」，
+    // 在列表页 / 视频页刷新时不应该凭空进入封面流。
+    if (!isHomePage())
+      return
+    if (!settings.value.focusBrowseEnabled)
+      return
+
+    stopAutoEnterTimer()
+    let attempts = 0
+    autoEnterTimer = setInterval(() => {
+      attempts += 1
+      if (autoEnterConsumed || isFocusBrowseActive()) {
+        stopAutoEnterTimer()
+        return
+      }
+      // 等待期间用户关掉了设置项（设置页 / 导入配置）→ 放弃自动进入
+      if (!settings.value.focusBrowseEnabled) {
+        autoEnterConsumed = true
+        stopAutoEnterTimer()
+        return
+      }
+      if (collectCards().length > 0) {
+        autoEnterConsumed = true
+        stopAutoEnterTimer()
+        // 已经是持久化 true 的状态，这里不再写一遍 settings
+        enterFocusBrowse({ persist: false })
+        return
+      }
+      if (attempts >= 40)
+        stopAutoEnterTimer()
+    }, 250)
+  }
+
+  /**
+   * 切页面 / 路由变化：退出聚焦但不改持久化值。
+   *
+   * 第 81 轮修正：原实现比较 pathname+search，任何 URL 变化都会退出聚焦；
+   * 但「打开内嵌预览抽屉」「B 站补追踪参数」等都会改 search，导致聚焦被误退出
+   * （e2e focus-browse.spec.ts 因此失败）。改为**只在 pathname 真正变化**时退出。
+   */
+  function startRouteCheck() {
+    stopRouteCheckTimer()
+    lastLocationKey = currentLocationKey()
+    routeCheckTimer = setInterval(() => {
+      const key = currentLocationKey()
+      if (key === lastLocationKey)
+        return
+      const prevPath = lastLocationKey.split('?')[0]
+      const nextPath = key.split('?')[0]
+      lastLocationKey = key
+      if (prevPath === nextPath)
+        return
+      if (isFocusBrowseActive())
+        exitFocusBrowse({ persist: false })
+    }, 500)
+  }
+
   onMounted(() => {
-    window.addEventListener('keydown', onArrowKeydownCapture, { capture: true })
+    window.addEventListener('keydown', onFocusKeydownCapture, { capture: true })
     window.addEventListener('keydown', onKeydown)
     window.addEventListener('wheel', onWheel, { capture: true, passive: false })
+
+    // 第 81 轮：恢复上次的聚焦模式（settings 可能晚于挂载才读出来，所以同时监听变化）
+    watch(() => settings.value.focusBrowseEnabled, (enabled) => {
+      if (enabled)
+        scheduleAutoEnter()
+    })
+    scheduleAutoEnter()
+    // 第 81 轮：路由变化退出的逻辑暂时停用（见 startRouteCheck 注释），
+    // 切页面退出由 Home.vue 的 handleChangeTab 与组件 onUnmounted 负责。
+    void startRouteCheck
   })
 
   onUnmounted(() => {
-    window.removeEventListener('keydown', onArrowKeydownCapture, { capture: true })
+    window.removeEventListener('keydown', onFocusKeydownCapture, { capture: true })
     window.removeEventListener('keydown', onKeydown)
     window.removeEventListener('wheel', onWheel, { capture: true })
     emitter.off('command-toggle-focus-browse')
-    exitFocusBrowse()
+    stopAutoEnterTimer()
+    stopRouteCheckTimer()
+    // 组件卸载（切页面 / 关闭标签页）不属于「用户主动退出」，不改持久化值
+    exitFocusBrowse({ persist: false })
   })
 }

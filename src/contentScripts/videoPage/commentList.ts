@@ -1,20 +1,25 @@
 /**
- * 视频页「自绘评论区」阶段 3（第 80 轮，只读渲染）。
+ * 视频页「自绘评论区」阶段 3/4（第 80/81 轮）：只读渲染 + 点赞 / 回复 / 发表。
  *
  * 数据：B 站评论 API（`/x/v2/reply` pn 分页；子回复 `/x/v2/reply/reply`）。
- * 真机实测（未登录）：`?type=1&oid=<aid>&pn=1&ps=5&sort=2` → code 0；子回复接口同样 code 0。
- * **不用 wbi 签名**（`/wbi/main` 会 -403）。
+ * 互动：`/x/v2/reply/action`（点赞）、`/x/v2/reply/add`（发表 / 楼中楼回复），
+ * 需要 cookie 里的 `bili_jct`（非 httpOnly，content script 可读）。
+ * 真机实测（未登录）：三个写接口都返回 `code -101 账号未登录`（HTTP 200，JSON），
+ * 说明请求格式正确；列表接口带 `action` 字段（0 = 未赞）用于已赞状态。
  *
- * 渲染：`#bewly-comment-list` 插进评论列（`#commentapp` 之前），原生 `#commentapp` 隐藏但保留（兜底）。
- * 容器 `flex: 1 1 auto; min-height: 0; overflow-y: auto` —— 评论列高度仍 = dock 高，fixedLayout 预算不变。
- *
- * 兜底：拿不到 aid / API 失败 / 非 0 → **恢复原生评论区**，绝不白屏。
- * 本轮只读：点赞 / 回复 / 发表留 `data-rpid` / `data-action` 属性给下一轮。
+ * 不用 wbi（`/wbi/main` 会 -403）。
+ * 兜底：拿不到 aid / 列表 API 失败 → 恢复原生评论区，绝不白屏。
  */
+import { showToast } from './actions'
+
 const LIST_ID = 'bewly-comment-list'
 const COLUMN_SELECTOR = '[data-bewly-comment-column], #bewly-comment-column'
 const NATIVE_APP_SELECTOR = '#commentapp'
 const PAGE_SIZE = 20
+const SUB_PAGE_SIZE = 20
+const MAX_SUB_PAGES = 10
+const MAX_ONLYUP_PAGES = 5
+const MAX_MESSAGE_LENGTH = 1000
 
 interface CommentItem {
   rpid: number | string
@@ -26,6 +31,7 @@ interface CommentItem {
   emote: Record<string, string>
   ctime: number
   like: number
+  liked: boolean
   rcount: number
   location: string
   isUp: boolean
@@ -37,6 +43,7 @@ interface CommentState {
   aid: number | null
   bvid: string
   ownerMid: string
+  isLogin: boolean
   sort: 2 | 0
   onlyUp: boolean
   page: number
@@ -44,13 +51,18 @@ interface CommentState {
   hasMore: boolean
   loading: boolean
   failed: boolean
-  subpage: { root: CommentItem, items: CommentItem[] } | null
+  subpage: { root: CommentItem, items: CommentItem[], loading: boolean } | null
+  /** 回复目标：rpid + 上一层 rpid（楼中楼） */
+  replyTarget: { rpid: string, parent: string, name: string, rootOf: string } | null
+  /** 排序切换时记住的滚动位置 */
+  scrollMemo: Record<string, number>
 }
 
 const state: CommentState = {
   aid: null,
   bvid: '',
   ownerMid: '',
+  isLogin: false,
   sort: 2,
   onlyUp: false,
   page: 0,
@@ -59,19 +71,52 @@ const state: CommentState = {
   loading: false,
   failed: false,
   subpage: null,
+  replyTarget: null,
+  scrollMemo: {},
 }
 
 let bridgeListening = false
 let listMounted = false
-/** aid 查询的兜底缓存（bvid → aid） */
 const aidCache = new Map<string, number>()
 
 function currentBvid(): string {
   return location.pathname.match(/\/video\/(BV[0-9A-Za-z]+)/)?.[1] ?? ''
 }
 
+function readCookie(name: string): string {
+  return document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`))?.[1] ?? ''
+}
+
+function csrfToken(): string {
+  return readCookie('bili_jct')
+}
+
+/** 登录态：桥 `isLogin` 优先，其次 cookie 里有没有 DedeUserID */
+function detectLogin(): boolean {
+  return state.isLogin || Boolean(readCookie('DedeUserID'))
+}
+
+function errorTip(code: number, message?: string): string {
+  if (code === -101)
+    return '请先登录后再操作'
+  if (code === -111)
+    return 'CSRF 校验失败，请刷新页面重试'
+  if (code === -352)
+    return '触发风控，请稍后再试'
+  if (code === -400)
+    return '请求参数有误'
+  return message
+    ? `操作失败：${message}`
+    : `操作失败（code ${code}）`
+}
+
 function onBridgeData(event: Event): void {
-  const detail = (event as CustomEvent).detail as { bvid?: string, aid?: number, owner?: { mid?: string | number } } | null
+  const detail = (event as CustomEvent).detail as {
+    bvid?: string
+    aid?: number
+    isLogin?: boolean
+    owner?: { mid?: string | number }
+  } | null
   if (!detail)
     return
   let changed = false
@@ -86,11 +131,14 @@ function onBridgeData(event: Event): void {
       changed = true
     }
   }
-  if (detail.bvid && detail.bvid !== state.bvid) {
+  if (typeof detail.isLogin === 'boolean' && detail.isLogin !== state.isLogin) {
+    state.isLogin = detail.isLogin
     changed = true
   }
+  if (detail.bvid && detail.bvid !== state.bvid)
+    changed = true
   if (changed)
-    reloadComments()
+    void reloadComments()
 }
 
 function startBridge(): void {
@@ -108,9 +156,9 @@ function stopBridge(): void {
   bridgeListening = false
 }
 
-async function fetchJson<T>(url: string): Promise<T | null> {
+async function fetchJson<T>(url: string, init?: RequestInit): Promise<T | null> {
   try {
-    const response = await fetch(url, { credentials: 'include' })
+    const response = await fetch(url, { credentials: 'include', ...init })
     if (!response.ok)
       return null
     return await response.json() as T
@@ -120,7 +168,15 @@ async function fetchJson<T>(url: string): Promise<T | null> {
   }
 }
 
-/** 兜底拿 aid：桥没给时用 view 接口按 bvid 查一次并缓存 */
+async function postForm(url: string, body: Record<string, string>): Promise<{ code: number, message?: string, data?: unknown } | null> {
+  const params = new URLSearchParams(body)
+  return fetchJson<{ code: number, message?: string, data?: unknown }>(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: params.toString(),
+  })
+}
+
 async function resolveAid(): Promise<number | null> {
   if (state.aid)
     return state.aid
@@ -158,6 +214,7 @@ function normalizeReply(raw: Record<string, any>): CommentItem {
     ? content.pictures.map((pic: { img_src?: string }) => pic.img_src).filter((src: unknown): src is string => typeof src === 'string')
     : []
   const mid = String(member.mid ?? raw.mid ?? '')
+  const action = Number(raw.action ?? 0)
   return {
     rpid: raw.rpid,
     mid,
@@ -168,6 +225,7 @@ function normalizeReply(raw: Record<string, any>): CommentItem {
     emote,
     ctime: raw.ctime ?? 0,
     like: raw.like ?? 0,
+    liked: action > 0,
     rcount: raw.rcount ?? 0,
     location: control.location ?? '',
     isUp: Boolean(mid && state.ownerMid && mid === state.ownerMid) || Boolean(control.is_up_top),
@@ -184,13 +242,11 @@ function escapeHtml(text: string): string {
     .replace(/"/g, '&quot;')
 }
 
-/** 正文：转义 → 表情替换 → @ 高亮 */
 function renderMessage(item: CommentItem): string {
   let html = escapeHtml(item.message)
   for (const [key, url] of Object.entries(item.emote)) {
-    const safeKey = escapeHtml(key)
-    const token = `<img class="bvp-cmt__emote" src="${escapeHtml(url)}" alt="${safeKey}" loading="lazy" referrerpolicy="no-referrer">`
-    html = html.split(safeKey).join(token)
+    const token = `<img class="bvp-cmt__emote" src="${escapeHtml(url)}" alt="${escapeHtml(key)}" loading="lazy" referrerpolicy="no-referrer">`
+    html = html.split(escapeHtml(key)).join(token)
   }
   html = html.replace(/@([\w\u4E00-\u9FA5.-]{1,20})/g, '<span class="bvp-cmt__at">@$1</span>')
   return html.replace(/\n/g, '<br>')
@@ -200,8 +256,7 @@ function formatTime(ctime: number): string {
   if (!ctime)
     return ''
   const date = new Date(ctime * 1000)
-  const now = Date.now()
-  const diff = Math.floor((now - date.getTime()) / 1000)
+  const diff = Math.floor((Date.now() - date.getTime()) / 1000)
   if (diff < 60)
     return '刚刚'
   if (diff < 3600)
@@ -234,9 +289,18 @@ function itemHtml(item: CommentItem, depth: number): string {
   const subReplies = depth === 0 && item.rcount > 0
     ? `<button type="button" class="bvp-cmt__more" data-action="open-subpage" data-rpid="${item.rpid}">共 ${item.rcount} 条回复</button>`
     : ''
+  const replyForm = state.replyTarget && state.replyTarget.rpid === String(item.rpid)
+    ? `<form class="bvp-cmt__compose bvp-cmt__compose--inline" data-action="submit-reply" data-rpid="${item.rpid}">
+        <textarea class="bvp-cmt__input" maxlength="${MAX_MESSAGE_LENGTH}" rows="2" placeholder="回复 @${escapeHtml(item.uname)}"></textarea>
+        <div class="bvp-cmt__compose-actions">
+          <button type="button" class="bvp-cmt__submit" data-action="submit-reply" data-rpid="${item.rpid}">发布</button>
+          <button type="button" class="bvp-cmt__cancel" data-action="cancel-reply">取消</button>
+        </div>
+      </form>`
+    : ''
   return `<article class="bvp-cmt${depth > 0
     ? ' bvp-cmt--sub'
-    : ''}" data-rpid="${item.rpid}" data-mid="${escapeHtml(item.mid)}">
+    : ''}${item.isUp ? ' bvp-cmt--up' : ''}" data-rpid="${item.rpid}" data-mid="${escapeHtml(item.mid)}">
     <div class="bvp-cmt__avatar">${avatar}</div>
     <div class="bvp-cmt__main">
       <div class="bvp-cmt__head">
@@ -254,28 +318,29 @@ function itemHtml(item: CommentItem, depth: number): string {
           ? `<span class="bvp-cmt__location">${escapeHtml(item.location)}</span>`
           : ''}
         <span class="bvp-cmt__spacer"></span>
-        <button type="button" class="bvp-cmt__action" data-action="like" data-rpid="${item.rpid}">赞 ${formatCountShort(item.like)}</button>
-        <button type="button" class="bvp-cmt__action" data-action="reply" data-rpid="${item.rpid}">回复</button>
+        <button type="button" class="bvp-cmt__action${item.liked ? ' is-active' : ''}" data-action="like" data-rpid="${item.rpid}">赞 ${formatCountShort(item.like)}</button>
+        <button type="button" class="bvp-cmt__action" data-action="reply" data-rpid="${item.rpid}" data-name="${escapeHtml(item.uname)}">回复</button>
       </div>
       ${subReplies}
+      ${replyForm}
     </div>
   </article>`
 }
 
-function panelChrome(): string {
-  return `<div class="bvp-cmt__toolbar">
-    <div class="bvp-cmt__sort">
-      <button type="button" class="bvp-cmt__tab${state.sort === 2
-        ? ' is-active'
-        : ''}" data-action="sort-hot">最热</button>
-      <button type="button" class="bvp-cmt__tab${state.sort === 0
-        ? ' is-active'
-        : ''}" data-action="sort-new">最新</button>
+function composerHtml(): string {
+  if (!detectLogin()) {
+    return `<div class="bvp-cmt__login-tip">
+      <span>登录后可以发评论</span>
+      <a class="bvp-cmt__login-link" href="https://passport.bilibili.com/login" target="_blank" rel="noopener noreferrer">去登录</a>
+    </div>`
+  }
+  return `<form class="bvp-cmt__compose bvp-cmt__compose--main" data-action="submit-comment">
+    <textarea class="bvp-cmt__input" maxlength="${MAX_MESSAGE_LENGTH}" rows="2" placeholder="发个友善的评论吧"></textarea>
+    <div class="bvp-cmt__compose-actions">
+      <span class="bvp-cmt__count">0/${MAX_MESSAGE_LENGTH}</span>
+      <button type="submit" class="bvp-cmt__submit" data-action="submit-comment">发布</button>
     </div>
-    <button type="button" class="bvp-cmt__tab${state.onlyUp ? ' is-active' : ''}" data-action="toggle-up">只看 UP 主</button>
-  </div>
-  <div class="bvp-cmt__list" id="bewly-comment-items"></div>
-  <div class="bvp-cmt__footer" id="bewly-comment-footer"></div>`
+  </form>`
 }
 
 function renderList(): void {
@@ -286,11 +351,13 @@ function renderList(): void {
   if (subpage) {
     const subItems = subpage.items.length
       ? subpage.items.map(item => itemHtml(item, 1)).join('')
-      : '<div class="bvp-cmt__empty">暂无回复</div>'
+      : `<div class="bvp-cmt__empty">${subpage.loading ? '加载回复中…' : '暂无回复'}</div>`
     container.innerHTML = `<div class="bvp-cmt__subpage-head">
         <button type="button" class="bvp-cmt__tab" data-action="close-subpage">← 返回评论列表</button>
       </div>
-      <div class="bvp-cmt__list">${itemHtml(subpage.root, 0)}${subItems}</div>`
+      <div class="bvp-cmt__list">${itemHtml(subpage.root, 0)}${subItems}</div>
+      <div class="bvp-cmt__footer">${composerHtml()}</div>`
+    bindContainerActions(container)
     return
   }
   const visible = state.onlyUp
@@ -300,33 +367,136 @@ function renderList(): void {
     ? visible.map(item => itemHtml(item, 0)).join('')
     : `<div class="bvp-cmt__empty">${state.loading
       ? '加载中…'
-      : (state.onlyUp ? '这个视频暂时还没有 UP 主的评论' : '还没有评论')}</div>`
-  container.innerHTML = panelChrome()
-  document.getElementById('bewly-comment-items')!.innerHTML = itemsHtml
-  const footer = document.getElementById('bewly-comment-footer')
-  if (footer) {
-    if (state.loading)
-      footer.innerHTML = '<div class="bvp-cmt__loading">加载中…</div>'
-    else if (state.hasMore)
-      footer.innerHTML = '<button type="button" class="bvp-cmt__load-more" data-action="load-more">加载更多</button>'
-    else if (visible.length)
-      footer.innerHTML = '<div class="bvp-cmt__end">没有更多了</div>'
-    else
-      footer.innerHTML = ''
-  }
+      : (state.onlyUp ? '正在查找 UP 主的评论…' : '还没有评论')}</div>`
+  container.innerHTML = `<div class="bvp-cmt__toolbar">
+      <div class="bvp-cmt__sort">
+        <button type="button" class="bvp-cmt__tab${state.sort === 2
+          ? ' is-active'
+          : ''}" data-action="sort-hot">最热</button>
+        <button type="button" class="bvp-cmt__tab${state.sort === 0
+          ? ' is-active'
+          : ''}" data-action="sort-new">最新</button>
+      </div>
+      <button type="button" class="bvp-cmt__tab${state.onlyUp ? ' is-active' : ''}" data-action="toggle-up">只看 UP 主</button>
+    </div>
+    <div class="bvp-cmt__list" id="bewly-comment-items">${itemsHtml}</div>
+    <div class="bvp-cmt__footer" id="bewly-comment-footer">
+      ${state.loading
+        ? '<div class="bvp-cmt__loading">加载中…</div>'
+        : state.hasMore
+          ? '<button type="button" class="bvp-cmt__load-more" data-action="load-more">加载更多</button>'
+          : visible.length ? '<div class="bvp-cmt__end">没有更多了</div>' : ''}
+      ${composerHtml()}
+    </div>`
   bindContainerActions(container)
+  // 排序切换后恢复滚动位置
+  const listEl = container.querySelector<HTMLElement>('.bvp-cmt__list')
+  if (listEl) {
+    const memo = state.scrollMemo[String(state.sort)]
+    if (memo)
+      listEl.scrollTop = memo
+  }
+}
+
+function updateItem(rpid: string, patch: Partial<CommentItem>): void {
+  const item = state.items.find(entry => String(entry.rpid) === rpid)
+  if (item)
+    Object.assign(item, patch)
+  if (state.subpage) {
+    const sub = state.subpage.items.find(entry => String(entry.rpid) === rpid)
+    if (sub)
+      Object.assign(sub, patch)
+  }
+}
+
+async function toggleLike(rpid: string): Promise<void> {
+  const item = state.items.find(entry => String(entry.rpid) === rpid)
+    ?? state.subpage?.items.find(entry => String(entry.rpid) === rpid)
+  if (!item)
+    return
+  const aid = await resolveAid()
+  if (!aid)
+    return
+  const nextLiked = !item.liked
+  // 乐观更新
+  updateItem(rpid, {
+    liked: nextLiked,
+    like: Math.max(0, item.like + (nextLiked
+      ? 1
+      : -1)),
+  })
+  renderList()
+  const result = await postForm('https://api.bilibili.com/x/v2/reply/action', {
+    oid: String(aid),
+    type: '1',
+    rpid,
+    action: nextLiked ? '1' : '0',
+    csrf: csrfToken(),
+  })
+  if (!result || result.code !== 0) {
+    // 回滚
+    updateItem(rpid, { liked: item.liked, like: item.like })
+    renderList()
+    showToast(errorTip(result?.code ?? -1, result?.message))
+  }
+}
+
+async function submitComment(message: string, target?: { root: string, parent: string }): Promise<boolean> {
+  const text = message.trim()
+  if (!text)
+    return false
+  if (!detectLogin()) {
+    showToast('请先登录后再发评论')
+    return false
+  }
+  if (text.length > MAX_MESSAGE_LENGTH) {
+    showToast(`评论不能超过 ${MAX_MESSAGE_LENGTH} 字`)
+    return false
+  }
+  const aid = await resolveAid()
+  if (!aid)
+    return false
+  const body: Record<string, string> = {
+    oid: String(aid),
+    type: '1',
+    message: text,
+    csrf: csrfToken(),
+  }
+  if (target) {
+    body.root = target.root
+    body.parent = target.parent
+  }
+  const result = await postForm('https://api.bilibili.com/x/v2/reply/add', body)
+  if (!result || result.code !== 0) {
+    showToast(errorTip(result?.code ?? -1, result?.message))
+    return false
+  }
+  showToast('发布成功')
+  return true
 }
 
 function bindContainerActions(container: HTMLElement): void {
   if (container.dataset.bound === '1')
     return
   container.dataset.bound = '1'
+  container.addEventListener('input', (event) => {
+    const target = event.target as HTMLElement
+    if (!target.classList.contains('bvp-cmt__input'))
+      return
+    const counter = target.parentElement?.querySelector('.bvp-cmt__count')
+    if (counter)
+      counter.textContent = `${(target as HTMLTextAreaElement).value.length}/${MAX_MESSAGE_LENGTH}`
+  })
   container.addEventListener('click', async (event) => {
     const target = (event.target as HTMLElement).closest<HTMLElement>('[data-action]')
     if (!target)
       return
     const action = target.dataset.action
+    const rpid = target.dataset.rpid ?? ''
     if (action === 'sort-hot' || action === 'sort-new') {
+      const listEl = container.querySelector<HTMLElement>('.bvp-cmt__list')
+      if (listEl)
+        state.scrollMemo[String(state.sort)] = listEl.scrollTop
       const next = action === 'sort-hot'
         ? 2
         : 0
@@ -339,28 +509,109 @@ function bindContainerActions(container: HTMLElement): void {
     if (action === 'toggle-up') {
       state.onlyUp = !state.onlyUp
       renderList()
+      if (state.onlyUp)
+        void ensureOnlyUpContent()
       return
     }
     if (action === 'load-more') {
       await loadPage(state.page + 1)
       return
     }
-    const rpid = target.dataset.rpid
-    if (action === 'open-subpage' && rpid)
+    if (action === 'like' && rpid) {
+      await toggleLike(rpid)
+      return
+    }
+    if (action === 'reply') {
+      const name = target.dataset.name ?? ''
+      const parent = await resolveRootForReply(rpid)
+      state.replyTarget = {
+        rpid,
+        parent: parent.parent,
+        rootOf: parent.root,
+        name,
+      }
+      renderList()
+      return
+    }
+    if (action === 'cancel-reply') {
+      state.replyTarget = null
+      renderList()
+      return
+    }
+    if (action === 'submit-reply' && rpid) {
+      const form = container.querySelector<HTMLFormElement>(`.bvp-cmt__compose[data-rpid="${rpid}"]`)
+      const input = form?.querySelector<HTMLTextAreaElement>('.bvp-cmt__input')
+      if (!input)
+        return
+      const parentInfo = state.subpage
+        ? { root: state.subpage.root.rpid, parent: rpid }
+        : { root: rpid, parent: rpid }
+      const ok = await submitComment(input.value, {
+        root: String(parentInfo.root),
+        parent: String(parentInfo.parent),
+      })
+      if (ok) {
+        state.replyTarget = null
+        if (state.subpage)
+          await openSubpage(String(state.subpage.root.rpid))
+        else
+          await loadPage(1)
+      }
+      return
+    }
+    if (action === 'open-subpage' && rpid) {
       await openSubpage(rpid)
-    else if (action === 'close-subpage')
-      closeSubpage()
-    // like / reply：下一轮接
+      return
+    }
+    if (action === 'close-subpage') {
+      state.subpage = null
+      renderList()
+    }
   })
+  container.addEventListener('submit', async (event) => {
+    const form = event.target as HTMLFormElement
+    if (!form.matches('.bvp-cmt__compose--main'))
+      return
+    event.preventDefault()
+    const input = form.querySelector<HTMLTextAreaElement>('.bvp-cmt__input')
+    if (!input)
+      return
+    const ok = await submitComment(input.value)
+    if (ok) {
+      input.value = ''
+      await loadPage(1)
+    }
+  })
+}
+
+/** 计算回复的 root / parent（子页内回复某条子回复时 parent = 该条，root = 主评论） */
+async function resolveRootForReply(rpid: string): Promise<{ root: string, parent: string }> {
+  if (state.subpage) {
+    const rootRpid = String(state.subpage.root.rpid)
+    return { root: rootRpid, parent: rpid }
+  }
+  return { root: rpid, parent: rpid }
+}
+
+/** 只看 UP：过滤结果为空且还有更多 → 自动翻页（上限 5 页，避免一次拉太多） */
+async function ensureOnlyUpContent(): Promise<void> {
+  let guard = 0
+  while (state.onlyUp && !state.items.some(item => item.isUp) && state.hasMore && guard < MAX_ONLYUP_PAGES) {
+    guard += 1
+    await loadPage(state.page + 1)
+  }
+  if (state.onlyUp)
+    renderList()
 }
 
 async function fetchMainPage(page: number): Promise<boolean> {
   const aid = await resolveAid()
   if (!aid)
     return false
-  const data = await fetchJson<{ code: number, data?: { replies?: Record<string, any>[], top_replies?: Record<string, any>[], page?: { count?: number } } }>(
-    `https://api.bilibili.com/x/v2/reply?type=1&oid=${aid}&pn=${page}&ps=${PAGE_SIZE}&sort=${state.sort}`,
-  )
+  const data = await fetchJson<{
+    code: number
+    data?: { replies?: Record<string, any>[], top_replies?: Record<string, any>[], page?: { count?: number } }
+  }>(`https://api.bilibili.com/x/v2/reply?type=1&oid=${aid}&pn=${page}&ps=${PAGE_SIZE}&sort=${state.sort}`)
   if (!data || data.code !== 0 || !data.data)
     return false
   const list = [
@@ -368,26 +619,23 @@ async function fetchMainPage(page: number): Promise<boolean> {
     ...(data.data.replies ?? []),
   ]
   const seen = new Set<string>()
-  const items: CommentItem[] = []
+  const pageItems: CommentItem[] = []
   for (const raw of list) {
     const item = normalizeReply(raw)
     if (seen.has(String(item.rpid)))
       continue
     seen.add(String(item.rpid))
-    items.push(item)
+    pageItems.push(item)
   }
-  if (page === 1) {
-    state.items = items
-  }
-  else {
-    state.items = [
-      ...state.items,
-      ...items.filter(item => !state.items.some(existing => String(existing.rpid) === String(item.rpid))),
-    ]
-  }
+  state.items = page === 1
+    ? pageItems
+    : [
+        ...state.items,
+        ...pageItems.filter(item => !state.items.some(existing => String(existing.rpid) === String(item.rpid))),
+      ]
   state.page = page
   const total = data.data.page?.count ?? 0
-  state.hasMore = items.length >= PAGE_SIZE && state.items.length < total
+  state.hasMore = pageItems.length >= PAGE_SIZE && state.items.length < total
   return true
 }
 
@@ -415,31 +663,43 @@ async function reloadComments(): Promise<void> {
   state.items = []
   state.hasMore = false
   state.subpage = null
+  state.replyTarget = null
   state.failed = false
   await loadPage(1)
 }
 
+/** 子页：自动把子回复全部加载完（pn 递增，最多 10 页 / is_end 判定） */
 async function openSubpage(rpid: string): Promise<void> {
   const aid = await resolveAid()
   const root = state.items.find(item => String(item.rpid) === String(rpid))
   if (!aid || !root)
     return
-  const data = await fetchJson<{ code: number, data?: { replies?: Record<string, any>[] } }>(
-    `https://api.bilibili.com/x/v2/reply/reply?type=1&oid=${aid}&root=${rpid}&pn=1&ps=20`,
-  )
-  const items = data?.code === 0 && data.data?.replies
-    ? data.data.replies.map(normalizeReply)
-    : []
-  state.subpage = { root, items }
+  state.subpage = { root, items: [], loading: true }
+  state.replyTarget = null
+  renderList()
+
+  const collected: CommentItem[] = []
+  for (let page = 1; page <= MAX_SUB_PAGES; page++) {
+    const data = await fetchJson<{
+      code: number
+      data?: {
+        replies?: Record<string, any>[]
+        page?: { count?: number }
+        is_end?: boolean
+      }
+    }>(`https://api.bilibili.com/x/v2/reply/reply?type=1&oid=${aid}&root=${rpid}&pn=${page}&ps=${SUB_PAGE_SIZE}`)
+    if (!data || data.code !== 0 || !data.data?.replies?.length)
+      break
+    const items = data.data.replies.map(normalizeReply)
+    collected.push(...items)
+    const isEnd = data.data.is_end ?? items.length < SUB_PAGE_SIZE
+    if (isEnd || collected.length >= (root.rcount || collected.length))
+      break
+  }
+  state.subpage = { root, items: collected, loading: false }
   renderList()
 }
 
-function closeSubpage(): void {
-  state.subpage = null
-  renderList()
-}
-
-/** 挂载自绘容器并隐藏原生评论区（失败时 restoreNative） */
 function mountList(column: HTMLElement, nativeApp: HTMLElement): void {
   let container = document.getElementById(LIST_ID)
   if (!container) {
@@ -469,6 +729,7 @@ export function syncCommentList(): boolean {
     state.items = []
     state.page = 0
     state.subpage = null
+    state.replyTarget = null
     state.failed = false
   }
   const column = document.querySelector<HTMLElement>(COLUMN_SELECTOR)
@@ -484,21 +745,22 @@ export function syncCommentList(): boolean {
 
 export function setupCommentList(): () => void {
   startBridge()
-  const enabled = syncCommentList()
-  if (!enabled)
+  if (!syncCommentList())
     restoreNative()
   return teardownCommentList
 }
 
-/** 卸载：移除自绘列表、恢复原生评论区 */
 export function teardownCommentList(): void {
   stopBridge()
   restoreNative()
   state.aid = null
   state.bvid = ''
   state.ownerMid = ''
+  state.isLogin = false
   state.items = []
   state.page = 0
   state.subpage = null
+  state.replyTarget = null
   state.failed = false
+  state.scrollMemo = {}
 }

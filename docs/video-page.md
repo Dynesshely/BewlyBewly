@@ -1426,3 +1426,46 @@ footer 侧补：`#footer bili-comment-action-buttons-renderer { flex: 0 0 auto; 
 3. 置顶字段名未真机确认（用 `reply_control.is_up_top` 兜底）；
 4. 表情映射依赖 `content.emote`（真机样本无表情，未验证）；
 5. 工具栏「举报 / 笔记」的原生触发按钮选择器按文案兜底，需真机确认（`.video-toolbar-right` 内）。
+
+## 第 81 轮：评论互动 + 第 51/53/55 轮增强在自绘版里重建
+
+### 接口实测（未登录，调试浏览器）
+
+| 接口 | 结果 |
+| --- | --- |
+| `POST /x/v2/reply/action`（点赞） | HTTP 200 + JSON `code: -101 账号未登录` |
+| `POST /x/v2/reply/add`（发表） | HTTP 200 + JSON `code: -101 账号未登录` |
+| `POST /x/v2/reply/add`（楼中楼 root/parent） | HTTP 200 + JSON `code: -101 账号未登录` |
+| 列表 `/x/v2/reply` | code 0；条目含 `action`（0 = 未赞）与 `like` |
+
+结论：三个写接口格式正确（未登录统一 -101），登录后即可用；`bili_jct` 在未登录时为空。
+
+### 互动（`commentList.ts`）
+
+- 点赞：乐观更新（`liked` 取反、`like` ±1）→ POST `reply/action` → 失败回滚 + toast；
+- 已赞状态：列表 `action > 0`；
+- 回复：点「回复」展开内联 textarea → POST `reply/add`（主列表 root=parent=rpid；子页内 root=主评论 rpid、parent=目标 rpid）→ 成功后刷新列表 / 重开子页；
+- 发表：底部自绘 composer（textarea + 字数 1000 + 发布按钮）；未登录显示「登录后可以发评论 + 去登录」；
+- 错误码提示：-101 请先登录 / -111 CSRF 校验失败 / -352 触发风控 / -400 参数有误，兜底「操作失败（code N）」。
+
+### 重建的增强
+
+1. **楼层节奏（第 51 轮）**：`.bvp-cmt + .bvp-cmt { margin-top: 8px }`、`.bvp-cmt--sub` 2px 竖线 + `padding-left: 12px` + hover 浅底、`.bvp-cmt--up::before` 2px 主题色条；
+2. **子页自动加载全部子回复（第 55 轮）**：pn 递增最多 10 页，`is_end` / `replies.length < ps` / 累计数 ≥ `rcount` 三重终止；
+3. **评论排版（第 53 轮）**：正文 `max-width: min(640px, 100%)`、时间/IP `nowrap`、次级信息 12.5px、图片 `max-width: 100%` + grid `minmax(120px, 1fr)`。
+
+### 顺带修
+
+- 只看 UP **跨页过滤**：过滤结果为空且 `hasMore` 时自动加载下一页（上限 5 页），不再「过滤成空」；
+- 排序切换：切之前记录 `.bvp-cmt__list` 的 `scrollTop`（按 sort 分键），切完后恢复；分页重置 ✓；
+- 工具栏激活态：每次渲染从原生 class（`on/active/liked`）重新读，点击后 400ms 再同步一次；
+- 图片 grid 点击新标签打开原图 ✓。
+
+### 剩余问题清单
+
+1. **未登录只能验证错误路径**：点赞/发表/回复的**成功**流程要登录后真机验证（-101 已验证提示正确）；
+2. `action` 字段语义：实测 0；已赞时的取值（1 或 2）未验证，代码用 `action > 0` 兼容；
+3. 楼中楼 `root/parent` 语义：主评论回复根 = 自身、子页回复 = (root=主评论, parent=目标)，需登录后验证层级正确；
+4. 子页自动加载用 `rcount` 与 `is_end` 双重判断，若接口不返回 `is_end`，靠「返回条数 < ps」终止；
+5. 发表成功后的列表刷新是整页重载（`loadPage(1)`），会丢滚动位置；后续可改成「插到列表顶部」；
+6. 自绘评论区的点赞/回复成功后未同步原生评论区（原生已隐藏，暂不影响）。

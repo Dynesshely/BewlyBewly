@@ -5,7 +5,7 @@ import type { GridLayoutType, PageDensity } from '~/logic'
 import type { HomeTab } from '~/stores/mainStore'
 import { useThrottleFn } from '@vueuse/core'
 import { useBewlyApp } from '~/composables/useAppProvider'
-import { isFocusBrowseActive } from '~/composables/useFocusBrowse'
+import { exitFocusBrowse, isFocusBrowseActive } from '~/composables/useFocusBrowse'
 import { TOP_BAR_VISIBILITY_CHANGE } from '~/constants/globalEvents'
 import { gridLayout, settings } from '~/logic'
 import { useMainStore } from '~/stores/mainStore'
@@ -442,6 +442,11 @@ function handleChangeTab(tab: HomeTab) {
   else {
     // 记住当前标签的滚动位置，切回来时恢复（第 20 轮）
     saveHomeScroll(activatedPage.value, currentScrollTop())
+
+    // 第 81 轮：切子标签时退出聚焦模式。传 persist: false ——
+    // 用户只是换了个子标签，不代表「不想用聚焦模式」，刷新后仍按持久化值恢复。
+    if (isFocusBrowseActive())
+      exitFocusBrowse({ persist: false })
   }
 
   if (tabContentLoading.value)

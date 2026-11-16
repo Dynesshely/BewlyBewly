@@ -217,6 +217,8 @@ export interface Settings {
   homePageTabVisibilityList: { page: HomeSubPage, visible: boolean }[]
   /** 首页当前激活的子标签：记忆最后浏览的首页视图（第 78 轮） */
   homeActiveTab: HomeSubPage
+  /** 首页是否处于聚焦模式（封面流）：记忆上次状态，刷新后自动恢复（第 81 轮） */
+  focusBrowseEnabled: boolean
   alwaysShowTabsOnHomePage: boolean
   useSearchPageModeOnHomePage: boolean
   searchPageModeWallpaperFixed: boolean
@@ -372,6 +374,7 @@ export const originalSettings: Settings = {
   followingTabShowLivestreamingVideos: false,
 
   homeActiveTab: 'ForYou' as HomeSubPage,
+  focusBrowseEnabled: false,
   homePageTabVisibilityList: [],
   alwaysShowTabsOnHomePage: false,
   useSearchPageModeOnHomePage: false,

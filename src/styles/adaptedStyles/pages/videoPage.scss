@@ -4420,3 +4420,170 @@ html.bewly-design.videoPage.bewly-video-fixed #viewbox_report {
     padding-inline: 8px;
   }
 }
+
+/* ===== 第 81 轮 comment-interaction（自绘评论区互动 + 第 51/53/55 轮增强重建） ===== */
+/* 楼层节奏：卡片之间 8px 空隙（替代分割线），子回复左侧 2px 竖线 + hover 浅底 */
+#bewly-comment-list .bvp-cmt {
+  position: relative;
+  gap: 10px;
+  padding-block: 4px;
+  border: 0;
+}
+
+#bewly-comment-list .bvp-cmt + .bvp-cmt {
+  margin-top: 8px;
+}
+
+.bvp-cmt--sub {
+  padding-left: 12px;
+  margin-left: 8px;
+  border-left: 2px solid color-mix(in oklab, currentColor 12%, transparent);
+  border-radius: 2px;
+}
+
+.bvp-cmt--sub:hover {
+  background: var(--bew-fill-1);
+}
+
+/* UP 主评论左侧 2px 主题色条 */
+.bvp-cmt--up {
+  padding-left: 8px;
+}
+
+.bvp-cmt--up::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 0;
+  width: 2px;
+  background: var(--bew-theme-color, var(--bew-bili-blue, hsl(195 100% 42%)));
+  border-radius: 1px;
+}
+
+/* 正文行宽上限 640（窄列 100%），次级信息 12.5px 不折行，图片不溢出 */
+.bvp-cmt__text {
+  max-width: min(640px, 100%);
+}
+
+.bvp-cmt__time,
+.bvp-cmt__location {
+  white-space: nowrap;
+}
+
+.bvp-cmt__pictures {
+  max-width: 100%;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+}
+
+.bvp-cmt__picture img {
+  max-width: 100%;
+}
+
+/* 点赞激活态 */
+.bvp-cmt__action.is-active {
+  color: var(--bew-theme-color, var(--bew-bili-blue, hsl(195 100% 42%)));
+}
+
+/* 内联回复 / 底部发表框 */
+.bvp-cmt__compose {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: min(640px, 100%);
+  margin-top: 6px;
+}
+
+.bvp-cmt__input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--bew-text-1);
+  resize: vertical;
+  background: var(--bew-fill-1);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  outline: none;
+}
+
+.bvp-cmt__input:focus {
+  border-color: var(--bew-theme-color, var(--bew-bili-blue, hsl(195 100% 42%)));
+}
+
+.bvp-cmt__compose-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.bvp-cmt__count {
+  margin-right: auto;
+  font-size: 12px;
+  color: var(--bew-text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.bvp-cmt__submit {
+  height: 28px;
+  padding: 0 14px;
+  font-size: 12.5px;
+  color: #fff;
+  cursor: pointer;
+  background: var(--bew-theme-color, var(--bew-bili-blue, hsl(195 100% 42%)));
+  border: 0;
+  border-radius: 14px;
+}
+
+.bvp-cmt__cancel {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  color: var(--bew-text-2);
+  cursor: pointer;
+  background: var(--bew-fill-1);
+  border: 0;
+  border-radius: 14px;
+}
+
+/* 未登录提示 */
+.bvp-cmt__login-tip {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  font-size: 12.5px;
+  color: var(--bew-text-3);
+}
+
+.bvp-cmt__login-link {
+  color: var(--bew-theme-color, var(--bew-bili-blue, hsl(195 100% 42%)));
+  text-decoration: none;
+}
+
+.bvp-cmt__login-link:hover {
+  text-decoration: underline;
+}
+
+/* 高对比：竖线/色条提一档 */
+@media (prefers-contrast: more) {
+  .bvp-cmt--sub {
+    border-left-color: currentColor;
+  }
+}
+
+@media (forced-colors: active) {
+  .bvp-cmt--sub {
+    border-left-color: CanvasText;
+  }
+
+  .bvp-cmt--up::before {
+    background: Highlight;
+  }
+}

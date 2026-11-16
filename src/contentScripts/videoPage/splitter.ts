@@ -133,9 +133,16 @@ function onPointerDown(event: PointerEvent): void {
   if (!el || event.button !== 0)
     return
   event.preventDefault()
-  el.setPointerCapture(event.pointerId)
+  // 第 90 轮：先置状态再捕获指针 —— setPointerCapture 在某些情况下（元素未连接 /
+  // pointerId 已被释放）会抛错，原来放在 dragging = true 之前，一旦抛错整个拖拽就静默失效。
   dragging = true
   dragPointerId = event.pointerId
+  try {
+    el.setPointerCapture(event.pointerId)
+  }
+  catch {
+    // 捕获失败不影响后续 pointermove（事件仍会冒泡到 document）
+  }
   el.setAttribute('data-dragging', '')
   document.body.classList.add(RESIZING_CLASS)
 }

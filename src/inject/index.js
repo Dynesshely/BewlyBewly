@@ -241,3 +241,111 @@ window.addEventListener('bewly-site-tweaks', (event) => {
     BEWLY_SITE_TWEAKS.disableP2P = detail.disableP2P
 })
 // #endregion
+
+// #region 视频页数据桥（第 78 轮）
+//
+// 内容脚本（ISOLATED world）读不到页面世界挂在 window 上的 `__INITIAL_STATE__`，
+// 而「自绘界面」方案要求直接从 B 站数据渲染、不再依赖原生 DOM 文本。
+// 这里由页面世界把需要的字段整理成一个轻量 payload，通过 window 事件转发。
+//
+// 内容脚本侧监听：window.addEventListener('bewly-video-data', e => e.detail)
+
+const BEWLY_VIDEO_DATA_EVENT = 'bewly-video-data'
+
+function collectBewlyVideoData() {
+  try {
+    const state = window.__INITIAL_STATE__
+    if (!state)
+      return null
+
+    const video = state.videoData || state.video
+    if (!video)
+      return null
+
+    const stat = video.stat || {}
+    const owner = video.owner || {}
+
+    return {
+      bvid: video.bvid || '',
+      title: video.title || '',
+      pubdate: video.pubdate || 0,
+      ctime: video.ctime || 0,
+      duration: video.duration || 0,
+      desc: video.desc || '',
+      tname: video.tname || '',
+      pic: video.pic || '',
+      copyright: video.copyright,
+      stat: {
+        view: stat.view || 0,
+        danmaku: stat.danmaku || 0,
+        like: stat.like || 0,
+        coin: stat.coin || 0,
+        favorite: stat.favorite || 0,
+        share: stat.share || 0,
+        reply: stat.reply || 0,
+      },
+      owner: {
+        name: owner.name || '',
+        mid: owner.mid || 0,
+        face: owner.face || '',
+      },
+      pages: Array.isArray(video.pages)
+        ? video.pages.length
+        : 0,
+      tags: Array.isArray(video.tags)
+        ? video.tags.map(tag => (tag && tag.tag_name) || '').filter(Boolean).slice(0, 40)
+        : [],
+    }
+  }
+  catch {
+    return null
+  }
+}
+
+let bewlyVideoDataTimer = null
+let bewlyVideoDataTries = 0
+
+function pushBewlyVideoData() {
+  const payload = collectBewlyVideoData()
+  if (!payload)
+    return false
+  try {
+    window.dispatchEvent(new CustomEvent(BEWLY_VIDEO_DATA_EVENT, { detail: payload }))
+    return true
+  }
+  catch {
+    return false
+  }
+}
+
+/** 数据可能晚于 document_start 就绪：轮询到首次成功为止；切视频后再推一次 */
+function startBewlyVideoDataWatch() {
+  if (bewlyVideoDataTimer)
+    clearInterval(bewlyVideoDataTimer)
+  bewlyVideoDataTries = 0
+  bewlyVideoDataTimer = setInterval(() => {
+    bewlyVideoDataTries += 1
+    if (pushBewlyVideoData() || bewlyVideoDataTries > 40)
+      clearInterval(bewlyVideoDataTimer)
+  }, 250)
+}
+
+startBewlyVideoDataWatch()
+
+// SPA 切视频 / 首次加载完成后重新推送
+window.addEventListener('historyChange', () => {
+  setTimeout(pushBewlyVideoData, 300)
+  setTimeout(pushBewlyVideoData, 1500)
+})
+
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(pushBewlyVideoData, 200)
+  setTimeout(pushBewlyVideoData, 1200)
+})
+
+// 内容脚本可主动索要（mount 时机不确定时用）
+window.addEventListener('bewly-video-data-request', () => {
+  if (!pushBewlyVideoData())
+    startBewlyVideoDataWatch()
+})
+// #endregion

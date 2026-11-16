@@ -47,6 +47,7 @@ import {
   markPlayerStage,
 } from './dom'
 import { clearFixedLayout, setupFixedLayout, syncFixedLayout } from './fixedLayout'
+import { setupInfoBar, syncInfoBar } from './infoBar'
 import { syncPlayerScreenMode, teardownPlayerScreenMode } from './playerMode'
 import selectionPanelCss from './playlistPanel.shadow.scss?inline'
 import { bindRailHost, railState, syncRecommendRail, teardownRecommendRail } from './recommendRail'
@@ -130,6 +131,8 @@ let disposeComments: (() => void) | null = null
 let disposeCommentColumn: (() => void) | null = null
 let disposeFixedLayout: (() => void) | null = null
 let disposeSplitter: (() => void) | null = null
+/** 自绘信息栏（第 78 轮阶段 1）：挂载时返回 teardown */
+let disposeInfoBar: (() => void) | null = null
 
 /**
  * 视口过窄（含极端 iframe 预览）时是否处于降级状态。
@@ -170,6 +173,10 @@ function degradeForNarrowViewport(): void {
     disposeSplitter()
     disposeSplitter = null
   }
+  if (disposeInfoBar) {
+    disposeInfoBar()
+    disposeInfoBar = null
+  }
   teardownToolbarActions()
   teardownDescPopover()
   teardownRecommendRail()
@@ -184,10 +191,13 @@ function restoreAfterNarrowViewport(): void {
   setupToolbarActions()
   if (!disposeCommentColumn)
     disposeCommentColumn = setupCommentColumn()
+
   if (!disposeFixedLayout)
     disposeFixedLayout = setupFixedLayout()
   if (!disposeSplitter)
     disposeSplitter = setupSplitter()
+  if (!disposeInfoBar)
+    disposeInfoBar = setupInfoBar()
   if (!isInIframe() && settings.value.videoPageShortcuts && !disposeShortcuts)
     disposeShortcuts = setupShortcuts()
 }
@@ -350,6 +360,10 @@ function mount(): void {
   // 广告清理（第 28 轮）：CSS 清单 + MutationObserver 兜底动态插入
   setupAdGuard()
 
+  // 第 78 轮阶段 1：自绘信息栏（标题 + meta）。渲染成功才隐藏原生节点，读不到数据自动回退。
+  if (!viewportDegraded)
+    disposeInfoBar = setupInfoBar()
+
   // 固定单页布局（第 28 轮）：窗口太小 / 番剧页 / 迷你态会自动回退到原生可滚动布局。
   // iframe 内不启用（抽屉视口不是整页视口）。
   if (!viewportDegraded)
@@ -447,6 +461,10 @@ function unmount(): void {
   if (disposeSplitter) {
     disposeSplitter()
     disposeSplitter = null
+  }
+  if (disposeInfoBar) {
+    disposeInfoBar()
+    disposeInfoBar = null
   }
   teardownAdGuard()
 
@@ -567,6 +585,9 @@ function sync(): void {
   const railVisible = Boolean(railState.placement && railState.cards.length)
   if (ui.recommendRailVisible !== railVisible)
     ui.recommendRailVisible = railVisible
+
+  // 第 78 轮阶段 1：自绘信息栏（必须在布局之前，隐藏原生节点会改变左列块高度实测）
+  safeSync('syncInfoBar', syncInfoBar)
 
   // 固定单页布局（第 29 轮）：**唯一**的布局所有者。
   // ⚠️ 第 36 轮起把它提到评论区同步之前：评论区 / 轨道 / 简介任何一处抛异常都不能阻止

@@ -1239,3 +1239,77 @@ footer 侧补：`#footer bili-comment-action-buttons-renderer { flex: 0 0 auto; 
 
 正文上限从 420 → 640（约 45 汉字，Lead 给的上限），826 宽列下左对齐、右侧只剩 ~102px；
 559 以下窄列由 `min(640px, 100%)` 自动退化为 100%。没有居中（居中会让正文左边缘离开头像 63px，不满足「正文左边缘 = 头像右 + gap」）。
+
+## 第 78 轮：自绘界面阶段 1 试点（标题 + 信息栏）
+
+目标：标题 / 播放量 / 弹幕 / 日期 / 版权 / 分P 由我们渲染，只读 B 站数据；原生 `.video-info-title`、
+`.video-info-meta`、`.video-info-detail-list` 在渲染成功后 `display:none`（不删除）。
+
+### 实现（`src/contentScripts/videoPage/infoBar.ts`）
+
+- 自绘块 `#bewly-info-bar` 插入 `#viewbox_report` 内部（第一个子元素之前），而不是 shadow：
+  `fixedLayout.measureDockBlocks()` 实测的是**左列直接子元素高度**，放在 report 内可保持子元素数量与高度预算不变；
+- 数据源优先级：内联 `<script>` 里的 `__INITIAL_STATE__`（isolated world 读不到 window 变量，只能截 JSON 文本）→
+  原生 DOM 文本（`.video-title` 的 `title`/文本、`.view-text`、`.dm-text`、`.pubdate-ip-text`、`.copyright-text`）→ 都失败则**不隐藏原生、不渲染**；
+- 按 bvid 缓存解析结果（切视频才重解析），渲染前比较 `dataset.signature`，内容不变不写 DOM；
+- 标题 2 行截断 + `title` 属性给全文；播放量/弹幕用 B 站已格式化文本（如「1万」「192」）；
+  日期取 `YYYY-MM-DD`；版权读 `.copyright-text`；分P 显示「共 N P」占位（仅当 `__INITIAL_STATE__` 可读）；
+- 卸载 / iframe 降级 / 读不到数据：移除自绘块并恢复原生节点 display。
+
+### 布局验证（CDP 现场模拟自绘块 + 隐藏原生，测完已恢复）
+
+| 指标 | 模拟前 | 模拟中 | 恢复后 |
+| --- | --- | --- | --- |
+| `#viewbox_report` 高 | 70 | **70** | 70 |
+| `#playerWrap` 高 | 656 | **656** | 656 |
+| 评论列高 | 848 | **848** | 848 |
+| `--bvp-fixed-dock-height` | 848px | **848px** | 848px |
+| 左列子元素数 | 7 | **7** | 7 |
+
+结论：自绘信息栏不影响 fixedLayout 的高度预算（report 高度由 `--bvp-fixed-info` 固定 70，自绘块在其内部）。
+
+### 风险清单（仍强依赖原生 DOM 的地方）
+
+1. **数据层**：`__INITIAL_STATE__` 在 content script 的 isolated world 不可读 —— 真机的内联 script 里只有对它的**引用**
+   （`window.__INITIAL_STATE__.xxx`），没有 JSON 字面量；因此阶段 1 只能用原生 DOM 文本，
+   播放量拿不到精确数字（DOM 是「1万」而不是 10103 → 无法显示「1.0万」）。**这是阶段 2 的第一块砖：page-world 桥接。**
+2. 自绘块借用了 `#viewbox_report` 的固定高度 70，仍依赖该容器与 `--bvp-fixed-info`。
+3. `fixedLayout.measureDockBlocks()` 依赖 `#mirror-vdcon .left-container` 的直接子元素结构；
+   阶段 2 自绘工具栏/标签行后要改成「读我们自己的布局变量」。
+4. 工具栏（点赞/投币/收藏/分享/举报/笔记）、UP 卡、标签行、简介、评论区、播放器全部仍是「改原生 DOM + 注入 CSS」。
+   播放器无法自绘（视频解码 / 弹幕 / 控制条都在 B 站播放器里）。
+5. 隐藏 `.video-info-title` 会连带隐藏 B 站的长标题「展开」面板（`show-more` / `overflow-panel`），
+   自绘只做 2 行截断 + `title` 提示，交互上是**降级**（用户可 hover 看全文）。
+6. 分P / 合集入口目前只是占位文本，未接点击交互。
+
+### 阶段 2 建议（按性价比排序）
+
+1. **page-world 数据桥接**（~0.5 天）：用 `chrome.scripting.executeScript({ world: 'MAIN' })` 或注入 page script + `postMessage`，
+   把 `__INITIAL_STATE__.videoData`（含 `stat` 精确数字、`owner`、`tags`、`pages`）读出来；这是后续一切自绘的前提。
+2. **标签行自绘**（~0.5 天，风险最低）：`tags` 只读渲染 + 点击跳转原生链接，无写操作。
+3. **UP 卡自绘**（~1 天）：`owner` 数据渲染头像/昵称/签名；「关注」按钮动作转发给原生按钮（避免 CSRF/风控）。
+4. **工具栏自绘**（~2~3 天，风险最高）：`stat` 只读展示先做（~1 天）；点赞/投币/收藏需要 B 站写接口（`bili_jct` + 风控），
+   建议先做「自绘展示 + 点击代理原生按钮」，等接口层稳定再接管写操作。
+5. 同时把自绘块从 `#viewbox_report` 迁到独立容器，并让 `fixedLayout` 读我们自己的布局变量（不再实测原生 DOM 子元素）。
+
+### 第 78 轮补充：接入 page-world 数据桥（精确数字）
+
+内容脚本在 isolated world 读不到 `window.__INITIAL_STATE__`，由 `src/inject/index.js`（MAIN world）整理后
+通过 `bewly-video-data` 事件推送；内容脚本可派发 `bewly-video-data-request` 主动索要。
+
+**数据来源优先级**（`infoBar.readVideoData()`）：
+
+1. `bewly-video-data` 事件缓存（page-world 桥；含精确 `stat` / `pages` / `tags` / `owner`）；
+2. 内联 `<script>` 文本里解析 `__INITIAL_STATE__`（当前真机 script 里只有引用，实际读不到）；
+3. 原生 DOM 文本（`.video-title` 的 `title` / `.view-text` / `.dm-text` / `.pubdate-ip-text` / `.copyright-text`）；
+4. 都没有 → 不隐藏原生、不渲染，绝不白屏。
+
+其他行为：
+
+- `setupInfoBar()` 里注册监听并立即 dispatch `bewly-video-data-request`；卸载时移除监听；
+- 收到数据后按 bvid 判断是否换视频（变了就清缓存）并立即 `syncInfoBar()`，不等 500ms 拍；
+- 有桥数据时播放量用 `formatCount(10103) = "1.0万"`（精确值再格式化），无桥数据时才退回 DOM 文本「1万」；
+- 分P 用 payload 的 `pages`（真机 8）→「共 8 P」；`tags` 已缓存但本阶段不渲染（标签行仍用原生，避免重复控件）。
+
+真机核对：主世界 `__INITIAL_STATE__.videoData` 存在，`stat = { view: 10103, danmaku: 192, like: 944, coin: 500, favorite: 2256, share: 504, reply: 20 }`、`pages = 8` —— 与 Lead 给的结构一致。
+当前调试浏览器未 build 最新 `inject/index.js`，所以 `bewly-video-data-request` 现场无响应（`events: 0`）；build 后即可验证。

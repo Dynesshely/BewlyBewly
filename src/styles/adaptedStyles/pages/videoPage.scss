@@ -3852,3 +3852,59 @@ html.bewly-design.videoPage .bewly-desc-tooltip :focus-visible {
   }
 }
 /* ===== 第 52 轮 contrast-focus end ===== */
+
+/* ===== 第 78 轮 info-bar（自绘信息栏阶段 1） =====
+   自绘块由 infoBar.ts 渲染进 #viewbox_report 内部（保持「左列直接子元素」数量不变，
+   fixedLayout 的实测高度预算因此不受影响）；原生 .video-info-title / .video-info-detail-list
+   在渲染成功后被 display:none。样式复用第 34 轮字阶 / 间距 token。 */
+#bewly-info-bar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--bvp-space-1, 4px);
+  min-width: 0;
+  width: 100%;
+}
+
+.bvp-info__title {
+  margin: 0;
+  font-size: var(--bvp-fs-title, 20px);
+  font-weight: 600;
+  line-height: var(--bvp-lh-title, 1.35);
+  color: var(--bew-text-1);
+  /* 长标题两行截断 + 省略号；完整标题在 title 属性里 */
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
+}
+
+.bvp-info__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--bvp-space-2, 8px);
+  font-size: var(--bvp-fs-meta, 12.5px);
+  line-height: var(--bvp-lh-meta, 1.25);
+  color: var(--bew-text-3);
+}
+
+.bvp-info__item {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bvp-info__item svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+/* 信息栏高度仍由 --bvp-fixed-info 控制，自绘块不额外撑高 */
+html.bewly-design.videoPage.bewly-video-fixed #viewbox_report {
+  overflow: hidden;
+}

@@ -209,6 +209,43 @@ function setCurrentLayout(value: GridLayoutType) {
   }
 }
 
+/**
+ * 首页当前子标签记忆（第 78 轮）。
+ *
+ * `gridLayout.byTab` 已经按子标签记住布局，但刷新 / 离开首页再回来时 activatedPage
+ * 总会重置为第一个标签，用户看到的是第一个标签的布局，于是以为「布局没被记住」。
+ * 这里把最后浏览的子标签也持久化到 settings（与 gridLayout 一样走 useStorageLocal），
+ * 恢复「同一个 tab + 同一套布局」。
+ *
+ * 字段由 Lead 加在 storage.ts：
+ *   homeActiveTab: HomeSubPage   // 默认 HomeSubPage.ForYou
+ * 字段尚未加入前用局部类型兼容，加入后无需改这里。
+ */
+interface HomeActiveTabMemory { homeActiveTab?: HomeSubPage }
+const HOME_DEFAULT_TAB: HomeSubPage = HomeSubPage.ForYou
+/** 用户是否已主动切过标签：避免 settings 异步读取完成时把当前标签拽回去 */
+let userPickedHomeTab = false
+
+function readStoredHomeTab(): HomeSubPage | undefined {
+  return (settings.value as unknown as HomeActiveTabMemory).homeActiveTab
+}
+
+function persistHomeTab(page: HomeSubPage): void {
+  (settings.value as unknown as HomeActiveTabMemory).homeActiveTab = page
+}
+
+function hasHomeTab(page: HomeSubPage): boolean {
+  return currentTabs.value.some(tab => tab.page === page)
+}
+
+/** 恢复上次浏览的子标签；为空或对应标签已隐藏时退回第一个可见标签 */
+function restoreHomeTab(): HomeSubPage {
+  const stored = readStoredHomeTab()
+  if (stored && hasHomeTab(stored))
+    return stored
+  return currentTabs.value[0]?.page ?? HOME_DEFAULT_TAB
+}
+
 const gridLayoutIcons = computed((): GridLayoutIcon[] => {
   return [
     { icon: 'i-mingcute:table-3-line', iconActivated: 'i-mingcute:table-3-fill', value: 'adaptive' },
@@ -238,6 +275,18 @@ const densityOptions = computed(() => [
 // use Json stringify to watch the changes of the array item properties
 watch(() => JSON.stringify(settings.value.homePageTabVisibilityList), () => {
   currentTabs.value = computeTabs()
+
+  // 标签可见性变化后当前标签可能已被隐藏：退回第一个可见标签（不覆盖已记住的标签）
+  if (!hasHomeTab(activatedPage.value) && currentTabs.value[0])
+    activatedPage.value = currentTabs.value[0].page
+})
+
+// settings 是异步读取的：加载完成后若用户还没手动切过标签，就恢复到上次浏览的标签
+watch(() => readStoredHomeTab(), (storedTab) => {
+  if (userPickedHomeTab || !storedTab || storedTab === activatedPage.value)
+    return
+  if (hasHomeTab(storedTab))
+    activatedPage.value = storedTab
 })
 
 function computeTabs(): HomeTab[] {
@@ -290,7 +339,8 @@ onMounted(() => {
   })
 
   currentTabs.value = computeTabs()
-  activatedPage.value = currentTabs.value[0].page
+  // 第 78 轮：恢复上次浏览的子标签，这样按 tab 记忆的 gridLayout.byTab 才能在刷新后看到
+  activatedPage.value = restoreHomeTab()
 
   emitter.on('switch-home-tab', (index: number) => {
     const tab = currentTabs.value[index]
@@ -398,6 +448,9 @@ function handleChangeTab(tab: HomeTab) {
     toggleTabContentLoading(false)
 
   activatedPage.value = tab.page
+  // 第 78 轮：记住最后浏览的子标签（刷新 / 离开首页再回来时恢复）
+  userPickedHomeTab = true
+  persistHomeTab(tab.page)
 
   // 先取消上一轮还没落位的恢复
   cancelScrollRestore?.()

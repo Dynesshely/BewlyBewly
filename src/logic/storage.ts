@@ -215,6 +215,8 @@ export interface Settings {
   followingTabShowLivestreamingVideos: boolean
 
   homePageTabVisibilityList: { page: HomeSubPage, visible: boolean }[]
+  /** 首页当前激活的子标签：记忆最后浏览的首页视图（第 78 轮） */
+  homeActiveTab: HomeSubPage
   alwaysShowTabsOnHomePage: boolean
   useSearchPageModeOnHomePage: boolean
   searchPageModeWallpaperFixed: boolean
@@ -369,6 +371,7 @@ export const originalSettings: Settings = {
 
   followingTabShowLivestreamingVideos: false,
 
+  homeActiveTab: 'ForYou' as HomeSubPage,
   homePageTabVisibilityList: [],
   alwaysShowTabsOnHomePage: false,
   useSearchPageModeOnHomePage: false,

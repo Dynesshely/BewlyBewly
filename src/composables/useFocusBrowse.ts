@@ -600,6 +600,23 @@ function isEditableEvent(event: KeyboardEvent): boolean {
   return !!el.closest?.('input, textarea, select, [contenteditable="true"]')
 }
 
+/**
+ * 事件是否落在「其它模块自己处理的键盘区域」里。
+ *
+ * 典型是视频页下部的推荐轨道（#bewly-video-page 的 shadow 里）：它自己监听 ←/→，
+ * 聚焦模式若在捕获阶段把它们抢走会造成回归。这里按 composedPath 判定并放行。
+ */
+function isEventFromOtherKeyboardUi(event: KeyboardEvent): boolean {
+  const path = event.composedPath?.() ?? []
+  return path.some((node) => {
+    if (!(node instanceof HTMLElement))
+      return false
+    if (node.id === 'bewly-video-page')
+      return true
+    return node.hasAttribute('data-bvp-rail') || node.classList.contains('bvp-rail')
+  })
+}
+
 /** 取当前 active 卡片的视频地址 */
 function getActiveCardUrl(): string {
   const card = cardEls[activeIndex]
@@ -687,6 +704,65 @@ export function useFocusBrowse() {
     }
   }
 
+  /**
+   * 方向键：在 window 的**捕获阶段**优先接管。
+   *
+   * 为什么不用冒泡阶段的 onKeydown：
+   * B 站首页的轮播 / 其它脚本会监听 ←/→ 并 preventDefault（即使轮播已被聚焦模式隐藏，
+   * 它们的 keydown 监听仍挂在文档上），而 onKeydown 开头有 `event.defaultPrevented` 早退，
+   * 于是 ←/→ 被页面脚本吞掉；↑/↓ 没人拦，所以表现成「只有左右键不生效」。
+   *
+   * 这里提前到 window 捕获阶段并 stopPropagation，保证聚焦模式下方向键只切卡片；
+   * 退出聚焦模式后本监听立刻不再接管，网格模式行为不变。
+   */
+  function onArrowKeydownCapture(event: KeyboardEvent) {
+    if (!isFocusBrowseActive())
+      return
+    // 刻意不看 event.defaultPrevented：页面脚本（轮播等）可能已经把它置 true，
+    // 聚焦模式下方向键必须仍归卡片切换所有；浮层与输入框已在下面单独放行。
+    if (event.isComposing)
+      return
+    // 命令面板 / 设置 / 预览抽屉等浮层打开时全部放行
+    if (hasOpenOverlay())
+      return
+    // 输入框内打字时不接管方向键
+    if (isEditableEvent(event))
+      return
+    // 用户把某个动作改键到方向键时，尊重自定义改键（交给冒泡阶段的 onKeydown）
+    if (resolveFocusAction(event))
+      return
+    // 视频页推荐轨道等模块自己的键盘区域：让给它自己处理
+    if (isEventFromOtherKeyboardUi(event))
+      return
+
+    switch (event.key) {
+      // 轨道是横向单行：←/→ 直接切上一张 / 下一张（与滚轮方向一致）
+      case 'ArrowLeft':
+        event.preventDefault()
+        event.stopPropagation()
+        focusMove(-1)
+        break
+      case 'ArrowRight':
+        event.preventDefault()
+        event.stopPropagation()
+        focusMove(1)
+        break
+      // 轨道没有纵向维度：↑/↓ 保持原有的「上一张 / 下一张」手感，不做列数换算
+      case 'ArrowUp':
+        event.preventDefault()
+        event.stopPropagation()
+        focusMove(-1)
+        break
+      case 'ArrowDown':
+        event.preventDefault()
+        event.stopPropagation()
+        focusMove(1)
+        break
+      default:
+        break
+    }
+  }
+
   function onKeydown(event: KeyboardEvent) {
     if (!isFocusBrowseActive())
       return
@@ -726,16 +802,9 @@ export function useFocusBrowse() {
       }
       return
     }
-    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-      event.preventDefault()
-      focusMove(1)
-      return
-    }
-    if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-      event.preventDefault()
-      focusMove(-1)
-      return
-    }
+    // 方向键在「捕获阶段」处理（见 onArrowKeydownCapture）：
+    // B 站首页的轮播等脚本会在 document 上对 ←/→ preventDefault，
+    // 冒泡阶段再处理就已经被 event.defaultPrevented 拦掉了。
     // Home / End 与网格模式保持一致
     if (event.key === 'Home') {
       event.preventDefault()
@@ -768,11 +837,13 @@ export function useFocusBrowse() {
   })
 
   onMounted(() => {
+    window.addEventListener('keydown', onArrowKeydownCapture, { capture: true })
     window.addEventListener('keydown', onKeydown)
     window.addEventListener('wheel', onWheel, { capture: true, passive: false })
   })
 
   onUnmounted(() => {
+    window.removeEventListener('keydown', onArrowKeydownCapture, { capture: true })
     window.removeEventListener('keydown', onKeydown)
     window.removeEventListener('wheel', onWheel, { capture: true })
     emitter.off('command-toggle-focus-browse')

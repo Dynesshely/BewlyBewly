@@ -69,22 +69,14 @@ html.bewly-search-drawn {
   }
   /* #endregion */
 
-  /* #region 网格化后卡片的盒模型 */
-  .bili-video-card {
-    width: 100% !important;
-    min-width: 0 !important;
-  }
-
-  .bili-video-card .bili-video-card__wrap {
-    width: 100%;
-    min-width: 0;
-  }
-
-  /* 封面保持 16:9，避免列宽变化时高度抖动 */
-  .bili-video-card .bili-video-card__image--wrap {
-    aspect-ratio: 16 / 9;
+  /* #region 卡片视觉（第 94 轮：移除一切影响布局的规则）
+   *
+   * 真机教训：B 站搜索卡是「.col_* 包装层 + __wrap 绝对定位」，
+   * 任何给它设 width / aspect-ratio 的规则都会让卡片高度塌成 0（42 张全 0 高）。
+   * 这里只保留纯装饰（圆角 / 遮罩），宽度与高度交给 B 站原生布局。
+   */
+  .bili-video-card__mask {
     border-radius: var(--bew-radius-half, 8px);
-    overflow: hidden;
   }
   /* #endregion */
 

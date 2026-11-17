@@ -4829,3 +4829,16 @@ html.bewly-design.videoPage #bewly-comment-column #commentapp {
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+
+/* ===== 第 94 轮 A：工具栏按钮层叠安全 =====
+   真机实测（CDP，视频页 2064×1217）：工具栏三个自绘按钮 rect y=835、命中自己
+   （BUTTON.bewly-desc-trigger / .bewly-toolbar-action），当前构建下没有覆盖。
+   但巡检另一次在 (1950,153)/(1988,153) 命中外层 .up-panel-container —— 那是宽屏/网页全屏
+   布局下按钮被推到右列上方、与 UP 卡重叠的形态。UP 卡是 static（z-index auto），
+   靠 DOM 顺序压住了按钮。这里给按钮组与单项一个轻量层叠提升，保证任何布局下都能点到。 */
+#bewly-toolbar-actions,
+#bewly-toolbar-actions > .bewly-desc-trigger,
+#bewly-toolbar-actions > .bewly-toolbar-action {
+  position: relative;
+  z-index: 1;
+}

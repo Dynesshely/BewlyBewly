@@ -16,7 +16,7 @@
 import type { App } from 'vue'
 import { createApp } from 'vue'
 
-import { syncCategories, syncSessions } from './actions'
+import { clearMessageList, resetListUnreadSnapshots, syncCategories, syncMessageList, syncSessions } from './actions'
 import MessageSessions from './components/MessageSessions.vue'
 import MessageTabs from './components/MessageTabs.vue'
 import {
@@ -26,8 +26,10 @@ import {
   getMessageRoute,
   getSessionListHostEl,
   isMessageCenterPage,
+  isMessageListRoute,
   isNativeLayoutReady,
 } from './dom'
+import { releaseAllListCards, syncListCards } from './listCards'
 import { resetState, state } from './state'
 
 const TABS_HOST_ID = 'bewly-message-tabs'
@@ -111,6 +113,9 @@ export function teardownMessageDrawn(): void {
 
   removeTabsHost()
   removeSessionsHost()
+  releaseAllListCards()
+  clearMessageList()
+  resetListUnreadSnapshots()
 
   document.documentElement.classList.remove(DRAWN_CLASS)
   resetState()
@@ -195,6 +200,16 @@ function sync(): void {
     removeSessionsHost()
     if (state.sessions.length)
       state.sessions = []
+  }
+
+  // 第 94 轮 B：回复 / @ / 收到的赞 / 系统通知 → 逐条目自绘
+  if (isMessageListRoute(state.route)) {
+    syncMessageList()
+    syncListCards()
+  }
+  else {
+    clearMessageList()
+    releaseAllListCards()
   }
 }
 

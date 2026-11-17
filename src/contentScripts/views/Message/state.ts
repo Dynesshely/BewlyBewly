@@ -36,6 +36,46 @@ export interface MessageSessionView {
   timeText: string
 }
 
+/** 互动类列表（回复 / @ / 收到的赞）的一行 */
+export interface MessageInteractionView {
+  /** 稳定 key：同一条里可能有多人，用原生下标 + 文本指纹 */
+  key: string
+  /** 原生列表里的下标，点击转发靠它定位 */
+  index: number
+  /** 参与的人（回复/@ 是 1 个，赞可能是 2 个展示名） */
+  unames: string[]
+  /** 动作文案：「对我的视频发表了评论」「等总计 47 人赞了我的视频」「在视频中@了我」 */
+  action: string
+  /** 引用原文（评论内容 / @ 到的正文），可能为空 */
+  message: string
+  /** 额外的引用内容（原生 `__reference`，出现时优先展示） */
+  reference: string
+  /** 源内容封面（视频封面等），可能为空 */
+  cover: string
+  /** 时间文本（原生已格式化） */
+  time: string
+  /** 头像列表（1–2 个） */
+  avatars: string[]
+  /** 多人点赞（原生 .interaction-item__left.multi），头像叠放展示 */
+  multi: boolean
+  /** 未读态（见 actions.ts 的说明：原生没有逐条已读标记，用分类未读计数近似） */
+  unread: boolean
+  /** 原生提供的按钮类型（按 hover 显隐，转发回原生） */
+  buttons: Array<'reply' | 'like' | 'delete' | 'notice'>
+}
+
+/** 系统通知列表的一行 */
+export interface MessageSystemView {
+  key: string
+  index: number
+  title: string
+  message: string
+  time: string
+  unread: boolean
+}
+
+export type MessageListKind = 'none' | 'interaction' | 'system'
+
 export interface MessageDrawnState {
   /** 原生消息中心结构已就绪，接管生效 */
   ready: boolean
@@ -49,6 +89,16 @@ export interface MessageDrawnState {
   loadingMore: boolean
   /** 会话列表标题（原生「最近消息」） */
   sessionTitle: string
+  /** 当前四类列表的类型（非 whisper 路由才有值） */
+  listKind: MessageListKind
+  /** 自绘互动列表 */
+  interactions: MessageInteractionView[]
+  /** 自绘系统通知列表 */
+  systems: MessageSystemView[]
+  /** 四类列表的标题（取当前激活分类名） */
+  listTitle: string
+  /** 该分类的未读数量（>0 时用于标未读，仅作近似） */
+  listUnread: number
 }
 
 function createInitialState(): MessageDrawnState {
@@ -59,6 +109,11 @@ function createInitialState(): MessageDrawnState {
     sessions: [],
     loadingMore: false,
     sessionTitle: '',
+    listKind: 'none',
+    interactions: [],
+    systems: [],
+    listTitle: '',
+    listUnread: 0,
   }
 }
 

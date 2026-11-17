@@ -18,6 +18,15 @@ export interface MessageDrawnMessages {
   loadingMore: string
   /** 会话项的未读无障碍文案 */
   unreadBadge: string
+  /** 四类列表：操作按钮文案（转发回原生按钮） */
+  actionReply: string
+  actionLike: string
+  actionDelete: string
+  actionNotice: string
+  /** 未读圆点的无障碍文案 */
+  unreadDot: string
+  /** 系统通知图标的无障碍文案 */
+  systemNotice: string
 }
 
 const CMN_CN: MessageDrawnMessages = {
@@ -28,6 +37,12 @@ const CMN_CN: MessageDrawnMessages = {
   yesterday: '昨天',
   loadingMore: '正在加载更多…',
   unreadBadge: '{count} 条未读',
+  actionReply: '回复',
+  actionLike: '点赞',
+  actionDelete: '删除该通知',
+  actionNotice: '不再通知',
+  unreadDot: '未读',
+  systemNotice: '系统通知',
 }
 
 const EN: MessageDrawnMessages = {
@@ -38,6 +53,12 @@ const EN: MessageDrawnMessages = {
   yesterday: 'Yesterday',
   loadingMore: 'Loading more…',
   unreadBadge: '{count} unread',
+  actionReply: 'Reply',
+  actionLike: 'Like',
+  actionDelete: 'Delete',
+  actionNotice: 'Mute',
+  unreadDot: 'Unread',
+  systemNotice: 'System notice',
 }
 
 const MESSAGES: Record<string, MessageDrawnMessages> = {

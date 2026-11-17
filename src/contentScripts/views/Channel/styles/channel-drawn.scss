@@ -1,0 +1,293 @@
+/**
+ * 分区页（自绘）样式。
+ *
+ * 由 `mount.ts` 以 `?inline` 引入、接管成功后才注入页面 `<head>`（卸载时移除），
+ * 所有颜色 / 圆角 / 阴影只用 `--bew-*` 设计令牌，深浅主题自动跟随（模块内不写死任何颜色）；
+ * 唯一例外是封面上的白色文字与黑色半透明遮罩（原生卡片同样是 `rgba(0,0,0,.6) + #fff`）。
+ * 类名统一以 `.channel-` / `#bewly-channel-drawn-root` 为前缀，避免和原生页、其它 Bewly 页面撞名。
+ */
+
+html.bewly-channel-drawn body {
+  background-color: var(--bew-bg);
+}
+
+/* #region 自挂载覆盖层外壳（mount.ts 创建的 DOM） */
+//
+//   #bewly-channel-drawn-root.bewly-channel-overlay  ← fixed 全屏、透明、不接事件
+//     └ .bewly-channel-shell                        ← 顶栏下方开始、自己滚动的滚动容器
+//         └ .bewly-channel-shell__inner             ← 页宽约束
+//
+#bewly-channel-drawn-root.bewly-channel-overlay {
+  position: fixed;
+  inset: 0;
+  /* 低于 #bewly 里顶栏的 z-index（99），高于页面内容 */
+  z-index: 90;
+  display: block;
+  font-family: inherit;
+  font-size: var(--bew-base-font-size, 14.8px);
+  line-height: 1.5;
+  color: var(--bew-text-1);
+  pointer-events: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+#bewly-channel-drawn-root *,
+#bewly-channel-drawn-root *::before,
+#bewly-channel-drawn-root *::after {
+  box-sizing: border-box;
+}
+
+.bewly-channel-shell {
+  position: absolute;
+  /* 由 mount.ts 按「有没有 Bewly 顶栏」设置：有顶栏 → 顶栏高度，没有 → 0 */
+  top: var(--bew-channel-shell-top, var(--bew-top-bar-height, 64px));
+  right: 0;
+  bottom: 0;
+  left: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--bew-fill-3) transparent;
+}
+
+.bewly-channel-shell__inner {
+  width: calc(100% - 150px);
+  max-width: var(--bew-page-max-width, 2280px);
+  margin: 0 auto;
+  padding: 10px 0 24px;
+}
+
+@media (min-width: 1024px) {
+  .bewly-channel-shell__inner {
+    width: calc(100% - 200px);
+  }
+}
+
+@media (max-width: 900px) {
+  .bewly-channel-shell__inner {
+    width: calc(100% - 32px);
+  }
+}
+/* #endregion */
+
+/* #region 页面骨架 */
+.channel-drawn-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 48px;
+}
+
+.channel-drawn-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 4px 2px;
+}
+
+.channel-drawn-head__title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--bew-text-1);
+}
+/* #endregion */
+
+/* #region 一级分区 pill 行 */
+.channel-nav {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 2px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  background-color: var(--bew-bg);
+}
+
+.channel-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.channel-nav__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--bew-radius-pill, 999px);
+  background-color: var(--bew-fill-1);
+  color: var(--bew-text-2);
+  font-size: 14px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background-color var(--bew-motion-fast, 0.2s) var(--bew-ease-out, ease),
+    color var(--bew-motion-fast, 0.2s) var(--bew-ease-out, ease);
+}
+
+.channel-nav__pill:hover {
+  background-color: var(--bew-fill-2);
+  color: var(--bew-text-1);
+}
+
+.channel-nav__pill:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+
+.channel-nav__pill--active {
+  background-color: var(--bew-theme-color);
+  color: #fff;
+}
+
+.channel-nav__pill--active:hover {
+  background-color: var(--bew-theme-color);
+  color: #fff;
+}
+
+/* PGC 分类（番剧 / 电影 / …）不是 /c/* 分区页，弱化一档区分开 */
+.channel-nav__pill--pgc {
+  background-color: transparent;
+  box-shadow: inset 0 0 0 1px var(--bew-border-color);
+}
+
+.channel-nav__pill--pgc:hover {
+  background-color: var(--bew-fill-1);
+}
+
+.channel-nav__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+/* #endregion */
+
+/* #region 二级分区 tab 行（当前 /c/* 布局没有二级入口，正常不渲染） */
+.channel-subtabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.channel-subtabs::-webkit-scrollbar {
+  display: none;
+}
+
+.channel-subtabs__tab {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  border-radius: var(--bew-radius-sm, 8px);
+  color: var(--bew-text-2);
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.channel-subtabs__tab:hover {
+  background-color: var(--bew-fill-1);
+  color: var(--bew-text-1);
+}
+
+.channel-subtabs__tab--active {
+  background-color: var(--bew-theme-color-20);
+  color: var(--bew-theme-color);
+}
+/* #endregion */
+
+/* #region 卡片网格 */
+.channel-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.channel-feed__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 24px 20px;
+  align-items: start;
+}
+
+@media (min-width: 1600px) {
+  .channel-feed__grid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+}
+
+.channel-feed__sentinel {
+  height: 1px;
+}
+
+.channel-feed__loading,
+.channel-feed__end,
+.channel-feed__error {
+  margin: 0;
+  text-align: center;
+  color: var(--bew-text-3);
+  font-size: 13px;
+}
+
+.channel-feed__error {
+  color: var(--bew-error-color);
+}
+
+.channel-feed__retry {
+  margin-left: 8px;
+  padding: 2px 10px;
+  border: none;
+  border-radius: var(--bew-radius-sm, 8px);
+  background-color: var(--bew-fill-2);
+  color: var(--bew-text-1);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.channel-feed__retry:hover {
+  background-color: var(--bew-fill-3);
+}
+
+.channel-feed__more {
+  align-self: center;
+  padding: 8px 20px;
+  border: none;
+  border-radius: var(--bew-radius-pill, 999px);
+  background-color: var(--bew-fill-1);
+  color: var(--bew-text-2);
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color var(--bew-motion-fast, 0.2s) var(--bew-ease-out, ease);
+}
+
+.channel-feed__more:hover {
+  background-color: var(--bew-fill-2);
+  color: var(--bew-text-1);
+}
+
+.channel-feed__link {
+  color: var(--bew-theme-color);
+  text-decoration: none;
+}
+
+.channel-feed__link:hover {
+  text-decoration: underline;
+}
+/* #endregion */
+
+@media (prefers-reduced-motion: reduce) {
+  .channel-nav,
+  .channel-nav__pill,
+  .channel-feed__more {
+    transition: none;
+  }
+}

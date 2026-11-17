@@ -423,3 +423,25 @@ html.bewly-zen:not(.bewly-zen--peek) #biliMainHeader {
   }
 }
 /* #endregion */
+
+/* ===== 第 94 轮 A：右侧悬浮按钮热区安全边距 =====
+   真机实测（CDP，视口 2064）：
+     #bewly shadow 内 .right-side（position: fixed; right: 0）下的两个 .ctrl-btn
+     rect = { x: 2038, w: 40, right: 2078 } → 右边缘超出视口 14px，中心 x=2058，
+     document.elementFromPoint(2058, 585) 返回 null（热区被裁）。
+   原因：.right-side 宽 52、.sidebar-content 内的按钮再溢出容器右侧 20px。
+   修法：只把按钮组往左推 20px（不移动 side 容器本身，避免影响其它右侧栏内容）。
+   用 :host-context() 限定：这段规则只在 #bewly 的 shadow root 内生效，
+   不会命中文档树里 B 站自己的 .right-side（视频页/专栏页也有同名类）。 */
+:host-context(html.bewly-design.momentsPage) .right-side .sidebar-content > .b-tooltip-wrapper,
+:host-context(html.bewly-design.momentsPage) .right-side .sidebar-content > .ctrl-btn,
+:host-context(html.bewly-design.userSpacePage) .right-side .sidebar-content > .b-tooltip-wrapper,
+:host-context(html.bewly-design.userSpacePage) .right-side .sidebar-content > .ctrl-btn {
+  margin-inline-end: 28px;
+}
+
+/* 兜底：容器不允许溢出时（overflow hidden）用位移，保证按钮完整落在视口内 */
+:host-context(html.bewly-design.momentsPage) .right-side,
+:host-context(html.bewly-design.userSpacePage) .right-side {
+  overflow: visible;
+}

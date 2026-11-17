@@ -212,3 +212,213 @@ export function triggerNativeLoadMore(): boolean {
 export function isNativeLayoutReady(): boolean {
   return Boolean(document.querySelector('.message-layout') && getNativeCategoryItems().length > 0)
 }
+
+// ============================ 第 94 轮 B：回复 / @ / 赞 / 系统通知 ============================
+//
+// 真机 dump（2026-11，CDP 只读）：
+//   reply  → .reply-layout > .reply-list           > .interaction-item × N
+//   at     → .at-layout    > .at-list              > .interaction-item × N
+//   love   → .love-section > .message-section__body > .love-list > .interaction-item × N
+//   system → .system-layout> .system-list          > .system-item     × N
+//
+// 互动条目内部（非哈希 BEM，稳定）：
+//   .interaction-item__left(.single|.multi) > .interaction-item__avatar img
+//   .interaction-item__uname × 1-2（多人点赞时是 2 个）
+//   .interaction-item__action       动作文案（前面带 &nbsp;）
+//   .interaction-item__msg          引用原文（评论内容 / @ 到的正文）
+//   .interaction-item__reference    额外引用块（部分条目才有）
+//   .interaction-item__cover img    源内容封面（视频封面等）
+//   .interaction-item__time         时间
+//   .interaction-item__btn.reply|like|delete|notice   操作按钮（默认 invisible，hover 才显）
+//
+// 系统条目：.system-item > .notify-item > .notify-item__top(.notify-item__title/__time) + __bottom(.__msg)
+//
+// 注意：原生列表**没有逐条已读标记**（只有左栏分类级未读数 / 小圆点），
+// 未读态由 actions.ts 用「分类未读数」近似（见那里的注释）。
+
+export type MessageListRoute = 'reply' | 'at' | 'love' | 'system'
+
+export type MessageListItemButton = 'reply' | 'like' | 'delete' | 'notice'
+
+export interface NativeInteractionRow {
+  index: number
+  element: HTMLElement
+  unames: string[]
+  action: string
+  message: string
+  reference: string
+  cover: string
+  time: string
+  avatars: string[]
+  multi: boolean
+  buttons: MessageListItemButton[]
+  unreadMarker: boolean
+}
+
+export interface NativeSystemRow {
+  index: number
+  element: HTMLElement
+  title: string
+  message: string
+  time: string
+  unreadMarker: boolean
+}
+
+const LIST_SELECTOR_BY_ROUTE: Record<MessageListRoute, string> = {
+  reply: '.reply-list',
+  at: '.at-list',
+  love: '.love-list',
+  system: '.system-list',
+}
+
+const ITEM_SELECTOR_BY_ROUTE: Record<MessageListRoute, string> = {
+  reply: '.interaction-item',
+  at: '.interaction-item',
+  love: '.interaction-item',
+  system: '.system-item',
+}
+
+/** 当前路由是否属于本轮自绘的四类列表 */
+export function isMessageListRoute(route: string): route is MessageListRoute {
+  return route === 'reply' || route === 'at' || route === 'love' || route === 'system'
+}
+
+/** 四类列表的原生列表容器（.reply-list / .at-list / .love-list / .system-list） */
+export function getMessageListEl(route: string = getMessageRoute()): HTMLElement | null {
+  if (!isMessageListRoute(route))
+    return null
+  return document.querySelector<HTMLElement>(LIST_SELECTOR_BY_ROUTE[route])
+}
+
+/** 某一类列表的原生条目（顺序即展示顺序） */
+export function getNativeListItems(route: string = getMessageRoute()): HTMLElement[] {
+  if (!isMessageListRoute(route))
+    return []
+  const list = getMessageListEl(route)
+  if (!list)
+    return []
+  return Array.from(list.querySelectorAll<HTMLElement>(ITEM_SELECTOR_BY_ROUTE[route]))
+}
+
+/** 保留段落换行的文本归一化（引用原文里可能有换行） */
+function normalizeMessage(raw: string): string {
+  return raw
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\u00A0/g, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+/**
+ * B 站图片地址补全协议（原生 src 常是 //i0.hdslb.com/...）。
+ *
+ * 原生 src 带尺寸参数时形如 `xxx.jpg@92w_92h.webp`，结尾已有格式后缀；
+ * 共享的 `<Picture>` 会自己追加 `.avif/.webp`，所以这里去掉结尾的格式后缀，
+ * 否则会拼出 `...webp.avif` 这种非法地址（真机预览里会全部退化成兜底占位）。
+ */
+function absoluteImage(raw: string | null | undefined): string {
+  let value = (raw ?? '').trim()
+  if (!value)
+    return ''
+  if (value.startsWith('//'))
+    value = `https:${value}`
+  if (value.includes('@'))
+    value = value.replace(/\.(?:avif|webp)$/i, '')
+  return value
+}
+
+function imageOf(root: Element | null): string {
+  if (!root)
+    return ''
+  return absoluteImage(root.querySelector('img')?.getAttribute('src'))
+}
+
+const BUTTON_CLASS_RE: Array<[MessageListItemButton, RegExp]> = [
+  ['reply', /(?:^|\s)reply(?:\s|$)/],
+  ['like', /(?:^|\s)like(?:\s|$)/],
+  ['delete', /(?:^|\s)delete(?:\s|$)/],
+  ['notice', /(?:^|\s)notice(?:\s|$)/],
+]
+
+function readButtons(element: Element): MessageListItemButton[] {
+  const buttons: MessageListItemButton[] = []
+  element.querySelectorAll<HTMLElement>('.interaction-item__btn').forEach((btn) => {
+    const cls = btn.className
+    BUTTON_CLASS_RE.forEach(([type, re]) => {
+      if (re.test(cls) && !buttons.includes(type))
+        buttons.push(type)
+    })
+  })
+  return buttons
+}
+
+/** 原生若将来加上逐条未读标记，这里先识别；没有则返回 false，交给分类计数近似 */
+function hasNativeUnreadMarker(element: Element): boolean {
+  const cls = String(element.className)
+  if (/unread|isUnread|is-unread/i.test(cls))
+    return true
+  if (element.getAttribute('data-read') === '0' || element.getAttribute('data-unread') === '1')
+    return true
+  return Boolean(element.querySelector('[class*="unread" i], [class*="Unread"]'))
+}
+
+export function readInteractionRows(route: string = getMessageRoute()): NativeInteractionRow[] {
+  return getNativeListItems(route).map((element, index) => {
+    const left = element.querySelector('.interaction-item__left')
+    return {
+      index,
+      element,
+      unames: Array.from(element.querySelectorAll('.interaction-item__uname'))
+        .map(node => textOf(node))
+        .filter(Boolean),
+      action: textOf(element.querySelector('.interaction-item__action')),
+      message: normalizeMessage(element.querySelector('.interaction-item__msg')?.textContent ?? ''),
+      reference: normalizeMessage(element.querySelector('.interaction-item__reference')?.textContent ?? ''),
+      cover: imageOf(element.querySelector('.interaction-item__cover')),
+      time: textOf(element.querySelector('.interaction-item__time')),
+      avatars: Array.from(element.querySelectorAll('.interaction-item__avatar img'))
+        .map(img => absoluteImage(img.getAttribute('src')))
+        .filter(Boolean),
+      multi: Boolean(left?.classList.contains('multi')),
+      buttons: readButtons(element),
+      unreadMarker: hasNativeUnreadMarker(element),
+    }
+  })
+}
+
+export function readSystemRows(route: string = getMessageRoute()): NativeSystemRow[] {
+  return getNativeListItems(route).map((element, index) => ({
+    index,
+    element,
+    title: textOf(element.querySelector('.notify-item__title')),
+    message: normalizeMessage(element.querySelector('.notify-item__msg')?.textContent ?? ''),
+    time: textOf(element.querySelector('.notify-item__time')),
+    unreadMarker: hasNativeUnreadMarker(element),
+  }))
+}
+
+/** 点击原生条目（完全交给 B 站自己的跳转逻辑） */
+export function clickNativeListItem(route: string, index: number): boolean {
+  const item = getNativeListItems(route)[index]
+  if (!item)
+    return false
+  item.click()
+  return true
+}
+
+/** 点击原生条目上的操作按钮（回复 / 点赞 / 删除通知 / 不再通知） */
+export function clickNativeListItemButton(route: string, index: number, type: MessageListItemButton): boolean {
+  const item = getNativeListItems(route)[index]
+  if (!item)
+    return false
+  const candidates = Array.from(item.querySelectorAll<HTMLElement>('.interaction-item__btn'))
+  const target = candidates.find((btn) => {
+    const cls = btn.className
+    return BUTTON_CLASS_RE.some(([buttonType, re]) => buttonType === type && re.test(cls))
+  })
+  if (!target)
+    return false
+  target.click()
+  return true
+}

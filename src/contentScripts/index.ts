@@ -21,6 +21,7 @@ import { setupSiteTweaks, syncSiteTweaks, teardownSiteTweaks } from './siteTweak
 import { setupSpacePage } from './spacePage'
 import { setupVideoPage } from './videoPage'
 import App from './views/App.vue'
+import { setupChannelDrawnPage, teardownChannelDrawnPage } from './views/Channel'
 import { setupLiveDrawnPage, teardownLiveDrawnPage } from './views/Live'
 // 搜索结果页整体自绘（第 92 轮 A）：自绘层挂载失败会自动回退原生页面
 import { setupMessageDrawn } from './views/Message'
@@ -297,11 +298,15 @@ async function onDOMLoaded() {
   // 热门 / 排行榜自绘（第 93 轮 F）：覆盖层自挂载，失败不影响原生页
   setupPopularPage()
 
-  // 分区 / 频道页增强层（密度、排序快捷、j/k 浏览）
-  // 热门页已由 setupPopularPage() 整体接管，channelPage 的 isChannelPage() 也会匹配 /v/popular*，
-  // 两者同时生效会叠两层浮层 → popular 页跳过。
-  if (!isPopularPage())
-    setupChannelPage()
+  // 分区 / 频道页自绘（第 94 轮 C）：覆盖层自挂载，五道回退闸门，失败完全不改页面。
+  // 热门页已由 setupPopularPage() 整体接管 → popular 页跳过。
+  // 注意：自绘未接管（返回 false 且页面未被改动）时才挂增强层，避免两层浮层。
+  if (!isPopularPage()) {
+    void setupChannelDrawnPage().then((takenOver) => {
+      if (!takenOver)
+        setupChannelPage()
+    })
+  }
 
   // 原生页面（搜索页等）的屏蔽词过滤：标记式隐藏，可逆
   if (settings.value.nativeFilterEnabled && !isFullyTakenOverPage())
@@ -321,6 +326,7 @@ async function onDOMLoaded() {
     teardownMomentsDrawnPage()
     teardownReadDrawnPage()
     teardownLiveDrawnPage()
+    teardownChannelDrawnPage()
   }, { once: true })
 
   // Reset the original Bilibili top bar display style

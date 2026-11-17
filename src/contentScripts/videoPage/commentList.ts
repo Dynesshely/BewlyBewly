@@ -228,7 +228,8 @@ function normalizeReply(raw: Record<string, any>): CommentItem {
     rpid: raw.rpid,
     mid,
     uname: member.uname ?? '',
-    face: member.face ?? '',
+    // 第 95 轮（真机实测）：评论接口 member 里是 `avatar`，`face` 只是兜底；两者都无则首字占位
+    face: member.avatar || member.face || '',
     level: member.level_info?.current ?? 0,
     message: content.message ?? '',
     emote,
@@ -427,11 +428,12 @@ function renderList(): void {
     <div class="bvp-cmt__footer" id="bewly-comment-footer">
       ${state.loading
         ? '<div class="bvp-cmt__loading">加载中…</div>'
-        : state.hasMore && shown.length >= visible.length
-          ? '<button type="button" class="bvp-cmt__load-more" data-action="load-more">加载更多</button>'
-          : shown.length < visible.length
-            ? '<button type="button" class="bvp-cmt__load-more" data-action="render-more">显示更多</button>'
-            : visible.length ? '<div class="bvp-cmt__end">没有更多了</div>' : ''}
+        : state.hasMore
+          ? '<div class="bvp-cmt__loading">滚动到底自动加载…</div>'
+          : visible.length ? '<div class="bvp-cmt__end">没有更多了</div>' : ''}
+        ${state.failed && !state.loading
+          ? '<button type="button" class="bvp-cmt__load-more" data-action="retry-load">加载失败，点此重试</button>'
+          : ''}
       ${composerSection()}
     </div>`
   bindContainerActions(container)
@@ -445,28 +447,32 @@ function renderList(): void {
   }
 }
 
-/** 滚动接近底部时把下一批已加载评论渲染出来（不请求接口） */
+/**
+ * 无限滚动（第 95 轮）：滚到距底部 < 200px 时自动请求下一页。
+ * - 同一时间只允许一个请求在飞（`state.loading` 守卫）；
+ * - 500ms 防抖，避免快速滚动连发；
+ * - 失败只标记 failed，不再自动重试（footer 显示重试按钮，用户点才重试）。
+ */
+/** 自动加载下一页的防抖定时器（无限滚动） */
+let autoLoadTimer = 0
 function bindAutoRender(container: HTMLElement): void {
   const listEl = container.querySelector<HTMLElement>('.bvp-cmt__list')
   if (!listEl || listEl.dataset.autoRender === '1')
     return
   listEl.dataset.autoRender = '1'
   listEl.addEventListener('scroll', () => {
-    const visible = state.onlyUp
-      ? state.items.filter(item => item.isUp)
-      : state.items
-    if (state.renderedCount >= visible.length)
+    if (state.subpage)
       return
-    const nearBottom = listEl.scrollTop + listEl.clientHeight >= listEl.scrollHeight - 240
-    if (!nearBottom)
+    const nearBottom = listEl.scrollTop + listEl.clientHeight >= listEl.scrollHeight - 200
+    if (!nearBottom || state.loading || !state.hasMore)
       return
-    const scrollTop = listEl.scrollTop
-    state.renderedCount += RENDER_BATCH
-    renderList()
-    // 渲染后恢复滚动位置（避免跳动）
-    const nextList = container.querySelector<HTMLElement>('.bvp-cmt__list')
-    if (nextList)
-      nextList.scrollTop = scrollTop
+    if (autoLoadTimer)
+      window.clearTimeout(autoLoadTimer)
+    autoLoadTimer = window.setTimeout(() => {
+      autoLoadTimer = 0
+      if (!state.loading && state.hasMore && !state.failed)
+        void loadPage(state.page + 1)
+    }, 500)
   }, { passive: true })
 }
 
@@ -623,11 +629,6 @@ function bindContainerActions(container: HTMLElement): void {
       await loadPage(state.page + 1)
       return
     }
-    if (action === 'render-more') {
-      state.renderedCount += RENDER_BATCH
-      renderList()
-      return
-    }
     if (action === 'open-emote') {
       const form = target.closest<HTMLElement>('.bvp-cmt__compose')
       if (form)
@@ -677,6 +678,11 @@ function bindContainerActions(container: HTMLElement): void {
     }
     if (action === 'open-subpage' && rpid) {
       await openSubpage(rpid)
+      return
+    }
+    if (action === 'retry-load') {
+      state.failed = false
+      await loadPage(state.page + 1)
       return
     }
     if (action === 'close-subpage') {

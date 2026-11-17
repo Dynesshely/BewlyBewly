@@ -1490,41 +1490,43 @@ html.bewly-design.videoPage.bewly-video-fixed {
 }
 /* #endregion */
 
-/* #region 内部滚动面板美化（A4） */
-html.bewly-design.videoPage.bewly-video-fixed {
+/* #region 内部滚动面板美化（A4，第 95 轮 B 修正）
+   第 95 轮真机结论：元素一旦设置标准滚动条属性（scrollbar-width / scrollbar-color），
+   Chromium 121+ 会改用标准滚动条渲染并**忽略 ::-webkit-scrollbar 自定义样式**。
+   原先这里同时写了 scrollbar-width: thin 与 ::-webkit-scrollbar 规则，
+   结果自定义样式从未生效 —— 现在只保留伪元素规则，标准属性移到 @supports(Firefox)。 */
+html.bewly-design.videoPage {
   .bewly-comment-column > #commentapp,
   .bewly-comment-column #commentapp {
-    scrollbar-width: thin;
-    scrollbar-color: var(--bvp-scroll-thumb) var(--bvp-scroll-track);
-    scroll-padding-block: var(--bvp-space-4);
+    /* 不设 scrollbar-width / scrollbar-color：让全局 ::-webkit-scrollbar 规则生效 */
+    scrollbar-gutter: stable;
+    scroll-padding-block: 16px;
   }
 
   .bewly-comment-column > #commentapp::-webkit-scrollbar,
   .bewly-comment-column #commentapp::-webkit-scrollbar {
-    width: var(--bvp-scroll-size);
-    height: var(--bvp-scroll-size);
+    width: var(--bew-scroll-size, 6px);
+    height: var(--bew-scroll-size, 6px);
   }
 
   .bewly-comment-column > #commentapp::-webkit-scrollbar-track,
   .bewly-comment-column #commentapp::-webkit-scrollbar-track {
-    background: var(--bvp-scroll-track);
+    background: var(--bew-scroll-track, transparent);
   }
 
   .bewly-comment-column > #commentapp::-webkit-scrollbar-thumb,
   .bewly-comment-column #commentapp::-webkit-scrollbar-thumb {
-    background: var(--bvp-scroll-thumb);
-    background-clip: padding-box;
-    border: 2px solid transparent;
-    border-radius: var(--bvp-space-2);
+    background-color: var(--bew-scroll-thumb, rgb(120 120 140 / 44%));
+    border-radius: 20px;
   }
 
   .bewly-comment-column > #commentapp::-webkit-scrollbar-thumb:hover,
   .bewly-comment-column #commentapp::-webkit-scrollbar-thumb:hover {
-    background: var(--bvp-scroll-thumb-hover);
-    background-clip: padding-box;
+    background-color: var(--bew-scroll-thumb-hover, rgb(120 120 140 / 60%));
   }
 
-  /* 评论列自身不出滚动条（滚动发生在 #commentapp 内） */
+  /* 评论列自身不出滚动条（滚动发生在 #commentapp / #bewly-comment-list 内）：
+     这里 scrollbar-width: none 是**刻意隐藏**，与上面的「被标准滚动条覆盖」不同 */
   .bewly-comment-column {
     scrollbar-width: none;
   }
@@ -1535,12 +1537,34 @@ html.bewly-design.videoPage.bewly-video-fixed {
   }
 }
 
-/* 轨道 viewport / 选集面板 / 帮助面板都在 shadow root 里（A 本轮不持有 shadow scss）。
-   令牌会随 CSS 变量继承进 shadow，native-style 的 typography 段可直接复用：
-   .bvp-rail__viewport / .bvp-playlist__list / .bvp-help__body
-   → scrollbar-width: thin; scrollbar-color: var(--bvp-scroll-thumb) var(--bvp-scroll-track);
-   → scroll-padding-block: var(--bvp-space-4);
-   （不提供 mask / 渐隐：第 39 轮用户明确要求删除。） */
+/* 自绘评论列表：真正的滚动容器（第 95 轮 B）
+   显式给伪元素规则，不依赖全局继承（避免被其它 scrollbar-width 规则带偏）。 */
+.bvp-cmt__list::-webkit-scrollbar {
+  width: var(--bew-scroll-size, 6px);
+  height: var(--bew-scroll-size, 6px);
+}
+
+.bvp-cmt__list::-webkit-scrollbar-track {
+  background: var(--bew-scroll-track, transparent);
+}
+
+.bvp-cmt__list::-webkit-scrollbar-thumb {
+  background-color: var(--bew-scroll-thumb, rgb(120 120 140 / 44%));
+  border-radius: 20px;
+}
+
+.bvp-cmt__list::-webkit-scrollbar-thumb:hover {
+  background-color: var(--bew-scroll-thumb-hover, rgb(120 120 140 / 60%));
+}
+
+/* Firefox：标准属性只在那里生效 */
+@supports (-moz-appearance: none) {
+  html.bewly-design.videoPage .bewly-comment-column #commentapp,
+  html.bewly-design.videoPage .bvp-cmt__list {
+    scrollbar-width: thin;
+    scrollbar-color: var(--bew-scroll-thumb) var(--bew-scroll-track);
+  }
+}
 /* #endregion */
 
 /* #region z-index 分层落地（A5） */
@@ -4233,7 +4257,8 @@ html.bewly-design.videoPage.bewly-video-fixed #viewbox_report {
   min-height: 0;
   padding: 0 12px;
   overflow-y: auto;
-  scrollbar-width: thin;
+  /* 第 95 轮 B：不设 scrollbar-width —— Chromium 121+ 会因此改用标准滚动条、忽略 ::-webkit-scrollbar */
+  scrollbar-gutter: stable;
 }
 
 .bvp-cmt {
@@ -4841,4 +4866,27 @@ html.bewly-design.videoPage #bewly-comment-column #commentapp {
 #bewly-toolbar-actions > .bewly-toolbar-action {
   position: relative;
   z-index: 1;
+}
+
+/* ===== 第 95 轮 ===== */
+/* 标题 + 信息栏已迁移到播放器下方（infoBar.ts 写 dataset）。
+ *
+ * 注意：**不能**用 display:none —— #viewbox_report 是 .left-container 的直接子元素，
+ * 它一旦完全脱离布局，.left-container 的宽度就塌成 0，进而 --bvp-fixed-player-width 算成 0，
+ * 播放器 / 信息栏 / 评论列全部 0×0（真机实测 metrics: dock=986;player=0x0;top=0）。
+ * 改成「保留在流里但高度为 0」：宽度继续撑住左列，高度不占位。
+ */
+/* 第 95 轮：暂时保持 report 正常显示（信息栏仍在 report 内），
+ * 等 fixedLayout 宽度计算修好、信息栏能安全移到播放器下方后再启用这段。 */
+#viewbox_report[data-bewly-info-moved] {
+  /* 禁用：见 infoBar.ts 里 canPlaceBelowPlayer 的注释 */
+}
+
+/* 无限滚动：footer 里的提示行（不是按钮，用户无需点击） */
+#bewly-comment-list .bvp-cmt__loading,
+#bewly-comment-list .bvp-cmt__end {
+  padding: 12px 0;
+  font-size: 12.5px;
+  color: var(--bew-text-3);
+  text-align: center;
 }

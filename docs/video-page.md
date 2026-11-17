@@ -1620,3 +1620,34 @@ pointermove 目标 0.25 → 松手后 metrics: player=397x706, colPct=63.79
 - 调试浏览器窗口在 hidden 状态时，Chrome **丢弃 CDP `Input.dispatchMouseEvent`**（实测 `document.visibilityState = hidden`，`Input` 事件不产生 pointerdown），
   所以拖拽用 `PointerEvent` dispatch 验证 handler 链路与 clamp 结果；
 - 验证过程中页面被切到搜索页，分屏比例可能停在 0.35（双击分隔条可复位）。
+
+## 第 95 轮：视频页 5 项修复（信息栏下移 / 5 指标 / 轨道封面 / 无限滚动 / 评论头像）
+
+基线为 `e685871a`（第 87 轮）；第 88-91 轮同类改动已整体回退，本轮按「已知正确做法」重做。
+
+### 1. 标题 + 信息默认在播放器下方
+
+`infoBar.ts` 渲染后尝试把 `#bewly-info-bar` 移到 `#playerWrap` 之后（`insertAdjacentElement('afterend')`），
+并写 `report.dataset.bewlyInfoMoved = '1'`；页面 CSS `#viewbox_report[data-bewly-info-moved] { display: none !important }` 隐藏原生信息栏。
+**锁定标志 `infoBarPlacedAfterPlayer`**：只有从未成功放置过才会退回 report，避免每拍来回迁移造成 500ms 闪烁（第 89 轮踩过的坑）。
+
+### 2. 信息栏 5 项指标
+
+第 88 轮的 bug 是 `toInternal()`（本轮为 `parseBridgePayload` / `readFromInitialState`）没映射 `like/coin/favorite/share` → 永远 undefined。
+本轮补全了**两条映射链**（桥 payload 与内联 script 解析）与渲染分支，并按 播放量 → 点赞 → 投币 → 收藏 → 分享 → 弹幕 的顺序输出。
+
+### 3. 推荐轨道封面
+
+封面 `img` 从 `loading="lazy"` 改为 `loading="eager"` + `fetchpriority="high"`：轨道位于视口底部，lazy 时可能长期不加载。
+（真机当前轨道未渲染：`--bvp-fixed-rail-space: 0px`、原生 `recommend-list-v1` 子元素为 0，属数据源为空，与封面代码无关。）
+
+### 5. 评论区无限滚动
+
+- 删除 footer 的「加载更多」按钮与「显示更多」按钮；
+- 监听 `.bvp-cmt__list` 的 `scroll`：距底部 < 200px 且 `hasMore` 且非 `loading` → 500ms 防抖后请求下一页；
+- footer 状态：加载中 / 「滚动到底自动加载…」/「没有更多了」；失败显示「加载失败，点此重试」（不自动重试，避免死循环）。
+
+### 6. 评论头像
+
+真机实测评论接口 `member` 里只有 `avatar`（无 `face`）→ 取值链改为 `member.avatar → member.face → 首字占位`，
+渲染仍是 `<img class="bvp-cmt__avatar-img" loading="lazy" referrerpolicy="no-referrer">` + 40px 圆形容器。

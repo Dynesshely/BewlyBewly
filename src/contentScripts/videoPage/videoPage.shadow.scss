@@ -1783,3 +1783,99 @@
   }
 }
 /* ===== 第 52 轮 contrast-focus end ===== */
+
+/* ===== 第 95 轮 B：视频页增强层（独立 shadow）滚动条 =====
+   视频页增强层 #bewly-video-page 是独立 shadow：样式来自本文件，不经过 style.css，
+   所以 main.scss 的全局滚动条规则进不来，必须单独写一份。
+
+   与全局一致的做法：
+   - 只写 ::-webkit-scrollbar*（**不写 scrollbar-width**，否则 Chromium 121+ 改用标准滚动条、
+     会忽略下面这些伪元素规则 —— 这是第 88 轮评论区失效的同一个坑）；
+   - 颜色消费文档里 html.bewly-design 上定义的 --bew-scroll-*（CSS 变量可穿透 shadow 继承），
+     自带兜底值，继承链断了也有色；
+   - 刻意隐藏滚动条的容器（.bvp-rail__viewport 横向轨道）保持不变，不在此覆盖。 */
+
+:host {
+  --bvp-shadow-scroll-thumb: var(--bew-scroll-thumb, rgb(120 120 140 / 44%));
+  --bvp-shadow-scroll-thumb-hover: var(--bew-scroll-thumb-hover, rgb(120 120 140 / 60%));
+  --bvp-shadow-scroll-size: var(--bew-scroll-size, 6px);
+}
+
+.bvp-root ::-webkit-scrollbar,
+.bvp-help ::-webkit-scrollbar,
+.bvp-playlist ::-webkit-scrollbar,
+.bvp-rail ::-webkit-scrollbar,
+.bvp-cmt ::-webkit-scrollbar {
+  width: var(--bvp-shadow-scroll-size);
+  height: var(--bvp-shadow-scroll-size);
+}
+
+.bvp-root ::-webkit-scrollbar-track,
+.bvp-help ::-webkit-scrollbar-track,
+.bvp-playlist ::-webkit-scrollbar-track,
+.bvp-rail ::-webkit-scrollbar-track,
+.bvp-cmt ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.bvp-root ::-webkit-scrollbar-thumb,
+.bvp-help ::-webkit-scrollbar-thumb,
+.bvp-playlist ::-webkit-scrollbar-thumb,
+.bvp-rail ::-webkit-scrollbar-thumb,
+.bvp-cmt ::-webkit-scrollbar-thumb {
+  background-color: var(--bvp-shadow-scroll-thumb);
+  border-radius: 20px;
+}
+
+.bvp-root ::-webkit-scrollbar-thumb:hover,
+.bvp-help ::-webkit-scrollbar-thumb:hover,
+.bvp-playlist ::-webkit-scrollbar-thumb:hover,
+.bvp-rail ::-webkit-scrollbar-thumb:hover,
+.bvp-cmt ::-webkit-scrollbar-thumb:hover {
+  background-color: var(--bvp-shadow-scroll-thumb-hover);
+}
+
+.bvp-root ::-webkit-scrollbar-button,
+.bvp-help ::-webkit-scrollbar-button,
+.bvp-playlist ::-webkit-scrollbar-button,
+.bvp-rail ::-webkit-scrollbar-button,
+.bvp-cmt ::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.bvp-root ::-webkit-scrollbar-corner,
+.bvp-help ::-webkit-scrollbar-corner,
+.bvp-playlist ::-webkit-scrollbar-corner,
+.bvp-rail ::-webkit-scrollbar-corner,
+.bvp-cmt ::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* 横向轨道 viewport 刻意不要滚动条（第 27/46 轮的决定），保持隐藏 */
+.bvp-rail__viewport {
+  scrollbar-width: none;
+}
+
+.bvp-rail__viewport::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* 高对比 / 强制色彩：thumb 用实色 */
+@media (prefers-contrast: more) {
+  :host {
+    --bvp-shadow-scroll-thumb: var(--bew-text-2);
+    --bvp-shadow-scroll-thumb-hover: var(--bew-text-1);
+  }
+}
+
+@media (forced-colors: active) {
+  :host {
+    --bvp-shadow-scroll-thumb: CanvasText;
+    --bvp-shadow-scroll-thumb-hover: Highlight;
+  }
+}
+/* ===== 第 95 轮 B end ===== */

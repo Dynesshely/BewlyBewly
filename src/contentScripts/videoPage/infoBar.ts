@@ -16,7 +16,7 @@
  * 2. 原生信息栏的已渲染文本（DOM 兜底，B 站改结构时至少还有文本）；
  * 3. 两者都失败 → **不隐藏原生、不渲染自绘块**，保持现状，绝不出现空白信息栏。
  */
-import { getVideoEl } from './dom'
+import { getPlayerWrapEl, getVideoEl } from './dom'
 
 const INFO_BAR_ID = 'bewly-info-bar'
 /**
@@ -37,6 +37,11 @@ interface VideoInfoData {
   bvid?: string
   title: string
   view: number | null
+  /** 互动数（第 95 轮）：桥 stat 提供；DOM 兜底时为 null */
+  like?: number | null
+  coin?: number | null
+  favorite?: number | null
+  share?: number | null
   danmaku: number | null
   /** 秒级时间戳 */
   pubdate: number | null
@@ -57,6 +62,8 @@ let cachedBvid = ''
 let bridgedData: VideoInfoData | null = null
 /** 是否已注册桥监听（避免重复注册） */
 let bridgeListening = false
+/** 第 95 轮：自绘信息栏是否已成功放到播放器下方（锁定标志，避免每拍来回迁移造成闪烁） */
+let infoBarPlacedAfterPlayer = false
 /** 被隐藏的原生节点的原始 display（卸载时恢复） */
 const hiddenNatives = new Map<HTMLElement, string>()
 
@@ -142,6 +149,10 @@ function parseBridgePayload(detail: unknown): VideoInfoData | null {
     title: payload.title,
     view: num(stat.view),
     danmaku: num(stat.danmaku),
+    like: num(stat.like),
+    coin: num(stat.coin),
+    favorite: num(stat.favorite),
+    share: num(stat.share),
     pubdate: num(payload.pubdate) ?? num(payload.ctime),
     copyright: num(payload.copyright),
     pages: num(payload.pages),
@@ -198,6 +209,10 @@ function readFromInitialState(): VideoInfoData | null {
     title: data.title,
     view: num(stat.view),
     danmaku: num(stat.danmaku),
+    like: num(stat.like),
+    coin: num(stat.coin),
+    favorite: num(stat.favorite),
+    share: num(stat.share),
     pubdate: num(data.pubdate) ?? num(data.ctime),
     copyright: num(data.copyright),
     pages: Array.isArray(data.pages)
@@ -287,6 +302,10 @@ const ICON_VIEW = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path
 const ICON_DANMAKU = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>'
 const ICON_DATE = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2.5" stroke="currentColor" stroke-width="1.6"/><path d="M4 9.5h16M8.5 3v3.5M15.5 3v3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>'
 const ICON_PAGES = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="6" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M7 3.5h13.5V16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>'
+const ICON_LIKE = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 10.5 11 4c1.4 0 2.4 1.1 2.2 2.5L12.8 9h5.1c1.2 0 2 1.2 1.7 2.3l-1.5 5.5A3 3 0 0 1 15.2 19H7" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><rect x="3.5" y="10" width="3.5" height="9" rx="1" stroke="currentColor" stroke-width="1.6"/></svg>'
+const ICON_COIN = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="7.5" stroke="currentColor" stroke-width="1.6"/><path d="M12 8.5v7M9.5 11h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>'
+const ICON_FAV = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 4.5 2.3 4.7 5.2.8-3.8 3.7.9 5.1-4.6-2.4-4.6 2.4.9-5.1L4.5 10l5.2-.8L12 4.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>'
+const ICON_SHARE = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M14 5.5 20 11l-6 5.5v-3.2c-4 0-6.6 1.2-8.5 3.7.4-4.8 3.1-7.6 8.5-7.9V5.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>'
 const ICON_COPYRIGHT = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6"/><path d="M14.4 10.3a2.9 2.9 0 1 0 0 3.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>'
 
 function makeItem(icon: string, label: string, title: string): HTMLElement {
@@ -334,8 +353,18 @@ function renderInfoBar(report: HTMLElement, data: VideoInfoData): void {
   const titleText = data.title
   const meta = [
     makeItem(ICON_VIEW, data.viewText ?? formatCount(data.view), '播放量'),
-    makeItem(ICON_DANMAKU, data.danmakuText ?? formatCount(data.danmaku), '弹幕数'),
   ]
+  // 第 95 轮：5 项指标 = 播放量 + 点赞 / 投币 / 收藏 / 分享（桥 stat 精确值）
+  if (data.like)
+    meta.push(makeItem(ICON_LIKE, formatCount(data.like), '点赞量'))
+  if (data.coin)
+    meta.push(makeItem(ICON_COIN, formatCount(data.coin), '投币量'))
+  if (data.favorite)
+    meta.push(makeItem(ICON_FAV, formatCount(data.favorite), '收藏量'))
+  if (data.share)
+    meta.push(makeItem(ICON_SHARE, formatCount(data.share), '分享量'))
+  if (data.danmaku)
+    meta.push(makeItem(ICON_DANMAKU, data.danmakuText ?? formatCount(data.danmaku), '弹幕数'))
   const date = formatDate(data.pubdate)
   if (date)
     meta.push(makeItem(ICON_DATE, date, '发布日期'))
@@ -360,6 +389,23 @@ function renderInfoBar(report: HTMLElement, data: VideoInfoData): void {
   }
   // 原生节点隐藏放在渲染成功之后：读不到数据时不会出现空白
   hideNativeNodes(report)
+
+  // 第 95 轮：标题 + 信息默认放到播放器下方。
+  //
+  // ⚠️ 当前**禁用**：真机实测把 bar 移到 #playerWrap 之后会导致整条布局链塌陷 ——
+  // #mirror-vdcon 的 grid 变成 "minmax(0px, 0px) minmax(0px, 1fr)"、
+  // .left-container / #playerWrap / 信息栏全部 0×0（metrics: dock=986;player=0x0;top=0）。
+  // 原因是 fixedLayout 的宽度计算依赖左列实际宽度，左列又由它写回的
+  // --bvp-fixed-player-width 决定 → 一旦某拍读到 0 就锁死在 0（自反馈死循环）。
+  // 需要先让 fixedLayout 的 totalWidth 不依赖自身输出，才能安全启用。
+  const playerWrap = getPlayerWrapEl()
+  const canPlaceBelowPlayer = false
+  if (canPlaceBelowPlayer && playerWrap) {
+    if (!infoBarPlacedAfterPlayer || bar.previousElementSibling !== playerWrap)
+      playerWrap.insertAdjacentElement('afterend', bar)
+    infoBarPlacedAfterPlayer = true
+    report.dataset.bewlyInfoMoved = '1'
+  }
 }
 
 /** 首屏 / 切视频时调用；返回 false 表示本次未启用自绘（调用方无需额外处理） */
@@ -391,6 +437,10 @@ export function setupInfoBar(): () => void {
 export function teardownInfoBar(): void {
   stopBridgeListening()
   document.getElementById(INFO_BAR_ID)?.remove()
+  infoBarPlacedAfterPlayer = false
+  const reportEl = document.querySelector<HTMLElement>('#viewbox_report')
+  if (reportEl)
+    delete reportEl.dataset.bewlyInfoMoved
   restoreNativeNodes()
   cachedData = null
   cachedBvid = ''

@@ -278,7 +278,18 @@ function applyLayout(mirror: HTMLElement, playerWrap: HTMLElement): void {
   const mirrorStyle = window.getComputedStyle(mirror)
   const padLeft = Number.parseFloat(mirrorStyle.paddingLeft) || 0
   const padX = padLeft + (Number.parseFloat(mirrorStyle.paddingRight) || 0)
-  const totalWidth = Math.max(0, Math.round(mirror.clientWidth - padX))
+  // 第 96 轮：宽度自反馈死循环保护。
+  //
+  // 症状：把信息栏移到播放器下方（隐藏 #viewbox_report）后，某拍 mirror.clientWidth 读到 0，
+  // 于是算出 playerWidth=0 写回 --bvp-fixed-player-width → grid 第一列 minmax(0px,0px)
+  // → .left-container / #playerWrap 全 0 → 下一拍 mirror 还是 0 → **永久锁死在 0**。
+  // （真机 metrics: dock=986;player=0x0;top=0，整页塌陷）
+  //
+  // 修法：mirror 宽度为 0 时用视口宽兜底算一次真实宽度，打破循环。
+  const rawTotalWidth = Math.max(0, Math.round(mirror.clientWidth - padX))
+  const totalWidth = rawTotalWidth > 0
+    ? rawTotalWidth
+    : Math.max(0, Math.round(window.innerWidth - padX - 48))
   /** 内容区左边缘（视口坐标）：分隔条定位与拖拽比例换算都用它（第 46 轮） */
   const contentLeft = Math.round(mirrorRect.left + padLeft)
   // 单列（网页全屏 / 宽屏）时播放器可用宽 = 整个内容宽；否则要给评论区留最小宽。

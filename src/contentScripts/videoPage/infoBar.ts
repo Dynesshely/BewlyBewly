@@ -392,12 +392,16 @@ function renderInfoBar(report: HTMLElement, data: VideoInfoData): void {
 
   // 第 95 轮：标题 + 信息默认放到播放器下方。
   //
-  // ⚠️ 当前**禁用**：真机实测把 bar 移到 #playerWrap 之后会导致整条布局链塌陷 ——
-  // #mirror-vdcon 的 grid 变成 "minmax(0px, 0px) minmax(0px, 1fr)"、
-  // .left-container / #playerWrap / 信息栏全部 0×0（metrics: dock=986;player=0x0;top=0）。
-  // 原因是 fixedLayout 的宽度计算依赖左列实际宽度，左列又由它写回的
-  // --bvp-fixed-player-width 决定 → 一旦某拍读到 0 就锁死在 0（自反馈死循环）。
-  // 需要先让 fixedLayout 的 totalWidth 不依赖自身输出，才能安全启用。
+  // ⚠️ 第 96 轮二次尝试仍失败，暂时禁用「信息栏放到播放器下方」。
+  //
+  // 两轮实测结论：
+  // ① 不加 fixedLayout 兜底 → mirror grid 第一列锁死 0px，整页 0×0；
+  // ② 加兜底（视口宽算 totalWidth）→ CSS 变量算对了
+  //    （--bvp-fixed-content-width: 1968px、--bvp-fixed-player-width: 1118px、metrics player=629x1118），
+  //    但 **DOM 实际 clientWidth 仍是 0** —— 说明 #mirror-vdcon 的宽度不由这个变量驱动，
+  //    而是由更上层容器决定；report 让位后整条链没有东西撑宽。
+  // 结论：要安全下移，必须先让 .left-container / #mirror-vdcon 有独立的宽度来源（不依赖 report），
+  // 这是一次结构性改动，不适合夹在其它修复里做。
   const playerWrap = getPlayerWrapEl()
   const canPlaceBelowPlayer = false
   if (canPlaceBelowPlayer && playerWrap) {

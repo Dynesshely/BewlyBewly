@@ -4876,10 +4876,13 @@ html.bewly-design.videoPage #bewly-comment-column #commentapp {
  * 播放器 / 信息栏 / 评论列全部 0×0（真机实测 metrics: dock=986;player=0x0;top=0）。
  * 改成「保留在流里但高度为 0」：宽度继续撑住左列，高度不占位。
  */
-/* 第 95 轮：暂时保持 report 正常显示（信息栏仍在 report 内），
- * 等 fixedLayout 宽度计算修好、信息栏能安全移到播放器下方后再启用这段。 */
+/* 第 95/96 轮：标题 + 信息栏已迁移到播放器下方，原生 report 让位。
+ *
+ * 不能 display:none —— #viewbox_report 是 .left-container 的直接子元素，
+ * 完全脱离布局会让左列宽度塌成 0。用「保留在流里但高度 0」。
+ * （fixedLayout 另有宽度 0 兜底，双保险。） */
 #viewbox_report[data-bewly-info-moved] {
-  /* 禁用：见 infoBar.ts 里 canPlaceBelowPlayer 的注释 */
+  /* 第 96 轮禁用：report 让位后左列失去宽度来源，整条链塌成 0（见 infoBar.ts 注释） */
 }
 
 /* 无限滚动：footer 里的提示行（不是按钮，用户无需点击） */

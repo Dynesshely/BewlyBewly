@@ -11,12 +11,15 @@ import {
   collectRailCards,
   computeRailPlacement,
   countHiddenNativeBlocks,
+  fetchRelatedCovers,
   findNativeContainer,
   hideDuplicateRecommendBlocks,
   hideOverlappingNativeLinks,
   markNativeTaken,
   refreshRailCovers,
+  relatedCoverFor,
   releaseNativeTaken,
+  rememberCover,
   reserveRailSpace,
   warmUpNativeCovers,
 } from './rail'
@@ -103,10 +106,20 @@ export function getRailPadding(): number {
       : 12
 }
 
+/** 当前页面视频的 bvid（related 接口需要它，不是推荐卡的 bvid） */
+function currentVideoBvid(): string {
+  return location.pathname.match(/\/video\/(BV[0-9A-Za-z]{8,})/)?.[1] ?? ''
+}
+
 function sameSequence(a: RailCard[], b: RailCard[]): boolean {
   return a.length === b.length && a.every((card, index) => card.bvid === b[index].bvid)
 }
 
+/** 封面采集重试：延迟 500ms，最多 3 次（期间不接管原生列表） */
+const COVER_RETRY_DELAY = 500
+const COVER_RETRY_MAX = 3
+let coverRetryCount = 0
+let coverRetryTimer = 0
 /** 重新采集并更新轨道（渲染状态由 railState.placement 表示） */
 export function syncRecommendRail(options: { enabled: boolean }): void {
   // 关闭开关 / 用户手动关闭 / 网页全屏与宽屏：轨道不渲染，并把原生列表还回去。
@@ -169,6 +182,22 @@ export function syncRecommendRail(options: { enabled: boolean }): void {
 
   // 轨道已经渲染出来：此时才接管（隐藏）原生推荐列表
   reserveRailSpace(height)
+  // 第 99 轮续：封面没采集齐就**先不接管**（隐藏原生列表会让 B 站懒加载彻底停摆，之后再也补不上）。
+  // 每拍检查一次：只要还有缺封面的卡、且重试次数没用完，就延迟 500ms 再采集一次。
+  const missingCovers = railState.cards.filter(card => !card.cover).length
+  if (missingCovers > 0 && coverRetryCount < COVER_RETRY_MAX) {
+    coverRetryCount += 1
+    if (coverRetryTimer)
+      window.clearTimeout(coverRetryTimer)
+    coverRetryTimer = window.setTimeout(() => {
+      coverRetryTimer = 0
+      syncRecommendRail({ enabled: true })
+    }, COVER_RETRY_DELAY)
+  }
+  else if (missingCovers === 0) {
+    coverRetryCount = 0
+  }
+
   markNativeTaken()
 
   // 重复推荐栏兜底（第 32 轮）：轨道渲染成功后，把「仍在视口内、含 ≥3 个视频链接」的原生块
@@ -184,6 +213,28 @@ export function syncRecommendRail(options: { enabled: boolean }): void {
   const filled = refreshRailCovers(railState.cards)
   if (filled)
     railState.cards = filled
+
+  // 第 99 轮续：cover 仍为空 → 用当前页面 bvid 的 related 列表补（`pic` 是稳定来源）。
+  // 注意：related?bvid=X 返回的是 X 的**相关视频**，不含 X 自己，所以必须用页面 bvid 拉整表。
+  const missingCovers2 = railState.cards.filter(card => !card.cover)
+  if (missingCovers2.length) {
+    const pageBvid = currentVideoBvid()
+    void fetchRelatedCovers(pageBvid).then(() => {
+      let filledAny = false
+      const next = railState.cards.map((card) => {
+        if (card.cover)
+          return card
+        const pic = relatedCoverFor(card.bvid)
+        if (!pic)
+          return card
+        rememberCover(card.bvid, pic)
+        filledAny = true
+        return { ...card, cover: pic }
+      })
+      if (filledAny)
+        railState.cards = next
+    })
+  }
 
   // 诊断标记：真机可直接读 `<html data-bewly-rail-cover="20/20">` 判断采集是否成功
   const withCover = railState.cards.filter(card => Boolean(card.cover)).length

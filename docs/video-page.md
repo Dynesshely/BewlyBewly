@@ -1682,3 +1682,31 @@ pointermove 目标 0.25 → 松手后 metrics: player=397x706, colPct=63.79
   CDP `Page.navigate`/`Page.reload` 会打断用户浏览；且调试浏览器加载的是**旧构建**（不含本轮代码），刷新也无法验证新逻辑；
 - 建议 build 后按下面方式验收：`<html data-bewly-rail-cover>` 应为 `20/20`；
   逐卡检查 `.bvp-rail__cover img` 的 `complete === true && naturalWidth > 0`，5 次刷新失败数应为 0。
+
+## 第 99 轮 B 续：轨道封面「采集时机」修复
+
+真机诊断（4 次刷新 3 次失败）：`railSpace: 253`、`railH: 253` 正常，但 `railImgs: 0`、`attr: 0/20` ——
+说明 `card.cover` 采集到的是空串，模板 `v-if="card.cover"` 为 false，连 `<img>` 都不渲染。
+
+### 根因（第 99 轮第一版的 preload 治不了）
+
+1. `coverCandidatesFrom()` 把 `img.currentSrc` 排在第一位 —— 它**只有图片加载完成后才有值**；
+   而原生卡片的封面是懒加载（真机卡片里 `.video-awesome-img` 是空 `<a>`，**根本没有 `<img>`**），
+   所以采集永远拿到空串；
+2. 采集失败后仍 `markNativeTaken()` 隐藏原生列表 → B 站懒加载彻底停摆，之后每拍重试都只能读到同一个空 DOM。
+
+### 修法
+
+1. `coverCandidatesFrom()` 改为**属性优先**：`data-src → src → data-original → srcset → currentSrc（最后兜底）`；
+2. **封面没齐不接管**：`syncRecommendRail()` 里若还有缺封面的卡、且重试次数 < 3，则延迟 500ms 重新 sync；
+3. **related 接口兜底**（最可靠）：`/x/web-interface/archive/related?bvid=<页面 bvid>` 返回 40 条带 `pic` 的相关视频，
+   真机实测 `code 0 / total 40 / withPic 40`。用它建 `bvid → pic` 映射，给缺封面的卡同步补上；
+   注意不能用「推荐卡的 bvid」去查（接口返回的是该 bvid 的相关列表、不含自身）；
+4. `absoluteUrl()` 统一把 `http://` 升级为 `https://`（B 站 `pic` 常是 http，https 页面下会被当混合内容拦掉）；
+5. `preloadCover()` 与 hdslb 镜像重试保留（对已拿到 URL 的封面仍有价值）。
+
+### 真机验证
+
+- `related` 接口：`code 0`、`total 40`、`withPic 40`（40 条全部带 pic URL，例：`http://i2.hdslb.com/bfs/archive/31b4…`）；
+- 当前构建（旧代码）轨道仍 `cards: 20 / imgs: 0 / coverStat: 0/20`（说明修复前确实 0 封面）；
+- 本轮代码未 build，**5 次刷新 20/20 的验收需 build 后复测**。

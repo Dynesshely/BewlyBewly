@@ -61,7 +61,8 @@ function findLink(card: HTMLElement): HTMLAnchorElement | null {
 
 function absoluteUrl(href: string): string {
   try {
-    return new URL(href, location.href).href
+    // 第 99 轮续：B 站 pic 常给 http://，https 页面下会被当混合内容拦掉 → 统一升级 https
+    return new URL(href, location.href).href.replace(/^http:\/\//, 'https://')
   }
   catch {
     return href
@@ -137,6 +138,13 @@ export function preloadCover(url: string): void {
 }
 
 /** 从元素上按「越接近真实地址越优先」的顺序取封面候选 */
+/**
+ * 从元素上按「属性优先」的顺序取封面候选（第 99 轮续）。
+ *
+ * 之前 `currentSrc` 排在第一位是错的：它只有图片**加载完成**后才有值，而采集经常发生在
+ * 图片还没开始加载的那一拍 → 全部候选为空 → 卡片 cover 空串 → 模板连 img 都不渲染。
+ * 现在唯一可靠的来源是 DOM 属性（`data-src` / `src` / `data-original`），`currentSrc` 只作最后兜底。
+ */
 function coverCandidatesFrom(img: HTMLImageElement): string[] {
   const dataset = img.dataset as Record<string, string | undefined>
   const srcset = (img.getAttribute('srcset') ?? '')
@@ -144,22 +152,22 @@ function coverCandidatesFrom(img: HTMLImageElement): string[] {
     .map(item => item.trim().split(/\s+/)[0])
     .filter(Boolean)
   return [
-    img.currentSrc,
-    img.getAttribute('src') ?? '',
-    dataset.src ?? '',
     img.getAttribute('data-src') ?? '',
+    img.getAttribute('src') ?? '',
     img.getAttribute('data-original') ?? '',
+    dataset.src ?? '',
     dataset.original ?? '',
     img.getAttribute('data-lazy-src') ?? '',
     img.getAttribute('data-lazy') ?? '',
     srcset[0] ?? '',
     dataset.srcset ?? '',
+    img.currentSrc,
   ]
 }
 
 /**
- * 封面取值兜底顺序：
- * `img.currentSrc → img.src → data-src → data-original → srcset 首项 → <picture><source> → 背景图 → 外层 a 的图`。
+ * 封面取值兜底顺序（第 99 轮续改为「属性优先」）：
+ * `data-src → src → data-original → srcset 首项 → currentSrc（加载完成后才有值）→ <picture><source> → 背景图 → 外层 a 的图`。
  */
 function findCover(card: HTMLElement): string {
   const img = card.querySelector<HTMLImageElement>('img')
@@ -253,6 +261,67 @@ export function warmUpNativeCovers(): void {
     if (known)
       preloadCover(known)
   }
+}
+
+/**
+ * related 接口补封面（第 99 轮续）。
+ *
+ * 关键点（上一版写错的地方）：`/x/web-interface/archive/related?bvid=X` 返回的是 **X 的相关视频列表**，
+ * 不包含 X 自己。所以必须用**当前页面视频**的 bvid 请求一次，得到 `bvid → pic` 映射，
+ * 再拿轨道里缺封面的卡去查表。
+ *
+ * 真机背景：B 站推荐卡的封面是懒加载（卡片可见后才注入 img / 背景图），而我们采集的那一刻
+ * 卡片里根本没有 img —— 所以 related 的 `pic` 是唯一稳定的封面来源。
+ */
+/** related 映射对应的页面 bvid（切视频时重拉） */
+let relatedCoverPageBvid = ''
+const relatedCoverMap = new Map<string, string>()
+let relatedInflight: Promise<Map<string, string>> | null = null
+
+/** B 站接口的 pic 常是 http:// → 强制 https，避免混合内容被浏览器拦截 */
+function toHttps(url: string): string {
+  return url.replace(/^http:\/\//, 'https://')
+}
+
+/** 拉当前页面的 related 列表，建立 bvid → pic 映射（按页面 bvid 缓存，切视频才重拉） */
+export function fetchRelatedCovers(currentBvid: string): Promise<Map<string, string>> {
+  if (!currentBvid)
+    return Promise.resolve(relatedCoverMap)
+  const cachedFor = relatedCoverPageBvid
+  if (cachedFor === currentBvid && relatedCoverMap.size)
+    return Promise.resolve(relatedCoverMap)
+  if (relatedInflight)
+    return relatedInflight
+  relatedCoverPageBvid = currentBvid
+  relatedInflight = fetch(`https://api.bilibili.com/x/web-interface/archive/related?bvid=${currentBvid}`, { credentials: 'include' })
+    .then(async (res) => {
+      if (!res.ok)
+        return relatedCoverMap
+      const json = await res.json() as { code: number, data?: Array<{ bvid?: string, pic?: string }> }
+      if (json.code !== 0 || !Array.isArray(json.data))
+        return relatedCoverMap
+      for (const item of json.data) {
+        if (item.bvid && item.pic)
+          relatedCoverMap.set(item.bvid, toHttps(absoluteUrl(item.pic)))
+      }
+      return relatedCoverMap
+    })
+    .catch(() => relatedCoverMap)
+    .finally(() => {
+      relatedInflight = null
+    })
+  return relatedInflight
+}
+
+/** 从 related 映射里取某张卡的封面（供 index 同步调用） */
+export function relatedCoverFor(bvid: string): string {
+  return relatedCoverMap.get(bvid) ?? ''
+}
+
+/** 直接给封面缓存补一条（供 related 兜底 / 外部命中） */
+export function rememberCover(bvid: string, cover: string): void {
+  if (bvid && cover && !coverCache.has(bvid))
+    coverCache.set(bvid, cover)
 }
 
 /** 拿当前所有原生卡片（不依赖容器选择器，逐级兜底） */

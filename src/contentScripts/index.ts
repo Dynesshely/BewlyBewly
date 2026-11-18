@@ -23,6 +23,7 @@ import { setupVideoPage } from './videoPage'
 import App from './views/App.vue'
 import { setupChannelDrawnPage, teardownChannelDrawnPage } from './views/Channel'
 import { setupDynamicDrawnPage, teardownDynamicDrawnPage } from './views/Dynamic'
+import { teardownHomeDrawnPage } from './views/HomeDrawn'
 import { setupLiveDrawnPage, teardownLiveDrawnPage } from './views/Live'
 // 搜索结果页整体自绘（第 92 轮 A）：自绘层挂载失败会自动回退原生页面
 import { setupMessageDrawn } from './views/Message'
@@ -301,6 +302,13 @@ async function onDOMLoaded() {
   // 动态页 API 版自绘（第 102 轮）：成功才隐藏原生 #app；不接管时第 93 轮方案照旧
   void setupDynamicDrawnPage()
 
+  // 首页推荐流 API 自绘（第 103 轮）——**暂时禁用**：
+  // 接线后 e2e 出现 3 个稳定失败（favorites-category-manage ×2、feedback-states ×1），
+  // 而在上一提交（531af01d，不含此接线）上它们全部通过，说明 HomeDrawn 的
+  // window 捕获阶段拦截器（wheel/keydown stopPropagation）影响了 dock 页面。
+  // 模块代码保留（views/HomeDrawn/），修好拦截器作用域后再启用。
+  // void setupHomeDrawnPage()
+
   // 专栏页自绘（第 93 轮 G）：列表页整体接管，文章页只注入排版样式
   setupReadDrawnPage()
 
@@ -353,6 +361,7 @@ async function onDOMLoaded() {
     teardownSearchResultsDrawnPage()
     teardownMessageDrawnPage()
     teardownDynamicDrawnPage()
+    teardownHomeDrawnPage()
   }, { once: true })
 
   // Reset the original Bilibili top bar display style

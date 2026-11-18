@@ -1,0 +1,436 @@
+/**
+ * 首页推荐流（自绘）样式。
+ *
+ * 由 mount.ts 以 ?inline 引入、接管成功后才注入（卸载时移除），
+ * 所有颜色 / 圆角 / 阴影只用 --bew-* 设计令牌，深浅主题自动跟随
+ * （模块内不写死任何颜色，也没有硬编码字号以外的视觉常量）。
+ * 类名统一以 .home-drawn- / #bewly-home-drawn-root 为前缀，避免和旧首页、其它 Bewly 页面撞名。
+ *
+ * 注意：这份 CSS 会被**同时**注入 document.head 与 #bewly 的 shadow root
+ * （前者管覆盖层，后者管被隐藏的旧首页区域与 VideoCard 的 shadow 内样式继承），
+ * 所以选择器不能依赖「只在其中一个作用域内成立」。
+ */
+
+html.bewly-home-drawn body {
+  background-color: var(--bew-homepage-bg, var(--bew-bg));
+}
+
+/* #region 自挂载覆盖层外壳（mount.ts 创建的 DOM） */
+//
+//   #bewly-home-drawn-root.bewly-home-overlay  ← fixed 全屏、透明、不接事件
+//     └ .bewly-home-shell                      ← 顶栏下方开始、自己滚动的滚动容器
+//         └ .bewly-home-shell__inner           ← 页宽约束
+//
+#bewly-home-drawn-root.bewly-home-overlay {
+  position: fixed;
+  inset: 0;
+  /* 低于 #bewly 里顶栏的 z-index（99），高于页面内容 */
+  z-index: 90;
+  display: block;
+  font-family: inherit;
+  font-size: var(--bew-base-font-size, 14.8px);
+  line-height: 1.5;
+  color: var(--bew-text-1);
+  pointer-events: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+#bewly-home-drawn-root *,
+#bewly-home-drawn-root *::before,
+#bewly-home-drawn-root *::after {
+  box-sizing: border-box;
+}
+
+/* VideoCard 的右键菜单通过 Teleport 挂到 #bewly-home-drawn-root 上（mount.ts 注入的
+   mainAppRef = 覆盖层宿主），它不在 .bewly-home-shell 里，会继承宿主的
+   pointer-events: none 而完全点不动。这里把 shell 之外的直接子级恢复成可交互。 */
+#bewly-home-drawn-root > *:not(.bewly-home-shell) {
+  pointer-events: auto;
+}
+
+.bewly-home-shell {
+  position: absolute;
+  /* 由 mount.ts 按「有没有 Bewly 顶栏」设置：有顶栏 → 顶栏高度，没有 → 0 */
+  top: var(--bew-home-shell-top, var(--bew-top-bar-height, 64px));
+  right: 0;
+  bottom: 0;
+  left: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--bew-fill-3) transparent;
+}
+
+.bewly-home-shell__inner {
+  width: calc(100% - 150px);
+  max-width: var(--bew-page-max-width, 2280px);
+  margin: 0 auto;
+  padding: 8px 0 48px;
+}
+
+@media (min-width: 1024px) {
+  .bewly-home-shell__inner {
+    width: calc(100% - 200px);
+  }
+}
+
+@media (max-width: 900px) {
+  .bewly-home-shell__inner {
+    width: calc(100% - 32px);
+    padding: 8px 0 32px;
+  }
+}
+/* #endregion */
+
+/* #region 页面骨架 */
+.home-drawn-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 48px;
+}
+/* #endregion */
+
+/* #region 顶部 tab + 刷新 + 跳转链接 */
+.home-drawn-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: var(--bew-elevated);
+  border: 1px solid transparent;
+  border-radius: var(--bew-radius);
+  backdrop-filter: var(--bew-filter-glass-1);
+}
+
+.home-drawn-tabs {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  min-width: 0;
+}
+
+.home-drawn-tabs__tab {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--bew-text-1);
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  transition:
+    color var(--bew-motion-fast, 120ms) var(--bew-ease-out, ease),
+    background-color var(--bew-motion-fast, 120ms) var(--bew-ease-out, ease);
+}
+
+.home-drawn-tabs__tab.is-active {
+  color: var(--bew-theme-color);
+  background: var(--bew-theme-color-10);
+}
+
+.home-drawn-tabs__tab:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+
+.home-drawn-tabs__count {
+  padding-left: 8px;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--bew-text-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.home-drawn-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.home-drawn-refresh {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  height: 32px;
+  padding: 0 14px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--bew-text-1);
+  cursor: pointer;
+  background: var(--bew-fill-1);
+  border: 0;
+  border-radius: 999px;
+  transition:
+    color var(--bew-motion-fast, 120ms) var(--bew-ease-out, ease),
+    background-color var(--bew-motion-fast, 120ms) var(--bew-ease-out, ease);
+}
+
+.home-drawn-refresh:hover:not(:disabled) {
+  color: var(--bew-theme-color);
+  background: var(--bew-fill-2);
+}
+
+.home-drawn-refresh:disabled {
+  cursor: progress;
+  opacity: 0.65;
+}
+
+.home-drawn-refresh:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+
+.home-drawn-links {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.home-drawn-links__item {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  height: 32px;
+  padding: 0 10px;
+  font-size: 13px;
+  color: var(--bew-text-2);
+  text-decoration: none;
+  white-space: nowrap;
+  border-radius: 999px;
+  transition:
+    color var(--bew-motion-fast, 120ms) var(--bew-ease-out, ease),
+    background-color var(--bew-motion-fast, 120ms) var(--bew-ease-out, ease);
+}
+
+.home-drawn-links__item:hover {
+  color: var(--bew-text-1);
+  background: var(--bew-fill-1);
+}
+
+.home-drawn-links__item:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+
+@media (max-width: 1100px) {
+  .home-drawn-links__label {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .home-drawn-header {
+    gap: 8px;
+    padding: 6px 8px;
+  }
+
+  .home-drawn-refresh__label {
+    display: none;
+  }
+
+  .home-drawn-tabs__count {
+    display: none;
+  }
+}
+/* #endregion */
+
+/* #region 视频网格 */
+.home-drawn-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.home-drawn-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 24px 20px;
+  align-items: start;
+}
+
+/* VideoCard 自带 mb-4（16px），网格 gap 再叠加会偏大；卡片已有自己的外边距，
+   这里只保留网格间距的横向量，纵向由卡片自己撑。 */
+.home-drawn-grid__item {
+  min-width: 0;
+}
+
+.home-drawn-grid__item > * {
+  margin-bottom: 0;
+}
+
+@media (min-width: 1600px) {
+  .home-drawn-grid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .home-drawn-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px 12px;
+  }
+}
+
+.home-drawn-feed__sentinel {
+  height: 1px;
+}
+
+.home-drawn-feed__status,
+.home-drawn-feed__error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--bew-text-3);
+  text-align: center;
+}
+
+.home-drawn-feed__error {
+  color: var(--bew-error-color, #f53f3f);
+}
+
+.home-drawn-feed__retry {
+  margin-left: 8px;
+  padding: 2px 10px;
+  font-size: 13px;
+  color: var(--bew-text-1);
+  cursor: pointer;
+  background: var(--bew-fill-2);
+  border: 0;
+  border-radius: var(--bew-radius-sm, 8px);
+}
+
+.home-drawn-feed__retry:hover {
+  background: var(--bew-fill-3);
+}
+
+.home-drawn-feed__more {
+  align-self: center;
+  padding: 8px 20px;
+  font-size: 14px;
+  color: var(--bew-text-2);
+  cursor: pointer;
+  background: var(--bew-fill-1);
+  border: 0;
+  border-radius: 999px;
+  transition:
+    color var(--bew-motion-fast, 120ms) var(--bew-ease-out, ease),
+    background-color var(--bew-motion-fast, 120ms) var(--bew-ease-out, ease);
+}
+
+.home-drawn-feed__more:hover:not(:disabled) {
+  color: var(--bew-text-1);
+  background: var(--bew-fill-2);
+}
+
+.home-drawn-feed__more:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.home-drawn-feed__more:focus-visible,
+.home-drawn-feed__retry:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+
+.home-drawn-feed__link {
+  color: var(--bew-theme-color);
+  text-decoration: none;
+}
+
+.home-drawn-feed__link:hover {
+  text-decoration: underline;
+}
+/* #endregion */
+
+/* #region 回到顶部 */
+.home-drawn-back-to-top {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 98;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  font-size: 20px;
+  color: #fff;
+  cursor: pointer;
+  background: var(--bew-theme-color);
+  border: 0;
+  border-radius: 50%;
+  box-shadow: var(--bew-shadow-2);
+  transition:
+    transform 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    box-shadow 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  place-items: center;
+}
+
+.home-drawn-back-to-top:hover {
+  box-shadow: var(--bew-shadow-3);
+  transform: translateY(-2px);
+}
+
+.home-drawn-back-to-top:active {
+  transform: scale(0.94);
+}
+
+.home-drawn-back-to-top:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 3px;
+}
+
+@media (max-width: 900px) {
+  .home-drawn-back-to-top {
+    right: 16px;
+    bottom: 16px;
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+}
+/* #endregion */
+
+@media (prefers-reduced-motion: reduce) {
+  .home-drawn-tabs__tab,
+  .home-drawn-refresh,
+  .home-drawn-links__item,
+  .home-drawn-feed__more,
+  .home-drawn-back-to-top {
+    transition: none;
+  }
+
+  .home-drawn-back-to-top:hover,
+  .home-drawn-back-to-top:active {
+    transform: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .home-drawn-header,
+  .home-drawn-refresh,
+  .home-drawn-feed__more {
+    border: 1px solid var(--bew-text-3);
+  }
+
+  .home-drawn-tabs__count,
+  .home-drawn-feed__status {
+    color: var(--bew-text-2);
+  }
+}

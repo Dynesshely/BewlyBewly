@@ -84,3 +84,40 @@
   }
 }
 // #endregion
+/* ===== 第 103 轮 ===== */
+/*
+ * 首页推荐流改为 API 拉取 + 完全自绘（views/HomeDrawn/**）。
+ *
+ * 这里只放「自绘接管后」需要压住的**原生页 / 旧 Bewly 首页遗留样式**；
+ * 自绘页自己的全部样式在 views/HomeDrawn/styles/home-drawn.scss（由 mount.ts
+ * 以 ?inline 注入，卸载时移除），不放这里，避免未接管时也生效。
+ *
+ * 真机结论（2026-11-19，CDP 9333）：
+ *  - 首页没有 #app（contentScripts/index.ts 在 DOMContentLoaded 就把 body 清空了），
+ *    旧首页是 App.vue 渲染在 #bewly shadow root 里的那份；
+ *  - 旧首页区域的隐藏由 mount.ts 注入到 shadow root 的 !important 规则完成
+ *    （inline style 会被 Vue 的 :style 绑定 patch 覆盖掉），所以这里不重复写；
+ *  - 本段只负责两件 light DOM 的事：① 页面底色跟随主页令牌；
+ *    ② 接管后原生顶栏 / 残留原生卡片不再接事件。
+ */
+html.bewly-home-drawn {
+  background-color: var(--bew-homepage-bg, var(--bew-bg));
+
+  /* 原生顶栏（remove-top-bar 下是 visibility:hidden 但仍占 64px）：
+     自绘覆盖层从它下方开始铺，保留这 64px 正好与 Bewly 顶栏对齐，
+     所以这里只确保它不接事件、不被误点。 */
+  .bili-header,
+  #biliMainHeader {
+    pointer-events: none !important;
+  }
+
+  /* 旧首页可能残留的原生卡片：接管后一律不接事件（自绘卡片在覆盖层里） */
+  #app .bili-video-card,
+  #app .bili-live-card,
+  #app .bili-skeleton-card {
+    pointer-events: none !important;
+  }
+}
+
+/* 未接管时（例如接口失败回退）不改变任何原生样式 —— 上面整段都挂在
+   html.bewly-home-drawn 之下，这个类只在 mount.ts 成功接管后添加。 */

@@ -29,6 +29,7 @@ import { setupMomentsDrawnPage, teardownMomentsDrawnPage } from './views/Moments
 import { isPopularPage, setupPopularPage, teardownPopularPage } from './views/Popular'
 import { setupReadDrawnPage, teardownReadDrawnPage } from './views/Read'
 import { teardownSearchDrawnPage } from './views/SearchPage'
+import { setupSpaceDrawnPage, teardownSpaceDrawnPage } from './views/Space'
 
 import '~/styles'
 import 'uno.css'
@@ -289,8 +290,12 @@ async function onDOMLoaded() {
   // 直播页自绘（第 93 轮 H）：直播站独立挂载，播放器/弹幕/礼物栏不动
   setupLiveDrawnPage()
 
-  // 用户空间增强层（筛选、密度、j/k、快速跳转）
-  setupSpacePage()
+  // 用户空间页整体自绘（第 100 轮）：API 拉数据 + 我们自己的组件渲染。
+  // 预取成功才接管（5 道闸门）；没接管时才挂原生增强层，避免两层抢键盘。
+  void setupSpaceDrawnPage().then((takenOver) => {
+    if (!takenOver)
+      setupSpacePage()
+  })
 
   // 专栏 / 文章页阅读模式（沉浸阅读 / 进度 / 目录 / 字号）
   setupArticlePage()
@@ -327,6 +332,7 @@ async function onDOMLoaded() {
     teardownReadDrawnPage()
     teardownLiveDrawnPage()
     teardownChannelDrawnPage()
+    teardownSpaceDrawnPage()
   }, { once: true })
 
   // Reset the original Bilibili top bar display style

@@ -1485,3 +1485,33 @@ html[data-bewly-space-profile="ready"] {
   }
 }
 // #endregion
+
+/* ===== 第 100 轮 ===== */
+// 空间页「完全自绘」接管期（src/contentScripts/views/Space）的页面级兜底。
+//
+// 自绘覆盖层自己的样式（`Space/styles/space-drawn.scss`）在接管成功时才注入 <head>，
+// 已经把 .bewly-space-overlay / .space-* 全部包住；这里只补两条**作用于 html/body 的
+// 兜底规则**，它们必须在页面级样式里才可靠：
+//
+//   1. 双滚动条：覆盖层是 fixed 全屏 + 自己滚动，原生文档若还能滚就会出现两条滚动条，
+//      接管期直接锁掉文档滚动；
+//   2. 闪一下：原生 #app 由 mount.ts 用 inline display:none 隐藏，但 SPA 重建 #app 的
+//      那几帧 inline 样式还没打上，用页面级 CSS 兜一道，避免原生页面内容闪出。
+//
+// 整个区块只在 <html> 有 .bewly-space-drawn 时生效（由 Space/mount.ts 接管成功后添加、
+// 卸载时移除），未接管 / 接管失败时页面与改动前完全一致。
+
+html.bewly-space-drawn {
+  overflow: hidden;
+
+  body {
+    overflow: hidden;
+    background-color: var(--bew-bg);
+  }
+
+  // 兜底隐藏原生空间页（inline display:none 由 mount.ts 打，这里防重建窗口期）
+  #app {
+    display: none !important;
+  }
+}
+// ===== 第 100 轮结束 =====

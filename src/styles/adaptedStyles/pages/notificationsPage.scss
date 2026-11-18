@@ -1700,3 +1700,36 @@ html.bewly-message-drawn {
   padding-bottom: 32px;
 }
 // #endregion
+
+/* ===== 第 102 轮 ===== */
+//
+// 消息中心改为「API 拉取 + 完全自绘」（views/MessageDrawn/**）。
+//
+// 本段只做两件事，都是为了 **自绘接管之后** 的页面级状态：
+//
+// 1. 把第 93 轮的 .bewly-msg-* 系列「混合方案」元素在接管时置为不显示。
+//    那些元素挂在原生 DOM 里，原生 DOM 被隐藏后它们本来就不可见；这里额外兜一层，
+//    是为了避免「原生 DOM 被站点重建 → 我们重新隐藏」的窗口期里闪出两套 UI。
+// 2. 原生内容区不再产生滚动条（自绘覆盖层自己管滚动，避免双滚动条）。
+//
+// 页面底色不在这里处理：它由自绘样式 message-drawn.scss 自己带 !important 设置，
+// 与覆盖层同生命周期注入 / 移除，不需要重新构建本文件才生效。
+//
+// 只在 .bewly-message-drawn-api 下生效：接管失败时一行都不影响原生页面与第 93/94 轮的方案。
+
+html.bewly-design.notificationsPage.bewly-message-drawn-api {
+  // 第 93/94 轮混合方案的宿主：接管后一律不显示
+  .bewly-msg-tabs-host,
+  .bewly-msg-sessions-host,
+  .bewly-msg-card,
+  .bewly-msg-session,
+  .bewly-msg-sessions__scroll {
+    display: none !important;
+  }
+
+  // 自绘覆盖层自己管滚动，原生内容区不再产生滚动条（避免双滚动条）
+  #app {
+    overflow: hidden;
+  }
+}
+/* ===== 第 102 轮结束 ===== */

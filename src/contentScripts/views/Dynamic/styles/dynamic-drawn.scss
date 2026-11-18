@@ -1,0 +1,901 @@
+/**
+ * 动态页（自绘）样式。
+ *
+ * 由 mount.ts 以 ?inline 引入、接管成功后才注入页面 <head>（卸载时移除）。
+ * 所有颜色 / 圆角 / 阴影只用 --bew-* 设计令牌，深浅主题自动跟随
+ * （模块内不写死任何颜色）。
+ *
+ * 类名统一以 .dynamic- / #bewly-dynamic-drawn-root 为前缀，
+ * 避免和原生动态页（.bili-dyn-*）、第 93 轮 DOM 方案（.bewly-moment-*）撞名。
+ */
+
+html.bewly-dynamic-drawn body {
+  background-color: var(--bew-bg);
+}
+
+/* #region 自挂载覆盖层外壳（mount.ts 创建的 DOM） */
+//
+//   #bewly-dynamic-drawn-root.bewly-dynamic-overlay  ← fixed 全屏、透明、不接事件
+//     └ .bewly-dynamic-shell                       ← 顶栏下方开始、自己滚动的滚动容器
+//         └ .bewly-dynamic-shell__inner            ← 页宽约束
+//
+#bewly-dynamic-drawn-root.bewly-dynamic-overlay {
+  position: fixed;
+  inset: 0;
+  /* 低于 #bewly 里顶栏的 z-index（99），高于页面内容 */
+  z-index: 90;
+  display: block;
+  font-family: inherit;
+  font-size: var(--bew-base-font-size, 14.8px);
+  line-height: 1.5;
+  color: var(--bew-text-1);
+  pointer-events: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+#bewly-dynamic-drawn-root *,
+#bewly-dynamic-drawn-root *::before,
+#bewly-dynamic-drawn-root *::after {
+  box-sizing: border-box;
+}
+
+/* 覆盖层直接子级里可能被 Teleport 挂上浮层（右键菜单等），
+   它们不在 shell 里，会继承宿主的 pointer-events: none 而点不动 */
+#bewly-dynamic-drawn-root > *:not(.bewly-dynamic-shell) {
+  pointer-events: auto;
+}
+
+.bewly-dynamic-shell {
+  position: absolute;
+  /* 由 mount.ts 按「有没有 Bewly 顶栏」设置 */
+  top: var(--bew-dynamic-shell-top, var(--bew-top-bar-height, 64px));
+  right: 0;
+  bottom: 0;
+  left: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--bew-fill-3) transparent;
+}
+
+/* 动态卡是竖排信息流，宽度收得比视频网格窄，与原生动态页的窄栏一致 */
+.bewly-dynamic-shell__inner {
+  width: calc(100% - 150px);
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 16px 0 48px;
+}
+
+@media (max-width: 900px) {
+  .bewly-dynamic-shell__inner {
+    width: calc(100% - 32px);
+    padding: 8px 0 32px;
+  }
+}
+/* #endregion */
+
+/* #region 页面骨架 + tab */
+.dynamic-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* tab 行高度（32px 按钮 + 上下各 8px padding + 2px 边框），
+     供 .dynamic-card 的 scroll-margin-top 使用 */
+  --bew-dynamic-tabs-height: 56px;
+}
+
+.dynamic-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  padding: 8px;
+  background: var(--bew-elevated);
+  border: 1px solid transparent;
+  border-radius: var(--bew-radius);
+  backdrop-filter: var(--bew-filter-glass-1);
+}
+
+.dynamic-tabs__tab {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 14px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--bew-text-2);
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  transition:
+    color var(--bew-motion-fast) var(--bew-ease-out),
+    background-color var(--bew-motion-fast) var(--bew-ease-out);
+}
+
+.dynamic-tabs__tab:hover {
+  color: var(--bew-text-1);
+  background: var(--bew-fill-1);
+}
+
+.dynamic-tabs__tab.is-active {
+  font-weight: 600;
+  color: var(--bew-theme-color);
+  background: var(--bew-theme-color-10);
+}
+
+.dynamic-tabs__tab:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+/* #endregion */
+
+/* #region 列表容器 */
+.dynamic-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dynamic-feed__items {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dynamic-feed__sentinel {
+  height: 1px;
+}
+
+.dynamic-feed__loading,
+.dynamic-feed__end,
+.dynamic-feed__error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--bew-text-3);
+  text-align: center;
+}
+
+.dynamic-feed__error {
+  color: var(--bew-error-color);
+}
+
+.dynamic-feed__retry {
+  margin-left: 8px;
+  padding: 2px 10px;
+  font-size: 13px;
+  color: var(--bew-text-1);
+  cursor: pointer;
+  background: var(--bew-fill-2);
+  border: 0;
+  border-radius: var(--bew-radius-sm);
+}
+
+.dynamic-feed__retry:hover {
+  background: var(--bew-fill-3);
+}
+
+.dynamic-feed__more {
+  align-self: center;
+  padding: 8px 20px;
+  font-size: 14px;
+  color: var(--bew-text-2);
+  cursor: pointer;
+  background: var(--bew-fill-1);
+  border: 0;
+  border-radius: 999px;
+  transition:
+    color var(--bew-motion-fast) var(--bew-ease-out),
+    background-color var(--bew-motion-fast) var(--bew-ease-out);
+}
+
+.dynamic-feed__more:hover:not(:disabled) {
+  color: var(--bew-text-1);
+  background: var(--bew-fill-2);
+}
+
+.dynamic-feed__more:focus-visible,
+.dynamic-feed__retry:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+
+.dynamic-feed__link {
+  color: var(--bew-theme-color);
+  text-decoration: none;
+}
+
+.dynamic-feed__link:hover {
+  text-decoration: underline;
+}
+/* #endregion */
+
+/* #region 动态卡片 */
+.dynamic-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: var(--bew-content);
+  border-radius: var(--bew-radius);
+  box-shadow: var(--bew-shadow-1);
+  transition: box-shadow var(--bew-motion-fast) var(--bew-ease-out);
+  /* tab 是 sticky 的（top: 0），卡片滚到顶上时会被它盖住头部。
+     scroll-margin 让「滚到某张卡」时给它留出 tab 的高度；
+     这个变量由 .dynamic-page 定义并向下继承（卡片是它的后代）。 */
+  scroll-margin-top: var(--bew-dynamic-tabs-height, 56px);
+}
+
+.dynamic-card:hover {
+  box-shadow: var(--bew-shadow-2);
+}
+
+.dynamic-card__header {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+/* 头像 40 圆 */
+.dynamic-card__avatar {
+  position: relative;
+  display: block;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  overflow: visible;
+  background: var(--bew-fill-2);
+  border-radius: 50%;
+}
+
+.dynamic-card__avatar .bewly-picture {
+  display: block;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border-radius: 50%;
+}
+
+.dynamic-card__avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dynamic-card__avatar-fallback {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--bew-text-2);
+  place-items: center;
+}
+
+/* 头像挂件：叠在头像右上角 */
+.dynamic-card__pendant {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 20px;
+  height: 20px;
+  pointer-events: none;
+  object-fit: contain;
+}
+
+.dynamic-card__meta {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dynamic-card__name-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.dynamic-card__name {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--bew-text-1);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dynamic-card__name:hover {
+  color: var(--bew-theme-color);
+}
+
+/* 等级 / 会员 / 认证：同一套小徽标 */
+.dynamic-card__badge {
+  flex: 0 0 auto;
+  max-width: 12em;
+  padding: 0 6px;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 18px;
+  color: var(--bew-text-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--bew-fill-2);
+  border-radius: var(--bew-radius-sm);
+}
+
+.dynamic-card__badge--vip {
+  color: var(--bew-theme-color);
+  background: var(--bew-theme-color-10);
+}
+
+.dynamic-card__time-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.dynamic-card__time {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--bew-text-3);
+  text-decoration: none;
+}
+
+.dynamic-card__time:hover {
+  color: var(--bew-theme-color);
+}
+
+.dynamic-card__topic {
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--bew-theme-color);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dynamic-card__topic:hover {
+  text-decoration: underline;
+}
+
+.dynamic-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* #endregion */
+
+/* #region 正文 */
+.dynamic-text-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dynamic-text {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  line-height: 1.72;
+  color: var(--bew-text-1);
+  white-space: pre-wrap;
+}
+
+/* 折叠：用 -webkit-line-clamp 出省略号，是否溢出自测（见 DynamicText.vue） */
+.dynamic-text.is-collapsed {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--dynamic-text-lines, 6);
+  line-clamp: var(--dynamic-text-lines, 6);
+}
+
+.dynamic-text__emoji {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  margin: 0 1px;
+  vertical-align: -4px;
+  object-fit: contain;
+}
+
+.dynamic-text__link {
+  color: var(--bew-theme-color);
+  text-decoration: none;
+}
+
+.dynamic-text__link:hover {
+  text-decoration: underline;
+}
+
+.dynamic-text__toggle {
+  align-self: flex-start;
+  padding: 0;
+  font-size: 12.5px;
+  color: var(--bew-theme-color);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.dynamic-text__toggle:hover {
+  text-decoration: underline;
+}
+
+.dynamic-text__toggle:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+  border-radius: var(--bew-radius-sm);
+}
+/* #endregion */
+
+/* #region 内容块（标题 + 正文 + 图片） */
+.dynamic-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dynamic-content__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--bew-text-1);
+}
+
+.dynamic-content__title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.dynamic-content__title a:hover {
+  color: var(--bew-theme-color);
+}
+/* #endregion */
+
+/* #region 图片网格：1 张大图 / 2–4 张 2 列 / 5–9 张 3 列 */
+.dynamic-pics {
+  display: grid;
+  gap: 4px;
+  max-width: 100%;
+}
+
+.dynamic-pics.is-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dynamic-pics.is-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dynamic-pics.is-single {
+  display: block;
+  width: 100%;
+  max-width: 340px;
+}
+
+.dynamic-pics__cell {
+  display: block;
+  overflow: hidden;
+  background: var(--bew-fill-2);
+  border-radius: 8px;
+}
+
+/* 多图固定方格；单图按接口给的比例（内联 aspect-ratio） */
+.dynamic-pics:not(.is-single) .dynamic-pics__cell {
+  aspect-ratio: 1 / 1;
+}
+
+.dynamic-pics.is-single .dynamic-pics__cell {
+  width: 100%;
+  max-height: 420px;
+}
+
+.dynamic-pics__cell .bewly-picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.dynamic-pics__cell img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dynamic-pics__cell:hover img {
+  opacity: 0.92;
+  transition: opacity var(--bew-motion-fast) var(--bew-ease-out);
+}
+/* #endregion */
+
+/* #region 视频卡 */
+.dynamic-video {
+  display: flex;
+  gap: 12px;
+  padding: 10px;
+  overflow: hidden;
+  color: inherit;
+  text-decoration: none;
+  background: var(--bew-fill-1);
+  border: 1px solid var(--bew-border-color);
+  border-radius: 10px;
+  transition: background-color var(--bew-motion-fast) var(--bew-ease-out);
+}
+
+.dynamic-video:hover {
+  background: var(--bew-fill-2);
+}
+
+.dynamic-video__cover {
+  position: relative;
+  display: block;
+  flex: none;
+  width: 200px;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  background: var(--bew-fill-2);
+  border-radius: 8px;
+}
+
+.dynamic-video__cover .bewly-picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.dynamic-video__cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 时长角标是压在**图片上的媒体遮罩**，不是主题表面：
+   白字 + 半透明黑底在任何主题下都必须保持对比度，所以这里不用 --bew-* 令牌
+   （与仓库既有 src/components/VideoCard/VideoCard.vue 的
+   `text="!white xs" bg="black opacity-60"` 完全一致）。 */
+.dynamic-video__duration {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  padding: 0 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #fff;
+  background: rgb(0 0 0 / 0.72);
+  border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dynamic-video__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.dynamic-video__badge {
+  align-self: flex-start;
+  padding: 0 5px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--bew-theme-color);
+  background: var(--bew-theme-color-10);
+  border-radius: var(--bew-radius-sm);
+}
+
+.dynamic-video__title {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--bew-text-1);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.dynamic-video:hover .dynamic-video__title {
+  color: var(--bew-theme-color);
+}
+
+.dynamic-video__desc {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--bew-text-3);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.dynamic-video__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: auto;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--bew-text-3);
+  font-variant-numeric: tabular-nums;
+}
+/* #endregion */
+
+/* #region 转发引用块 */
+.dynamic-quote {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bew-fill-1);
+  border-radius: 10px;
+}
+
+.dynamic-quote__author {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  text-decoration: none;
+}
+
+.dynamic-quote__avatar {
+  display: block;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  overflow: hidden;
+  background: var(--bew-fill-2);
+  border-radius: 50%;
+}
+
+.dynamic-quote__avatar .bewly-picture {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+
+.dynamic-quote__avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dynamic-quote__name {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--bew-text-1);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dynamic-quote__author:hover .dynamic-quote__name {
+  color: var(--bew-theme-color);
+}
+
+/* 引用块里的图片与视频收窄一档 */
+.dynamic-quote .dynamic-video__cover {
+  width: 132px;
+}
+
+.dynamic-quote .dynamic-pics.is-single {
+  max-width: 220px;
+}
+
+.dynamic-quote .dynamic-pics {
+  gap: 3px;
+}
+/* #endregion */
+
+/* #region 操作栏 */
+.dynamic-card__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding-top: 4px;
+  border-top: 1px solid var(--bew-border-color);
+}
+
+.dynamic-card__action {
+  display: inline-flex;
+  flex: 1 1 0;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  font-size: 12.5px;
+  color: var(--bew-text-3);
+  text-decoration: none;
+  border-radius: var(--bew-radius-sm);
+  transition:
+    color var(--bew-motion-fast) var(--bew-ease-out),
+    background-color var(--bew-motion-fast) var(--bew-ease-out);
+}
+
+.dynamic-card__action:hover {
+  color: var(--bew-theme-color);
+  background: var(--bew-fill-1);
+}
+
+.dynamic-card__action.is-liked {
+  color: var(--bew-theme-color);
+}
+
+.dynamic-card__action:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+
+.dynamic-card__action-count {
+  font-variant-numeric: tabular-nums;
+}
+/* #endregion */
+
+/* #region 骨架 */
+.dynamic-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dynamic-skeleton__card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: var(--bew-content);
+  border-radius: var(--bew-radius);
+  box-shadow: var(--bew-shadow-1);
+}
+
+.dynamic-skeleton__header {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.dynamic-skeleton__avatar {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  background: var(--bew-fill-2);
+  border-radius: 50%;
+  animation: dynamic-skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+.dynamic-skeleton__meta {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dynamic-skeleton__line {
+  width: 100%;
+  height: 12px;
+  background: var(--bew-fill-2);
+  border-radius: 6px;
+  animation: dynamic-skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+.dynamic-skeleton__line--name {
+  width: 26%;
+  height: 14px;
+}
+
+.dynamic-skeleton__line--time {
+  width: 16%;
+  height: 10px;
+}
+
+.dynamic-skeleton__line--short {
+  width: 62%;
+}
+
+.dynamic-skeleton__block {
+  width: 100%;
+  height: 120px;
+  background: var(--bew-fill-1);
+  border-radius: 10px;
+  animation: dynamic-skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes dynamic-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.55;
+  }
+}
+/* #endregion */
+
+/* #region 窄屏 / 减低动效 / 高对比度 */
+@media (max-width: 640px) {
+  .dynamic-card {
+    padding: 12px;
+  }
+
+  .dynamic-video {
+    gap: 10px;
+    padding: 8px;
+  }
+
+  .dynamic-video__cover {
+    width: 132px;
+  }
+
+  .dynamic-pics.is-single {
+    max-width: 100%;
+  }
+
+  .dynamic-tabs__tab {
+    padding: 0 10px;
+    font-size: 13px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dynamic-tabs__tab,
+  .dynamic-card,
+  .dynamic-feed__more,
+  .dynamic-card__action,
+  .dynamic-pics__cell:hover img {
+    transition: none;
+  }
+
+  .dynamic-skeleton__avatar,
+  .dynamic-skeleton__line,
+  .dynamic-skeleton__block {
+    animation: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .dynamic-card,
+  .dynamic-tabs,
+  .dynamic-video,
+  .dynamic-quote {
+    border: 1px solid var(--bew-text-3);
+    box-shadow: none;
+  }
+
+  .dynamic-feed__loading,
+  .dynamic-feed__end,
+  .dynamic-card__time,
+  .dynamic-video__desc,
+  .dynamic-video__stats {
+    color: var(--bew-text-2);
+  }
+}
+/* #endregion */

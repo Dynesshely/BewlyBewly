@@ -22,9 +22,11 @@ import { setupSpacePage } from './spacePage'
 import { setupVideoPage } from './videoPage'
 import App from './views/App.vue'
 import { setupChannelDrawnPage, teardownChannelDrawnPage } from './views/Channel'
+import { setupDynamicDrawnPage, teardownDynamicDrawnPage } from './views/Dynamic'
 import { setupLiveDrawnPage, teardownLiveDrawnPage } from './views/Live'
 // 搜索结果页整体自绘（第 92 轮 A）：自绘层挂载失败会自动回退原生页面
 import { setupMessageDrawn } from './views/Message'
+import { setupMessageDrawnPage, teardownMessageDrawnPage } from './views/MessageDrawn'
 import { setupMomentsDrawnPage, teardownMomentsDrawnPage } from './views/Moments/native'
 import { isPopularPage, setupPopularPage, teardownPopularPage } from './views/Popular'
 import { setupReadDrawnPage, teardownReadDrawnPage } from './views/Read'
@@ -286,11 +288,18 @@ async function onDOMLoaded() {
   // 仍复现）→ 触发点不在样式内容。在定位前保持禁用，搜索页走原生。
   // setupSearchDrawnPage()
 
-  // 消息中心页自绘（第 93 轮 E）：会话列表与聊天气泡覆盖层，8s 等不到骨架则完全不接管
-  setupMessageDrawn()
+  // 消息中心整体自绘（第 102 轮）：API 拉数据 + 完全自绘。
+  // 预取成功才接管；没接管时才挂第 93/94 轮的混合方案（原生 DOM 做数据源）。
+  void setupMessageDrawnPage().then((takenOver) => {
+    if (!takenOver)
+      setupMessageDrawn()
+  })
 
   // 动态页自绘（第 93 轮 D）：逐条替换原生动态卡片，单条失败只回退该条
   setupMomentsDrawnPage()
+
+  // 动态页 API 版自绘（第 102 轮）：成功才隐藏原生 #app；不接管时第 93 轮方案照旧
+  void setupDynamicDrawnPage()
 
   // 专栏页自绘（第 93 轮 G）：列表页整体接管，文章页只注入排版样式
   setupReadDrawnPage()
@@ -342,6 +351,8 @@ async function onDOMLoaded() {
     teardownChannelDrawnPage()
     teardownSpaceDrawnPage()
     teardownSearchResultsDrawnPage()
+    teardownMessageDrawnPage()
+    teardownDynamicDrawnPage()
   }, { once: true })
 
   // Reset the original Bilibili top bar display style

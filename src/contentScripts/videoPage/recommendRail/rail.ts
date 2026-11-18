@@ -77,6 +77,65 @@ function absoluteUrl(href: string): string {
  */
 const coverCache = new Map<string, string>()
 
+/** 已发起预加载的封面 URL（避免每拍重复 new Image 造成请求风暴/取消） */
+const preloadedCovers = new Set<string>()
+
+/** CDN 备选域名：hdslb 的 i0/i1/i2 互为镜像，个别域名偶发 403/超时时换一个重试 */
+const HDSLB_HOSTS = ['i0.hdslb.com', 'i1.hdslb.com', 'i2.hdslb.com']
+
+/** 把封面 URL 换成另一个 hdslb 镜像域名（不是 hdslb / 没有镜像时返回空串） */
+export function alternateCoverUrl(url: string): string {
+  const match = url.match(/^(?:https?:)?\/\/(i\d)\.hdslb\.com\//)
+  if (!match)
+    return ''
+  const current = match[1]
+  const next = HDSLB_HOSTS.find(host => host !== `${current}.hdslb.com`)
+  return next
+    ? url.replace(`${current}.hdslb.com`, next)
+    : ''
+}
+
+/**
+ * 主动预加载封面（第 99 轮）。
+ *
+ * 真机问题：原生列表被轨道隐藏（display: none）后 B 站懒加载封面不再触发；
+ * 而 findCover() 读的是已渲染 img 的 currentSrc/src —— 采集那一拍图片还没加载时封面就永远空串
+ * （表现为「经常空白，偶尔刷新能显示」）。这里用 new Image() 主动抓一次（不插入 DOM）。
+ */
+const coverMirrors = new Map<string, string>()
+
+/** 取封面的最终地址：原地址预加载失败时换成 hdslb 镜像地址 */
+export function resolveCoverUrl(url: string): string {
+  return coverMirrors.get(url) ?? url
+}
+
+export function preloadCover(url: string): void {
+  if (!url || preloadedCovers.has(url))
+    return
+  preloadedCovers.add(url)
+  try {
+    const img = new Image()
+    img.referrerPolicy = 'no-referrer'
+    img.decoding = 'async'
+    // 第 99 轮：单个 hdslb 域名偶发 403/超时 → 换镜像再试一次（只重试一次）
+    img.addEventListener('error', () => {
+      const alternate = alternateCoverUrl(url)
+      if (!alternate || preloadedCovers.has(alternate))
+        return
+      coverMirrors.set(url, alternate)
+      preloadedCovers.add(alternate)
+      const retry = new Image()
+      retry.referrerPolicy = 'no-referrer'
+      retry.decoding = 'async'
+      retry.src = alternate
+    }, { once: true })
+    img.src = url
+  }
+  catch {
+    // 预加载失败不影响主流程
+  }
+}
+
 /** 从元素上按「越接近真实地址越优先」的顺序取封面候选 */
 function coverCandidatesFrom(img: HTMLImageElement): string[] {
   const dataset = img.dataset as Record<string, string | undefined>
@@ -187,6 +246,12 @@ export function warmUpNativeCovers(): void {
       if (cached)
         continue
     }
+
+    // 第 99 轮：不管采集到的是「已经加载好的图片」还是「data-src 里的地址」，
+    // 都主动预加载一次 —— 原生列表马上要被隐藏，隐藏后懒加载不会再触发。
+    const known = cover || coverCache.get(bvid) || ''
+    if (known)
+      preloadCover(known)
   }
 }
 
@@ -233,10 +298,10 @@ export function refreshRailCovers(current: RailCard[]): RailCard[] | null {
     const bvid = (link?.getAttribute('href') ?? '').match(BV_RE)?.[1] ?? ''
     if (!bvid)
       continue
-    const cover = findCover(card)
-    if (cover) {
-      coverCache.set(bvid, cover)
-      covers.set(bvid, cover)
+    const rawCover = findCover(card)
+    if (rawCover) {
+      coverCache.set(bvid, rawCover)
+      covers.set(bvid, resolveCoverUrl(rawCover))
     }
   }
   if (!covers.size)
@@ -343,7 +408,12 @@ export function collectRailCards(): RailCard[] {
       return
     seen.add(bvid)
     const { upName, views } = findUpAndViews(card)
-    const cover = findCover(card) || cachedCover(bvid)
+    const rawCover = findCover(card) || cachedCover(bvid)
+    const cover = rawCover
+      ? resolveCoverUrl(rawCover)
+      : ''
+    if (rawCover)
+      preloadCover(rawCover)
     if (cover && !coverCache.has(bvid))
       coverCache.set(bvid, cover)
     cards.push({

@@ -4900,3 +4900,16 @@ html.bewly-video-fixed #viewbox_report[data-bewly-info-moved] {
   color: var(--bew-text-3);
   text-align: center;
 }
+
+/* ===== 第 99 轮 ===== */
+/* 推荐轨道封面：img 自身带 background-image 兜底（图片解码/代理失败时背景仍可见），
+   并保证封面容器在极窄高度下也不塌成 0（否则浏览器不请求图片资源）。 */
+.bvp-rail__cover img {
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+.bvp-rail__cover {
+  min-height: 48px;
+}

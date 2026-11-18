@@ -1276,13 +1276,19 @@ html[data-bewly-space-profile="ready"] {
   }
 
   // ---------- 视频网格 ----------
+  /* 第 99 轮：**放弃网格改造**（保持 B 站原生列表布局）。
+     真机复现结论：空间页每张视频卡外都有独立包装层（.items__item / .video-list__item /
+     masterpiece-block__item），旧实现用「所有卡片的共同祖先」当网格容器，在「合集和系列」页
+     命中的是整块 .contet-list —— 被 grid 化后每张卡只剩 ~24px 宽，压成细竖条（用户截图）。
+     现在 dom.ts 的 markGridContainer() 恒返回 null，不再打任何 data-bewly-space-grid 标记；
+     这里保留一条「万一有残留标记也绝不 grid 化」的兜底，防止历史 DOM 上残留属性造成布局破碎。 */
   [data-bewly-space-grid] {
-    display: grid !important;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 16px;
-    max-width: 1440px;
-    margin: 0 auto;
-    padding: 0 16px 16px;
+    display: revert !important;
+    grid-template-columns: none !important;
+    gap: normal !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   [data-bewly-space-card] {

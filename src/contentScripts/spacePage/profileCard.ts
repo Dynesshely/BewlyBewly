@@ -1,4 +1,4 @@
-import { clearGridMarks, collectVideoCards, findSpaceHeader, GRID_ATTR, markGridContainer, readSpaceProfile } from './dom'
+import { clearGridMarks, collectVideoCards, findSpaceHeader, findVideoListContainer, readSpaceProfile } from './dom'
 /**
  * 空间页头部信息卡自绘（第 92 轮）。
  *
@@ -194,8 +194,9 @@ function tryTakeover(): boolean {
 
   // 视频网格：给共同父容器打标记，页面级 CSS 做 grid
   clearGridMarks()
-  const grid = markGridContainer()
-  ensureLoadMore(grid)
+  // 第 99 轮：不再网格化列表，只把「加载更多」挂在视频主列表之后
+  const listContainer = findVideoListContainer()
+  ensureLoadMore(listContainer)
   return true
 }
 
@@ -206,10 +207,9 @@ function refresh(): void {
     document.getElementById(LOAD_MORE_ID)?.remove()
     return
   }
-  // 卡片已就绪后只需要维护「加载更多」按钮与网格标记
-  const grid = document.querySelector<HTMLElement>(`[${GRID_ATTR}]`)
-  if (!document.getElementById(LOAD_MORE_ID) || !grid)
-    ensureLoadMore(grid)
+  // 卡片已就绪后只需要维护「加载更多」按钮（第 99 轮起不再网格化列表）
+  if (!document.getElementById(LOAD_MORE_ID))
+    ensureLoadMore(findVideoListContainer())
 }
 
 /**
@@ -226,10 +226,9 @@ function startCardPolling(): void {
   const tick = () => {
     cardPollTimer = null
     const cards = collectVideoCards()
-    if (cards.length >= 2) {
-      clearGridMarks()
-      const grid = markGridContainer()
-      ensureLoadMore(grid)
+    if (cards.length >= 6) {
+      const listContainer = findVideoListContainer()
+      ensureLoadMore(listContainer)
       return
     }
     if (Date.now() >= cardPollDeadline)

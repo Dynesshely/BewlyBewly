@@ -1651,3 +1651,34 @@ pointermove 目标 0.25 → 松手后 metrics: player=397x706, colPct=63.79
 
 真机实测评论接口 `member` 里只有 `avatar`（无 `face`）→ 取值链改为 `member.avatar → member.face → 首字占位`，
 渲染仍是 `<img class="bvp-cmt__avatar-img" loading="lazy" referrerpolicy="no-referrer">` + 40px 圆形容器。
+
+## 第 99 轮 B：推荐轨道封面经常加载不出来
+
+### 排查结论
+
+1. **不是协议相对 URL 问题**：`absoluteUrl()` 用 `new URL(href, location.href)` 处理，`//i0.hdslb.com/...` 会补成 `https://`；
+2. **不是 `loading=lazy` 问题**：第 95 轮已改 `eager + fetchpriority=high`（本轮保留）；
+3. **不是每拍重建 img**：Vue 用 `:key="card.bvid"`，同一 bvid 的 `<img>` 复用；
+4. **真根因：采集与「隐藏原生列表」赛跑 + 没有主动预加载**。`warmUpNativeCovers()` 只把 `data-src` 补到 `src`，
+   而 `findCover()` 读的是已渲染 `img` 的 `currentSrc/src`；那一拍图片还没完成时封面就是空串并被写进 `railState.cards`。
+   一旦原生列表被 `display:none`，B 站懒加载不再推进，`refreshRailCovers()` 只能从同一个空 DOM 再读 → 空封面长期存在
+   （周期刷新偶尔赶上图片加载完成的那一拍 → 「偶尔能显示」）；
+5. **容器高度为 0 时不发请求** 只在 fixed 布局把轨道压成 0 的瞬间成立（`--bvp-fixed-rail-space: 0px`），
+   本轮在 CSS 里给封面容器加 `min-height: 48px` 兜底。
+
+### 修法
+
+1. `rail.ts` 新增 **主动预加载**：`preloadCover(url)` 用 `new Image()` 抓图（不插 DOM、不影响布局），URL 记 `preloadedCovers` 防重复；
+   `warmUpNativeCovers()`（隐藏原生列表前）与 `collectRailCards()`/`refreshRailCovers()` 全链调用；
+2. **CDN 镜像重试**：`i0/i1/i2.hdslb.com` 互为镜像，`alternateCoverUrl()` 换域名；预加载 `error` 时换镜像再试一次，
+   并把镜像地址记入 `coverMirrors`，渲染时用 `resolveCoverUrl()` 取最终地址；
+3. `RecommendRail.vue`：封面 `<img>` 增加 `:style="{ backgroundImage: 'url(' + card.cover + ')' }"` 兜底
+   （图片解码失败/代理拦截时背景仍可能显示），保留 `loading=eager` / `fetchpriority=high` / `no-referrer`；
+4. 页面 scss 追加：`.bvp-rail__cover { min-height: 48px }` + `img` 的 `background-position/size/repeat`。
+
+### 真机验证限制（本轮未能给出 5 次刷新失败数）
+
+- 调试浏览器当前被用户占用（页面在 `space.bilibili.com`，`visibilityState` 时而 `hidden`），
+  CDP `Page.navigate`/`Page.reload` 会打断用户浏览；且调试浏览器加载的是**旧构建**（不含本轮代码），刷新也无法验证新逻辑；
+- 建议 build 后按下面方式验收：`<html data-bewly-rail-cover>` 应为 `20/20`；
+  逐卡检查 `.bvp-rail__cover img` 的 `complete === true && naturalWidth > 0`，5 次刷新失败数应为 0。

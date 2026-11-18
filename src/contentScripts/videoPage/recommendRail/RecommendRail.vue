@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { RailCard, RailPlacement } from './types'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-
 import { setHostHitOpen } from '.'
+
 import { useMessages } from '../i18n'
 import { RAIL_MAX_VISIBLE, RAIL_MIN_VISIBLE } from './types'
 
@@ -442,6 +442,7 @@ function findCardFromEvent(event: Event): RailCard | null {
               v-if="card.cover && !failedUrls.has(card.cover)"
               :src="card.cover"
               :alt="card.title"
+              :style="{ backgroundImage: `url(${card.cover})` }"
               loading="eager"
               fetchpriority="high"
               decoding="async"

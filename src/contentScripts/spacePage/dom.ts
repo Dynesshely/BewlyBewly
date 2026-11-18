@@ -489,34 +489,62 @@ export const GRID_ATTR = 'data-bewly-space-grid'
 /** 卡片标记属性：给每张卡片打上，便于统一卡片内部视觉 */
 export const CARD_ATTR = 'data-bewly-space-card'
 
+/** 列表定位的最小卡片数：少于这个数说明是分组行 / 侧栏小列表，不当作视频主列表 */
+const MIN_LIST_CARDS = 6
+
 /**
- * 给视频卡列表的共同父容器打网格标记。
+ * 合集 / 系列 / 分组容器：这些区域里的卡片行必须保持原生 flex 布局。
  *
- * 为什么用「共同父容器」而不是猜类名：空间页列表容器的类名随 B 站版本变化，
- * 而从已扫到的卡片反推父容器是稳定的（卡片选择器已经在 `CARD_GROUPS` 里维护）。
+ * 第 99 轮事故复盘：旧实现取「所有卡片的共同祖先」当网格容器，在「合集和系列」页
+ * 命中的是整块 `.contet-list`，把它 grid 化后每张卡被压成 ~24px 的细竖条
+ * （用户截图确认）。而空间页每张视频卡外面还有一层独立包装
+ * （`.items__item` / `.video-list__item` / `masterpiece-block__item`），
+ * 「同父级」条件在真实页面上永远不成立 —— 也就是说**无法可靠区分「主列表」与「分组行」**。
  *
- * @returns 打上标记的容器（没有 ≥2 张卡时返回 null，不做任何标记）
+ * 结论（第 99 轮）：**放弃网格改造**，保持 B 站原生列表布局；
+ * 自绘只保留头部信息卡 + 卡片内部视觉 + 加载更多按钮。
  */
-export function markGridContainer(): HTMLElement | null {
+const COLLECTION_GUARD = [
+  '[class*="collection"]',
+  '[class*="series"]',
+  '[class*="channel"]',
+  '[class*="section"]',
+  '[class*="lists"]',
+  '[class*="contet-list"]',
+  '[class*="video-list"]',
+].join(', ')
+
+/**
+ * 找「视频主列表容器」（仅用于插入加载更多按钮，**不改它的布局**）。
+ *
+ * @returns 列表容器；不满足条件（卡片太少 / 落在合集分组内）时返回 null
+ */
+export function findVideoListContainer(): HTMLElement | null {
   const cards = collectVideoCards()
-  if (cards.length < 2)
+  if (cards.length < MIN_LIST_CARDS)
     return null
 
-  // 找所有卡片的共同祖先：从第一张卡往上爬，直到包含全部卡片
-  let candidate: HTMLElement | null = cards[0]
+  // 从第一张卡往上爬，找到第一个「包含全部卡片」的祖先（即列表容器）
+  let candidate: HTMLElement | null = cards[0]?.parentElement ?? null
   while (candidate && !cards.every(card => candidate!.contains(card)))
-    candidate = candidate.parentElement
-  // 共同祖先可能就是卡片自己（嵌套情况）：退一级
-  if (candidate && cards.includes(candidate))
     candidate = candidate.parentElement
   if (!candidate || candidate === document.body)
     return null
-
-  candidate.setAttribute(GRID_ATTR, '')
-  cards.forEach((card) => {
-    card.setAttribute(CARD_ATTR, '')
-  })
+  if (candidate.closest(COLLECTION_GUARD))
+    return null
   return candidate
+}
+
+/**
+ * 网格标记函数（第 99 轮起**不再使用**）。
+ *
+ * 保留导出只是为了不破坏既有调用点；它不会再给任何元素打 `data-bewly-space-grid`，
+ * 因此页面级 CSS 里的网格规则永远不会命中 —— 这是有意的安全回退。
+ *
+ * @returns 永远是 null
+ */
+export function markGridContainer(): HTMLElement | null {
+  return null
 }
 
 /** 清除网格标记（卸载 / 切换 tab 时） */

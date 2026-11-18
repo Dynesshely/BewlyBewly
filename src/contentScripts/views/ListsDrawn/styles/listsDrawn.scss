@@ -1,0 +1,540 @@
+/**
+ * 三个列表页（稍后再看 / 历史 / 收藏）自绘新增的样式。
+ *
+ * 只写 listShared 里没有的东西：
+ * - 批量选择工具条与卡片选中态（稍后再看）；
+ * - 加载更多 / 到底提示；
+ * - 收藏页的「左侧收藏夹 + 右侧网格」两栏布局（窄屏堆叠）；
+ * - 收藏夹侧栏的列表项、更多菜单、确认框、新建输入。
+ *
+ * 颜色 / 圆角 / 阴影 / 动效一律用 `--bew-*` 变量，深浅主题自动跟随；
+ * 不写死任何色值（唯一例外是半透明遮罩用 `color-mix` 基于变量混出来）。
+ */
+
+/* #region 页面容器 */
+.lists-drawn-page {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* #endregion */
+
+/* #region 批量选择工具条（稍后再看） */
+.lists-batch-bar {
+  position: sticky;
+  top: var(--bew-top-bar-height, 64px);
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--bew-elevated);
+  border: 1px solid var(--bew-border-color);
+  border-radius: var(--bew-radius);
+  box-shadow: var(--bew-shadow-1);
+  backdrop-filter: var(--bew-filter-glass-1);
+}
+
+.lists-batch-bar__count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bew-text-1);
+}
+
+.lists-batch-bar__hint {
+  font-size: 11px;
+  color: var(--bew-text-3);
+}
+
+.lists-batch-bar__btn {
+  padding: 4px 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--bew-text-1);
+  cursor: pointer;
+  background: var(--bew-fill-1);
+  border: 1px solid var(--bew-border-color);
+  border-radius: 999px;
+  transition:
+    color var(--bew-motion-fast, 140ms) var(--bew-ease-out, ease),
+    background-color var(--bew-motion-fast, 140ms) var(--bew-ease-out, ease),
+    border-color var(--bew-motion-fast, 140ms) var(--bew-ease-out, ease);
+}
+
+.lists-batch-bar__btn:hover:not(:disabled) {
+  color: var(--bew-theme-color);
+  background: var(--bew-fill-2);
+  border-color: var(--bew-theme-color-40);
+}
+
+.lists-batch-bar__btn.is-danger:hover:not(:disabled) {
+  color: var(--bew-error-color);
+}
+
+.lists-batch-bar__btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.lists-batch-bar__btn:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+/* #endregion */
+
+/* #region 列表视图的分隔线
+ * listPage.scss 里的规则是 `.bewly-list-grid--list .bewly-list-card + .bewly-list-card`，
+ * 依赖两张卡片（article）互为兄弟。自绘版为了挂 data-bewly-list-card 与选择方框，
+ * 在卡片外面套了 .lists-drawn-card，article 不再互为兄弟，这里补一条等价规则。 */
+.bewly-list-grid--list .lists-drawn-card + .lists-drawn-card {
+  border-top: 1px solid var(--bew-border-color);
+}
+/* #endregion */
+
+/* #region 卡片选中态与方框（稍后再看批量模式） */
+.lists-drawn-card {
+  position: relative;
+  min-width: 0;
+  border-radius: var(--bew-radius);
+  transition: box-shadow var(--bew-motion-fast, 140ms) var(--bew-ease-out, ease);
+}
+
+.lists-drawn-card.is-select-mode {
+  /* 选择模式下整卡可点：点空白处也能切换选中 */
+  cursor: pointer;
+}
+
+.lists-drawn-card.is-selected {
+  box-shadow: 0 0 0 2px var(--bew-theme-color);
+}
+
+.lists-drawn-select {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 4;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  font-size: 16px;
+  color: var(--bew-text-2);
+  cursor: pointer;
+  background: var(--bew-elevated-solid);
+  border: 1px solid var(--bew-border-color);
+  border-radius: 8px;
+  box-shadow: var(--bew-shadow-1);
+  place-items: center;
+}
+
+.lists-drawn-select:hover:not(:disabled) {
+  color: var(--bew-theme-color);
+}
+
+.lists-drawn-select.is-checked {
+  color: var(--bew-theme-color);
+  border-color: var(--bew-theme-color);
+}
+
+.lists-drawn-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.lists-drawn-select:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+/* #endregion */
+
+/* #region 加载更多 / 到底 */
+.lists-load-more {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px 0 8px;
+}
+
+.lists-load-more__note {
+  font-size: 11px;
+  color: var(--bew-text-3);
+}
+
+.lists-end {
+  padding: 16px 0 8px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--bew-text-3);
+  text-align: center;
+}
+/* #endregion */
+
+/* #region 错误态 */
+.lists-drawn-error__native {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  font-size: 12px;
+  color: var(--bew-text-2);
+  text-decoration: none;
+  background: transparent;
+  border: 1px solid var(--bew-border-color);
+  border-radius: 999px;
+  transition:
+    color var(--bew-motion-fast, 140ms) var(--bew-ease-out, ease),
+    border-color var(--bew-motion-fast, 140ms) var(--bew-ease-out, ease);
+}
+
+.lists-drawn-error__native:hover {
+  color: var(--bew-theme-color);
+  border-color: var(--bew-theme-color-40);
+}
+
+.lists-drawn-error__native:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+/* #endregion */
+
+/* #region 收藏页两栏布局 */
+.lists-fav-layout {
+  display: grid;
+  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.lists-fav-main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* 窄屏：侧栏变成顶部横向滚动条 */
+@media (max-width: 900px) {
+  .lists-fav-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+}
+/* #endregion */
+
+/* #region 收藏夹侧栏 */
+.lists-fav-side {
+  position: sticky;
+  top: calc(var(--bew-top-bar-height, 64px) + 8px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: var(--bew-elevated);
+  border: 1px solid var(--bew-border-color);
+  border-radius: var(--bew-radius);
+}
+
+.lists-fav-side__title {
+  padding: 0 4px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bew-text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.lists-fav-side__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.lists-fav-side__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  border-radius: 8px;
+}
+
+.lists-fav-side__link {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 7px 8px;
+  font-size: 13px;
+  color: var(--bew-text-1);
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  transition:
+    color var(--bew-motion-fast, 140ms) var(--bew-ease-out, ease),
+    background-color var(--bew-motion-fast, 140ms) var(--bew-ease-out, ease);
+}
+
+.lists-fav-side__link:hover:not(:disabled) {
+  background: var(--bew-fill-1);
+}
+
+.lists-fav-side__link.is-active {
+  color: var(--bew-theme-color);
+  background: var(--bew-fill-2);
+}
+
+.lists-fav-side__link:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.lists-fav-side__link:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+
+.lists-fav-side__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lists-fav-side__count {
+  flex: none;
+  padding: 0 5px;
+  font-size: 10px;
+  line-height: 16px;
+  color: var(--bew-text-3);
+  background: var(--bew-fill-1);
+  border-radius: 6px;
+}
+
+.lists-fav-side__more {
+  flex: none;
+  display: grid;
+  width: 22px;
+  height: 22px;
+  font-size: 14px;
+  color: var(--bew-text-3);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity var(--bew-motion-fast, 140ms) var(--bew-ease-out, ease);
+  place-items: center;
+}
+
+.lists-fav-side__item:hover .lists-fav-side__more,
+.lists-fav-side__more:focus-visible,
+.lists-fav-side__more[aria-expanded="true"] {
+  opacity: 1;
+}
+
+.lists-fav-side__more:hover {
+  color: var(--bew-theme-color);
+  background: var(--bew-fill-2);
+}
+
+.lists-fav-side__more:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+
+.lists-fav-side__menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 4px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  min-width: 120px;
+  padding: 4px;
+  background: var(--bew-elevated-solid);
+  border: 1px solid var(--bew-border-color);
+  border-radius: 10px;
+  box-shadow: var(--bew-shadow-2);
+}
+
+.lists-fav-side__menu button {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--bew-text-1);
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+}
+
+.lists-fav-side__menu button:hover:not(:disabled) {
+  background: var(--bew-fill-1);
+}
+
+.lists-fav-side__menu button.is-danger {
+  color: var(--bew-error-color);
+}
+
+.lists-fav-side__menu button:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: -2px;
+}
+
+.lists-fav-side__confirm {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 4px;
+  z-index: 40;
+  width: min(260px, 80vw);
+  padding: 10px;
+  background: var(--bew-elevated-solid);
+  border: 1px solid var(--bew-border-color);
+  border-radius: 10px;
+  box-shadow: var(--bew-shadow-2);
+}
+
+.lists-fav-side__confirm-title {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--bew-text-1);
+}
+
+.lists-fav-side__confirm-desc {
+  margin: 0 0 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--bew-text-3);
+}
+
+.lists-fav-side__confirm-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.lists-fav-side__rename,
+.lists-fav-side__create {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  width: 100%;
+  padding: 2px 0;
+}
+
+.lists-fav-side__rename input,
+.lists-fav-side__create input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  font-size: 12px;
+  color: var(--bew-text-1);
+  background: var(--bew-fill-1);
+  border: 1px solid var(--bew-border-color);
+  border-radius: 8px;
+  outline: none;
+}
+
+.lists-fav-side__rename input:focus,
+.lists-fav-side__create input:focus {
+  border-color: var(--bew-theme-color);
+}
+
+.lists-fav-side__mini {
+  display: grid;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+  color: var(--bew-text-2);
+  cursor: pointer;
+  background: var(--bew-fill-1);
+  border: 1px solid var(--bew-border-color);
+  border-radius: 6px;
+  place-items: center;
+}
+
+.lists-fav-side__mini.is-primary {
+  color: var(--bew-theme-color);
+  border-color: var(--bew-theme-color-40);
+}
+
+.lists-fav-side__mini.is-danger {
+  color: var(--bew-error-color);
+}
+
+.lists-fav-side__mini:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.lists-fav-side__add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px;
+  font-size: 12px;
+  color: var(--bew-theme-color);
+  cursor: pointer;
+  background: transparent;
+  border: 1px dashed var(--bew-border-color);
+  border-radius: 8px;
+  transition: background-color var(--bew-motion-fast, 140ms) var(--bew-ease-out, ease);
+}
+
+.lists-fav-side__add:hover:not(:disabled) {
+  background: var(--bew-fill-1);
+}
+
+.lists-fav-side__add:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+
+/* 窄屏：侧栏横过来，菜单/确认框改为向下撑开 */
+@media (max-width: 900px) {
+  .lists-fav-side {
+    position: static;
+  }
+
+  .lists-fav-side__list {
+    flex-direction: row;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .lists-fav-side__item {
+    flex: none;
+    max-width: 220px;
+  }
+
+  .lists-fav-side__link {
+    gap: 6px;
+  }
+}
+/* #endregion */
+
+/* #region 减少动态效果 */
+@media (prefers-reduced-motion: reduce) {
+  .lists-batch-bar__btn,
+  .lists-drawn-card,
+  .lists-fav-side__link,
+  .lists-fav-side__more,
+  .lists-fav-side__add,
+  .lists-drawn-select {
+    transition: none;
+  }
+}
+/* #endregion */

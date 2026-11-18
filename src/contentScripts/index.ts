@@ -28,6 +28,10 @@ import { setupMessageDrawn } from './views/Message'
 import { setupMomentsDrawnPage, teardownMomentsDrawnPage } from './views/Moments/native'
 import { isPopularPage, setupPopularPage, teardownPopularPage } from './views/Popular'
 import { setupReadDrawnPage, teardownReadDrawnPage } from './views/Read'
+import {
+  setupSearchDrawnPage as setupSearchResultsDrawnPage,
+  teardownSearchDrawnPage as teardownSearchResultsDrawnPage,
+} from './views/Search'
 import { teardownSearchDrawnPage } from './views/SearchPage'
 import { setupSpaceDrawnPage, teardownSpaceDrawnPage } from './views/Space'
 
@@ -269,8 +273,12 @@ async function onDOMLoaded() {
   // 内部会自行判断是否原生消息页
   setupNotificationPage()
 
-  // 搜索结果页增强层（j/k 浏览、密度、快速筛选）
-  setupSearchEnhance()
+  // 搜索结果页整体自绘（第 101 轮）：API 拉数据 + 我们自己的组件渲染。
+  // 接管成功时自绘页会隐藏旧的增强层浮层；没接管时才挂增强层，避免两层抢键盘。
+  void setupSearchResultsDrawnPage().then((takenOver) => {
+    if (!takenOver)
+      setupSearchEnhance()
+  })
 
   // 搜索结果页视觉改造（第 92 轮 A）。
   // 第 94 轮二次结论：**只要给 <html> 加 bewly-search-drawn 类并注入样式，42 张结果卡
@@ -333,6 +341,7 @@ async function onDOMLoaded() {
     teardownLiveDrawnPage()
     teardownChannelDrawnPage()
     teardownSpaceDrawnPage()
+    teardownSearchResultsDrawnPage()
   }, { once: true })
 
   // Reset the original Bilibili top bar display style

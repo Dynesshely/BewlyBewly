@@ -464,3 +464,28 @@ html.bewly-design.searchPage.dark {
   }
 }
 // #endregion
+
+/* ===== 第 101 轮 ===== */
+/*
+ * 搜索结果页整体自绘（contentScripts/views/Search）。
+ *
+ * 自绘层的样式都写在模块内（views/Search/styles/search-drawn.scss，接管成功才注入），
+ * 这里只补两件「页面级」的事：
+ *
+ *   1. 接管后的页面底色 —— 覆盖层是 fixed + 透明，底色必须由页面提供，
+ *      只改模块样式的话原生页底色会从覆盖层边缘透出来；
+ *   2. 原生 DOM 的显式隐藏兜底 —— mount.ts 会给要隐藏的节点打
+ *      data-bewly-search-drawn-hidden 并写 inline display:none；
+ *      这条 !important 规则保证站点重建节点 / 覆盖 inline 样式时也不会「露馅」。
+ *
+ * 注意：**不要**在这里给原生结果卡写任何布局（第 92–94 轮的结论：那会让卡片高度塌成 0）。
+ */
+html.bewly-search-drawn {
+  body {
+    background-color: var(--bew-bg);
+  }
+
+  [data-bewly-search-drawn-hidden] {
+    display: none !important;
+  }
+}

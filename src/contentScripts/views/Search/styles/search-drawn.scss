@@ -1,0 +1,438 @@
+/**
+ * 搜索结果页（自绘）样式。
+ *
+ * 由 mount.ts 以 ?inline 引入、接管成功后才注入页面 <head>（卸载时移除），
+ * 所有颜色 / 圆角 / 阴影只用 --bew-* 设计令牌，深浅主题自动跟随
+ * （模块内不写死任何颜色）。
+ * 类名统一以 .search- / #bewly-search-drawn-root 为前缀，避免和原生页、其它 Bewly 页面撞名。
+ */
+
+html.bewly-search-drawn body {
+  background-color: var(--bew-bg);
+}
+
+/* #region 自挂载覆盖层外壳（mount.ts 创建的 DOM） */
+//
+//   #bewly-search-drawn-root.bewly-search-overlay  ← fixed 全屏、透明、不接事件
+//     └ .bewly-search-shell                       ← 顶栏下方开始、自己滚动的滚动容器
+//         └ .bewly-search-shell__inner            ← 页宽约束
+//
+#bewly-search-drawn-root.bewly-search-overlay {
+  position: fixed;
+  inset: 0;
+  /* 低于 #bewly 里顶栏的 z-index（99），高于页面内容 */
+  z-index: 90;
+  display: block;
+  font-family: inherit;
+  font-size: var(--bew-base-font-size, 14.8px);
+  line-height: 1.5;
+  color: var(--bew-text-1);
+  pointer-events: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+#bewly-search-drawn-root *,
+#bewly-search-drawn-root *::before,
+#bewly-search-drawn-root *::after {
+  box-sizing: border-box;
+}
+
+/* VideoCard 的右键菜单 / 浮层通过 Teleport 挂到 #bewly-search-drawn-root 上
+   （mount.ts 注入的 mainAppRef = 覆盖层宿主），它不在 .bewly-search-shell 里，
+   会继承宿主的 pointer-events: none 而完全点不动。这里把 shell 之外的直接子级恢复成可交互。 */
+#bewly-search-drawn-root > *:not(.bewly-search-shell) {
+  pointer-events: auto;
+}
+
+.bewly-search-shell {
+  position: absolute;
+  /* 由 mount.ts 按「有没有 Bewly 顶栏」设置：有顶栏 → 顶栏高度，没有 → 0 */
+  top: var(--bew-search-shell-top, var(--bew-top-bar-height, 64px));
+  right: 0;
+  bottom: 0;
+  left: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--bew-fill-3) transparent;
+}
+
+.bewly-search-shell__inner {
+  width: calc(100% - 150px);
+  max-width: var(--bew-page-max-width, 2280px);
+  margin: 0 auto;
+  padding: 16px 0 40px;
+}
+
+@media (min-width: 1024px) {
+  .bewly-search-shell__inner {
+    width: calc(100% - 200px);
+  }
+}
+
+@media (max-width: 900px) {
+  .bewly-search-shell__inner {
+    width: calc(100% - 32px);
+    padding: 8px 0 24px;
+  }
+}
+/* #endregion */
+
+/* #region 页面骨架 */
+.search-drawn-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 32px;
+}
+
+.search-drawn-head {
+  display: flex;
+  justify-content: center;
+}
+
+.search-drawn-summary {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--bew-text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.search-drawn-inline-error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--bew-error-color);
+  text-align: center;
+}
+
+.search-drawn-inline-error__retry {
+  margin-left: 8px;
+  padding: 2px 10px;
+  font-size: 13px;
+  color: var(--bew-text-1);
+  cursor: pointer;
+  background: var(--bew-fill-2);
+  border: 0;
+  border-radius: var(--bew-radius-sm);
+}
+
+.search-drawn-inline-error__retry:hover {
+  background: var(--bew-fill-3);
+}
+/* #endregion */
+
+/* #region 搜索框 */
+.search-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  max-width: 720px;
+  height: 44px;
+  padding: 0 6px 0 14px;
+  background: var(--bew-content);
+  border: 1px solid var(--bew-border-color);
+  border-radius: 999px;
+  box-shadow: var(--bew-shadow-1);
+  transition: border-color var(--bew-motion-fast) var(--bew-ease-out);
+}
+
+.search-bar:focus-within {
+  border-color: var(--bew-theme-color);
+}
+
+.search-bar__icon {
+  flex: 0 0 auto;
+  font-size: 17px;
+  color: var(--bew-text-3);
+}
+
+.search-bar__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  font-family: inherit;
+  font-size: 14.5px;
+  color: var(--bew-text-1);
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+
+.search-bar__input::placeholder {
+  color: var(--bew-text-3);
+}
+
+/* 原生 search input 的清除按钮在深色下是黑块，换成主题色 */
+.search-bar__input::-webkit-search-cancel-button {
+  cursor: pointer;
+  filter: var(--bew-search-cancel-filter, none);
+}
+
+.search-bar__submit {
+  flex: 0 0 auto;
+  height: 32px;
+  padding: 0 18px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--bew-text-1);
+  cursor: pointer;
+  background: var(--bew-fill-2);
+  border: 0;
+  border-radius: 999px;
+  transition:
+    color var(--bew-motion-fast) var(--bew-ease-out),
+    background-color var(--bew-motion-fast) var(--bew-ease-out);
+}
+
+.search-bar__submit:hover {
+  color: var(--bew-theme-color);
+  background: var(--bew-theme-color-10);
+}
+
+.search-bar__submit:focus-visible,
+.search-bar__input:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+/* #endregion */
+
+/* #region 筛选栏 */
+.search-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bew-elevated);
+  border: 1px solid transparent;
+  border-radius: var(--bew-radius);
+  backdrop-filter: var(--bew-filter-glass-1);
+}
+
+.search-filters__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.search-filters__label {
+  flex: 0 0 auto;
+  min-width: 40px;
+  font-size: 12.5px;
+  color: var(--bew-text-3);
+}
+
+.search-filters__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.search-filters__chip {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--bew-text-2);
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  transition:
+    color var(--bew-motion-fast) var(--bew-ease-out),
+    background-color var(--bew-motion-fast) var(--bew-ease-out);
+}
+
+.search-filters__chip:hover {
+  color: var(--bew-text-1);
+  background: var(--bew-fill-1);
+}
+
+.search-filters__chip.is-active {
+  font-weight: 600;
+  color: var(--bew-theme-color);
+  background: var(--bew-theme-color-10);
+}
+
+.search-filters__chip:focus-visible,
+.search-filters__select select:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+
+/* 分区下拉：原生 select + 自绘箭头（不用自绘下拉，浮层里不会被 overflow 裁掉） */
+.search-filters__select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.search-filters__select select {
+  height: 30px;
+  padding: 0 30px 0 12px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--bew-text-1);
+  cursor: pointer;
+  background: var(--bew-fill-1);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  appearance: none;
+}
+
+.search-filters__select select:hover {
+  background: var(--bew-fill-2);
+}
+
+.search-filters__select-arrow {
+  position: absolute;
+  right: 10px;
+  font-size: 13px;
+  color: var(--bew-text-3);
+  pointer-events: none;
+}
+/* #endregion */
+
+/* #region 结果网格 */
+.search-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.search-grid__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 24px 20px;
+  align-items: start;
+}
+
+@media (min-width: 1600px) {
+  .search-grid__cards {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .search-grid__cards {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px 12px;
+  }
+}
+
+.search-grid__native {
+  color: var(--bew-theme-color);
+  text-decoration: none;
+}
+
+.search-grid__native:hover {
+  text-decoration: underline;
+}
+/* #endregion */
+
+/* #region 分页 */
+.search-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.search-pagination__step,
+.search-pagination__page {
+  min-width: 34px;
+  height: 34px;
+  padding: 0 12px;
+  font-family: inherit;
+  font-size: 13.5px;
+  line-height: 1;
+  color: var(--bew-text-2);
+  cursor: pointer;
+  background: var(--bew-fill-1);
+  border: 0;
+  border-radius: var(--bew-radius-sm);
+  transition:
+    color var(--bew-motion-fast) var(--bew-ease-out),
+    background-color var(--bew-motion-fast) var(--bew-ease-out);
+  font-variant-numeric: tabular-nums;
+}
+
+.search-pagination__page {
+  padding: 0 10px;
+}
+
+.search-pagination__step:hover:not(:disabled),
+.search-pagination__page:hover:not(:disabled) {
+  color: var(--bew-text-1);
+  background: var(--bew-fill-2);
+}
+
+.search-pagination__page.is-active {
+  font-weight: 600;
+  color: var(--bew-theme-color);
+  background: var(--bew-theme-color-10);
+}
+
+.search-pagination__step:disabled,
+.search-pagination__page:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.search-pagination__step:focus-visible,
+.search-pagination__page:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+
+.search-pagination__gap {
+  min-width: 20px;
+  font-size: 13px;
+  color: var(--bew-text-3);
+  text-align: center;
+}
+
+.search-pagination__status {
+  margin-left: 8px;
+  font-size: 12.5px;
+  color: var(--bew-text-3);
+  font-variant-numeric: tabular-nums;
+}
+/* #endregion */
+
+@media (prefers-reduced-motion: reduce) {
+  .search-bar,
+  .search-filters__chip,
+  .search-pagination__step,
+  .search-pagination__page {
+    transition: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .search-bar,
+  .search-filters {
+    border: 1px solid var(--bew-text-3);
+    box-shadow: none;
+  }
+
+  .search-drawn-summary,
+  .search-pagination__status,
+  .search-pagination__gap {
+    color: var(--bew-text-2);
+  }
+}

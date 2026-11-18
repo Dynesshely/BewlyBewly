@@ -715,14 +715,20 @@ onUnmounted(() => {
       <Transition name="fade">
         <template v-if="showBewlyPage">
           <div ref="scrollbarRef" class="bewly-scroll-container" @scroll="handleOsScroll">
-            <main m-auto max-w="$bew-page-max-width">
+            <main m-auto max-w="$bew-page-max-width" data-bewly-page-host>
               <div
                 p="t-[calc(var(--bew-top-bar-height)+10px)]" m-auto
                 w="lg:[calc(100%-200px)] [calc(100%-150px)]"
               >
-                <Transition name="page-fade">
-                  <Component :is="pages[activatedPage]" />
-                </Transition>
+                <!-- 第 104 轮：给「当前激活页」一个可定位宿主，
+                     让需要整体接管某个页面的模块（如 HomeDrawn）只隐藏这个宿主，
+                     而不是隐藏 .bewly-scroll-container（那是所有 dock 页共用的滚动容器）。
+                     宿主放在 Transition 外面：Transition 要求子元素带 v-if/v-show。 -->
+                <div data-bewly-active-page :data-bewly-page="activatedPage">
+                  <Transition name="page-fade">
+                    <Component :is="pages[activatedPage]" />
+                  </Transition>
+                </div>
               </div>
             </main>
             <div ref="reachBottomSentinel" aria-hidden="true" style="height: 1px" />

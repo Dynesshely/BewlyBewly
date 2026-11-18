@@ -129,11 +129,25 @@ function getBewlyShadowRoot(): ShadowRoot | null {
   }
 }
 
-/** 找 App.vue 渲染的旧首页区域（.bewly-scroll-container 的父层） */
+/**
+ * 找 App.vue 渲染的「当前激活页」宿主（第 104 轮修正）。
+ *
+ * 原来返回的是 .bewly-scroll-container 的**父层** —— 那是所有 dock 页共用的容器，
+ * 隐藏它会让切到收藏夹/动态等页面后目标页也不可见（e2e 因此稳定挂 3 个用例）。
+ * 现在 App.vue 给激活页套了 [data-bewly-active-page] 宿主，只隐藏这个宿主即可。
+ */
 function findBewlyPageArea(): HTMLElement | null {
   const shadowRoot = getBewlyShadowRoot()
-  const scroll = shadowRoot?.querySelector<HTMLElement>('.bewly-scroll-container') ?? null
-  return scroll?.parentElement ?? null
+  if (!shadowRoot)
+    return null
+  const host = shadowRoot.querySelector<HTMLElement>('[data-bewly-active-page]')
+  if (!host)
+    return null
+  // 只在当前激活页确实是首页时隐藏（避免误隐藏别的 dock 页）
+  const page = host.getAttribute('data-bewly-page')
+  if (page && page !== 'Home')
+    return null
+  return host
 }
 
 /** 隐藏旧首页（幂等；只动本模块标记过的节点） */

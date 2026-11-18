@@ -313,7 +313,11 @@ async function onDOMLoaded() {
   //    测试里的 clickDockItem + 断言自然超时。
   // 要正确接管，必须只隐藏「首页自己的内容节点」而不是共用滚动容器；
   // 这需要改 App.vue 的渲染结构（给首页内容加独立包裹层），属于结构性改动。
-  // 模块代码保留在 views/HomeDrawn/，修好后再启用。
+  // 首页推荐流 API 自绘 —— **最终禁用**（第 103/104 轮共试了 5 种修法，e2e 的 3 个用例始终挂）：
+  //   ① 移除 window 捕获拦截器；② 路由同步改 0ms；③ 只隐藏 [data-bewly-active-page] 宿主；
+  //   ④ 把宿主移出 <Transition>；⑤ 清空 installInterceptors 调用。
+  // 均无效 → 说明冲突点在别处（很可能是 fixture 注入的假卡片 + 覆盖层的隐藏互相影响），
+  // 需要专门花时间用 e2e 的 fixture 复现。模块与 App.vue 的结构改进（[data-bewly-active-page]）保留。
   // void setupHomeDrawnPage()
 
   // 专栏页自绘（第 93 轮 G）：列表页整体接管，文章页只注入排版样式

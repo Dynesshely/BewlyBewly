@@ -547,15 +547,44 @@ export function clearFixedLayout(): void {
  * 顺序固定为「先读、后写」：所有 rect 读取都在写变量之前完成，
  * 写完之后不再读任何自己改动过的量。
  */
+/** 布局状态滞后确认：连续这么多次判定一致才真正切换（250ms/拍 → 约 1s） */
+const STATE_SWITCH_THRESHOLD = 4
+let pendingFixed: boolean | null = null
+let pendingCount = 0
+
 export function syncFixedLayout(): void {
   const mirror = getMirror()
   const playerWrap = getPlayerWrapEl()
+  const wantFixed = Boolean(shouldEnable() && mirror && playerWrap)
 
-  if (!shouldEnable() || !mirror || !playerWrap) {
-    if (applied || document.documentElement.classList.contains(FIXED_LAYOUT_CLASS))
-      clearFixedLayout()
-    return
+  // 第 98 轮：布局状态防振荡（hysteresis）。
+  //
+  // 生产环境出现过 500ms 周期的「固定布局 ↔ 非固定布局」闪烁：某拍 shouldEnable()
+  // 因测量抖动返回 false → clearFixedLayout() → 下一拍又 true → 反复。
+  // 这里要求连续 STATE_SWITCH_THRESHOLD 次判定一致才真正切换状态，
+  // 单拍抖动被吃掉，用户看不到闪。
+  if (wantFixed !== applied) {
+    if (pendingFixed !== wantFixed) {
+      pendingFixed = wantFixed
+      pendingCount = 1
+    }
+    else {
+      pendingCount += 1
+    }
+    if (pendingCount < STATE_SWITCH_THRESHOLD) {
+      // 未确认前保持现状；已生效时照常重算，避免布局停在中间态
+      if (applied && mirror && playerWrap)
+        applyLayout(mirror, playerWrap)
+      return
+    }
   }
+  else {
+    pendingFixed = null
+    pendingCount = 0
+  }
+
+  if (!mirror || !playerWrap)
+    return
 
   if (!applied) {
     // 只在第一次接管时记录原始行内高度，避免把我们的值记成「原始值」

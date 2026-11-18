@@ -4881,8 +4881,14 @@ html.bewly-design.videoPage #bewly-comment-column #commentapp {
  * 不能 display:none —— #viewbox_report 是 .left-container 的直接子元素，
  * 完全脱离布局会让左列宽度塌成 0。用「保留在流里但高度 0」。
  * （fixedLayout 另有宽度 0 兜底，双保险。） */
-#viewbox_report[data-bewly-info-moved] {
-  /* 第 97 轮：真机隔离实验确认隐藏 report 安全（mirror/left/player 尺寸不变） */
+/* 第 98 轮：report 只在**固定布局生效时**隐藏。
+ *
+ * 生产环境实测会周期性闪成「左列全黑、只剩推荐轨道」：
+ * fixedLayout 某一拍判定失败 → clearFixedLayout() 退出固定布局，
+ * 但 #viewbox_report 仍被隐藏 → 播放器/信息栏/工具栏全部不可见 → 黑屏；
+ * 下一拍又恢复 → 500ms 周期闪烁。
+ * 把 report 的隐藏与 html.bewly-video-fixed 绑定后，非固定布局时 report 自动回来。 */
+html.bewly-video-fixed #viewbox_report[data-bewly-info-moved] {
   display: none !important;
 }
 

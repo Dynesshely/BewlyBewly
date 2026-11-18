@@ -4882,7 +4882,8 @@ html.bewly-design.videoPage #bewly-comment-column #commentapp {
  * 完全脱离布局会让左列宽度塌成 0。用「保留在流里但高度 0」。
  * （fixedLayout 另有宽度 0 兜底，双保险。） */
 #viewbox_report[data-bewly-info-moved] {
-  /* 第 96 轮禁用：report 让位后左列失去宽度来源，整条链塌成 0（见 infoBar.ts 注释） */
+  /* 第 97 轮：真机隔离实验确认隐藏 report 安全（mirror/left/player 尺寸不变） */
+  display: none !important;
 }
 
 /* 无限滚动：footer 里的提示行（不是按钮，用户无需点击） */

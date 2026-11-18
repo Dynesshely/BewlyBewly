@@ -343,7 +343,13 @@ function restoreNativeNodes(): void {
 
 /** 渲染 / 更新自绘信息栏（内容不变就不写 DOM） */
 function renderInfoBar(report: HTMLElement, data: VideoInfoData): void {
-  let bar = report.querySelector<HTMLElement>(`#${INFO_BAR_ID}`)
+  // 第 97 轮根因修复：必须用 **document** 查，不能用 report 查。
+  //
+  // 信息栏会被移到 #playerWrap 之后（report 外部）。原来写成 report.querySelector，
+  // 移到外面后就找不到 → 每拍都 createElement 新建一个塞回 report 里
+  // → 真机实测 .left-container 里堆了 **35 个 #bewly-info-bar（全 0×0）**，
+  // 直接导致左列宽度塌陷、播放器 0×0、top=0。这是前几轮所有「下移即塌陷」的真正原因。
+  let bar = document.querySelector<HTMLElement>(`#${INFO_BAR_ID}`)
   if (!bar) {
     bar = document.createElement('div')
     bar.id = INFO_BAR_ID
@@ -392,23 +398,21 @@ function renderInfoBar(report: HTMLElement, data: VideoInfoData): void {
 
   // 第 95 轮：标题 + 信息默认放到播放器下方。
   //
-  // ⚠️ 第 96 轮二次尝试仍失败，暂时禁用「信息栏放到播放器下方」。
-  //
-  // 两轮实测结论：
-  // ① 不加 fixedLayout 兜底 → mirror grid 第一列锁死 0px，整页 0×0；
-  // ② 加兜底（视口宽算 totalWidth）→ CSS 变量算对了
-  //    （--bvp-fixed-content-width: 1968px、--bvp-fixed-player-width: 1118px、metrics player=629x1118），
-  //    但 **DOM 实际 clientWidth 仍是 0** —— 说明 #mirror-vdcon 的宽度不由这个变量驱动，
-  //    而是由更上层容器决定；report 让位后整条链没有东西撑宽。
-  // 结论：要安全下移，必须先让 .left-container / #mirror-vdcon 有独立的宽度来源（不依赖 report），
-  // 这是一次结构性改动，不适合夹在其它修复里做。
+  // 第 97 轮：真机隔离实验确认「隐藏 #viewbox_report 本身完全安全」
+  // （注入 display:none 后 mirror / left-container / player 尺寸全不变，只有 report 变 0×0），
+  // 之前判断的「report 让位导致塌陷」是误判 —— 真正原因是移动 infoBar 的那一拍
+  // 与 fixedLayout 测量发生竞态。这里在移动后主动触发一次 resize，让 fixedLayout 立刻重算。
   const playerWrap = getPlayerWrapEl()
-  const canPlaceBelowPlayer = false
+  const canPlaceBelowPlayer = Boolean(playerWrap && playerWrap.parentElement && !playerWrap.classList.contains('left-container'))
   if (canPlaceBelowPlayer && playerWrap) {
     if (!infoBarPlacedAfterPlayer || bar.previousElementSibling !== playerWrap)
       playerWrap.insertAdjacentElement('afterend', bar)
     infoBarPlacedAfterPlayer = true
     report.dataset.bewlyInfoMoved = '1'
+    // 移动后立刻触发一次布局重算，避免 fixedLayout 用「移动中」的中间态测量导致塌陷
+    requestAnimationFrame(() => {
+      window.dispatchEvent(new Event('resize'))
+    })
   }
 }
 

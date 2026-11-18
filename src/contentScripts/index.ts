@@ -302,11 +302,18 @@ async function onDOMLoaded() {
   // 动态页 API 版自绘（第 102 轮）：成功才隐藏原生 #app；不接管时第 93 轮方案照旧
   void setupDynamicDrawnPage()
 
-  // 首页推荐流 API 自绘（第 103 轮）——**暂时禁用**：
-  // 接线后 e2e 出现 3 个稳定失败（favorites-category-manage ×2、feedback-states ×1），
-  // 而在上一提交（531af01d，不含此接线）上它们全部通过，说明 HomeDrawn 的
-  // window 捕获阶段拦截器（wheel/keydown stopPropagation）影响了 dock 页面。
-  // 模块代码保留（views/HomeDrawn/），修好拦截器作用域后再启用。
+  // 首页推荐流 API 自绘（第 103 轮）——**继续禁用**。
+  //
+  // 第 104 轮排查结论（留给后来人，别再重试同一条路）：
+  // ① 移除 window 捕获拦截器 **不能** 解决 e2e 失败（favorites-category-manage ×2 /
+  //    feedback-states ×1 仍稳定挂）；
+  // ② 把路由同步从 300ms 防抖改成 0ms 也**不能**解决；
+  // ③ 真因是 HomeDrawn 隐藏的是 `.bewly-scroll-container` —— 那是 **die dock 页共用**的
+  //    滚动容器，接管首页后切到收藏夹/动态等页面，目标页渲染在同一个容器里也不可见，
+  //    测试里的 clickDockItem + 断言自然超时。
+  // 要正确接管，必须只隐藏「首页自己的内容节点」而不是共用滚动容器；
+  // 这需要改 App.vue 的渲染结构（给首页内容加独立包裹层），属于结构性改动。
+  // 模块代码保留在 views/HomeDrawn/，修好后再启用。
   // void setupHomeDrawnPage()
 
   // 专栏页自绘（第 93 轮 G）：列表页整体接管，文章页只注入排版样式

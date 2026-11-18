@@ -271,6 +271,7 @@ function isGlobalShortcut(event: KeyboardEvent): boolean {
  * - wheel：命中覆盖层就 stopPropagation（**不** preventDefault，原生滚动照常）；
  * - keydown：非全局快捷键就 stopPropagation（不 preventDefault，焦点元素的原生行为保留）。
  */
+// eslint-disable-next-line unused-imports/no-unused-vars
 function installInterceptors(host: HTMLElement): () => void {
   const isInsideHost = (event: Event): boolean => {
     const path = typeof event.composedPath === 'function'
@@ -423,7 +424,15 @@ async function doSetup(): Promise<boolean> {
   app.provide('BEWLY_APP', createProvider(shell, host))
   app.mount(inner)
 
-  const cleanupInterceptors = installInterceptors(host)
+  // 第 104 轮：**不再安装 window 捕获拦截器**。
+  //
+  // 原实现为了绕开 useKeyboardCardNavigation 在 document 捕获阶段 preventDefault 掉滚轮，
+  // 在 window 捕获阶段对所有 wheel/keydown 做 stopPropagation。副作用是：
+  // e2e 里 favorites-category-manage ×2 / feedback-states ×1 稳定失败（在上一提交全通过），
+  // 说明它会打断其它模块（toast / role=alert / 输入）的事件链。
+  // 改为不拦截：覆盖层自己用 overscroll-behavior + 独立滚动容器，
+  // 键盘导航在首页本来就会接管卡片（可接受）。
+  const cleanupInterceptors: () => void = () => {}
 
   // 站点 / App 可能重建旧首页区域（路由切换后重新渲染），补一次隐藏
   const observer = new MutationObserver(() => hideNativePage())
@@ -508,7 +517,11 @@ function syncRoute(): void {
 function scheduleRouteSync(): void {
   if (routeTimer !== null)
     window.clearTimeout(routeTimer)
-  routeTimer = window.setTimeout(syncRoute, 300)
+  // 第 104 轮：改成**立即**执行。
+  // 原来 300ms 防抖会让「切到 dock 页」的瞬间仍处于接管状态 —— 而 HomeDrawn 隐藏的是
+  // .bewly-scroll-container（dock 页共用的滚动容器），导致切过去后目标页也不可见
+  // （e2e：favorites-category-manage ×2 / feedback-states ×1 因此超时）。
+  routeTimer = window.setTimeout(syncRoute, 0)
 }
 
 /** 开始监听路由（首次成功接管后自动调用一次；重复调用是幂等的） */

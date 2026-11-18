@@ -1,0 +1,38 @@
+// 全站交互反馈令牌（UI 统一轮）。
+//
+// 审计结论：8 个自绘页里悬停反馈有 4 套写法 ——
+//   · 整卡位移 -2px + 阴影提升（专栏、直播）
+//   · 封面缩放 1.03（专栏、直播）
+//   · 只有背景变色（视频卡、动态卡的按钮）
+//   · 0.2s ease / 0.3s ease / var(--bew-motion-*) 三种时长混用
+// 本轮统一为：整卡 `translateY(calc(var(--bew-hover-lift)))` + 阴影升到 shadow-2，
+// 封面 `scale(var(--bew-hover-cover-scale))`，时长一律 --bew-motion-base + --bew-ease-out。
+
+$hover-lift: -2px;
+$hover-cover-scale: 1.03;
+
+// 控件高度三档：审计里 tab / pill / chip / 分页按钮出现过 28 / 30 / 32 / 34 / 36 / 38 / 40px，
+// 同一类元素（圆形胶囊按钮）在不同页差 2~6px。收敛为 sm(32) / md(36) / lg(44)。
+$control-h-sm: 32px;
+$control-h-md: 36px;
+$control-h-lg: 44px;
+
+// 卡片自身可点击时使用的完整悬停过渡（位移 + 阴影）
+$hover-transition: "transform var(--bew-motion-base) var(--bew-ease-out), box-shadow var(--bew-motion-base) var(--bew-ease-out)";
+
+/// 在 `:root` / `:host` 上输出交互令牌
+@mixin tokens {
+  --bew-hover-lift: #{$hover-lift};
+  --bew-hover-cover-scale: #{$hover-cover-scale};
+  --bew-control-h-sm: #{$control-h-sm};
+  --bew-control-h-md: #{$control-h-md};
+  --bew-control-h-lg: #{$control-h-lg};
+  --bew-focus-ring-width: 2px;
+  --bew-focus-ring-offset: 2px;
+}
+
+/// 统一的键盘焦点描边（各页面 focus-visible 只写 @include 即可）
+@mixin focus-ring {
+  outline: var(--bew-focus-ring-width, 2px) solid var(--bew-theme-color);
+  outline-offset: var(--bew-focus-ring-offset, 2px);
+}

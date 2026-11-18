@@ -26,7 +26,11 @@ const props = defineProps<{
   nativeUrl: string
 }>()
 
-defineEmits<{ (e: 'retry'): void }>()
+defineEmits<{
+  (e: 'retry'): void
+  /** 空态里「清空筛选条件」：由父组件把排序 / 时长 / 分区恢复默认并重拉 */
+  (e: 'clearFilters'): void
+}>()
 
 const { t } = useSearchDrawnI18n()
 
@@ -57,6 +61,7 @@ const cards = computed(() => props.items.map(item => ({
       :title="t.errorTitle"
       :message="errorMessage"
       :retry-label="t.retry"
+      :fallback-hint="t.errorFallbackHint"
       @retry="$emit('retry')"
     >
       <a class="search-grid__native" :href="nativeUrl">
@@ -64,11 +69,19 @@ const cards = computed(() => props.items.map(item => ({
       </a>
     </ErrorState>
 
+    <!-- 空态：「换关键词」要回到顶部输入框，「清空筛选」一点就好 — 直接给按钮 -->
     <EmptyState
       v-else
       :title="t.emptyTitle"
       :description="t.emptyDescription"
       icon="i-mingcute:search-line"
-    />
+    >
+      <button class="search-grid__clear" type="button" @click="$emit('clearFilters')">
+        {{ t.emptyClearFilters }}
+      </button>
+      <a class="search-grid__native" :href="nativeUrl">
+        {{ t.emptyNative }}
+      </a>
+    </EmptyState>
   </section>
 </template>

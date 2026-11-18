@@ -11,7 +11,10 @@
  * 原生 DOM 的隐藏由 `mount.ts` 负责。
  */
 import type { PopularTabId, RankRegionDef, RankRegionId } from './constants'
+import BackToTopButton from '~/components/BackToTopButton/BackToTopButton.vue'
 import { useBewlyApp } from '~/composables/useAppProvider'
+import { useBackToTopButton } from '~/composables/useBackToTopButton'
+import { useDrawnPageKeyboardNav } from '~/composables/useDrawnPageKeyboardNav'
 import PopularFeed from './components/PopularFeed.vue'
 import PopularNav from './components/PopularNav.vue'
 import PreciousView from './components/PreciousView.vue'
@@ -45,6 +48,25 @@ onUnmounted(() => {
 // 之后若被 KeepAlive 缓存，重新激活时地址可能已经变了（例如从别处返回）
 onActivated(syncFromLocation)
 
+// #region 键盘导航（J / K / ↑ / ↓ / Enter / Esc / Home / End）
+//
+// 热门 / 排行榜此前没有任何键盘路径：想打开第 7 个视频只能鼠标点。
+// 表里的卡片与首页同一套 VideoCard，所以直接复用统一的导航语义。
+const pageNav = useDrawnPageKeyboardNav()
+
+// 视图切换 / 榜单分区切换后列表整体替换 → 收敛高亮下标
+watch([
+  tab,
+  () => region.value.id,
+], () => pageNav.reconcile())
+// #endregion
+
+// #region 回到顶部
+//
+// 热门页是无限滚动，滚过两屏就想回顶；此前这一页没有回顶入口。
+const { showTop, scrollToTop } = useBackToTopButton()
+// #endregion
+
 /** 只改地址栏，不触发整页导航；即使失败也不影响内部状态 */
 function replacePath(path: string) {
   try {
@@ -68,6 +90,8 @@ function selectTab(next: PopularTabId) {
   tab.value = next
   replacePath(pathForTab(next, region.value))
   handleBackToTop()
+  // 切 tab 后卡片整批换掉，旧高亮指向的内容已经不在页面上
+  pageNav.clear()
 }
 
 function selectRegion(next: RankRegionId) {
@@ -77,6 +101,7 @@ function selectRegion(next: RankRegionId) {
   region.value = def
   replacePath(pathForRegion(def))
   handleBackToTop()
+  pageNav.clear()
 }
 </script>
 
@@ -84,9 +109,11 @@ function selectRegion(next: RankRegionId) {
   <div class="popular-page">
     <PopularNav :active="tab" @select="selectTab" />
 
-    <PopularFeed v-if="tab === 'popular'" />
+    <PopularFeed v-if="tab === 'popular'" @go-rank="selectTab('rank')" />
     <WeeklyView v-else-if="tab === 'weekly'" />
     <PreciousView v-else-if="tab === 'precious'" />
     <RankView v-else :region="region" @select-region="selectRegion" />
+
+    <BackToTopButton :show-top="showTop" @top="scrollToTop" />
   </div>
 </template>

@@ -3,7 +3,8 @@
  *
  * 由 `mount.ts` 以 `?inline` 引入、接管成功后才注入页面 `<head>`（卸载时移除），
  * 所有颜色 / 圆角 / 阴影只用 `--bew-*` 设计令牌，深浅主题自动跟随（模块内不写死任何颜色）；
- * 唯一例外是封面上的白色文字与黑色半透明遮罩（原生卡片同样是 `rgba(0,0,0,.6) + #fff`）。
+ * 媒体上的前景色（白字 / 半透明黑遮罩）用 --bew-text-on-media / --bew-media-scrim，
+ * 不再各页各写 `#fff`，深浅主题同一套值。
  * 类名统一以 `.channel-` / `#bewly-channel-drawn-root` 为前缀，避免和原生页、其它 Bewly 页面撞名。
  */
 
@@ -25,7 +26,7 @@ html.bewly-channel-drawn body {
   display: block;
   font-family: inherit;
   font-size: var(--bew-base-font-size, 14.8px);
-  line-height: 1.5;
+  line-height: var(--bew-lh-body);
   color: var(--bew-text-1);
   pointer-events: none;
   -webkit-font-smoothing: antialiased;
@@ -53,21 +54,22 @@ html.bewly-channel-drawn body {
 }
 
 .bewly-channel-shell__inner {
-  width: calc(100% - 150px);
+  width: calc(100% - var(--bew-page-inset, 75px) * 2);
   max-width: var(--bew-page-max-width, 2280px);
   margin: 0 auto;
-  padding: 10px 0 24px;
+  padding: var(--bew-page-pad-top, 16px) 0 var(--bew-page-pad-bottom, 32px);
 }
 
 @media (min-width: 1024px) {
   .bewly-channel-shell__inner {
-    width: calc(100% - 200px);
+    width: calc(100% - var(--bew-page-inset-wide, 100px) * 2);
   }
 }
 
 @media (max-width: 900px) {
   .bewly-channel-shell__inner {
-    width: calc(100% - 32px);
+    width: calc(100% - var(--bew-page-inset-narrow, 16px) * 2);
+    padding: var(--bew-space-8, 8px) 0 var(--bew-space-24, 24px);
   }
 }
 /* #endregion */
@@ -76,21 +78,21 @@ html.bewly-channel-drawn body {
 .channel-drawn-page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding-bottom: 48px;
+  gap: var(--bew-section-gap, 16px);
+  padding-bottom: var(--bew-page-pad-bottom, 32px);
 }
 
 .channel-drawn-head {
   display: flex;
+  gap: var(--bew-space-16, 16px);
   align-items: center;
-  gap: 16px;
   flex-wrap: wrap;
-  padding: 4px 2px;
+  padding: var(--bew-space-4, 4px) 2px;
 }
 
 .channel-drawn-head__title {
   margin: 0;
-  font-size: 22px;
+  font-size: var(--bew-fs-hero);
   font-weight: 600;
   color: var(--bew-text-1);
 }
@@ -118,14 +120,15 @@ html.bewly-channel-drawn body {
 .channel-nav__pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--bew-space-8, 8px);
   flex: 0 0 auto;
-  height: 34px;
-  padding: 0 14px;
+  /* 与动态 / 热门 / 消息页的 tab 胶囊统一 32px（原来 34px，同一行里和其它页差 2px） */
+  height: var(--bew-control-h-sm, 32px);
+  padding: 0 var(--bew-space-12, 12px);
   border-radius: var(--bew-radius-pill, 999px);
   background-color: var(--bew-fill-1);
   color: var(--bew-text-2);
-  font-size: 14px;
+  font-size: var(--bew-fs-control);
   text-decoration: none;
   white-space: nowrap;
   transition:
@@ -145,12 +148,12 @@ html.bewly-channel-drawn body {
 
 .channel-nav__pill--active {
   background-color: var(--bew-theme-color);
-  color: #fff;
+  color: var(--bew-text-on-theme);
 }
 
 .channel-nav__pill--active:hover {
   background-color: var(--bew-theme-color);
-  color: #fff;
+  color: var(--bew-text-on-theme);
 }
 
 /* PGC 分类（番剧 / 电影 / …）不是 /c/* 分区页，弱化一档区分开 */
@@ -189,7 +192,7 @@ html.bewly-channel-drawn body {
   padding: 4px 10px;
   border-radius: var(--bew-radius-sm, 8px);
   color: var(--bew-text-2);
-  font-size: 13px;
+  font-size: var(--bew-fs-secondary);
   text-decoration: none;
   white-space: nowrap;
 }
@@ -209,13 +212,13 @@ html.bewly-channel-drawn body {
 .channel-feed {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--bew-section-gap, 16px);
 }
 
 .channel-feed__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 24px 20px;
+  gap: var(--bew-grid-gap-row, 24px) var(--bew-grid-gap-col, 20px);
   align-items: start;
 }
 
@@ -235,7 +238,7 @@ html.bewly-channel-drawn body {
   margin: 0;
   text-align: center;
   color: var(--bew-text-3);
-  font-size: 13px;
+  font-size: var(--bew-fs-secondary);
 }
 
 .channel-feed__error {
@@ -250,7 +253,7 @@ html.bewly-channel-drawn body {
   background-color: var(--bew-fill-2);
   color: var(--bew-text-1);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--bew-fs-secondary);
 }
 
 .channel-feed__retry:hover {
@@ -265,7 +268,7 @@ html.bewly-channel-drawn body {
   background-color: var(--bew-fill-1);
   color: var(--bew-text-2);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--bew-fs-control);
   transition: background-color var(--bew-motion-fast, 0.2s) var(--bew-ease-out, ease);
 }
 
@@ -290,4 +293,34 @@ html.bewly-channel-drawn body {
   .channel-feed__more {
     transition: none;
   }
+}
+
+/* VideoCard 自带 `mb-4`（= 14.8px，UnoCSS 的 rem → calc(--bew-base-font-size * 1)），
+   放进网格后会把行间距从 24px 撑到 39px，且与直播 / 专栏网格（24px）不一致。
+   这里在自绘页网格内清零，行间距完全由 --bew-grid-gap-row 决定。 */
+.channel-feed__grid > [data-video-card] {
+  margin-bottom: 0;
+  transition:
+    transform var(--bew-motion-base) var(--bew-ease-out),
+    box-shadow var(--bew-motion-base) var(--bew-ease-out);
+}
+
+/* 悬停反馈全站统一：上浮 2px + 阴影 shadow-1 → shadow-2（原本只有背景 / 描边变化）。 */
+.channel-feed__grid > [data-video-card]:hover {
+  box-shadow: var(--bew-shadow-2);
+  transform: translateY(var(--bew-hover-lift, -2px));
+}
+
+/* 原生 <button> / <input> 在 Chromium 里**不继承**字号，默认 13.3333px
+   （真机实测：消息页会话列表、直播页次要点因此比其它页小 1.5px）。
+   :where() 把特异性降到 0，任何显式 font-size 的类规则仍然优先。 */
+:where(
+  #bewly-channel-drawn-root button,
+  #bewly-channel-drawn-root input,
+  #bewly-channel-drawn-root select,
+  #bewly-channel-drawn-root textarea
+) {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
 }

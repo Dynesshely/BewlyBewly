@@ -18,6 +18,15 @@ withDefaults(defineProps<{
   retryLabel?: string
   /** 是否使用 role=alert + aria-live（默认开） */
   live?: boolean
+  /**
+   * 二级出路的说明文字（第 106 轮）。
+   *
+   * 只有「重试」时，用户遇到反复失败的接口会陷在「重试 → 还是失败」里，
+   * 不知道该换个走法。页面向本组件传入一段说明（例如「重试还是不行？
+   * 可以在原版页面打开，或换个数据源」），渲染在按钮上方作为引导；
+   * 具体按钮仍由默认插槽提供，组件只负责排版与可达性。
+   */
+  fallbackHint?: string
 }>(), {
   title: '',
   message: '',
@@ -25,6 +34,7 @@ withDefaults(defineProps<{
   retryable: true,
   retryLabel: 'Retry',
   live: true,
+  fallbackHint: '',
 })
 
 defineEmits<{ (e: 'retry'): void }>()
@@ -46,6 +56,10 @@ defineEmits<{ (e: 'retry'): void }>()
     </p>
     <p v-if="message" class="feedback-error__message">
       {{ message }}
+    </p>
+
+    <p v-if="fallbackHint" class="feedback-error__hint">
+      {{ fallbackHint }}
     </p>
 
     <div v-if="retryable || $slots.default" class="feedback-error__actions">
@@ -118,6 +132,15 @@ defineEmits<{ (e: 'retry'): void }>()
   overflow-wrap: anywhere;
 }
 
+.feedback-error__hint {
+  max-width: 52ch;
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--bew-text-2);
+  text-wrap: pretty;
+}
+
 .feedback-error__actions {
   display: flex;
   flex-wrap: wrap;
@@ -166,6 +189,10 @@ defineEmits<{ (e: 'retry'): void }>()
 @media (max-width: 640px) {
   .feedback-error {
     padding: 32px 12px;
+  }
+
+  .feedback-error__hint {
+    font-size: 12px;
   }
 
   .feedback-error__art {

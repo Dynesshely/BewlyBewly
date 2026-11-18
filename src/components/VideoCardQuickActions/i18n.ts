@@ -52,6 +52,10 @@ export interface QuickActionsMessages {
   watchLaterOk: string
   watchLaterRemoved: string
   watchLaterFail: string
+  /** 撤销：移除类操作（取消收藏 / 移出稍后再看）的 6 秒撤销窗口 */
+  undo: string
+  undoDone: string
+  undoFailed: string
 }
 
 const CMN_CN: QuickActionsMessages = {
@@ -94,6 +98,9 @@ const CMN_CN: QuickActionsMessages = {
   watchLaterOk: '已加入稍后再看',
   watchLaterRemoved: '已从稍后再看移除',
   watchLaterFail: '操作失败，请稍后重试',
+  undo: '撤销',
+  undoDone: '已撤销',
+  undoFailed: '撤销失败，请稍后重试',
 }
 
 const EN: QuickActionsMessages = {
@@ -136,6 +143,9 @@ const EN: QuickActionsMessages = {
   watchLaterOk: 'Added to Watch Later',
   watchLaterRemoved: 'Removed from Watch Later',
   watchLaterFail: 'Action failed, please try again',
+  undo: 'Undo',
+  undoDone: 'Undone',
+  undoFailed: 'Failed to undo, please try again',
 }
 
 const CMN_TW: QuickActionsMessages = {
@@ -178,6 +188,9 @@ const CMN_TW: QuickActionsMessages = {
   watchLaterOk: '已加入稍後再看',
   watchLaterRemoved: '已從稍後再看移除',
   watchLaterFail: '操作失敗，請稍後重試',
+  undo: '復原',
+  undoDone: '已復原',
+  undoFailed: '復原失敗，請稍後重試',
 }
 
 const JYUT: QuickActionsMessages = {
@@ -212,6 +225,9 @@ const JYUT: QuickActionsMessages = {
   watchLaterOk: '加咗去稍後再看',
   watchLaterRemoved: '喺稍後再看移除咗',
   watchLaterFail: '操作失敗，轉頭再試',
+  undo: '復原',
+  undoDone: '復原咗',
+  undoFailed: '復原唔到，轉頭再試',
 }
 
 /** 模块自建 i18n：四种语言键集合完全一致（缺键回退简中 / 英文，不会出现空串） */

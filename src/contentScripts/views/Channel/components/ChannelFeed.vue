@@ -164,6 +164,7 @@ useListPageActions({
       :title="t.errorTitle"
       :message="errorMessage"
       :retry-label="t.retry"
+      :fallback-hint="t.errorFallbackHint"
       @retry="refresh"
     >
       <a class="channel-feed__link" :href="nativeUrl">
@@ -171,7 +172,15 @@ useListPageActions({
       </a>
     </ErrorState>
 
-    <EmptyState v-else :title="t.emptyTitle" :description="t.emptyDescription" />
+    <!-- 空态：给「去热门」与「原版页面」两条明确出路，而不是只留一句说明 -->
+    <EmptyState v-else :title="t.emptyTitle" :description="t.emptyDescription">
+      <a class="channel-feed__link" href="https://www.bilibili.com/v/popular/all">
+        {{ t.emptyPopular }}
+      </a>
+      <a class="channel-feed__link" :href="nativeUrl">
+        {{ t.emptyNative }}
+      </a>
+    </EmptyState>
 
     <!-- 追加失败的提示 + 重试（保留已有列表） -->
     <p v-if="archives.length && errorMessage" class="channel-feed__error" role="alert">

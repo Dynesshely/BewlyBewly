@@ -1,0 +1,57 @@
+// 全站字号 / 行高 / 字重令牌（UI 统一轮）。
+//
+// 审计结论（CDP 真机，8 个自绘页）：同一层级的文字在不同页面出现 20 种字号
+// （10 / 10.5 / 11 / 11.1 / 11.5 / 12 / 12.5 / 12.95 / 13 / 13.5 / 14 / 14.5 /
+// 15 / 16 / 16.65 / 17 / 18 / 18.5 / 20 / 22 / 24 / 28 / 36px）。
+//
+// 收敛后只有**一套梯子**，且与仓库既有的 UnoCSS 字号体系同源：
+// UnoCSS 里 `text-lg / text-sm / text-xs` 会被 unocss.config.ts 的
+// text-size-transformer 改写成 `calc(var(--bew-base-font-size) * 1.125 / 0.875 / 0.75)`，
+// 所以 VideoCard 这类共享组件算出来是 16.65 / 12.95 / 11.1px。
+// 令牌直接用同一组系数表达，自绘页与共享组件才能算出一模一样的像素值。
+
+// 展示级：页面主标题（空间 / 分区 / 热门 / 专栏 / 直播首页）
+$fs-hero: 22px;
+// 区块标题（面板标题、大号数字）
+$fs-section: 18px;
+// 卡片标题 = UnoCSS text-lg（16.65px）
+$fs-card-title-mul: 1.125;
+// 控件文字（tab / pill / chip / 按钮）——所有页已是 14px，保持不变
+$fs-control: 14px;
+// 次要信息 = UnoCSS text-sm（12.95px）
+$fs-secondary-mul: 0.875;
+// 微型标签 / 封面角标 = UnoCSS text-xs（11.1px）
+$fs-micro-mul: 0.75;
+// 徽标数字（未读角标），需比 micro 再小一档，不参与 Uno 体系
+$fs-badge: 10.5px;
+
+$lh-tight: 1.25; // 标题
+$lh-snug: 1.4; // 次要信息
+$lh-body: 1.5; // 正文
+$lh-reading: 1.7; // 长文正文（动态正文、专栏摘要）
+
+$fw-medium: 500;
+$fw-semibold: 600;
+$fw-bold: 700;
+
+/// 在 `:root` / `:host` 上输出字号令牌
+@mixin tokens {
+  --bew-fs-hero: #{$fs-hero};
+  --bew-fs-section: #{$fs-section};
+  --bew-fs-card-title: calc(var(--bew-base-font-size, 14.8px) * #{$fs-card-title-mul});
+  --bew-fs-body: var(--bew-base-font-size, 14.8px);
+  --bew-fs-control: #{$fs-control};
+  --bew-fs-secondary: calc(var(--bew-base-font-size, 14.8px) * #{$fs-secondary-mul});
+  --bew-fs-caption: calc(var(--bew-base-font-size, 14.8px) * #{$fs-secondary-mul});
+  --bew-fs-micro: calc(var(--bew-base-font-size, 14.8px) * #{$fs-micro-mul});
+  --bew-fs-badge: #{$fs-badge};
+
+  --bew-lh-tight: #{$lh-tight};
+  --bew-lh-snug: #{$lh-snug};
+  --bew-lh-body: #{$lh-body};
+  --bew-lh-reading: #{$lh-reading};
+
+  --bew-fw-medium: #{$fw-medium};
+  --bew-fw-semibold: #{$fw-semibold};
+  --bew-fw-bold: #{$fw-bold};
+}

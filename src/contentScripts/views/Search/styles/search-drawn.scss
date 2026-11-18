@@ -25,7 +25,7 @@ html.bewly-search-drawn body {
   display: block;
   font-family: inherit;
   font-size: var(--bew-base-font-size, 14.8px);
-  line-height: 1.5;
+  line-height: var(--bew-lh-body);
   color: var(--bew-text-1);
   pointer-events: none;
   -webkit-font-smoothing: antialiased;
@@ -60,22 +60,22 @@ html.bewly-search-drawn body {
 }
 
 .bewly-search-shell__inner {
-  width: calc(100% - 150px);
+  width: calc(100% - var(--bew-page-inset, 75px) * 2);
   max-width: var(--bew-page-max-width, 2280px);
   margin: 0 auto;
-  padding: 16px 0 40px;
+  padding: var(--bew-page-pad-top, 16px) 0 var(--bew-page-pad-bottom, 32px);
 }
 
 @media (min-width: 1024px) {
   .bewly-search-shell__inner {
-    width: calc(100% - 200px);
+    width: calc(100% - var(--bew-page-inset-wide, 100px) * 2);
   }
 }
 
 @media (max-width: 900px) {
   .bewly-search-shell__inner {
-    width: calc(100% - 32px);
-    padding: 8px 0 24px;
+    width: calc(100% - var(--bew-page-inset-narrow, 16px) * 2);
+    padding: var(--bew-space-8, 8px) 0 var(--bew-space-24, 24px);
   }
 }
 /* #endregion */
@@ -84,8 +84,7 @@ html.bewly-search-drawn body {
 .search-drawn-page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding-bottom: 32px;
+  gap: var(--bew-section-gap, 16px);
 }
 
 .search-drawn-head {
@@ -95,14 +94,14 @@ html.bewly-search-drawn body {
 
 .search-drawn-summary {
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-text-3);
   font-variant-numeric: tabular-nums;
 }
 
 .search-drawn-inline-error {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-error-color);
   text-align: center;
 }
@@ -110,7 +109,7 @@ html.bewly-search-drawn body {
 .search-drawn-inline-error__retry {
   margin-left: 8px;
   padding: 2px 10px;
-  font-size: 13px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-text-1);
   cursor: pointer;
   background: var(--bew-fill-2);
@@ -155,7 +154,7 @@ html.bewly-search-drawn body {
   height: 100%;
   padding: 0;
   font-family: inherit;
-  font-size: 14.5px;
+  font-size: var(--bew-fs-control);
   color: var(--bew-text-1);
   background: transparent;
   border: 0;
@@ -177,7 +176,7 @@ html.bewly-search-drawn body {
   height: 32px;
   padding: 0 18px;
   font-family: inherit;
-  font-size: 14px;
+  font-size: var(--bew-fs-control);
   font-weight: 500;
   line-height: 1;
   color: var(--bew-text-1);
@@ -225,7 +224,7 @@ html.bewly-search-drawn body {
 .search-filters__label {
   flex: 0 0 auto;
   min-width: 40px;
-  font-size: 12.5px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-text-3);
 }
 
@@ -239,10 +238,10 @@ html.bewly-search-drawn body {
 .search-filters__chip {
   display: inline-flex;
   align-items: center;
-  height: 30px;
-  padding: 0 12px;
+  height: 32px;
+  padding: 0 var(--bew-space-12, 12px);
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--bew-fs-secondary);
   line-height: 1;
   color: var(--bew-text-2);
   white-space: nowrap;
@@ -280,10 +279,10 @@ html.bewly-search-drawn body {
 }
 
 .search-filters__select select {
-  height: 30px;
-  padding: 0 30px 0 12px;
+  height: 32px;
+  padding: 0 30px 0 var(--bew-space-12, 12px);
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-text-1);
   cursor: pointer;
   background: var(--bew-fill-1);
@@ -299,7 +298,7 @@ html.bewly-search-drawn body {
 .search-filters__select-arrow {
   position: absolute;
   right: 10px;
-  font-size: 13px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-text-3);
   pointer-events: none;
 }
@@ -309,13 +308,13 @@ html.bewly-search-drawn body {
 .search-grid {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--bew-section-gap, 16px);
 }
 
 .search-grid__cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 24px 20px;
+  gap: var(--bew-grid-gap-row, 24px) var(--bew-grid-gap-col, 20px);
   align-items: start;
 }
 
@@ -346,7 +345,7 @@ html.bewly-search-drawn body {
 .search-pagination {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--bew-space-8, 8px);
   align-items: center;
   justify-content: center;
   padding: 8px 0;
@@ -354,11 +353,11 @@ html.bewly-search-drawn body {
 
 .search-pagination__step,
 .search-pagination__page {
-  min-width: 34px;
-  height: 34px;
-  padding: 0 12px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 var(--bew-space-12, 12px);
   font-family: inherit;
-  font-size: 13.5px;
+  font-size: var(--bew-fs-control);
   line-height: 1;
   color: var(--bew-text-2);
   cursor: pointer;
@@ -401,14 +400,14 @@ html.bewly-search-drawn body {
 
 .search-pagination__gap {
   min-width: 20px;
-  font-size: 13px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-text-3);
   text-align: center;
 }
 
 .search-pagination__status {
   margin-left: 8px;
-  font-size: 12.5px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-text-3);
   font-variant-numeric: tabular-nums;
 }
@@ -435,4 +434,34 @@ html.bewly-search-drawn body {
   .search-pagination__gap {
     color: var(--bew-text-2);
   }
+}
+
+/* VideoCard 自带 `mb-4`（= 14.8px，UnoCSS 的 rem → calc(--bew-base-font-size * 1)），
+   放进网格后会把行间距从 24px 撑到 39px，且与直播 / 专栏网格（24px）不一致。
+   这里在自绘页网格内清零，行间距完全由 --bew-grid-gap-row 决定。 */
+.search-grid__cards > [data-video-card] {
+  margin-bottom: 0;
+  transition:
+    transform var(--bew-motion-base) var(--bew-ease-out),
+    box-shadow var(--bew-motion-base) var(--bew-ease-out);
+}
+
+/* 悬停反馈全站统一：上浮 2px + 阴影 shadow-1 → shadow-2（原本只有背景 / 描边变化）。 */
+.search-grid__cards > [data-video-card]:hover {
+  box-shadow: var(--bew-shadow-2);
+  transform: translateY(var(--bew-hover-lift, -2px));
+}
+
+/* 原生 <button> / <input> 在 Chromium 里**不继承**字号，默认 13.3333px
+   （真机实测：消息页会话列表、直播页次要点因此比其它页小 1.5px）。
+   :where() 把特异性降到 0，任何显式 font-size 的类规则仍然优先。 */
+:where(
+  #bewly-search-drawn-root button,
+  #bewly-search-drawn-root input,
+  #bewly-search-drawn-root select,
+  #bewly-search-drawn-root textarea
+) {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
 }

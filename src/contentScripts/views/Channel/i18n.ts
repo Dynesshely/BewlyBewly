@@ -25,6 +25,12 @@ export interface ChannelMessages {
   errorNative: string
   emptyTitle: string
   emptyDescription: string
+  /** 空态按钮：去热门页（分区没内容时热门通常有） */
+  emptyPopular: string
+  /** 空态按钮：在原版页面打开 */
+  emptyNative: string
+  /** 错误态二级出路说明 */
+  errorFallbackHint: string
 }
 
 const CMN_CN: ChannelMessages = {
@@ -38,6 +44,9 @@ const CMN_CN: ChannelMessages = {
   errorNative: '在原版页面打开',
   emptyTitle: '暂无内容',
   emptyDescription: '这个分区暂时没有可展示的内容，稍后再看看吧。',
+  emptyPopular: '去热门看看',
+  emptyNative: '在原版页面打开',
+  errorFallbackHint: '重试还是不行？可以去热门页看看，或切到原版页面。',
 }
 
 const CMN_TW: ChannelMessages = {
@@ -51,6 +60,9 @@ const CMN_TW: ChannelMessages = {
   errorNative: '在原版頁面開啟',
   emptyTitle: '暫無內容',
   emptyDescription: '這個分區暫時沒有可展示的內容，稍後再看看吧。',
+  emptyPopular: '去熱門看看',
+  emptyNative: '在原版頁面開啟',
+  errorFallbackHint: '重試還是不行？可以去熱門頁看看，或切到原版頁面。',
 }
 
 const JYUT: ChannelMessages = {
@@ -61,6 +73,9 @@ const JYUT: ChannelMessages = {
   retry: '再試一次',
   errorNative: '喺原版頁面開啟',
   emptyDescription: '呢個分區暫時冇嘢可以睇，遲啲再嚟睇下。',
+  emptyPopular: '去熱門睇下',
+  emptyNative: '喺原版頁面開啟',
+  errorFallbackHint: '再試都唔得？可以去熱門頁睇下，或者切去原版頁面。',
 }
 
 const EN: ChannelMessages = {
@@ -74,6 +89,9 @@ const EN: ChannelMessages = {
   errorNative: 'Open in the original page',
   emptyTitle: 'Nothing here yet',
   emptyDescription: 'This channel has no content to show right now. Check back later.',
+  emptyPopular: 'Browse trending',
+  emptyNative: 'Open in the original page',
+  errorFallbackHint: 'Still failing? Try trending, or open the original page.',
 }
 
 const MESSAGES: Record<ModuleLocale, ChannelMessages> = {

@@ -33,27 +33,28 @@
   pointer-events: auto;
   background: var(--bew-bg);
   font-size: var(--bew-base-font-size, 14.8px);
-  line-height: 1.5;
+  line-height: var(--bew-lh-body);
   scrollbar-width: thin;
   scrollbar-color: var(--bew-fill-3) transparent;
 }
 
 .bew-live-inner {
-  width: calc(100% - 40px);
+  width: calc(100% - var(--bew-page-inset, 75px) * 2);
   max-width: var(--bew-page-max-width, 2280px);
   margin: 0 auto;
-  padding: 16px 0 48px;
+  padding: var(--bew-page-pad-top, 16px) 0 var(--bew-page-pad-bottom, 32px);
 }
 
 @media (min-width: 1024px) {
   .bew-live-inner {
-    width: calc(100% - 80px);
+    width: calc(100% - var(--bew-page-inset-wide, 100px) * 2);
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 900px) {
   .bew-live-inner {
-    width: calc(100% - 24px);
+    width: calc(100% - var(--bew-page-inset-narrow, 16px) * 2);
+    padding: var(--bew-space-8, 8px) 0 var(--bew-space-24, 24px);
   }
 }
 /* #endregion */
@@ -63,27 +64,27 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin-bottom: 12px;
+  margin-bottom: var(--bew-section-gap, 16px);
 }
 
 .bew-live-home__title {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--bew-fs-hero);
   font-weight: 600;
   color: var(--bew-text-1);
 }
 
 .bew-live-home__subtitle {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-text-3);
 }
 
 .bew-live-areas {
   display: flex;
   flex-wrap: nowrap;
-  gap: 8px;
-  margin-bottom: 18px;
+  gap: var(--bew-space-8, 8px);
+  margin-bottom: var(--bew-section-gap, 16px);
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -97,8 +98,9 @@
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  padding: 6px 16px;
-  font-size: 13px;
+  height: var(--bew-control-h-sm, 32px);
+  padding: 0 var(--bew-space-16, 16px);
+  font-size: var(--bew-fs-control);
   font-weight: 500;
   color: var(--bew-text-2);
   text-decoration: none;
@@ -136,10 +138,10 @@
 
 .bew-live-area__sub {
   padding: 6px 10px;
-  font-size: 13px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-text-2);
   text-decoration: none;
-  border-radius: 6px;
+  border-radius: var(--bew-radius-sm, 8px);
 }
 
 .bew-live-area__sub:hover {
@@ -152,22 +154,22 @@
 .bew-live-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 20px 14px;
+  gap: var(--bew-grid-gap-row, 24px) var(--bew-grid-gap-col, 20px);
 }
 
 .bew-live-card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--bew-space-8, 8px);
   text-decoration: none;
   cursor: pointer;
-  border-radius: 8px;
+  border-radius: var(--bew-radius);
   outline: none;
-  transition: transform 0.2s ease;
+  transition: transform var(--bew-motion-base) var(--bew-ease-out);
 }
 
 .bew-live-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(var(--bew-hover-lift, -2px));
 }
 
 .bew-live-card__cover {
@@ -176,7 +178,7 @@
   aspect-ratio: 16 / 9;
   overflow: hidden;
   background: var(--bew-fill-1);
-  border-radius: 8px;
+  border-radius: var(--bew-radius);
   box-shadow: var(--bew-shadow-1);
 }
 
@@ -184,11 +186,11 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.3s ease;
+  transition: transform var(--bew-motion-slow) var(--bew-ease-out);
 }
 
 .bew-live-card:hover .bew-live-card__cover img {
-  transform: scale(1.03);
+  transform: scale(var(--bew-hover-cover-scale, 1.03));
 }
 
 .bew-live-card__cover-fallback {
@@ -205,12 +207,12 @@
   gap: 4px;
   align-items: center;
   padding: 2px 8px;
-  font-size: 11px;
+  font-size: var(--bew-fs-micro);
   font-weight: 600;
   line-height: 16px;
-  color: #fff;
+  color: var(--bew-text-on-theme);
   background: var(--bew-bili-pink, hsl(343deg 94% 72%));
-  border-radius: 6px;
+  border-radius: var(--bew-radius-sm, 8px);
 }
 
 .bew-live-card__badge-dot {
@@ -236,10 +238,10 @@
   position: absolute;
   right: 8px;
   bottom: 6px;
-  font-size: 12px;
+  font-size: var(--bew-fs-caption);
   font-weight: 500;
-  color: #fff;
-  text-shadow: 0 1px 4px rgb(0 0 0 / 60%);
+  color: var(--bew-text-on-media);
+  text-shadow: var(--bew-media-shadow);
 }
 
 .bew-live-card__meta {
@@ -266,9 +268,9 @@
   display: -webkit-box;
   margin: 0;
   overflow: hidden;
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 20px;
+  font-size: var(--bew-fs-card-title);
+  font-weight: var(--bew-fw-medium);
+  line-height: var(--bew-lh-snug);
   color: var(--bew-text-1);
   transition: color 0.2s ease;
   -webkit-line-clamp: 2;
@@ -286,7 +288,7 @@
   min-width: 0;
   margin: 2px 0 0;
   overflow: hidden;
-  font-size: 12px;
+  font-size: var(--bew-fs-caption);
   line-height: 18px;
   color: var(--bew-text-3);
   white-space: nowrap;
@@ -328,7 +330,7 @@
 
 .bew-live-card.is-compact .bew-live-card__meta {
   flex: 1;
-  gap: 6px;
+  gap: var(--bew-space-8, 8px);
   align-items: center;
   min-width: 0;
 }
@@ -338,7 +340,7 @@
 }
 
 .bew-live-card.is-compact .bew-live-card__title {
-  font-size: 13px;
+  font-size: var(--bew-fs-secondary);
   line-height: 18px;
   -webkit-line-clamp: 2;
 }
@@ -349,7 +351,7 @@
 }
 
 .bew-live-card.is-compact .bew-live-card__sub {
-  font-size: 11px;
+  font-size: var(--bew-fs-micro);
   line-height: 16px;
 }
 
@@ -357,14 +359,14 @@
   top: 5px;
   left: 5px;
   padding: 0 5px;
-  font-size: 10px;
+  font-size: var(--bew-fs-micro);
   line-height: 14px;
 }
 
 .bew-live-card.is-compact .bew-live-card__online {
   right: 5px;
   bottom: 3px;
-  font-size: 10px;
+  font-size: var(--bew-fs-micro);
 }
 /* #endregion */
 
@@ -391,7 +393,7 @@
   width: 80%;
   height: 12px;
   background: var(--bew-skeleton, var(--bew-fill-1));
-  border-radius: 6px;
+  border-radius: 4px;
   animation: bew-live-shimmer 1.4s ease-in-out infinite;
 }
 
@@ -413,7 +415,7 @@
 .bew-live-state {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--bew-space-8, 8px);
   align-items: center;
   justify-content: center;
   padding: 80px 16px;
@@ -422,20 +424,20 @@
 
 .bew-live-state__title {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--bew-fs-card-title);
   font-weight: 600;
   color: var(--bew-text-1);
 }
 
 .bew-live-state__desc {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-text-3);
 }
 
 .bew-live-btn {
   padding: 6px 18px;
-  font-size: 13px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-theme-color);
   cursor: pointer;
   background: var(--bew-theme-color-10);
@@ -450,7 +452,7 @@
 
 .bew-live-btn.is-small {
   padding: 4px 12px;
-  font-size: 12px;
+  font-size: var(--bew-fs-caption);
 }
 
 .bew-live-sentinel {
@@ -463,7 +465,7 @@
 
 .bew-live-sentinel__text,
 .bew-live-sentinel__link {
-  font-size: 13px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-text-3);
   text-decoration: none;
 }
@@ -481,7 +483,7 @@
   width: 100%;
   height: 100%;
   padding: 0 12px;
-  font-size: 13px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-text-1);
   background: var(--bew-content, transparent);
   backdrop-filter: var(--bew-filter-glass-1, blur(20px));
@@ -510,12 +512,12 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  line-height: 1.25;
+  line-height: var(--bew-lh-tight);
 }
 
 .bew-live-bar__uname {
   overflow: hidden;
-  font-size: 14px;
+  font-size: var(--bew-fs-control);
   font-weight: 600;
   color: var(--bew-text-1);
   text-overflow: ellipsis;
@@ -524,10 +526,10 @@
 
 .bew-live-bar__meta {
   display: flex;
-  gap: 6px;
+  gap: var(--bew-space-8, 8px);
   align-items: center;
   overflow: hidden;
-  font-size: 11px;
+  font-size: var(--bew-fs-micro);
   color: var(--bew-text-3);
   white-space: nowrap;
 }
@@ -535,10 +537,10 @@
 .bew-live-bar__badge {
   flex-shrink: 0;
   padding: 0 6px;
-  font-size: 10px;
+  font-size: var(--bew-fs-micro);
   font-weight: 600;
   line-height: 15px;
-  color: #fff;
+  color: var(--bew-text-on-theme);
   background: var(--bew-bili-pink, hsl(343deg 94% 72%));
   border-radius: 4px;
 }
@@ -555,10 +557,10 @@
 
 .bew-live-bar__stats {
   display: flex;
-  gap: 14px;
+  gap: var(--bew-space-16, 16px);
   align-items: center;
   margin-left: auto;
-  font-size: 12px;
+  font-size: var(--bew-fs-caption);
 }
 
 .bew-live-bar__stat {
@@ -570,22 +572,22 @@
 }
 
 .bew-live-bar__stat-value {
-  font-size: 13px;
+  font-size: var(--bew-fs-secondary);
   font-weight: 600;
   color: var(--bew-text-1);
 }
 
 .bew-live-bar__stat-label {
-  font-size: 11px;
+  font-size: var(--bew-fs-micro);
   color: var(--bew-text-4, var(--bew-text-3));
 }
 
 .bew-live-bar__follow {
   flex-shrink: 0;
   padding: 5px 16px;
-  font-size: 12px;
+  font-size: var(--bew-fs-caption);
   font-weight: 600;
-  color: #fff;
+  color: var(--bew-text-on-theme);
   cursor: pointer;
   background: var(--bew-theme-color);
   border: none;
@@ -613,7 +615,7 @@
 .bew-live-rec {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--bew-space-8, 8px);
   padding: 12px;
   margin-top: 12px;
   background: var(--bew-content);
@@ -628,13 +630,13 @@
 
 .bew-live-rec__title {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--bew-fs-control);
   font-weight: 600;
   color: var(--bew-text-1);
 }
 
 .bew-live-rec__more {
-  font-size: 12px;
+  font-size: var(--bew-fs-caption);
   color: var(--bew-text-3);
   text-decoration: none;
 }
@@ -655,3 +657,12 @@
   padding: 8px 0;
 }
 /* #endregion */
+
+/* 原生 <button> / <input> 在 Chromium 里**不继承**字号，默认 13.3333px
+   （真机实测：消息页会话列表、直播页次要点因此比其它页小 1.5px）。
+   :where() 把特异性降到 0，任何显式 font-size 的类规则仍然优先。 */
+:where(:host) :where(button, input, select, textarea) {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}

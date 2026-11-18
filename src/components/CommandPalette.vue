@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ShortcutScope } from '~/constants/shortcutRegistry'
 import { useI18n } from 'vue-i18n'
+import { useAppProviderOptional } from '~/composables/useAppProvider'
 import { isFocusBrowseActive } from '~/composables/useFocusBrowse'
 import {
   getActiveShortcutScopes,
@@ -10,12 +11,15 @@ import {
   matchesShortcutQuery,
   scopeLabelKey,
 } from '~/constants/shortcutRegistry'
+import { AppPage } from '~/enums/appEnums'
 import { settings } from '~/logic'
 import { isHomePage } from '~/utils/main'
 import emitter from '~/utils/mitt'
+import { useCommandPaletteMessages } from './CommandPalette/i18n'
 
 const emit = defineEmits<{ (e: 'close'): void }>()
 const { t } = useI18n()
+const { t: tp } = useCommandPaletteMessages()
 
 interface Command {
   id: string
@@ -244,6 +248,134 @@ const commands = computed<Command[]>(() => [
   },
 ])
 
+// #region 一次直达：页面跳转 / 搜索 / 打开 UP 空间（第 106 轮）
+//
+// 痛点（真机实测）：想「搜一个视频」或「打开某个 UP 的空间」，
+// 用户要么滚回顶栏找搜索框（首页 3 次点击 + 输入），要么记住 space.bilibili.com/<mid>
+// 自己拼地址。命令面板本来就是「一条命令直达」的地方，却只有首页 tab 与开关类命令。
+//
+// 这里补三类命令：
+//   1. 直接跳转：历史 / 稍后再看 / 收藏 / 动态 / 消息 / 热门 —— 走 App 的 dock 切页，
+//      不整页刷新（首页以外在 dock 内，切页是设置里已有的行为）；
+//   2. 搜索视频：查询词非空且与当前输入不同 → 在地址栏跳搜索页（自绘搜索结果页会接管）；
+//   3. 打开 UP 空间：输入是纯数字 UID → 直达 space.bilibili.com/<mid>。
+//
+// 全部按当前输入动态生成，输入为空时不出现（避免刷屏）。
+
+/** 当前可用的 BEWLY_APP provider（命令面板在 #bewly shadow 内，正常一定能拿到） */
+const appProvider = useAppProviderOptional()
+
+/** 当前输入是否像一个 UID（纯数字，1~12 位） */
+const queryAsMid = computed(() => /^\d{1,12}$/.test(query.value.trim())
+  ? query.value.trim()
+  : '')
+
+/** 当前输入是否像一个关键词（含非数字字符，或有中文） */
+const queryAsKeyword = computed(() => query.value.trim() && !queryAsMid.value
+  ? query.value.trim()
+  : '')
+
+/**
+ * dock 切页：在首页内切 dock 页（不刷新），非首页直接跳过去。
+ *
+ * 走 `BEWLY_APP` provider 里的 `activatedPage`：App.vue 自己对它有 watch
+ * （会同步地址栏 ?page=、重置滚动、切顶栏可见性），所以只要改这个 ref，
+ * 效果与点 Dock 完全一致，不需要新增事件，也不需要改 App.vue。
+ */
+function openDockPage(page: AppPage) {
+  const provider = appProvider
+  if (provider) {
+    provider.activatedPage.value = page
+    return
+  }
+  // 不在 App 树内（极少数宿主）：退回整页跳转
+  window.open(`https://www.bilibili.com/?page=${page}`, '_self')
+}
+
+/** 搜索视频：跳搜索结果页（自绘搜索页会接管渲染） */
+function searchVideos(keyword: string) {
+  const target = new URL('https://search.bilibili.com/all')
+  target.searchParams.set('keyword', keyword)
+  location.href = target.toString()
+}
+
+/** 打开 UP 主空间 */
+function openSpaceByMid(mid: string) {
+  location.href = `https://space.bilibili.com/${mid}`
+}
+
+/** 直接跳转类命令（固定 6 条，输入为空时也展示） */
+const goCommands = computed<Command[]>(() => [
+  {
+    id: 'go-history',
+    label: tp.value.openHistory,
+    scope: 'global',
+    run: () => openDockPage(AppPage.History),
+  },
+  {
+    id: 'go-watchlater',
+    label: tp.value.openWatchLater,
+    scope: 'global',
+    run: () => openDockPage(AppPage.WatchLater),
+  },
+  {
+    id: 'go-favorites',
+    label: tp.value.openFavorites,
+    scope: 'global',
+    run: () => openDockPage(AppPage.Favorites),
+  },
+  {
+    id: 'go-moments',
+    label: tp.value.openMoments,
+    scope: 'global',
+    run: () => openDockPage(AppPage.Moments),
+  },
+  {
+    id: 'go-message',
+    label: tp.value.openMessage,
+    scope: 'global',
+    run: () => {
+      window.open('https://message.bilibili.com/', '_self')
+    },
+  },
+  {
+    id: 'go-popular',
+    label: tp.value.openPopular,
+    scope: 'global',
+    run: () => {
+      window.open('https://www.bilibili.com/v/popular/all', '_self')
+    },
+  },
+])
+
+/** 输入驱动的命令：搜索视频 / 打开 UP 空间 */
+const queryCommands = computed<Command[]>(() => {
+  const list: Command[] = []
+  const keyword = queryAsKeyword.value
+  if (keyword) {
+    list.push({
+      id: 'search-video',
+      label: tp.value.searchVideo.replace('{query}', keyword),
+      hint: 'Enter',
+      scope: 'global',
+      run: () => searchVideos(keyword),
+    })
+  }
+  const mid = queryAsMid.value
+  if (mid) {
+    list.push({
+      id: 'open-space',
+      label: tp.value.openSpace.replace('{mid}', mid),
+      hint: 'Enter',
+      scope: 'global',
+      run: () => openSpaceByMid(mid),
+    })
+  }
+  return list
+})
+
+/** 跳转分组的分组标题行 */
+const goHeader = computed<Command>(() => buildSectionHeader('go', tp.value.groupGo))
 const activeScopes = computed(() => getActiveShortcutScopes())
 
 /**
@@ -374,6 +506,30 @@ function buildToggleRow(count: number): Command {
   }
 }
 
+/**
+ * 把「跳转 / 搜索 / 打开空间」插到列表最前面。
+ *
+ * 输入为空时只插「直接跳转」分组（6 条固定入口）；
+ * 输入非空时，输入驱动的命令（搜索视频 / 打开 UP 空间）排在跳转之前 ——
+ * 用户敲了字，最想做的就是「用这个字干点什么」，跳转类退居其后。
+ */
+function withQuickCommands(list: Command[], q: string): Command[] {
+  const queryItems = queryCommands.value.filter(cmd => matchesCommand(cmd, q))
+  const goItems = goCommands.value.filter(cmd => matchesCommand(cmd, q))
+  const parts: Command[] = []
+  if (queryItems.length)
+    parts.push(buildSectionHeader('query', tp.value.groupSearch), ...queryItems)
+  if (goItems.length)
+    parts.push(goHeader.value, ...goItems)
+  if (!parts.length)
+    return list
+  // 跳转分组与 query 分组都插在最前：它们在任何页面上都可用，优先级高于页面内动作
+  return [
+    ...parts,
+    ...list,
+  ]
+}
+
 const filtered = computed<Command[]>(() => {
   const q = query.value.trim().toLowerCase()
 
@@ -384,15 +540,15 @@ const filtered = computed<Command[]>(() => {
       ...registryCommands.value,
     ]
     if (!q) {
-      return [
+      return withQuickCommands([
         ...executable,
         ...buildReferenceCommands('all'),
-      ]
+      ], q)
     }
-    return [
+    return withQuickCommands([
       ...executable.filter(cmd => matchesCommand(cmd, q)),
       ...buildReferenceCommands('all', q),
-    ]
+    ], q)
   }
 
   // 页面确定且没有输入：内置命令 → 当前页可执行动作 / 当前页快捷键 → 折叠的其他页面
@@ -416,7 +572,7 @@ const filtered = computed<Command[]>(() => {
         list.push(...otherItems)
     }
 
-    return list
+    return withQuickCommands(list, q)
   }
 
   // 有关键词：可执行的排前面并分组，其他页面 / 不可执行的排后面
@@ -434,7 +590,7 @@ const filtered = computed<Command[]>(() => {
     list.push(buildSectionHeader('current', t('keyboard_registry.current_scope'), true), ...currentItems)
   if (otherItems.length)
     list.push(buildSectionHeader('other', `${t('command_palette.shortcut_unavailable')} · ${otherItems.length}`), ...otherItems)
-  return list
+  return withQuickCommands(list, q)
 })
 
 watch(filtered, () => {

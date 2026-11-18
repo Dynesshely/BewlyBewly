@@ -25,7 +25,7 @@ html.bewly-space-drawn body {
   display: block;
   font-family: inherit;
   font-size: var(--bew-base-font-size, 14.8px);
-  line-height: 1.5;
+  line-height: var(--bew-lh-body);
   color: var(--bew-text-1);
   pointer-events: none;
   -webkit-font-smoothing: antialiased;
@@ -59,23 +59,25 @@ html.bewly-space-drawn body {
   scrollbar-color: var(--bew-fill-3) transparent;
 }
 
+/* 页面宽度约束：全站统一走 --bew-page-inset*（75 / 100 / 16px 单边留白），
+   与搜索 / 热门 / 分区 / 直播 / 消息页共用同一组令牌，避免各页差 8~55px。 */
 .bewly-space-shell__inner {
-  width: calc(100% - 150px);
+  width: calc(100% - var(--bew-page-inset, 75px) * 2);
   max-width: var(--bew-page-max-width, 2280px);
   margin: 0 auto;
-  padding: 16px 0 32px;
+  padding: var(--bew-page-pad-top, 16px) 0 var(--bew-page-pad-bottom, 32px);
 }
 
 @media (min-width: 1024px) {
   .bewly-space-shell__inner {
-    width: calc(100% - 200px);
+    width: calc(100% - var(--bew-page-inset-wide, 100px) * 2);
   }
 }
 
 @media (max-width: 900px) {
   .bewly-space-shell__inner {
-    width: calc(100% - 32px);
-    padding: 8px 0 24px;
+    width: calc(100% - var(--bew-page-inset-narrow, 16px) * 2);
+    padding: var(--bew-space-8, 8px) 0 var(--bew-space-24, 24px);
   }
 }
 /* #endregion */
@@ -84,8 +86,8 @@ html.bewly-space-drawn body {
 .space-drawn-page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding-bottom: 48px;
+  gap: var(--bew-section-gap, 16px);
+  padding-bottom: var(--bew-page-pad-bottom, 32px);
 }
 /* #endregion */
 
@@ -161,7 +163,7 @@ html.bewly-space-drawn body {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--bew-space-8, 8px);
   min-width: 0;
 }
 
@@ -176,9 +178,9 @@ html.bewly-space-drawn body {
 .space-profile__name {
   margin: 0;
   overflow: hidden;
-  font-size: 20px;
+  font-size: var(--bew-fs-hero);
   font-weight: 600;
-  line-height: 1.35;
+  line-height: var(--bew-lh-tight);
   color: var(--bew-text-1);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -188,7 +190,7 @@ html.bewly-space-drawn body {
 .space-profile__badge {
   flex: 0 0 auto;
   padding: 0 6px;
-  font-size: 11px;
+  font-size: var(--bew-fs-micro);
   font-weight: 500;
   line-height: 18px;
   color: var(--bew-text-2);
@@ -210,8 +212,8 @@ html.bewly-space-drawn body {
   display: -webkit-box;
   margin: 0;
   overflow: hidden;
-  font-size: 12.5px;
-  line-height: 1.5;
+  font-size: var(--bew-fs-secondary);
+  line-height: var(--bew-lh-body);
   color: var(--bew-text-2);
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
@@ -224,7 +226,7 @@ html.bewly-space-drawn body {
   flex-wrap: wrap;
   gap: 16px;
   margin-top: 2px;
-  font-size: 12.5px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-text-2);
 }
 
@@ -235,7 +237,7 @@ html.bewly-space-drawn body {
 }
 
 .space-profile__stat-value {
-  font-size: 14px;
+  font-size: var(--bew-fs-control);
   font-weight: 600;
   color: var(--bew-text-1);
   font-variant-numeric: tabular-nums;
@@ -250,7 +252,7 @@ html.bewly-space-drawn body {
   min-width: 96px;
   height: 36px;
   padding: 0 16px;
-  font-size: 14px;
+  font-size: var(--bew-fs-control);
   font-weight: 500;
   line-height: 1;
   color: var(--bew-text-1);
@@ -304,7 +306,7 @@ html.bewly-space-drawn body {
   }
 
   .space-profile__name {
-    font-size: 17px;
+    font-size: var(--bew-fs-section);
   }
 }
 /* #endregion */
@@ -328,7 +330,7 @@ html.bewly-space-drawn body {
 .space-sort__count {
   margin-left: auto;
   padding: 0 6px;
-  font-size: 12px;
+  font-size: var(--bew-fs-caption);
   color: var(--bew-text-3);
   font-variant-numeric: tabular-nums;
 }
@@ -338,7 +340,7 @@ html.bewly-space-drawn body {
   align-items: center;
   height: 32px;
   padding: 0 14px;
-  font-size: 14px;
+  font-size: var(--bew-fs-control);
   line-height: 1;
   color: var(--bew-text-2);
   white-space: nowrap;
@@ -372,13 +374,13 @@ html.bewly-space-drawn body {
 .space-grid {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--bew-section-gap, 16px);
 }
 
 .space-grid__cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 24px 20px;
+  gap: var(--bew-grid-gap-row, 24px) var(--bew-grid-gap-col, 20px);
   align-items: start;
 }
 
@@ -403,7 +405,7 @@ html.bewly-space-drawn body {
 .space-grid__end,
 .space-grid__error {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-text-3);
   text-align: center;
 }
@@ -415,7 +417,7 @@ html.bewly-space-drawn body {
 .space-grid__retry {
   margin-left: 8px;
   padding: 2px 10px;
-  font-size: 13px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-text-1);
   cursor: pointer;
   background: var(--bew-fill-2);
@@ -430,7 +432,7 @@ html.bewly-space-drawn body {
 .space-grid__more {
   align-self: center;
   padding: 8px 20px;
-  font-size: 14px;
+  font-size: var(--bew-fs-control);
   color: var(--bew-text-2);
   cursor: pointer;
   background: var(--bew-fill-1);
@@ -462,6 +464,27 @@ html.bewly-space-drawn body {
   text-decoration: none;
 }
 
+/* 空态里的次级按钮：与错误态的「在原版页面打开」并排，视觉重量更轻 */
+.space-grid__empty-reload {
+  padding: 2px 10px;
+  font-size: var(--bew-fs-secondary);
+  color: var(--bew-text-2);
+  cursor: pointer;
+  background: var(--bew-fill-1);
+  border: 0;
+  border-radius: 999px;
+}
+
+.space-grid__empty-reload:hover {
+  color: var(--bew-text-1);
+  background: var(--bew-fill-2);
+}
+
+.space-grid__empty-reload:focus-visible {
+  outline: 2px solid var(--bew-theme-color);
+  outline-offset: 2px;
+}
+
 .space-grid__link:hover {
   text-decoration: underline;
 }
@@ -487,4 +510,34 @@ html.bewly-space-drawn body {
   .space-grid__end {
     color: var(--bew-text-2);
   }
+}
+
+/* VideoCard 自带 `mb-4`（= 14.8px，UnoCSS 的 rem → calc(--bew-base-font-size * 1)），
+   放进网格后会把行间距从 24px 撑到 39px，且与直播 / 专栏网格（24px）不一致。
+   这里在自绘页网格内清零，行间距完全由 --bew-grid-gap-row 决定。 */
+.space-grid__cards > [data-video-card] {
+  margin-bottom: 0;
+  transition:
+    transform var(--bew-motion-base) var(--bew-ease-out),
+    box-shadow var(--bew-motion-base) var(--bew-ease-out);
+}
+
+/* 悬停反馈全站统一：上浮 2px + 阴影 shadow-1 → shadow-2（原本只有背景 / 描边变化）。 */
+.space-grid__cards > [data-video-card]:hover {
+  box-shadow: var(--bew-shadow-2);
+  transform: translateY(var(--bew-hover-lift, -2px));
+}
+
+/* 原生 <button> / <input> 在 Chromium 里**不继承**字号，默认 13.3333px
+   （真机实测：消息页会话列表、直播页次要点因此比其它页小 1.5px）。
+   :where() 把特异性降到 0，任何显式 font-size 的类规则仍然优先。 */
+:where(
+  #bewly-space-drawn-root button,
+  #bewly-space-drawn-root input,
+  #bewly-space-drawn-root select,
+  #bewly-space-drawn-root textarea
+) {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
 }

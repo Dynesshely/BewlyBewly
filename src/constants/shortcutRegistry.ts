@@ -379,7 +379,10 @@ export const SHORTCUT_REGISTRY: ShortcutRegistryEntry[] = [
   },
   // #endregion
 
-  // #region 搜索结果页（contentScripts/searchPage/keyboard.ts）
+  // #region 搜索结果页
+  //
+  // 第 106 轮起由自绘搜索页 `views/Search/SearchPage.vue` 经
+  // `composables/useDrawnPageKeyboardNav` 实际实现（此前只有登记、按下去没反应）。
   {
     id: 'search-next',
     scope: 'search',
@@ -406,7 +409,11 @@ export const SHORTCUT_REGISTRY: ShortcutRegistryEntry[] = [
   },
   // #endregion
 
-  // #region 用户空间（contentScripts/spacePage/keyboard.ts）
+  // #region 用户空间
+  //
+  // 第 106 轮起由自绘空间页 `views/Space/SpacePage.vue` 经
+  // `composables/useDrawnPageKeyboardNav` 实际实现（连同热门 / 分区 / 动态 / 消息四个
+  // 没有登记 scope 的自绘页，语义完全一致）。
   {
     id: 'space-next',
     scope: 'space',

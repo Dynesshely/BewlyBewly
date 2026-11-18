@@ -27,7 +27,7 @@ html.bewly-dynamic-drawn body {
   display: block;
   font-family: inherit;
   font-size: var(--bew-base-font-size, 14.8px);
-  line-height: 1.5;
+  line-height: var(--bew-lh-body);
   color: var(--bew-text-1);
   pointer-events: none;
   -webkit-font-smoothing: antialiased;
@@ -61,17 +61,19 @@ html.bewly-dynamic-drawn body {
 }
 
 /* 动态卡是竖排信息流，宽度收得比视频网格窄，与原生动态页的窄栏一致 */
+/* 动态是竖排信息流，宽度固定在 760px 的阅读栏（与其它页的页宽令牌无关），
+   但左右留白与上下留白仍跟全站令牌一致。 */
 .bewly-dynamic-shell__inner {
-  width: calc(100% - 150px);
+  width: calc(100% - var(--bew-page-inset, 75px) * 2);
   max-width: 760px;
   margin: 0 auto;
-  padding: 16px 0 48px;
+  padding: var(--bew-page-pad-top, 16px) 0 var(--bew-page-pad-bottom, 32px);
 }
 
 @media (max-width: 900px) {
   .bewly-dynamic-shell__inner {
-    width: calc(100% - 32px);
-    padding: 8px 0 32px;
+    width: calc(100% - var(--bew-page-inset-narrow, 16px) * 2);
+    padding: var(--bew-space-8, 8px) 0 var(--bew-space-24, 24px);
   }
 }
 /* #endregion */
@@ -80,7 +82,7 @@ html.bewly-dynamic-drawn body {
 .dynamic-page {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--bew-section-gap, 16px);
   /* tab 行高度（32px 按钮 + 上下各 8px padding + 2px 边框），
      供 .dynamic-card 的 scroll-margin-top 使用 */
   --bew-dynamic-tabs-height: 56px;
@@ -106,7 +108,7 @@ html.bewly-dynamic-drawn body {
   align-items: center;
   height: 32px;
   padding: 0 14px;
-  font-size: 14px;
+  font-size: var(--bew-fs-control);
   line-height: 1;
   color: var(--bew-text-2);
   white-space: nowrap;
@@ -140,7 +142,7 @@ html.bewly-dynamic-drawn body {
 .dynamic-feed {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--bew-card-gap, 12px);
 }
 
 .dynamic-feed__items {
@@ -157,7 +159,7 @@ html.bewly-dynamic-drawn body {
 .dynamic-feed__end,
 .dynamic-feed__error {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-text-3);
   text-align: center;
 }
@@ -169,7 +171,7 @@ html.bewly-dynamic-drawn body {
 .dynamic-feed__retry {
   margin-left: 8px;
   padding: 2px 10px;
-  font-size: 13px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-text-1);
   cursor: pointer;
   background: var(--bew-fill-2);
@@ -184,7 +186,7 @@ html.bewly-dynamic-drawn body {
 .dynamic-feed__more {
   align-self: center;
   padding: 8px 20px;
-  font-size: 14px;
+  font-size: var(--bew-fs-control);
   color: var(--bew-text-2);
   cursor: pointer;
   background: var(--bew-fill-1);
@@ -220,12 +222,16 @@ html.bewly-dynamic-drawn body {
 .dynamic-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px;
+  gap: var(--bew-card-gap, 12px);
+  padding: var(--bew-space-16, 16px);
   background: var(--bew-content);
   border-radius: var(--bew-radius);
   box-shadow: var(--bew-shadow-1);
-  transition: box-shadow var(--bew-motion-fast) var(--bew-ease-out);
+  /* 悬停反馈全站统一：上浮 2px + 阴影从 shadow-1 升到 shadow-2。
+     这里原本只有阴影变化、没有位移，与专栏卡 / 直播卡不一致。 */
+  transition:
+    transform var(--bew-motion-base) var(--bew-ease-out),
+    box-shadow var(--bew-motion-base) var(--bew-ease-out);
   /* tab 是 sticky 的（top: 0），卡片滚到顶上时会被它盖住头部。
      scroll-margin 让「滚到某张卡」时给它留出 tab 的高度；
      这个变量由 .dynamic-page 定义并向下继承（卡片是它的后代）。 */
@@ -234,11 +240,12 @@ html.bewly-dynamic-drawn body {
 
 .dynamic-card:hover {
   box-shadow: var(--bew-shadow-2);
+  transform: translateY(var(--bew-hover-lift, -2px));
 }
 
 .dynamic-card__header {
   display: flex;
-  gap: 10px;
+  gap: var(--bew-space-8, 8px);
   align-items: flex-start;
 }
 
@@ -301,16 +308,16 @@ html.bewly-dynamic-drawn body {
 .dynamic-card__name-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--bew-space-8, 8px);
   align-items: center;
   min-width: 0;
 }
 
 .dynamic-card__name {
   overflow: hidden;
-  font-size: 14px;
+  font-size: var(--bew-fs-control);
   font-weight: 600;
-  line-height: 1.5;
+  line-height: var(--bew-lh-body);
   color: var(--bew-text-1);
   text-decoration: none;
   text-overflow: ellipsis;
@@ -327,7 +334,7 @@ html.bewly-dynamic-drawn body {
   max-width: 12em;
   padding: 0 6px;
   overflow: hidden;
-  font-size: 11px;
+  font-size: var(--bew-fs-micro);
   font-weight: 500;
   line-height: 18px;
   color: var(--bew-text-2);
@@ -351,8 +358,8 @@ html.bewly-dynamic-drawn body {
 }
 
 .dynamic-card__time {
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: var(--bew-fs-caption);
+  line-height: var(--bew-lh-body);
   color: var(--bew-text-3);
   text-decoration: none;
 }
@@ -363,8 +370,8 @@ html.bewly-dynamic-drawn body {
 
 .dynamic-card__topic {
   overflow: hidden;
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: var(--bew-fs-caption);
+  line-height: var(--bew-lh-body);
   color: var(--bew-theme-color);
   text-decoration: none;
   text-overflow: ellipsis;
@@ -378,7 +385,7 @@ html.bewly-dynamic-drawn body {
 .dynamic-card__body {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--bew-space-8, 8px);
 }
 /* #endregion */
 
@@ -392,8 +399,8 @@ html.bewly-dynamic-drawn body {
 .dynamic-text {
   margin: 0;
   overflow-wrap: anywhere;
-  font-size: 14px;
-  line-height: 1.72;
+  font-size: var(--bew-fs-control);
+  line-height: var(--bew-lh-reading);
   color: var(--bew-text-1);
   white-space: pre-wrap;
 }
@@ -428,7 +435,7 @@ html.bewly-dynamic-drawn body {
 .dynamic-text__toggle {
   align-self: flex-start;
   padding: 0;
-  font-size: 12.5px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-theme-color);
   cursor: pointer;
   background: transparent;
@@ -455,9 +462,9 @@ html.bewly-dynamic-drawn body {
 
 .dynamic-content__title {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--bew-fs-card-title);
   font-weight: 600;
-  line-height: 1.5;
+  line-height: var(--bew-lh-body);
   color: var(--bew-text-1);
 }
 
@@ -496,7 +503,7 @@ html.bewly-dynamic-drawn body {
   display: block;
   overflow: hidden;
   background: var(--bew-fill-2);
-  border-radius: 8px;
+  border-radius: var(--bew-radius-sm);
 }
 
 /* 多图固定方格；单图按接口给的比例（内联 aspect-ratio） */
@@ -538,7 +545,7 @@ html.bewly-dynamic-drawn body {
   text-decoration: none;
   background: var(--bew-fill-1);
   border: 1px solid var(--bew-border-color);
-  border-radius: 10px;
+  border-radius: var(--bew-radius-sm);
   transition: background-color var(--bew-motion-fast) var(--bew-ease-out);
 }
 
@@ -554,7 +561,7 @@ html.bewly-dynamic-drawn body {
   overflow: hidden;
   aspect-ratio: 16 / 9;
   background: var(--bew-fill-2);
-  border-radius: 8px;
+  border-radius: var(--bew-radius-sm);
 }
 
 .dynamic-video__cover .bewly-picture {
@@ -571,18 +578,17 @@ html.bewly-dynamic-drawn body {
 }
 
 /* 时长角标是压在**图片上的媒体遮罩**，不是主题表面：
-   白字 + 半透明黑底在任何主题下都必须保持对比度，所以这里不用 --bew-* 令牌
-   （与仓库既有 src/components/VideoCard/VideoCard.vue 的
-   `text="!white xs" bg="black opacity-60"` 完全一致）。 */
+   白字 + 半透明黑底在任何主题下都必须保持对比度，所以用专门的媒体令牌
+   （--bew-text-on-media / --bew-media-scrim，深浅主题同值，不随主题反转）。 */
 .dynamic-video__duration {
   position: absolute;
   right: 6px;
   bottom: 6px;
   padding: 0 4px;
-  font-size: 11px;
-  line-height: 1.5;
-  color: #fff;
-  background: rgb(0 0 0 / 0.72);
+  font-size: var(--bew-fs-micro);
+  line-height: var(--bew-lh-body);
+  color: var(--bew-text-on-media);
+  background: var(--bew-media-scrim);
   border-radius: 4px;
   font-variant-numeric: tabular-nums;
 }
@@ -598,7 +604,7 @@ html.bewly-dynamic-drawn body {
 .dynamic-video__badge {
   align-self: flex-start;
   padding: 0 5px;
-  font-size: 11px;
+  font-size: var(--bew-fs-micro);
   line-height: 16px;
   color: var(--bew-theme-color);
   background: var(--bew-theme-color-10);
@@ -608,9 +614,9 @@ html.bewly-dynamic-drawn body {
 .dynamic-video__title {
   display: -webkit-box;
   overflow: hidden;
-  font-size: 14px;
+  font-size: var(--bew-fs-control);
   font-weight: 500;
-  line-height: 1.5;
+  line-height: var(--bew-lh-body);
   color: var(--bew-text-1);
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
@@ -625,8 +631,8 @@ html.bewly-dynamic-drawn body {
 .dynamic-video__desc {
   display: -webkit-box;
   overflow: hidden;
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: var(--bew-fs-caption);
+  line-height: var(--bew-lh-body);
   color: var(--bew-text-3);
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
@@ -637,10 +643,10 @@ html.bewly-dynamic-drawn body {
 .dynamic-video__stats {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: var(--bew-space-8, 8px);
   margin-top: auto;
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: var(--bew-fs-caption);
+  line-height: var(--bew-lh-body);
   color: var(--bew-text-3);
   font-variant-numeric: tabular-nums;
 }
@@ -653,12 +659,12 @@ html.bewly-dynamic-drawn body {
   gap: 8px;
   padding: 10px 12px;
   background: var(--bew-fill-1);
-  border-radius: 10px;
+  border-radius: var(--bew-radius-sm);
 }
 
 .dynamic-quote__author {
   display: flex;
-  gap: 6px;
+  gap: var(--bew-space-8, 8px);
   align-items: center;
   min-width: 0;
   text-decoration: none;
@@ -689,9 +695,9 @@ html.bewly-dynamic-drawn body {
 
 .dynamic-quote__name {
   overflow: hidden;
-  font-size: 13px;
+  font-size: var(--bew-fs-secondary);
   font-weight: 600;
-  line-height: 1.5;
+  line-height: var(--bew-lh-body);
   color: var(--bew-text-1);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -711,7 +717,7 @@ html.bewly-dynamic-drawn body {
 }
 
 .dynamic-quote .dynamic-pics {
-  gap: 3px;
+  gap: var(--bew-space-4, 4px);
 }
 /* #endregion */
 
@@ -727,11 +733,11 @@ html.bewly-dynamic-drawn body {
 .dynamic-card__action {
   display: inline-flex;
   flex: 1 1 0;
-  gap: 6px;
+  gap: var(--bew-space-8, 8px);
   align-items: center;
   justify-content: center;
   height: 32px;
-  font-size: 12.5px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-text-3);
   text-decoration: none;
   border-radius: var(--bew-radius-sm);
@@ -769,7 +775,7 @@ html.bewly-dynamic-drawn body {
 .dynamic-skeleton__card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--bew-space-8, 8px);
   padding: 16px;
   background: var(--bew-content);
   border-radius: var(--bew-radius);
@@ -778,7 +784,7 @@ html.bewly-dynamic-drawn body {
 
 .dynamic-skeleton__header {
   display: flex;
-  gap: 10px;
+  gap: var(--bew-space-8, 8px);
   align-items: center;
 }
 
@@ -795,14 +801,14 @@ html.bewly-dynamic-drawn body {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--bew-space-8, 8px);
 }
 
 .dynamic-skeleton__line {
   width: 100%;
   height: 12px;
   background: var(--bew-fill-2);
-  border-radius: 6px;
+  border-radius: 4px;
   animation: dynamic-skeleton-pulse 1.6s ease-in-out infinite;
 }
 
@@ -824,7 +830,7 @@ html.bewly-dynamic-drawn body {
   width: 100%;
   height: 120px;
   background: var(--bew-fill-1);
-  border-radius: 10px;
+  border-radius: var(--bew-radius-sm);
   animation: dynamic-skeleton-pulse 1.6s ease-in-out infinite;
 }
 
@@ -847,7 +853,7 @@ html.bewly-dynamic-drawn body {
   }
 
   .dynamic-video {
-    gap: 10px;
+    gap: var(--bew-space-8, 8px);
     padding: 8px;
   }
 
@@ -861,7 +867,7 @@ html.bewly-dynamic-drawn body {
 
   .dynamic-tabs__tab {
     padding: 0 10px;
-    font-size: 13px;
+    font-size: var(--bew-fs-secondary);
   }
 }
 
@@ -899,3 +905,17 @@ html.bewly-dynamic-drawn body {
   }
 }
 /* #endregion */
+
+/* 原生 <button> / <input> 在 Chromium 里**不继承**字号，默认 13.3333px
+   （真机实测：消息页会话列表、直播页次要点因此比其它页小 1.5px）。
+   :where() 把特异性降到 0，任何显式 font-size 的类规则仍然优先。 */
+:where(
+  #bewly-dynamic-drawn-root button,
+  #bewly-dynamic-drawn-root input,
+  #bewly-dynamic-drawn-root select,
+  #bewly-dynamic-drawn-root textarea
+) {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}

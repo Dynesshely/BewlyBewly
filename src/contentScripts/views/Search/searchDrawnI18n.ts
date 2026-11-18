@@ -53,6 +53,12 @@ export interface SearchDrawnMessages {
   errorNative: string
   emptyTitle: string
   emptyDescription: string
+  /** 空态按钮：放宽筛选（清掉排序 / 时长 / 分区） */
+  emptyClearFilters: string
+  /** 空态按钮：在原版页面打开 */
+  emptyNative: string
+  /** 错误态二级出路说明 */
+  errorFallbackHint: string
 }
 
 const CMN_CN: SearchDrawnMessages = {
@@ -87,6 +93,9 @@ const CMN_CN: SearchDrawnMessages = {
   errorNative: '在原版页面打开',
   emptyTitle: '没有找到相关视频',
   emptyDescription: '换一个关键词，或放宽筛选条件再试试。',
+  emptyClearFilters: '清空筛选条件',
+  emptyNative: '在原版页面打开',
+  errorFallbackHint: '重试还是不行？可以清空筛选条件，或切到原版搜索页。',
 }
 
 const CMN_TW: SearchDrawnMessages = {
@@ -121,6 +130,9 @@ const CMN_TW: SearchDrawnMessages = {
   errorNative: '在原版頁面開啟',
   emptyTitle: '沒有找到相關影片',
   emptyDescription: '換一個關鍵字，或放寬篩選條件再試試。',
+  emptyClearFilters: '清空篩選條件',
+  emptyNative: '在原版頁面開啟',
+  errorFallbackHint: '重試還是不行？可以清空篩選條件，或切到原版搜尋頁。',
 }
 
 const JYUT: SearchDrawnMessages = {
@@ -134,6 +146,9 @@ const JYUT: SearchDrawnMessages = {
   errorNative: '喺原版頁面開啟',
   emptyTitle: '搵唔到相關影片',
   emptyDescription: '換個關鍵字，或者放寬篩選再搵過。',
+  emptyClearFilters: '清走晒篩選',
+  emptyNative: '喺原版頁面開啟',
+  errorFallbackHint: '再試都搵唔到？可以清走篩選，或者切去原版搜尋頁。',
 }
 
 const EN: SearchDrawnMessages = {
@@ -168,6 +183,9 @@ const EN: SearchDrawnMessages = {
   errorNative: 'Open in the original page',
   emptyTitle: 'No matching videos',
   emptyDescription: 'Try another keyword or loosen the filters.',
+  emptyClearFilters: 'Clear filters',
+  emptyNative: 'Open in the original page',
+  errorFallbackHint: 'Still failing? Clear the filters, or use the original search page.',
 }
 
 const MESSAGES: Record<ModuleLocale, SearchDrawnMessages> = {

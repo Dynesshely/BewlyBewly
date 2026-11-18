@@ -13,7 +13,10 @@
  */
 import type { SpaceSortId } from './constants'
 import type { ArcSearchItem, SpaceRelationStatResult, SpaceUpInfo } from './types'
+import BackToTopButton from '~/components/BackToTopButton/BackToTopButton.vue'
 import { useBewlyApp } from '~/composables/useAppProvider'
+import { useBackToTopButton } from '~/composables/useBackToTopButton'
+import { useDrawnPageKeyboardNav } from '~/composables/useDrawnPageKeyboardNav'
 import { numFormatter } from '~/utils/dataFormatter'
 import SpaceProfileCard from './components/SpaceProfileCard.vue'
 import SpaceVideoGrid from './components/SpaceVideoGrid.vue'
@@ -59,6 +62,16 @@ const totalText = computed(() => {
   return t.value.videoCount.replace('{count}', numFormatter(count).trim())
 })
 
+// #region 键盘导航（J / K / ↑ / ↓ / Enter / Esc / Home / End）
+//
+// 注册表（constants/shortcutRegistry 的 space scope）早就登记了这四个动作，
+// 命令面板和 ? 帮助也把「当前页可用」标出来了，但此前没有任何实现（真机按 J/K 无反应）。
+const pageNav = useDrawnPageKeyboardNav()
+
+// 卡片网格由 SpaceVideoGrid 渲染，列表刷新后高亮下标可能越界 → 收敛
+watch(() => sort.value, () => pageNav.reconcile())
+// #endregion
+
 /**
  * 切排序：重置网格并重拉第 1 页。
  *
@@ -71,8 +84,16 @@ function selectSort(next: SpaceSortId) {
   sort.value = next
   // 新排序是另一份列表，停在原滚动位置会让人以为内容没变
   handleBackToTop()
+  // 换排序后旧高亮就不再指向「刚看的那张」了，清掉避免误导
+  pageNav.clear()
   void gridRef.value?.reload(next)
 }
+
+// #region 回到顶部 / 底部
+//
+// 空间页是无限滚动列表，滚过两屏就想回顶是高频动作；此前这一页没有回顶按钮。
+const { showTop, showBottom, scrollToTop, scrollToBottom } = useBackToTopButton({ withBottom: true })
+// #endregion
 </script>
 
 <template>
@@ -102,6 +123,13 @@ function selectSort(next: SpaceSortId) {
       :initial="initialVideos"
       :initial-total="initialTotal"
       :up="upBrief"
+    />
+
+    <BackToTopButton
+      :show-top="showTop"
+      :show-bottom="showBottom"
+      @top="scrollToTop"
+      @bottom="scrollToBottom"
     />
   </div>
 </template>

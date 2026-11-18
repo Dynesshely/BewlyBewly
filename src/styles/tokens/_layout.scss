@@ -1,0 +1,59 @@
+// 全站页面骨架 / 间距令牌（UI 统一轮）。
+//
+// 审计结论（CDP 真机，8 个自绘页）：页面容器三套宽度算法、四套顶部留白、
+// 两套区块间距、四套网格间距：
+//   · 容器横向留白：calc(100% - 150px)（空间/搜索/热门/分区/动态）、
+//     calc(100% - 96px)（消息）、calc(100% - 40px)（直播）、clamp(16px,3vw,48px)（专栏）
+//   · 顶部留白：16px（空间/搜索/消息/动态/直播）、10px（热门/分区）、24px（专栏）
+//   · 底部留白：32 / 40 / 48 / 20 / 24px 各一份
+//   · 区块间距：16px（空间/搜索/热门/分区）、12px（消息/动态）
+//   · 网格间距：24px 20px / 24px 16px / 20px 14px
+// 全部收敛到下面这一组，页面只写 var(--bew-page-*) / var(--bew-gap-*)。
+
+// 页面左右留白（单边）。三档断点与既有 @media 保持一致：<=900 / 默认 / >=1024
+$page-inset: 75px;
+$page-inset-wide: 100px;
+$page-inset-narrow: 16px;
+
+// 页面上下留白
+$page-pad-top: 16px;
+$page-pad-bottom: 32px;
+
+// 区块之间（页头 / 吸顶 tab / 网格）与卡片之间的间距
+$section-gap: 16px;
+$card-gap: 12px;
+
+// 视频 / 文章网格的行列间距
+$grid-gap-row: 24px;
+$grid-gap-col: 20px;
+
+/// 在 `:root` / `:host` 上输出布局令牌
+@mixin tokens {
+  --bew-page-inset: #{$page-inset};
+  --bew-page-inset-wide: #{$page-inset-wide};
+  --bew-page-inset-narrow: #{$page-inset-narrow};
+  --bew-page-pad-top: #{$page-pad-top};
+  --bew-page-pad-bottom: #{$page-pad-bottom};
+  --bew-section-gap: #{$section-gap};
+  --bew-card-gap: #{$card-gap};
+  --bew-grid-gap-row: #{$grid-gap-row};
+  --bew-grid-gap-col: #{$grid-gap-col};
+}
+
+/// 统一的「页面宽度约束」mixin：外壳 inner 直接 @include，避免各页各写一套 calc。
+/// 三档断点：<=900 收窄到窄屏留白；>=1024 用宽屏留白；其余用默认留白。
+@mixin page-inner {
+  width: calc(100% - var(--bew-page-inset, #{75px}) * 2);
+  max-width: var(--bew-page-max-width, 2280px);
+  margin: 0 auto;
+  padding: var(--bew-page-pad-top, #{16px}) 0 var(--bew-page-pad-bottom, #{32px});
+
+  @media (min-width: 1024px) {
+    width: calc(100% - var(--bew-page-inset-wide, #{100px}) * 2);
+  }
+
+  @media (max-width: 900px) {
+    width: calc(100% - var(--bew-page-inset-narrow, #{16px}) * 2);
+    padding: var(--bew-space-8, 8px) 0 var(--bew-space-24, 24px);
+  }
+}

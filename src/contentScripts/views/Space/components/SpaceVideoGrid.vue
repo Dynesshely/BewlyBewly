@@ -224,6 +224,7 @@ defineExpose({ reload, loadMore })
       :title="t.errorTitle"
       :message="errorMessage"
       :retry-label="t.retry"
+      :fallback-hint="t.errorFallbackHint"
       @retry="reload()"
     >
       <a class="space-grid__link" :href="nativeUrl">
@@ -231,7 +232,15 @@ defineExpose({ reload, loadMore })
       </a>
     </ErrorState>
 
-    <EmptyState v-else :title="t.emptyTitle" :description="t.emptyDescription" />
+    <!-- 空态也给「下一步做什么」：原版页面 / 重新加载，而不是只留一行说明 -->
+    <EmptyState v-else :title="t.emptyTitle" :description="t.emptyDescription">
+      <a class="space-grid__link" :href="nativeUrl">
+        {{ t.emptyNative }}
+      </a>
+      <button class="space-grid__empty-reload" type="button" @click="reload()">
+        {{ t.emptyReload }}
+      </button>
+    </EmptyState>
 
     <!-- 追加失败的提示 + 重试（保留已有列表） -->
     <p v-if="cards.length && errorMessage" class="space-grid__error" role="alert">

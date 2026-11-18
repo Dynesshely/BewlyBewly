@@ -1,6 +1,9 @@
+@use "./tokens/interaction" as interaction;
+@use "./tokens/layout" as layout;
 @use "./tokens/motion" as motion;
 @use "./tokens/radius" as radius;
 @use "./tokens/spacing" as spacing;
+@use "./tokens/typography" as typography;
 
 * {
   outline-color: var(--bew-theme-color-80);
@@ -475,6 +478,9 @@ html.bewly-zen:not(.bewly-zen--peek) #biliMainHeader {
   @include motion.tokens;
   @include spacing.tokens;
   @include radius.tokens;
+  @include typography.tokens;
+  @include layout.tokens;
+  @include interaction.tokens;
 }
 
 // prefers-reduced-motion 收敛到一处：把动效时长令牌压成 0ms。

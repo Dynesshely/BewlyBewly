@@ -5,6 +5,7 @@ import type { Video } from '~/components/VideoCard/types'
 import { computed, reactive, ref, toValue } from 'vue'
 import { useToast } from 'vue-toastification'
 
+import { showUndoableToast } from '~/composables/useUndoableAction'
 import api from '~/utils/api'
 import { getCSRF, getUserID } from '~/utils/main'
 
@@ -275,7 +276,11 @@ export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefi
    *   把已知收藏夹整体作为移除候选（取消收藏）。
    * - 失败时回滚会话内的收藏归属、真实状态缓存与图标。
    */
-  async function commitFavorite(nextFolderIds: number[], removalCandidates: number[] = []): Promise<boolean> {
+  async function commitFavorite(
+    nextFolderIds: number[],
+    removalCandidates: number[] = [],
+    options: { silent?: boolean } = {},
+  ): Promise<boolean> {
     if (favoritePending.value)
       return false
     if (!isLoggedIn()) {
@@ -314,7 +319,8 @@ export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefi
       const toRemove = candidates.filter(id => !nextFolderIds.includes(id))
 
       if (toAdd.length === 0 && toRemove.length === 0 && previousStatus === (nextFolderIds.length > 0)) {
-        toast.info(messages.value.favoriteNoChange)
+        if (!options.silent)
+          toast.info(messages.value.favoriteNoChange)
         return true
       }
 
@@ -325,7 +331,8 @@ export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefi
 
       if (toAdd.length === 0 && toRemove.length === 0) {
         // 只有状态需要对齐（例如服务端已收藏、本次仅确认）
-        toast.success(messages.value.favoriteOk)
+        if (!options.silent)
+          toast.success(messages.value.favoriteOk)
         return true
       }
 
@@ -348,12 +355,27 @@ export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefi
         return false
       }
 
-      if (toRemove.length > 0 && toAdd.length === 0)
-        toast.success(messages.value.favoriteRemoved)
-      else if (toAdd.length > 0 && toRemove.length === 0)
+      if (options.silent)
+        return true
+      if (toRemove.length > 0 && toAdd.length === 0) {
+        // 取消收藏是不可逆操作：给 6 秒撤销窗口，而不是只报一句「已取消收藏」。
+        // 撤销时把刚才移除的那些收藏夹原样加回去。
+        const undoFolders = [...toRemove]
+        void showUndoableToast({
+          key: `favorite:${resolvedAid}`,
+          message: messages.value.favoriteRemoved,
+          undoLabel: messages.value.undo,
+          undoneLabel: messages.value.undoDone,
+          undoFailedLabel: messages.value.undoFailed,
+          onUndo: () => commitFavorite(undoFolders, [], { silent: true }),
+        })
+      }
+      else if (toAdd.length > 0 && toRemove.length === 0) {
         toast.success(messages.value.favoriteOk)
-      else
+      }
+      else {
         toast.success(messages.value.favoriteUpdated)
+      }
       return true
     }
     catch {
@@ -428,6 +450,37 @@ export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefi
   }
 
   /**
+   * 撤销「移出稍后再看」：把条目重新加回去。
+   *
+   * 只在撤销窗口里被调用，返回是否成功（失败时调用方弹「撤销失败」，不静默吞）。
+   * 状态先乐观写回，请求失败再撤销回原状态 —— 与正向操作同一套回滚约定。
+   */
+  async function restoreWatchLater(aid: number, previous: boolean): Promise<boolean> {
+    if (typeof aid !== 'number' || !Number.isFinite(aid) || aid <= 0)
+      return false
+    markWatchLaterPending(aid, true)
+    setWatchLaterStatus(aid, true)
+    try {
+      const result = await api.watchlater.saveToWatchLater({
+        aid,
+        csrf: getCSRF(),
+      })
+      if (readErrorCode(result) !== 0) {
+        setWatchLaterStatus(aid, previous)
+        return false
+      }
+      return true
+    }
+    catch {
+      setWatchLaterStatus(aid, previous)
+      return false
+    }
+    finally {
+      markWatchLaterPending(aid, false)
+    }
+  }
+
+  /**
    * 稍后再看开关（第 19 轮）：
    *
    * - 未加入 / 无记录 → `saveToWatchLater` 加入；
@@ -489,7 +542,22 @@ export function useCardQuickActions(videoSource: MaybeRefOrGetter<Video | undefi
         return
       }
 
-      toast.success(target ? messages.value.watchLaterOk : messages.value.watchLaterRemoved)
+      // 移出稍后再看是不可逆操作：给 6 秒撤销窗口（加回去 = 重新 saveToWatchLater）。
+      // 加入的方向保持原来的即时成功提示，不需要撤销。
+      if (!target) {
+        const undoAid = resolvedAid
+        void showUndoableToast({
+          key: `watchlater:${undoAid}`,
+          message: messages.value.watchLaterRemoved,
+          undoLabel: messages.value.undo,
+          undoneLabel: messages.value.undoDone,
+          undoFailedLabel: messages.value.undoFailed,
+          onUndo: () => restoreWatchLater(undoAid, previous ?? false),
+        })
+      }
+      else {
+        toast.success(messages.value.watchLaterOk)
+      }
     }
     catch {
       setWatchLaterStatus(resolvedAid, previous ?? false)

@@ -194,6 +194,17 @@
   // #endregion
 
   --bew-border-color: rgb(131 131 145 / 18%);
+
+  // #region 媒体 / 主题色底上的前景色（UI 统一轮）
+  // 封面图、主题色胶囊、徽标这类「底色本身是深色或高饱和色」的位置，
+  // 前景固定用白色，深浅主题一致；遮罩同理。原先各页面各写 #fff / rgb(0 0 0 / …)，
+  // 收敛到这里后只有一处定义。
+  --bew-text-on-media: hsl(0 0% 100%);
+  --bew-text-on-theme: hsl(0 0% 100%);
+  --bew-media-scrim: rgb(0 0 0 / 72%);
+  --bew-media-scrim-soft: rgb(0 0 0 / 60%);
+  --bew-media-shadow: 0 1px 4px rgb(0 0 0 / 60%);
+  // #endregion
 }
 
 :host(.dark),

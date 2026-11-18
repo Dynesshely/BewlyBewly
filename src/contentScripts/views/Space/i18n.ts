@@ -27,6 +27,12 @@ export interface SpaceMessages {
   errorNative: string
   emptyTitle: string
   emptyDescription: string
+  /** 空态主按钮：在原版页面打开（空态也给一个明确的下一步） */
+  emptyNative: string
+  /** 空态次按钮：重新加载 */
+  emptyReload: string
+  /** 错误态二级出路说明（重试之外还能做什么） */
+  errorFallbackHint: string
   /** 关注 / 已关注 / 互相关注 */
   follow: string
   followed: string
@@ -58,6 +64,9 @@ const CMN_CN: SpaceMessages = {
   errorNative: '在原版页面打开',
   emptyTitle: '还没有投稿',
   emptyDescription: '这个 UP 主暂时没有可展示的视频，稍后再来看看吧。',
+  emptyNative: '在原版页面打开',
+  emptyReload: '重新加载',
+  errorFallbackHint: '重试还是不行？可以切到原版页面查看，或稍后再回来。',
   follow: '关注',
   followed: '已关注',
   followMutual: '互相关注',
@@ -83,6 +92,9 @@ const CMN_TW: SpaceMessages = {
   errorNative: '在原版頁面開啟',
   emptyTitle: '還沒有投稿',
   emptyDescription: '這個 UP 主暫時沒有可展示的影片，稍後再來看看吧。',
+  emptyNative: '在原版頁面開啟',
+  emptyReload: '重新載入',
+  errorFallbackHint: '重試還是不行？可以切到原版頁面查看，或稍後再回來。',
   follow: '關注',
   followed: '已關注',
   followMutual: '互相關注',
@@ -103,6 +115,9 @@ const JYUT: SpaceMessages = {
   retry: '再試一次',
   errorNative: '喺原版頁面開啟',
   emptyDescription: '呢個 UP 主暫時冇嘢可以睇，遲啲再嚟睇下。',
+  emptyNative: '喺原版頁面開啟',
+  emptyReload: '再載入一次',
+  errorFallbackHint: '再試都唔得？可以切去原版頁面睇，或者遲啲再返嚟。',
   followLogin: '要登入咗 B 站帳號先得',
   followFailed: '搞唔到',
   fans: '粉絲',
@@ -122,6 +137,9 @@ const EN: SpaceMessages = {
   errorNative: 'Open in the original page',
   emptyTitle: 'No uploads yet',
   emptyDescription: 'This creator has no videos to show right now. Check back later.',
+  emptyNative: 'Open in the original page',
+  emptyReload: 'Reload',
+  errorFallbackHint: 'Still failing? Try the original page, or come back later.',
   follow: 'Follow',
   followed: 'Following',
   followMutual: 'Mutual',

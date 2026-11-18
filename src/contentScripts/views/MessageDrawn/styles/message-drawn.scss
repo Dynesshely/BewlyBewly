@@ -35,7 +35,7 @@ html.bewly-message-drawn-api body {
   display: block;
   font-family: inherit;
   font-size: var(--bew-base-font-size, 14.8px);
-  line-height: 1.5;
+  line-height: var(--bew-lh-body);
   color: var(--bew-text-1);
   pointer-events: none;
   -webkit-font-smoothing: antialiased;
@@ -70,23 +70,23 @@ html.bewly-message-drawn-api body {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  width: calc(100% - 96px);
+  width: calc(100% - var(--bew-page-inset, 75px) * 2);
   max-width: var(--bew-page-max-width, 2280px);
   min-height: 0;
   margin: 0 auto;
-  padding: 16px 0 20px;
+  padding: var(--bew-page-pad-top, 16px) 0 var(--bew-page-pad-bottom, 32px);
 }
 
 @media (min-width: 1024px) {
   .bewly-message-shell__inner {
-    width: calc(100% - 160px);
+    width: calc(100% - var(--bew-page-inset-wide, 100px) * 2);
   }
 }
 
 @media (max-width: 900px) {
   .bewly-message-shell__inner {
-    width: calc(100% - 24px);
-    padding: 8px 0 12px;
+    width: calc(100% - var(--bew-page-inset-narrow, 16px) * 2);
+    padding: var(--bew-space-8, 8px) 0 var(--bew-space-24, 24px);
   }
 }
 /* #endregion */
@@ -96,7 +96,7 @@ html.bewly-message-drawn-api body {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--bew-section-gap, 16px);
   min-height: 0;
 }
 
@@ -130,9 +130,9 @@ html.bewly-message-drawn-api body {
 .msg-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: var(--bew-space-4, 4px);
   align-items: center;
-  padding: 6px;
+  padding: var(--bew-space-8, 8px);
   background: var(--bew-elevated);
   border: 1px solid transparent;
   border-radius: var(--bew-radius);
@@ -141,12 +141,12 @@ html.bewly-message-drawn-api body {
 
 .msg-tabs__tab {
   display: inline-flex;
-  gap: 6px;
+  gap: var(--bew-space-8, 8px);
   align-items: center;
   height: 32px;
   padding: 0 14px;
   font-family: inherit;
-  font-size: 13.5px;
+  font-size: var(--bew-fs-control);
   line-height: 1;
   color: var(--bew-text-2);
   white-space: nowrap;
@@ -179,7 +179,7 @@ html.bewly-message-drawn-api body {
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
-  font-size: 10.5px;
+  font-size: var(--bew-fs-badge);
   font-weight: 600;
   line-height: 16px;
   color: var(--bew-text-1);
@@ -208,11 +208,11 @@ html.bewly-message-drawn-api body {
 .msg-sessions__search {
   display: flex;
   flex: 0 0 auto;
-  gap: 6px;
+  gap: var(--bew-space-8, 8px);
   align-items: center;
-  height: 34px;
-  margin: 8px 8px 0;
-  padding: 0 10px;
+  height: var(--bew-control-h-sm, 32px);
+  margin: var(--bew-space-8, 8px) var(--bew-space-8, 8px) 0;
+  padding: 0 var(--bew-space-12, 12px);
   background: var(--bew-fill-1);
   border-radius: 999px;
 }
@@ -229,7 +229,7 @@ html.bewly-message-drawn-api body {
   height: 100%;
   padding: 0;
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-text-1);
   background: transparent;
   border: 0;
@@ -262,7 +262,7 @@ html.bewly-message-drawn-api body {
 
 .msg-sessions__item {
   display: flex;
-  gap: 10px;
+  gap: var(--bew-space-8, 8px);
   align-items: center;
   width: 100%;
   padding: 8px;
@@ -321,7 +321,7 @@ html.bewly-message-drawn-api body {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--bew-space-4, 4px);
   min-width: 0;
 }
 
@@ -335,7 +335,7 @@ html.bewly-message-drawn-api body {
 .msg-sessions__name {
   flex: 1 1 auto;
   overflow: hidden;
-  font-size: 13.5px;
+  font-size: var(--bew-fs-control);
   font-weight: 600;
   color: var(--bew-text-1);
   text-overflow: ellipsis;
@@ -344,7 +344,7 @@ html.bewly-message-drawn-api body {
 
 .msg-sessions__time {
   flex: 0 0 auto;
-  font-size: 11.5px;
+  font-size: var(--bew-fs-micro);
   color: var(--bew-text-3);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -353,7 +353,7 @@ html.bewly-message-drawn-api body {
 .msg-sessions__summary {
   flex: 1 1 auto;
   overflow: hidden;
-  font-size: 12.5px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-text-3);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -365,10 +365,10 @@ html.bewly-message-drawn-api body {
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
-  font-size: 10.5px;
+  font-size: var(--bew-fs-badge);
   font-weight: 600;
   line-height: 18px;
-  color: #fff;
+  color: var(--bew-text-on-theme);
   text-align: center;
   background: var(--bew-error-color, #f56c6c);
   border-radius: 999px;
@@ -387,7 +387,7 @@ html.bewly-message-drawn-api body {
 
 .msg-sessions__hint {
   margin: 8px 0;
-  font-size: 12px;
+  font-size: var(--bew-fs-caption);
   color: var(--bew-text-3);
   text-align: center;
 }
@@ -404,21 +404,21 @@ html.bewly-message-drawn-api body {
 
 .msg-sessions__empty-title {
   margin: 0 0 4px;
-  font-size: 13.5px;
+  font-size: var(--bew-fs-control);
   font-weight: 600;
   color: var(--bew-text-1);
 }
 
 .msg-sessions__empty-desc {
   margin: 0;
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: var(--bew-fs-caption);
+  line-height: var(--bew-lh-body);
   color: var(--bew-text-3);
 }
 
 .msg-sessions__error {
   margin: 8px 4px;
-  font-size: 12.5px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-error-color);
   text-align: center;
 }
@@ -427,7 +427,7 @@ html.bewly-message-drawn-api body {
   margin-left: 6px;
   padding: 2px 10px;
   font-family: inherit;
-  font-size: 12px;
+  font-size: var(--bew-fs-caption);
   color: var(--bew-text-1);
   cursor: pointer;
   background: var(--bew-fill-2);
@@ -439,13 +439,13 @@ html.bewly-message-drawn-api body {
 .msg-sessions__skeletons {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--bew-space-8, 8px);
   padding: 8px;
 }
 
 .msg-sessions__skeleton {
   display: flex;
-  gap: 10px;
+  gap: var(--bew-space-8, 8px);
   align-items: center;
 }
 
@@ -462,7 +462,7 @@ html.bewly-message-drawn-api body {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--bew-space-8, 8px);
 }
 
 .msg-sessions__skeleton-line {
@@ -490,7 +490,7 @@ html.bewly-message-drawn-api body {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--bew-space-8, 8px);
   align-items: center;
   justify-content: center;
   padding: 32px;
@@ -504,14 +504,14 @@ html.bewly-message-drawn-api body {
 
 .msg-chat__placeholder-title {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--bew-fs-card-title);
   font-weight: 600;
   color: var(--bew-text-1);
 }
 
 .msg-chat__placeholder-desc {
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-text-3);
 }
 
@@ -529,8 +529,8 @@ html.bewly-message-drawn-api body {
   display: none;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: var(--bew-control-h-sm, 32px);
+  height: var(--bew-control-h-sm, 32px);
   font-size: 16px;
   color: var(--bew-text-2);
   cursor: pointer;
@@ -552,7 +552,7 @@ html.bewly-message-drawn-api body {
 
 .msg-chat__head-name {
   overflow: hidden;
-  font-size: 14px;
+  font-size: var(--bew-fs-control);
   font-weight: 600;
   color: var(--bew-text-1);
   text-overflow: ellipsis;
@@ -561,7 +561,7 @@ html.bewly-message-drawn-api body {
 
 .msg-chat__head-flag {
   padding: 1px 8px;
-  font-size: 11px;
+  font-size: var(--bew-fs-micro);
   color: var(--bew-text-3);
   background: var(--bew-fill-1);
   border-radius: 999px;
@@ -587,7 +587,7 @@ html.bewly-message-drawn-api body {
 
 .msg-chat__hint {
   margin: 4px 0 8px;
-  font-size: 11.5px;
+  font-size: var(--bew-fs-micro);
   color: var(--bew-text-3);
   text-align: center;
 }
@@ -597,7 +597,7 @@ html.bewly-message-drawn-api body {
   padding: 4px 14px;
   margin-bottom: 8px;
   font-family: inherit;
-  font-size: 12px;
+  font-size: var(--bew-fs-caption);
   color: var(--bew-text-2);
   cursor: pointer;
   background: var(--bew-fill-1);
@@ -625,7 +625,7 @@ html.bewly-message-drawn-api body {
 
 .msg-chat__time {
   margin: 0;
-  font-size: 11.5px;
+  font-size: var(--bew-fs-micro);
   color: var(--bew-text-3);
   text-align: center;
 }
@@ -652,7 +652,7 @@ html.bewly-message-drawn-api body {
 
 .msg-chat__bubble-avatar.is-fallback {
   display: grid;
-  font-size: 13px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-text-2);
   background: var(--bew-fill-2);
   place-items: center;
@@ -661,8 +661,8 @@ html.bewly-message-drawn-api body {
 .msg-chat__bubble {
   max-width: min(68%, 560px);
   padding: 8px 12px;
-  font-size: 13.5px;
-  line-height: 1.6;
+  font-size: var(--bew-fs-control);
+  line-height: var(--bew-lh-body);
   color: var(--bew-text-1);
   overflow-wrap: anywhere;
   background: var(--bew-fill-2);
@@ -671,7 +671,7 @@ html.bewly-message-drawn-api body {
 }
 
 .msg-chat__bubble-wrap.is-mine .msg-chat__bubble {
-  color: #fff;
+  color: var(--bew-text-on-theme);
   background: var(--bew-theme-color);
   border-top-left-radius: var(--bew-radius);
   border-top-right-radius: 4px;
@@ -728,36 +728,36 @@ html.bewly-message-drawn-api body {
 .msg-chat__share-title {
   display: -webkit-box;
   overflow: hidden;
-  font-size: 12.5px;
-  line-height: 1.45;
+  font-size: var(--bew-fs-secondary);
+  line-height: var(--bew-lh-body);
   color: var(--bew-text-1);
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
 .msg-chat__share-author {
-  font-size: 11.5px;
+  font-size: var(--bew-fs-micro);
   color: var(--bew-text-3);
 }
 
 .msg-chat__card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--bew-space-8, 8px);
   width: 260px;
 }
 
 .msg-chat__card-title {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--bew-fs-secondary);
   font-weight: 600;
   color: var(--bew-text-1);
 }
 
 .msg-chat__card-text {
   margin: 0;
-  font-size: 12.5px;
-  line-height: 1.55;
+  font-size: var(--bew-fs-secondary);
+  line-height: var(--bew-lh-body);
   color: var(--bew-text-2);
   white-space: pre-wrap;
 }
@@ -768,7 +768,7 @@ html.bewly-message-drawn-api body {
 }
 
 .msg-chat__card-link {
-  font-size: 12px;
+  font-size: var(--bew-fs-caption);
   color: var(--bew-theme-color);
   text-decoration: none;
 }
@@ -779,7 +779,7 @@ html.bewly-message-drawn-api body {
 
 .msg-chat__unsupported {
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-text-3);
 }
 
@@ -796,20 +796,20 @@ html.bewly-message-drawn-api body {
 
 .msg-chat__empty-title {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--bew-fs-control);
   font-weight: 600;
   color: var(--bew-text-1);
 }
 
 .msg-chat__empty-desc {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--bew-fs-caption);
   color: var(--bew-text-3);
 }
 
 .msg-chat__error {
   margin: 8px 0;
-  font-size: 12.5px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-error-color);
   text-align: center;
 }
@@ -818,7 +818,7 @@ html.bewly-message-drawn-api body {
   margin-left: 6px;
   padding: 2px 10px;
   font-family: inherit;
-  font-size: 12px;
+  font-size: var(--bew-fs-caption);
   color: var(--bew-text-1);
   cursor: pointer;
   background: var(--bew-fill-2);
@@ -830,7 +830,7 @@ html.bewly-message-drawn-api body {
 .msg-chat__skeletons {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--bew-space-8, 8px);
   padding: 8px 0;
 }
 
@@ -907,7 +907,7 @@ html.bewly-message-drawn-api body {
 
 .msg-feed__avatar.is-fallback {
   display: grid;
-  font-size: 14px;
+  font-size: var(--bew-fs-control);
   color: var(--bew-text-2);
   place-items: center;
 }
@@ -923,11 +923,11 @@ html.bewly-message-drawn-api body {
 .msg-feed__line {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--bew-space-8, 8px);
   align-items: baseline;
   margin: 0;
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: var(--bew-fs-secondary);
+  line-height: var(--bew-lh-body);
 }
 
 .msg-feed__actor {
@@ -940,7 +940,7 @@ html.bewly-message-drawn-api body {
 }
 
 .msg-feed__count {
-  font-size: 12px;
+  font-size: var(--bew-fs-caption);
   color: var(--bew-text-3);
 }
 
@@ -948,8 +948,8 @@ html.bewly-message-drawn-api body {
   display: -webkit-box;
   margin: 0;
   overflow: hidden;
-  font-size: 13px;
-  line-height: 1.55;
+  font-size: var(--bew-fs-secondary);
+  line-height: var(--bew-lh-body);
   color: var(--bew-text-1);
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
@@ -960,8 +960,8 @@ html.bewly-message-drawn-api body {
   display: -webkit-box;
   margin: 0;
   overflow: hidden;
-  font-size: 12.5px;
-  line-height: 1.5;
+  font-size: var(--bew-fs-secondary);
+  line-height: var(--bew-lh-body);
   color: var(--bew-text-2);
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -969,7 +969,7 @@ html.bewly-message-drawn-api body {
 
 .msg-feed__time {
   margin: 0;
-  font-size: 11.5px;
+  font-size: var(--bew-fs-micro);
   color: var(--bew-text-3);
   font-variant-numeric: tabular-nums;
 }
@@ -984,7 +984,7 @@ html.bewly-message-drawn-api body {
 
 .msg-feed__hint {
   margin: 12px 0;
-  font-size: 12px;
+  font-size: var(--bew-fs-caption);
   color: var(--bew-text-3);
   text-align: center;
 }
@@ -996,7 +996,7 @@ html.bewly-message-drawn-api body {
 
 .msg-feed__inline-error {
   margin: 8px 0;
-  font-size: 12.5px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-error-color);
   text-align: center;
 }
@@ -1005,7 +1005,7 @@ html.bewly-message-drawn-api body {
   margin-left: 6px;
   padding: 2px 10px;
   font-family: inherit;
-  font-size: 12px;
+  font-size: var(--bew-fs-caption);
   color: var(--bew-text-1);
   cursor: pointer;
   background: var(--bew-fill-2);
@@ -1029,7 +1029,7 @@ html.bewly-message-drawn-api body {
 .msg-system__skeletons {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--bew-space-16, 16px);
   padding: 16px 12px;
 }
 
@@ -1055,7 +1055,7 @@ html.bewly-message-drawn-api body {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--bew-space-8, 8px);
 }
 
 .msg-feed__skeleton-line,
@@ -1109,7 +1109,7 @@ html.bewly-message-drawn-api body {
 
 .msg-system__logo.is-fallback {
   display: grid;
-  font-size: 17px;
+  font-size: var(--bew-fs-section);
   color: var(--bew-theme-color);
   background: var(--bew-theme-color-10);
   place-items: center;
@@ -1135,7 +1135,7 @@ html.bewly-message-drawn-api body {
   flex: 1 1 auto;
   margin: 0;
   overflow: hidden;
-  font-size: 13.5px;
+  font-size: var(--bew-fs-control);
   font-weight: 600;
   color: var(--bew-text-1);
   text-overflow: ellipsis;
@@ -1144,7 +1144,7 @@ html.bewly-message-drawn-api body {
 
 .msg-system__time {
   flex: 0 0 auto;
-  font-size: 11.5px;
+  font-size: var(--bew-fs-micro);
   color: var(--bew-text-3);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -1154,8 +1154,8 @@ html.bewly-message-drawn-api body {
   display: -webkit-box;
   margin: 0;
   overflow: hidden;
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: var(--bew-fs-secondary);
+  line-height: var(--bew-lh-body);
   color: var(--bew-text-2);
   overflow-wrap: anywhere;
   white-space: pre-wrap;
@@ -1165,7 +1165,7 @@ html.bewly-message-drawn-api body {
 
 .msg-system__link {
   align-self: flex-start;
-  font-size: 12px;
+  font-size: var(--bew-fs-caption);
   color: var(--bew-theme-color);
   text-decoration: none;
 }
@@ -1176,7 +1176,7 @@ html.bewly-message-drawn-api body {
 
 .msg-system__hint {
   margin: 12px 0;
-  font-size: 12px;
+  font-size: var(--bew-fs-caption);
   color: var(--bew-text-3);
   text-align: center;
 }
@@ -1188,7 +1188,7 @@ html.bewly-message-drawn-api body {
 
 .msg-system__inline-error {
   margin: 8px 0;
-  font-size: 12.5px;
+  font-size: var(--bew-fs-secondary);
   color: var(--bew-error-color);
   text-align: center;
 }
@@ -1197,7 +1197,7 @@ html.bewly-message-drawn-api body {
   margin-left: 6px;
   padding: 2px 10px;
   font-family: inherit;
-  font-size: 12px;
+  font-size: var(--bew-fs-caption);
   color: var(--bew-text-1);
   cursor: pointer;
   background: var(--bew-fill-2);
@@ -1292,3 +1292,17 @@ html.bewly-message-drawn-api body {
   }
 }
 /* #endregion */
+
+/* 原生 <button> / <input> 在 Chromium 里**不继承**字号，默认 13.3333px
+   （真机实测：消息页会话列表、直播页次要点因此比其它页小 1.5px）。
+   :where() 把特异性降到 0，任何显式 font-size 的类规则仍然优先。 */
+:where(
+  #bewly-message-drawn-root button,
+  #bewly-message-drawn-root input,
+  #bewly-message-drawn-root select,
+  #bewly-message-drawn-root textarea
+) {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}

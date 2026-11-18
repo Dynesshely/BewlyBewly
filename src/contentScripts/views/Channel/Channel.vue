@@ -11,6 +11,9 @@
 import type { ChannelNavItem } from './constants'
 import type { SubRegionTab } from './dom'
 import type { RegionArchive } from './types'
+import BackToTopButton from '~/components/BackToTopButton/BackToTopButton.vue'
+import { useBackToTopButton } from '~/composables/useBackToTopButton'
+import { useDrawnPageKeyboardNav } from '~/composables/useDrawnPageKeyboardNav'
 import ChannelFeed from './components/ChannelFeed.vue'
 import ChannelNav from './components/ChannelNav.vue'
 import SubRegionTabs from './components/SubRegionTabs.vue'
@@ -32,6 +35,20 @@ const title = computed(() => {
   const name = props.regionName || props.slug
   return t.value.pageTitle.replace('{name}', name)
 })
+
+// #region 键盘导航（J / K / ↑ / ↓ / Enter / Esc / Home / End）
+//
+// 分区页是无限滚动的卡片流，此前只能在卡片之间用鼠标找；
+// 键盘语义与首页 / 空间页保持完全一致（同一套 composable）。
+const pageNav = useDrawnPageKeyboardNav()
+
+// 一级分区切换会整页重建（mount.ts 重新接管），这里只做防御性收敛
+watch(() => props.slug, () => pageNav.reconcile())
+// #endregion
+
+// #region 回到顶部
+const { showTop, scrollToTop } = useBackToTopButton()
+// #endregion
 </script>
 
 <template>
@@ -46,5 +63,7 @@ const title = computed(() => {
     </header>
 
     <ChannelFeed :from-region="fromRegion" :initial="initialArchives" />
+
+    <BackToTopButton :show-top="showTop" @top="scrollToTop" />
   </div>
 </template>

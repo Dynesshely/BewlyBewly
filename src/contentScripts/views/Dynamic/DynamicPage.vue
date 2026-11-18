@@ -22,9 +22,12 @@
 import type { DynamicTabId } from './constants'
 import type { DynamicItem, DynamicPageBridge } from './types'
 import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
+import BackToTopButton from '~/components/BackToTopButton/BackToTopButton.vue'
 import EmptyState from '~/components/Feedback/EmptyState.vue'
 import ErrorState from '~/components/Feedback/ErrorState.vue'
 import { useBewlyApp } from '~/composables/useAppProvider'
+import { useBackToTopButton } from '~/composables/useBackToTopButton'
+import { useDrawnPageKeyboardNav } from '~/composables/useDrawnPageKeyboardNav'
 import { useListPageActions } from '~/composables/useListPageActions'
 import { settings } from '~/logic'
 import { resolveModuleLocale } from '~/utils/moduleI18n'
@@ -240,6 +243,31 @@ onBeforeUnmount(() => {
   observer = null
 })
 
+// #region 键盘导航（J / K / ↑ / ↓ / Enter / Esc / Home / End）
+//
+// 动态页此前没有任何键盘路径：一屏 2~3 张大卡，想打开第 6 条只能滚 + 点。
+// 卡片是 `.dynamic-card`（不是 VideoCard），所以显式传选择器，并把 Enter 映射成
+// 「点卡片里的主链接」—— 与鼠标点击完全同一条路径（走 ALink 的目标页设置）。
+const pageNav = useDrawnPageKeyboardNav({
+  cardSelector: '.dynamic-card',
+  // 动态卡里第一个 <a> 是作者头像：Enter 应当打开「这条动态」的详情，
+  // 而不是把用户带到 UP 主空间 —— 用卡片里的时间戳链接（它的 href 就是详情页）。
+  openCard: (card) => {
+    const detail = card.querySelector<HTMLAnchorElement>('.dynamic-card__time')
+      ?? card.querySelector<HTMLAnchorElement>('a[href*="/opus/"]')
+      ?? card.querySelector<HTMLAnchorElement>('a[href]')
+    detail?.click()
+  },
+})
+
+// 切 tab / 刷新会整体替换列表 → 收敛高亮下标
+watch(tab, () => pageNav.reconcile())
+// #endregion
+
+// #region 回到顶部
+const { showTop, scrollToTop } = useBackToTopButton()
+// #endregion
+
 useListPageActions({
   isLoading,
   noMoreContent: noMore,
@@ -296,6 +324,8 @@ defineExpose({ reload, loadMore, selectTab, bridge })
       </ErrorState>
 
       <EmptyState v-else :title="t.emptyTitle" :description="t.emptyDescription" />
+
+      <BackToTopButton :show-top="showTop" @top="scrollToTop" />
 
       <!-- 追加失败的提示 + 重试（保留已有列表） -->
       <p v-if="items.length && errorMessage" class="dynamic-feed__error" role="alert">

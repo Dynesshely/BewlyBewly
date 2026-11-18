@@ -69,6 +69,10 @@ export interface PopularMessages {
   errorNative: string
   emptyTitle: string
   emptyDescription: string
+  /** 空态按钮：切到「排行榜」tab（热门没内容时更可能有东西看） */
+  emptyRank: string
+  /** 错误态二级出路说明 */
+  errorFallbackHint: string
 
   playCount: string
   danmakuCount: string
@@ -111,6 +115,8 @@ const CMN_CN: PopularMessages = {
   errorNative: '在原版页面打开',
   emptyTitle: '暂无内容',
   emptyDescription: '这个分类暂时没有可展示的内容，稍后再看看吧。',
+  emptyRank: '去看看排行榜',
+  errorFallbackHint: '重试还是不行？可以去排行榜看看，或切到原版页面。',
 
   playCount: '播放',
   danmakuCount: '弹幕',
@@ -175,6 +181,8 @@ const CMN_TW: PopularMessages = {
   errorNative: '在原版頁面開啟',
   emptyTitle: '暫無內容',
   emptyDescription: '這個分類暫時沒有可展示的內容，稍後再看看吧。',
+  emptyRank: '去看看排行榜',
+  errorFallbackHint: '重試還是不行？可以去排行榜看看，或切到原版頁面。',
 
   playCount: '播放',
   danmakuCount: '彈幕',
@@ -227,6 +235,8 @@ const JYUT: PopularMessages = {
   errorNative: '喺原版頁面開啟',
   emptyTitle: '暫時冇內容',
   emptyDescription: '呢個分類暫時冇嘢可以睇，遲啲再嚟睇下。',
+  emptyRank: '去睇下排行榜',
+  errorFallbackHint: '再試都唔得？可以去排行榜睇下，或者切去原版頁面。',
 }
 
 const EN: PopularMessages = {
@@ -264,6 +274,8 @@ const EN: PopularMessages = {
   errorNative: 'Open the original page',
   emptyTitle: 'Nothing here yet',
   emptyDescription: 'This section has no content right now — check back later.',
+  emptyRank: 'Browse the ranking',
+  errorFallbackHint: 'Still failing? Try the ranking, or open the original page.',
 
   playCount: 'Views',
   danmakuCount: 'Danmaku',

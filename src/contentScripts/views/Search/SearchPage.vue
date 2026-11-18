@@ -21,7 +21,10 @@
  */
 import type { SearchDurationId, SearchOrderId } from './constants'
 import type { SearchApiItem, SearchFiltersState, SearchPageBridge, SearchRouteState } from './types'
+import BackToTopButton from '~/components/BackToTopButton/BackToTopButton.vue'
 import { useBewlyApp } from '~/composables/useAppProvider'
+import { useBackToTopButton } from '~/composables/useBackToTopButton'
+import { useDrawnPageKeyboardNav } from '~/composables/useDrawnPageKeyboardNav'
 import { useListPageActions } from '~/composables/useListPageActions'
 import { numFormatter } from '~/utils/dataFormatter'
 import SearchBar from './components/SearchBar.vue'
@@ -224,6 +227,22 @@ function retry() {
   void load(page.value)
 }
 
+/**
+ * 空态 / 错误态的「放宽条件」：把排序 / 时长 / 分区一次性恢复默认并重拉第 1 页。
+ *
+ * 搜索页最常见的「没有结果」其实是筛选条件太窄（例如选了 60 分钟以上 + 冷门分区），
+ * 让用户自己一个个点回去是纯粹的额外心智负担，这里给一个「一键放宽」。
+ */
+function clearFilters() {
+  const changed = order.value !== 'totalrank' || duration.value !== '' || tid.value !== ''
+  order.value = 'totalrank'
+  duration.value = ''
+  tid.value = ''
+  if (!changed)
+    return
+  resetForFilters()
+}
+
 /** 覆盖层的「刷新」动作 / 外部调用：重拉当前页 */
 function reload() {
   void load(page.value)
@@ -258,6 +277,25 @@ function syncRoute(next?: SearchRouteState) {
 
   void load(target.page)
 }
+
+// #region 键盘导航（J ↓ / K ↑ / Enter / Esc / Home / End）
+//
+// 注册表 search scope 登记了这四个动作、命令面板也标了「当前页可用」，
+// 但此前没有任何实现（真机按 J / ↓ 高亮不动）。翻页 / 换关键词 / 换筛选都会整体替换
+// 列表，下标会越界，所以三处状态变化后都收敛一次。
+const pageNav = useDrawnPageKeyboardNav()
+
+watch([
+  () => page.value,
+  () => keyword.value,
+], () => pageNav.reconcile())
+// #endregion
+
+// #region 回到顶部
+//
+// 搜索结果按页码分页、单页 30 张卡也要滚两屏以上；此前这一页没有回顶入口。
+const { showTop, scrollToTop } = useBackToTopButton()
+// #endregion
 
 useListPageActions({
   isLoading,
@@ -312,6 +350,7 @@ defineExpose({ syncRoute, reload })
       :error-message="errorMessage"
       :native-url="nativeUrl"
       @retry="retry"
+      @clear-filters="clearFilters"
     />
 
     <!-- 翻页失败但已有列表：保留卡片，只在下方提示 + 重试 -->
@@ -359,5 +398,7 @@ defineExpose({ syncRoute, reload })
 
       <span class="search-pagination__status">{{ pageStatusText }}</span>
     </nav>
+
+    <BackToTopButton :show-top="showTop" @top="scrollToTop" />
   </div>
 </template>

@@ -9,6 +9,11 @@ import { getPopularFeed } from '../fetcher'
 import { usePopularI18n } from '../i18n'
 import { getRcmdTag, toVideoCard } from '../utils'
 
+const emit = defineEmits<{
+  /** 空态：「去排行榜看看」—— 切到排行榜 tab（热门没有内容时排行榜通常有） */
+  (e: 'goRank'): void
+}>()
+
 const { t } = usePopularI18n()
 const { haveScrollbar } = useBewlyApp()
 
@@ -150,6 +155,7 @@ defineExpose({ loadMore, refresh })
         :title="t.errorTitle"
         :message="errorMessage"
         :retry-label="t.retry"
+        :fallback-hint="t.errorFallbackHint"
         @retry="refresh"
       >
         <a class="popular-text-button" :href="NATIVE_POPULAR_URL" target="_blank" rel="noopener">
@@ -157,11 +163,19 @@ defineExpose({ loadMore, refresh })
         </a>
       </ErrorState>
 
+      <!-- 空态：给一条明确的下一步（排行榜在这里几乎总有内容） -->
       <EmptyState
         v-else-if="hasLoadedOnce"
         :title="t.emptyTitle"
         :description="t.emptyDescription"
-      />
+      >
+        <button class="popular-text-button" type="button" @click="emit('goRank')">
+          {{ t.emptyRank }}
+        </button>
+        <a class="popular-text-button" :href="NATIVE_POPULAR_URL" target="_blank" rel="noopener">
+          {{ t.errorNative }}
+        </a>
+      </EmptyState>
     </template>
   </section>
 </template>

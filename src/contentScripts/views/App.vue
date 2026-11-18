@@ -170,7 +170,16 @@ const showBewlyPage = computed((): boolean => {
   if (iframePageURL.value)
     return false
 
-  return isHomePage() && !settings.value.useOriginalBilibiliHomepage
+  // 第 103 轮修（既有 bug）：原实现硬编码 isHomePage()，导致 /watchlater、/history、
+  // /favorites 这些 **dock 页面永远不渲染** —— bewly-wrapper 高度被算成 0，
+  // 用户在稍后再看/历史/收藏页看到的是一片空白（真机实测 wrapBox 2058x0）。
+  //
+  // 正确判据是「当前 activatedPage 对应一个 Bewly 页面」（上面已用 hasBewlyPage 校验过）；
+  // 首页只是额外要尊重「使用原生首页」这个设置。
+  if (isHomePage())
+    return !settings.value.useOriginalBilibiliHomepage
+
+  return true
 })
 const showTopBar = computed((): boolean => {
   // When using the open in drawer feature, the iframe inside the page will hide the top bar

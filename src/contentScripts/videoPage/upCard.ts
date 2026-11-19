@@ -196,6 +196,53 @@ function restoreNativeChildren(): void {
   hiddenChildren.clear()
 }
 
+/** 发消息图标（内联 SVG，不依赖任何外部样式表 —— 第 112 轮） */
+const ICON_MESSAGE = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H9l-4.2 3.15A.6.6 0 0 1 4 18.7V6.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>'
+
+/**
+ * 自绘 UP 卡样式（第 112 轮）。
+ *
+ * 原来是**没有任何 CSS**的裸 DOM（只靠 `bvp-up__*` 类名碰运气），
+ * 真机看「发消息」是文字按钮、签名被挤成两行还截断。
+ * 这里内联注入（与 `commentDrawn.ts` 同做法），不依赖 `videoPage.shadow.scss`，
+ * 避免与其它模块的样式改动互相影响。
+ */
+const UP_CARD_STYLE_ID = 'bewly-up-card-style'
+function ensureUpCardStyle(): void {
+  if (document.getElementById(UP_CARD_STYLE_ID))
+    return
+  const style = document.createElement('style')
+  style.id = UP_CARD_STYLE_ID
+  style.textContent = [
+    '#bewly-up-card{display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:12px;',
+    'background:var(--bew-elevated,#fff);box-shadow:var(--bew-shadow-1);}',
+    '#bewly-up-card .bvp-up__avatar{display:grid;flex:0 0 auto;place-items:center;width:44px;height:44px;',
+    'overflow:hidden;font-size:16px;font-weight:600;color:#fff;background:var(--bew-theme-color,#00aeec);border-radius:50%;}',
+    '#bewly-up-card .bvp-up__avatar img{display:block;width:100%;height:100%;object-fit:cover;border-radius:50%;}',
+    // info 是唯一的弹性项：给 min-width:0 才能让子级 ellipsis 生效
+    '#bewly-up-card .bvp-up__info{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px;}',
+    '#bewly-up-card .bvp-up__name-row{display:flex;gap:6px;align-items:center;min-width:0;}',
+    '#bewly-up-card .bvp-up__name{overflow:hidden;font-size:14px;font-weight:600;color:var(--bew-text-1);',
+    'text-decoration:none;text-overflow:ellipsis;white-space:nowrap;}',
+    // 签名：**强制单行**（用户要求「尽量显示一整行」），超长才 ellipsis
+    '#bewly-up-card .bvp-up__desc{overflow:hidden;font-size:12px;line-height:1.5;color:var(--bew-text-3);',
+    'text-overflow:ellipsis;white-space:nowrap;}',
+    '#bewly-up-card .bvp-up__actions{display:flex;flex:0 0 auto;gap:6px;align-items:center;}',
+    '#bewly-up-card .bvp-up__btn{display:inline-flex;gap:4px;align-items:center;justify-content:center;',
+    'min-width:28px;height:28px;padding:0 8px;font-size:12px;line-height:1;color:#fff;cursor:pointer;',
+    'background:var(--bew-theme-color,#00aeec);border:0;border-radius:14px;}',
+    '#bewly-up-card .bvp-up__btn svg{width:15px;height:15px;}',
+    '#bewly-up-card .bvp-up__btn--follow{background:var(--bew-theme-color,#00aeec);}',
+    '#bewly-up-card .bvp-up__btn--follow.is-followed{color:var(--bew-text-2);background:var(--bew-fill-1);}',
+    // 发消息：**纯图标按钮**（用户要求）
+    '#bewly-up-card .bvp-up__btn--message{width:28px;padding:0;color:var(--bew-text-2);',
+    'background:var(--bew-fill-1);border-radius:50%;}',
+    '#bewly-up-card .bvp-up__btn--message:hover{color:var(--bew-theme-color,#00aeec);}',
+    '#bewly-up-card .bvp-up__btn:hover{opacity:.9;}',
+  ].join('')
+  document.head.appendChild(style)
+}
+
 function buildButton(label: string, className: string, onClick: () => void): HTMLButtonElement {
   const button = document.createElement('button')
   button.type = 'button'
@@ -209,7 +256,24 @@ function buildButton(label: string, className: string, onClick: () => void): HTM
   return button
 }
 
+/** 纯图标按钮（第 112 轮）：`iconHtml` 是内联 SVG，`label` 只做无障碍文案 */
+function buildIconButton(iconHtml: string, label: string, className: string, onClick: () => void): HTMLButtonElement {
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.className = className
+  button.title = label
+  button.setAttribute('aria-label', label)
+  button.innerHTML = iconHtml
+  button.addEventListener('click', (event) => {
+    event.preventDefault()
+    event.stopPropagation()
+    onClick()
+  })
+  return button
+}
+
 function renderUpCard(panel: HTMLElement, data: OwnerData): void {
+  ensureUpCardStyle()
   let card = panel.querySelector<HTMLElement>(`#${UP_CARD_ID}`)
   if (!card) {
     card = document.createElement('div')
@@ -291,15 +355,21 @@ function renderUpCard(panel: HTMLElement, data: OwnerData): void {
 
     const actions = document.createElement('div')
     actions.className = 'bvp-up__actions'
+    // 第 112 轮：关注按钮保留文字（状态可读），发消息改成**纯图标按钮**
     const followLabel = data.followed ? '已关注' : '+ 关注'
     const follow = buildButton(followLabel, `bvp-up__btn bvp-up__btn--follow${data.followed ? ' is-followed' : ''}`, () => {
       // 转发给原生关注按钮：不自己调接口
       findNativeButton(panel, FOLLOW_SELECTORS)?.click()
       window.setTimeout(syncUpCard, 300)
     })
-    const message = buildButton('发消息', 'bvp-up__btn bvp-up__btn--message', () => {
-      findNativeButton(panel, MESSAGE_SELECTORS)?.click()
-    })
+    const message = buildIconButton(
+      ICON_MESSAGE,
+      '发消息',
+      'bvp-up__btn bvp-up__btn--message',
+      () => {
+        findNativeButton(panel, MESSAGE_SELECTORS)?.click()
+      },
+    )
     actions.append(follow, message)
 
     card.append(avatar, info, actions)

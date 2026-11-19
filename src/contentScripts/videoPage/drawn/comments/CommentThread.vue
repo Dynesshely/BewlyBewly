@@ -136,7 +136,11 @@ function loadMoreReplies(): void {
         </template>
       </div>
 
-      <div v-if="item.pictures.length" class="bcd-thread__pictures">
+      <div
+        v-if="item.pictures.length"
+        class="bcd-thread__pictures"
+        :class="item.pictures.length === 1 ? 'bcd-thread__pictures--single' : 'bcd-thread__pictures--multi'"
+      >
         <a
           v-for="(src, index) in item.pictures"
           :key="index"
@@ -236,6 +240,9 @@ function loadMoreReplies(): void {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  /* 双保险：容器已 overflow:hidden + border-radius，但 B 站全局 img 规则
+     可能把 overflow 裁切干掉，这里给图片自己也加圆角 */
+  border-radius: 50%;
 }
 
 .bcd-thread__avatar-fallback {
@@ -304,17 +311,42 @@ function loadMoreReplies(): void {
   vertical-align: text-bottom;
 }
 
+/**
+ * 评论图片。
+ *
+ * ⚠️ 第 112 轮修：原来写的是 `repeat(auto-fill, minmax(88px, 1fr))`，
+ * 单图时会撑满整行（实测一张图占满 566px 宽的整条评论区，用户截图里的
+ * GTA6 logo 就是这个问题）。改成：
+ *   - 单图：最大 320px，高度上限 240px（object-fit: cover）
+ *   - 多图：网格，容器最大 480px
+ */
 .bcd-thread__pictures {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
   gap: 8px;
-  margin-top: 4px;
+  margin-top: 6px;
+}
+
+.bcd-thread__pictures--single {
+  grid-template-columns: minmax(0, 320px);
+}
+
+.bcd-thread__pictures--multi {
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  max-width: 480px;
+}
+
+.bcd-thread__picture {
+  display: block;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--bew-fill-1);
 }
 
 .bcd-thread__picture img {
   display: block;
   width: 100%;
-  height: auto;
+  max-height: 240px;
+  object-fit: cover;
   border-radius: 6px;
 }
 
@@ -391,15 +423,27 @@ function loadMoreReplies(): void {
   color: var(--bew-text-3);
 }
 
+/**
+ * 「共 N 条回复」/ 链接按钮。
+ *
+ * ⚠️ 第 112 轮修：B 站全局 CSS 给 `button` 设了背景/边框，把这里的
+ * `background: none; border: 0` 覆盖掉，用户截图里「共 419 条回复」渲染成
+ * 一块白色实心方块。这三个属性加 !important 压回去（只影响本组件的这两个类）。
+ */
 .bcd-thread__link,
 .bcd-thread__more {
   align-self: flex-start;
-  padding: 0;
+  padding: 0 !important;
   font-size: 12px;
-  color: var(--bew-theme-color, var(--bew-bili-blue, hsl(195 100% 42%)));
+  line-height: 1.6;
+  color: var(--bew-theme-color, var(--bew-bili-blue, hsl(195 100% 42%))) !important;
   cursor: pointer;
-  background: none;
-  border: 0;
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: none;
 }
 
 .bcd-thread__more:hover,

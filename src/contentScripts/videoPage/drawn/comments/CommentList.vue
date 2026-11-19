@@ -387,7 +387,9 @@ defineExpose({
 .bcd-list__body {
   flex: 1 1 auto;
   min-height: 0;
-  padding: 0 12px;
+  /* 底部留出发送区高度：发送区是 sticky 浮在滚动容器底部的，
+     不留白的话最后一条评论会被它压住（第 112 轮真机截图可见） */
+  padding: 0 12px 116px;
   overflow-y: auto;
   scrollbar-gutter: stable;
 }

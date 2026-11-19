@@ -104,13 +104,27 @@ function onKeydown(event: KeyboardEvent): void {
 </template>
 
 <style scoped>
+/**
+ * 底部发送区（第 112 轮修）。
+ *
+ * 原来只有 `flex: 0 0 auto` —— 在 `#bewly-comment-drawn` 拿到确定高度、列表内部滚动时
+ * 它确实在底部；但一旦外层高度不确定（评论列被原生布局收缩/hover 展开），
+ * 整个自绘块会跟着页面滚走，用户就看不到发送框了。
+ * 加 `position: sticky; bottom: 0` 做双保险：外层是滚动容器时贴底，
+ * 外层不是时退化成普通流式块，不会破坏布局。
+ */
 .bcd-compose {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   display: flex;
   flex: 0 0 auto;
   flex-direction: column;
   gap: 6px;
   padding: 8px 12px 10px;
+  background: var(--bew-elevated, var(--bew-bg));
   border-top: 1px solid var(--bew-fill-1);
+  backdrop-filter: var(--bew-filter-force-dark, none);
 }
 
 .bcd-compose__input {

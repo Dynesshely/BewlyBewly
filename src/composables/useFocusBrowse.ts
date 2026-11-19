@@ -78,7 +78,15 @@ function persistFocusBrowse(enabled: boolean): void {
 
 /* #endregion */
 
+/** 首页 API 自绘（HomeDrawn）的根与滚动容器（第 116 轮） */
+const HOME_DRAWN_ROOT_SELECTOR = '#bewly-home-drawn-root'
+const HOME_DRAWN_SCROLL_SELECTOR = '#bewly-home-drawn-root .bewly-home-shell'
+
 function getScrollRoot(): HTMLElement | null {
+  // HomeDrawn 接管首页时，滚动容器是 light DOM 的 .bewly-home-shell
+  const drawn = document.querySelector<HTMLElement>(HOME_DRAWN_SCROLL_SELECTOR)
+  if (drawn)
+    return drawn
   const root = document.querySelector('#bewly')?.shadowRoot
   return root?.querySelector<HTMLElement>('.bewly-scroll-container') ?? null
 }
@@ -89,7 +97,20 @@ function getWrapper(): HTMLElement | null {
   return root?.querySelector<HTMLElement>('#bewly-wrapper') ?? null
 }
 
+/**
+ * 收集卡片。
+ *
+ * ⚠️ 第 116 轮修：原来**只查 `#bewly` shadow root**。但首页从第 103 轮起是
+ * **API 拉取 + 完全自绘**（HomeDrawn），卡片渲染在 light DOM 的
+ * `#bewly-home-drawn-root` 覆盖层里 → 这里返回空数组 →
+ * **3D 翻转聚焦视图在首页完全不生效**（用户说的「聚焦视图没有在自绘页面生效」）。
+ */
 function collectCards(): HTMLElement[] {
+  const drawnCards = Array.from(
+    document.querySelectorAll<HTMLElement>(`${HOME_DRAWN_ROOT_SELECTOR} [data-video-card]`),
+  )
+  if (drawnCards.length)
+    return drawnCards
   const root = document.querySelector('#bewly')?.shadowRoot
   if (!root)
     return []

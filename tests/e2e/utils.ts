@@ -103,13 +103,20 @@ export async function readExtensionState(page: Page) {
   })
 }
 
-/** 当前高亮卡片的 data-video-url（键盘导航是否就绪、高亮是否移动的判断依据） */
+/**
+ * 当前高亮卡片的 data-video-url（键盘导航是否就绪、高亮是否移动的判断依据）。
+ *
+ * 第 116 轮：与 countCards 同理 —— 首页 API 自绘后高亮可能落在 light DOM 的
+ * `#bewly-home-drawn-root` 卡片上，只在 shadow root 里查会读不到 → 用例超时。
+ */
 export async function readActiveCardUrl(page: Page): Promise<string> {
   return page.evaluate(() => {
+    const SELECTOR = '[data-video-card][data-keyboard-active]'
+    const drawn = document.querySelector(`#bewly-home-drawn-root ${SELECTOR}`)
+    if (drawn)
+      return drawn.getAttribute('data-video-url') ?? ''
     const root = document.querySelector('#bewly')?.shadowRoot
-    return root
-      ?.querySelector('[data-video-card][data-keyboard-active]')
-      ?.getAttribute('data-video-url') ?? ''
+    return root?.querySelector(SELECTOR)?.getAttribute('data-video-url') ?? ''
   })
 }
 

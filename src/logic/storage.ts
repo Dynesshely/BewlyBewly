@@ -219,6 +219,13 @@ export interface Settings {
   homeActiveTab: HomeSubPage
   /** 首页是否处于聚焦模式（封面流）：记忆上次状态，刷新后自动恢复（第 81 轮） */
   focusBrowseEnabled: boolean
+  /**
+   * 是否在页面底部显示「当前键盘高亮卡片」的信息条（第 116 轮）。
+   *
+   * 默认 **false**：用户反馈它经常显示成一条与注意力无关的胶囊（尤其高亮与滚动
+   * 状态不一致时），默认隐藏减少噪音；需要时可在设置里打开。
+   */
+  showActiveCardInfo: boolean
   alwaysShowTabsOnHomePage: boolean
   useSearchPageModeOnHomePage: boolean
   searchPageModeWallpaperFixed: boolean
@@ -375,6 +382,7 @@ export const originalSettings: Settings = {
 
   homeActiveTab: 'ForYou' as HomeSubPage,
   focusBrowseEnabled: false,
+  showActiveCardInfo: false,
   homePageTabVisibilityList: [],
   alwaysShowTabsOnHomePage: false,
   useSearchPageModeOnHomePage: false,

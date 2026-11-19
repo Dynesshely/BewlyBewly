@@ -774,7 +774,7 @@ onUnmounted(() => {
 
     <CommandPalette v-if="showCommandPalette" @close="showCommandPalette = false" />
 
-    <div v-if="activeCardInfo" class="bewly-active-info">
+    <div v-if="activeCardInfo && settings.showActiveCardInfo" class="bewly-active-info">
       <span class="bewly-active-info-title">{{ activeCardInfo.title }}</span>
       <template v-if="showCardInfoDetail">
         <span v-if="activeCardInfo.author" class="bewly-active-info-meta">{{ activeCardInfo.author }}</span>

@@ -300,19 +300,35 @@ function clearLegacyDrawnList(nativeApp: HTMLElement): void {
     nativeApp.style.removeProperty('display')
 }
 
+/**
+ * 把「为什么接管 / 为什么不接管」写进 `<html data-bewly-comment-drawn>`。
+ *
+ * 第 125 轮：content script 的 `console.warn` 用户抓不到（isolated world），
+ * 但 DOM 属性任何环境都能读 —— 出问题时让用户在控制台跑
+ *   document.documentElement.dataset.bewlyCommentDrawn
+ * 就能直接看到卡在哪道闸门。
+ */
+function markDrawn(reason: string): void {
+  document.documentElement.dataset.bewlyCommentDrawn = reason
+}
+
 async function doSetup(): Promise<boolean> {
   const bvid = currentBvid()
-  if (!bvid)
+  if (!bvid) {
+    markDrawn('skip:no-bvid')
     return false
+  }
 
   const nativeApp = await waitForAnchor()
   if (!nativeApp) {
+    markDrawn('skip:no-commentapp')
     console.warn('[bewly] comment drawn: #commentapp not found, fallback to native')
     return false
   }
 
   const brief = await resolveBrief(bvid)
   if (!brief || !brief.aid) {
+    markDrawn('skip:no-aid')
     console.warn('[bewly] comment drawn: aid unavailable, fallback to native')
     return false
   }
@@ -331,12 +347,14 @@ async function doSetup(): Promise<boolean> {
     initialHasMore = page.hasMore
   }
   catch (error) {
+    markDrawn('skip:prefetch-failed')
     console.warn('[bewly] comment drawn: prefetch failed, fallback to native', error)
     return false
   }
 
   // 接口成功但条目太少：交给原生（未登录时接口只给 3 条，接管了反而比原生更空）
   if (initialItems.length < MIN_INITIAL_ITEMS) {
+    markDrawn(`skip:too-few-items(${initialItems.length})`)
     console.warn(
       `[bewly] comment drawn: only ${initialItems.length} items on first page (need ${MIN_INITIAL_ITEMS}), fallback to native`,
     )
@@ -344,8 +362,10 @@ async function doSetup(): Promise<boolean> {
   }
 
   // 预取期间用户可能切了视频 → 放弃
-  if (currentBvid() !== bvid)
+  if (currentBvid() !== bvid) {
+    markDrawn('skip:bvid-changed')
     return false
+  }
 
   // —— 到这里才开始动 DOM ——
   clearLegacyDrawnList(nativeApp)
@@ -381,6 +401,7 @@ async function doSetup(): Promise<boolean> {
   const headerStyleEl = hideNativeHeaderRow(commentsHost)
 
   document.documentElement.classList.add(COMMENT_DRAWN_ACTIVE_CLASS)
+  markDrawn(`ok(items=${initialItems.length},total=${initialTotal ?? '?'})`)
 
   mounted = {
     app,

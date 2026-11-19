@@ -23,6 +23,7 @@
  * 增强 UI（工具条 / 展开按钮）仍在 videoPage 的 shadow 浮层里，按 #navbar / thread 的 rect 固定定位。
  */
 import { showToast } from './actions'
+import { getCommentDrawnApi, isCommentDrawnActive } from './commentDrawn'
 import { getMessages } from './i18n'
 import { ui } from './state'
 
@@ -1407,8 +1408,23 @@ export function getActiveSort(): '' | CommentSortKind {
   return ''
 }
 
-/** 点原生排序按钮（bili-text-button），不自己发请求 */
+/**
+ * 点原生排序按钮（bili-text-button），不自己发请求。
+ *
+ * 第 110 轮：自绘评论区（`commentDrawn.ts`）接管时，原生排序行已被隐藏，
+ * 这里改成切自绘列表的排序（e2e / 快捷键仍然走同一个导出，签名不变）。
+ */
 export function clickCommentSort(kind: CommentSortKind): void {
+  const drawn = getCommentDrawnApi()
+  if (isCommentDrawnActive() && drawn) {
+    void drawn.setSort(kind)
+    ui.commentActiveSort = kind
+    showToast(kind === 'hot'
+      ? messages().commentSortHotToast
+      : messages().commentSortLatestToast)
+    return
+  }
+
   const button = getSortButtons()[kind]
   if (!button) {
     showToast(messages().commentsSortUnavailable)
@@ -1454,6 +1470,30 @@ function applyOnlyUpState(): void {
 }
 
 export function toggleCommentsOnlyUp(): void {
+  // 第 110 轮：自绘评论区接管时，筛选由自绘列表负责（原生线程已被隐藏）。
+  // 这里切自绘列表的 onlyUp，同时把标记同步回 ui / html class（e2e 与样式都读它）。
+  const drawn = getCommentDrawnApi()
+  if (isCommentDrawnActive() && drawn) {
+    if (drawn.isOnlyUp()) {
+      drawn.setOnlyUp(false)
+      ui.commentsOnlyUp = false
+      storeOnlyUp(false)
+      document.documentElement.classList.remove(ONLY_UP_ROOT_CLASS)
+      showToast(messages().commentsOnlyUpOff)
+      return
+    }
+    if (!drawn.hasUpComment()) {
+      showToast(messages().commentsUpUnavailable)
+      return
+    }
+    drawn.setOnlyUp(true)
+    ui.commentsOnlyUp = true
+    storeOnlyUp(true)
+    document.documentElement.classList.add(ONLY_UP_ROOT_CLASS)
+    showToast(messages().commentsOnlyUpOn)
+    return
+  }
+
   if (ui.commentsOnlyUp) {
     setCommentsOnlyUp(false)
     return
@@ -1571,7 +1611,15 @@ function refreshFoldPositions(): void {
     ui.commentFoldButtons = next
 }
 
+/**
+ * 展开一条被折叠的长评论（折叠按钮组件调用）。
+ *
+ * 第 110 轮：自绘评论区的正文不做 400px 折叠（自绘列表里长评论的自然展开更符合阅读），
+ * 因此接管时这里没有可展开的目标，直接返回（签名保持不变，CommentFoldButtons.vue 不受影响）。
+ */
 export function expandComment(id: number): void {
+  if (isCommentDrawnActive())
+    return
   const target = foldTargets.get(id)
   if (!target)
     return

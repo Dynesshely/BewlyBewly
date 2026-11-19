@@ -26,6 +26,7 @@ import {
 } from './actions'
 import { setupAdGuard, teardownAdGuard } from './adGuard'
 import { restoreCommentColumn, setupCommentColumn, syncCommentColumn } from './commentColumn'
+import { isCommentDrawnActive, setupCommentDrawn, syncCommentDrawn, teardownCommentDrawn } from './commentDrawn'
 import { setupCommentList, syncCommentList } from './commentList'
 import { getCommentStyleStat, setupComments, syncComments } from './comments'
 import PlaylistPanel from './components/PlaylistPanel.vue'
@@ -97,6 +98,24 @@ function safeSync(label: string, fn: () => void): void {
     console.warn(`[Bewly] ${label} failed:`, error instanceof Error
       ? (error.stack ?? error.message)
       : error)
+  }
+}
+
+/**
+ * 单拍同步的「带返回值」版本：异常时返回 undefined，不影响后续步骤。
+ *
+ * 第 110 轮：同步自绘评论区需要知道它当前是 active 还是 off，
+ * 才能决定要不要让上一版自绘列表（commentList.ts）让位。
+ */
+function safeSyncResult<T>(label: string, fn: () => T): T | undefined {
+  try {
+    return fn()
+  }
+  catch (error) {
+    console.warn(`[Bewly] ${label} failed:`, error instanceof Error
+      ? (error.stack ?? error.message)
+      : error)
+    return undefined
   }
 }
 
@@ -239,7 +258,7 @@ function restoreAfterNarrowViewport(): void {
     disposeToolbar = setupToolbar()
   if (!disposeDescPanel)
     disposeDescPanel = setupDescPanel()
-  if (!disposeCommentList)
+  if (!disposeCommentList && !isCommentDrawnActive())
     disposeCommentList = setupCommentList()
 
   // 第 80 轮阶段 3：自绘工具栏 / 简介 / 评论区（只读）
@@ -247,7 +266,8 @@ function restoreAfterNarrowViewport(): void {
     disposeToolbar = setupToolbar()
   if (!viewportDegraded)
     disposeDescPanel = setupDescPanel()
-  if (!viewportDegraded)
+  // 第 110 轮：自绘评论区已接管时不再启动上一版自绘列表（否则页面会出现两条评论列表）
+  if (!viewportDegraded && !isCommentDrawnActive())
     disposeCommentList = setupCommentList()
 
   if (!isInIframe() && settings.value.videoPageShortcuts && !disposeShortcuts)
@@ -392,6 +412,11 @@ function mount(): void {
   // 评论区增强（排序 / 只看 UP / 长评论折叠）：没有评论区时组件自身不渲染
   disposeComments = setupComments()
 
+  // 第 110 轮：自绘评论区（接口 /x/v2/reply + 完全自绘）。
+  // 异步探测：拿得到 aid 与第一页评论才接管；任何一步失败都**完全不碰原生 DOM**，
+  // 下面的 commentList（上一版自绘）继续按原逻辑工作，e2e 的合同页也照旧走原生。
+  void setupCommentDrawn()
+
   // 真机诊断（第 34 轮）：**读 DOM 属性**，因为 content script 在 isolated world，
   // 给 window 赋的函数页面控制台看不到。
   //   document.documentElement.dataset.bewlyCommentsStyle  → 形如 "2/2;fs=14px"
@@ -504,6 +529,8 @@ function unmount(): void {
     disposeComments()
     disposeComments = null
   }
+  // 第 110 轮：自绘评论区（接口版）卸载并还原原生列表样式
+  teardownCommentDrawn()
   // 第 33 轮 wrap 版本：简介按钮被移进 #bewly-toolbar-actions wrapper，
   // 所以先拆 toolbar（它会把简介按钮放回 wrapper 原位、再整体移除 wrapper），
   // 然后再拆 descPopover（移除按钮本身）。顺序反过来也不会漏清理，但会少一次「放回原位」。
@@ -674,7 +701,21 @@ function sync(): void {
   // 第 80 轮阶段 3：工具栏 / 简介会隐藏原生节点（改高度实测），评论区自绘在评论列内
   safeSync('syncToolbar', syncToolbar)
   safeSync('syncDescPanel', syncDescPanel)
-  safeSync('syncCommentList', syncCommentList)
+  // 第 110 轮：自绘评论区（接口版）每拍同步：换视频 / 宿主重建时自动还原或补注入
+  const commentDrawnState = safeSyncResult('syncCommentDrawn', syncCommentDrawn)
+  // 上一版自绘列表只在「接口版没有接管」时工作：接口版一旦接管，就停掉它并移除其容器，
+  // 避免页面上同时出现两条评论列表（接口失败时它照旧工作，e2e 的合同页也依赖它）。
+  if (commentDrawnState === 'active') {
+    safeSync('syncCommentList(stop)', () => {
+      if (disposeCommentList) {
+        disposeCommentList()
+        disposeCommentList = null
+      }
+    })
+  }
+  else {
+    safeSync('syncCommentList', syncCommentList)
+  }
 
   // 固定单页布局（第 29 轮）：**唯一**的布局所有者。
   // ⚠️ 第 36 轮起把它提到评论区同步之前：评论区 / 轨道 / 简介任何一处抛异常都不能阻止

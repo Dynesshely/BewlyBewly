@@ -16,7 +16,9 @@
  * 2. 原生信息栏的已渲染文本（DOM 兜底，B 站改结构时至少还有文本）；
  * 3. 两者都失败 → **不隐藏原生、不渲染自绘块**，保持现状，绝不出现空白信息栏。
  */
+import type { ApiVideoMeta } from './drawn/types'
 import { getPlayerWrapEl, getVideoEl } from './dom'
+import { fetchVideoMeta, peekVideoMeta } from './drawn/meta'
 
 const INFO_BAR_ID = 'bewly-info-bar'
 /**
@@ -254,9 +256,37 @@ function readFromDom(): VideoInfoData | null {
   }
 }
 
+/** API 元数据 → infoBar 内部形状（第 109 轮） */
+function apiMetaToVideoInfo(meta: ApiVideoMeta): VideoInfoData {
+  return {
+    bvid: meta.bvid,
+    title: meta.title,
+    view: meta.view,
+    like: meta.like,
+    coin: meta.coin,
+    favorite: meta.favorite,
+    share: meta.share,
+    danmaku: meta.danmaku,
+    pubdate: meta.pubdate,
+    copyright: meta.copyright,
+    pages: meta.pages,
+    tags: meta.tags,
+  }
+}
+
 /** 统一取数据：同一 bvid 用缓存；bvid 变化才重新解析 */
 function readVideoData(): VideoInfoData | null {
   const bvid = currentBvid()
+  // 优先级 0（第 109 轮）：API 拉取的元数据。
+  // 这是唯一不依赖 B 站 DOM 结构 / 内联脚本格式的数据源，
+  // 拿到就用它（下面三级只作为接口失败时的回退）。
+  const apiMeta = peekVideoMeta(bvid)
+  if (apiMeta)
+    return apiMetaToVideoInfo(apiMeta)
+  // 还没拉到 → 触发一次后台预取（fetchVideoMeta 内部有 inflight 去重 + 按 bvid 缓存，
+  // 成功后的下一拍轮询就会命中上面那条分支）。失败不做事，继续走下面的回退链。
+  if (bvid)
+    void fetchVideoMeta(bvid)
   // 优先级 1：page-world 桥推送的数据（精确 stat / pages / tags）
   if (bridgedData && (!bvid || !bridgedData.bvid || bridgedData.bvid === bvid))
     return bridgedData

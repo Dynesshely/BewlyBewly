@@ -10,6 +10,8 @@ import { getCSRF } from '~/utils/main'
 import emitter from '~/utils/mitt'
 
 const CARD_SELECTOR = '[data-video-card]'
+/** 第 115 轮：首页 API 自绘覆盖层里的卡片（不在 #bewly shadow root 内） */
+const HOME_DRAWN_CARD_SELECTOR = '#bewly-home-drawn-root [data-video-card]'
 // B 站原生页面（搜索页、原生首页模式）的卡片选择器
 const NATIVE_CARD_SELECTOR = '.bili-video-card'
 const ACTIVE_ATTR = 'data-keyboard-active'
@@ -108,7 +110,29 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
   let observer: MutationObserver | undefined
   let shadowRootEl: ShadowRoot | null = null
 
+  /**
+   * 收集可导航的卡片。
+   *
+   * 第 115 轮修：首页从第 103 轮起改成 **API 拉取 + 完全自绘**（HomeDrawn），
+   * 卡片渲染在 light DOM 的 `#bewly-home-drawn-root` 覆盖层里，**不在 `#bewly` shadow root 内**。
+   * 而原来只查 `shadowRootEl`，于是首页：
+   *   · 方向键不切高亮（找不到卡片）
+   *   · 没有 active 边框高亮
+   *   · 页面不跟随高亮卡片滚动
+   *   · 聚焦视图（Shift+F，基于同一套高亮）完全无效
+   * 但 App.vue 的 `activeCardInfo` 仍能拿到「上一次残留的卡片信息」→
+   * 底部出现一个只显示内容概述、却对应不到任何高亮卡片的胶囊（用户看到的那个 Chip）。
+   */
   function getCards(): HTMLElement[] {
+    // 第 115 轮：HomeDrawn **优先**。
+    // 之前是「shadow root 优先」，但 HomeDrawn 接管后旧 Home 只是被隐藏、DOM 还在
+    // （30 张卡仍在 shadow 里）→ 高亮被加在看不见的旧卡片上，
+    // 于是「有滚动跟随、但看不到任何边框高亮」。
+    const drawnCards = Array.from(
+      document.querySelectorAll<HTMLElement>(HOME_DRAWN_CARD_SELECTOR),
+    )
+    if (drawnCards.length)
+      return drawnCards
     const bewlyCards = Array.from(shadowRootEl?.querySelectorAll<HTMLElement>(CARD_SELECTOR) ?? [])
     if (bewlyCards.length)
       return bewlyCards
@@ -125,7 +149,20 @@ export function useKeyboardCardNavigation(getOsInstance?: () => ScrollInstance |
     return cards.findIndex(card => card.hasAttribute(ACTIVE_ATTR))
   }
 
+  /** 首页 API 自绘（HomeDrawn）的滚动容器选择器（第 115 轮） */
+  const HOME_DRAWN_SCROLL_SELECTOR = '#bewly-home-drawn-root .bewly-home-shell'
+
   function getInstance(): ScrollInstance | null {
+    // 第 115 轮：HomeDrawn 接管首页时，**页面滚动容器是它自己的 shell**（light DOM），
+    // 不是 #bewly shadow 里的 .bewly-scroll-container。原来一律用后者 →
+    // 方向键切高亮后「页面不跟随滚动」，聚焦视图也因为滚不动而看起来没生效。
+    const drawnShell = document.querySelector<HTMLElement>(HOME_DRAWN_SCROLL_SELECTOR)
+    if (drawnShell) {
+      return {
+        elements: () => ({ viewport: drawnShell, scrollOffsetElement: drawnShell }),
+        update: () => false,
+      }
+    }
     try {
       return getOsInstance?.() ?? null
     }

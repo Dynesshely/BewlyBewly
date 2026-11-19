@@ -154,6 +154,7 @@ let disposeShortcuts: (() => void) | null = null
 let disposeComments: (() => void) | null = null
 let disposeCommentColumn: (() => void) | null = null
 let disposeFixedLayout: (() => void) | null = null
+let disposeVideoFit: (() => void) | null = null
 let disposeSplitter: (() => void) | null = null
 /** 自绘信息栏（第 78 轮阶段 1）：挂载时返回 teardown */
 let disposeInfoBar: (() => void) | null = null
@@ -201,6 +202,10 @@ function degradeForNarrowViewport(): void {
     disposeFixedLayout = null
   }
   clearFixedLayout()
+  if (disposeVideoFit) {
+    disposeVideoFit()
+    disposeVideoFit = null
+  }
   if (disposeSplitter) {
     disposeSplitter()
     disposeSplitter = null
@@ -453,6 +458,22 @@ function mount(): void {
   // iframe 内不启用（抽屉视口不是整页视口）。
   if (!viewportDegraded)
     disposeFixedLayout = setupFixedLayout()
+
+  // 第 113 轮：按视口铺满版式（铺满画面 / 无页面滚动 / 推荐轨道置底）。
+  // 全部效果挂在 html.bewly-video-fit 上：compute 给 ok=false 时不接管，
+  // 去掉这个类即完整回退到旧布局（fixedLayout.ts 一行未改）。
+  // 第 113 轮：按视口铺满版式 —— **暂不启用**。
+  //
+  // 宽屏已有正面效果（1920×1080 / 1280×800 实测 scrollHeight==clientHeight、
+  // scrollWidth==clientWidth，无页面滚动），但还有两个未修的问题：
+  //   ① 窄屏（<1280）compute 给 ok=false → 完全不接管，页面仍是原生滚动（565×1397 实测
+  //      scrollHeight 4945 / clientHeight 1391、scrollWidth 1080 / clientWidth 559）；
+  //   ② 接线后 2 个既有 e2e 红：
+  //      - 「滚动后收成迷你浮窗，P 还原」（html 缺 bewly-video-mini）
+  //      - 「窄屏切到上下分区」（评论列 columnVisible=false）
+  // 模块（videoPage/layout/**）保留，修好这两点后把下面一行放开即可。
+  // if (!viewportDegraded)
+  //   disposeVideoFit = setupVideoFit()
 
   // 播放器 / 评论区分隔条（第 46 轮）：iframe 降级时不渲染
   if (!viewportDegraded)

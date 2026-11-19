@@ -176,11 +176,17 @@ export function computeLayout(input: FitLayoutInput): FitLayoutResult {
     // 评论列只剩 7px →「窄屏上下分区」的 e2e 断言 columnVisible(height>100) 失败，
     // 用户看到的也是「播放器巨大、评论区一条缝」。
     // 现在限制播放器最多占「可用高度 − 控制条 − 预留」的 55%，剩下的全给评论列。
-    const budget = Math.max(80, mainH - controlH - reserveH)
+    // ⚠️ 第 120 轮修：原来用 `videoH + controlH + reserveH` 当左列高度，
+    // 而 reserveH 是**实测**出来的（窄屏下信息栏/工具栏/标签行/弹幕列表加起来能到 900+），
+    // 565×1397 实测 leftHeight=1240 → 评论列只剩 **73px**（用户看到「评论区不见了」）。
+    //
+    // 改成「按比例切」：左列最多占 mainH 的 60%，播放器最多占左列预算里扣掉控制条后的 70%，
+    // 信息区最多再吃 120px。剩下的全部给评论列。
+    const leftBudget = Math.round(mainH * 0.6)
     const fullVideoH = Math.round(contentW * 9 / 16)
-    videoH = Math.min(fullVideoH, Math.round(budget * 0.55))
+    videoH = Math.min(fullVideoH, Math.round((leftBudget - controlH) * 0.7))
     playerW = Math.round(videoH * 16 / 9)
-    leftHeight = Math.min(mainH, videoH + controlH + reserveH)
+    leftHeight = Math.min(leftBudget, videoH + controlH + Math.min(reserveH, 120))
     rightTop = px(mainTop + leftHeight + innerGap)
     rightHeight = px(Math.max(0, mainH - leftHeight - innerGap))
     sideW = contentW

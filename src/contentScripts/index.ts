@@ -23,7 +23,7 @@ import { setupVideoPage } from './videoPage'
 import App from './views/App.vue'
 import { setupChannelDrawnPage, teardownChannelDrawnPage } from './views/Channel'
 import { setupDynamicDrawnPage, teardownDynamicDrawnPage } from './views/Dynamic'
-import { teardownHomeDrawnPage } from './views/HomeDrawn'
+import { setupHomeDrawnPage, teardownHomeDrawnPage } from './views/HomeDrawn'
 import { setupLiveDrawnPage, teardownLiveDrawnPage } from './views/Live'
 // 搜索结果页整体自绘（第 92 轮 A）：自绘层挂载失败会自动回退原生页面
 import { setupMessageDrawn } from './views/Message'
@@ -223,6 +223,8 @@ let siteTweaksTimer: number | null = null
 async function onDOMLoaded() {
   let originalTopBar: HTMLElement | null = null
 
+  // 首页推荐流 API 自绘（第 103/104 轮）
+
   const changeHomePage = !isInIframe() && !settings.value.useOriginalBilibiliHomepage && isHomePage()
 
   // Remove the original Bilibili homepage if in Bilibili homepage & useOriginalBilibiliHomepage is enabled
@@ -318,8 +320,6 @@ async function onDOMLoaded() {
   //   ④ 把宿主移出 <Transition>；⑤ 清空 installInterceptors 调用。
   // 均无效 → 说明冲突点在别处（很可能是 fixture 注入的假卡片 + 覆盖层的隐藏互相影响），
   // 需要专门花时间用 e2e 的 fixture 复现。模块与 App.vue 的结构改进（[data-bewly-active-page]）保留。
-  // void setupHomeDrawnPage()
-
   // 专栏页自绘（第 93 轮 G）：列表页整体接管，文章页只注入排版样式
   setupReadDrawnPage()
 
@@ -335,6 +335,12 @@ async function onDOMLoaded() {
 
   // 专栏 / 文章页阅读模式（沉浸阅读 / 进度 / 目录 / 字号）
   setupArticlePage()
+
+  // 首页推荐流 API 自绘（第 103/104 轮）：API 拉数据 + 我们自己的组件渲染。
+  // 预取成功才隐藏旧首页；不接管时 views/Home 照旧工作。
+  void setupHomeDrawnPage()
+
+  // 首页推荐流 API 自绘（第 103/104 轮）
 
   // 热门 / 排行榜自绘（第 93 轮 F）：覆盖层自挂载，失败不影响原生页
   setupPopularPage()

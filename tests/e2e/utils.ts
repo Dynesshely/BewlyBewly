@@ -113,9 +113,21 @@ export async function readActiveCardUrl(page: Page): Promise<string> {
   })
 }
 
-/** 卡片数量（含注入的测试卡片） */
+/**
+ * 卡片数量（含注入的测试卡片）。
+ *
+ * 第 107 轮：首页推荐流改成 API 自绘后，卡片渲染在 light DOM 的
+ * `#bewly-home-drawn-root` 覆盖层里（不再在 `#bewly` shadow root 内），
+ * 所以这里两个位置都数，取较大值 —— 否则「等卡片稳定」的用例会永久超时。
+ */
 export async function countCards(page: Page): Promise<number> {
-  return page.evaluate(() => document.querySelector('#bewly')?.shadowRoot?.querySelectorAll('[data-video-card]').length ?? 0)
+  return page.evaluate(() => {
+    const shadow = document.querySelector('#bewly')?.shadowRoot
+    const shadowCards = shadow?.querySelectorAll('[data-video-card]').length ?? 0
+    const drawn = document.querySelector('#bewly-home-drawn-root')
+    const drawnCards = drawn?.querySelectorAll('[data-video-card], [data-bewly-home-card]').length ?? 0
+    return Math.max(shadowCards, drawnCards)
+  })
 }
 
 /**

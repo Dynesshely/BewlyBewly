@@ -473,8 +473,12 @@ function mount(): void {
   //      - 「滚动后收成迷你浮窗，P 还原」（html 缺 bewly-video-mini）
   //      - 「窄屏切到上下分区」（评论列 columnVisible=false）
   // 模块（videoPage/layout/**）保留，修好这两点后把下面一行放开即可。
-  if (!viewportDegraded)
-    disposeVideoFit = setupVideoFit()
+  // 第 118 轮：**窄屏降级时也尝试**铺满布局。
+  // 原来包在 `if (!viewportDegraded)` 里，而 `DEGRADE_MIN_WIDTH = 900` ——
+  // 565×1397 这种窄高视口直接跳过，页面仍是原生 4945px 高 + 1080px 宽的滚动页
+  // （用户要的「完全按视图宽高铺满、无滚动」在窄屏完全没兑现）。
+  // setupVideoFit 内部有自己的保护：computeLayout 在极端视口返回 ok=false，此时不接管。
+  disposeVideoFit = setupVideoFit()
 
   // 播放器 / 评论区分隔条（第 46 轮）：iframe 降级时不渲染
   if (!viewportDegraded)

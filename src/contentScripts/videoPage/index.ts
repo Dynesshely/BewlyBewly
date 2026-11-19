@@ -447,7 +447,6 @@ function mount(): void {
 
     // 工具栏原生入口「选集 / 快捷键」（第 33 轮）：把右下角浮动按钮挪进原生工具栏
     setupToolbarActions()
-
     // 评论区移到播放器右侧、与播放器同高（第 27 轮）：找不到结构 / 窄屏会自动回退
     disposeCommentColumn = setupCommentColumn()
   }

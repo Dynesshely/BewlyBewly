@@ -246,6 +246,16 @@ html.bewly-video-fit:not(.bewly-video-mini).bewly-video-fit-stacked [data-bewly-
  * 因此单独注入一份；轨道自身的定位由 rail.ts 写内联样式（每拍重算），
  * 这里用 !important 把它钉在 compute.ts 算出的位置上，两边不会打架。
  */
+/**
+ * ⚠️ 第 124 轮修：rail viewport 里**绝对不能再写 scrollbar-width**。
+ *
+ * Chromium 121+ 的规则：元素一旦使用标准 scrollbar-width / scrollbar-color，
+ * 它上面的 ::-webkit-scrollbar* 伪元素样式会被**整体忽略**（同一坑本仓库第 27 轮
+ * 在 .bvp-cmt__list 上踩过一次，videoPage.shadow.scss:1792 还留着警告注释）。
+ *
+ * 原来这里写了 scrollbar-width: thin，直接把轨道的自定义滚动条
+ * （rail.ts 注入的 ::-webkit-scrollbar 规则）废掉，用户看到的就是系统默认水平滚动条。
+ */
 export const FIT_SHADOW_CSS = `
 .bvp-rail {
   position: fixed !important;
@@ -264,7 +274,6 @@ export const FIT_SHADOW_CSS = `
   height: 100% !important;
   overflow-x: auto !important;
   overflow-y: hidden !important;
-  scrollbar-width: thin;
 }
 
 .bvp-rail__track {

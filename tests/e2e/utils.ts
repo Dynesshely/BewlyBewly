@@ -322,6 +322,36 @@ export async function stubBackgroundJson(
   }, rules)
 }
 
+/**
+ * 在 **browser context 层**给接口做 JSON 桩（第 111 轮）。
+ *
+ * 为什么需要它：`stubBackgroundJson` 替换的是 service worker 的 fetch，
+ * 只能拦住「经 background 发起」的请求。而从第 100 轮起，新页面的自绘模块
+ * （Space/Search/Message/Dynamic/Home/ListsDrawn）都在 **content script 里直接 fetch**
+ * （走 `wbiGet`），不经过 background —— 那种桩对它们完全无效，
+ * 导致依赖桩的用例（list-offscreen / favorites / scroll-memory / feedback-states）超时。
+ *
+ * context.route 拦的是网络层，isolated world 里发出的请求同样经过这一层。
+ */
+export async function stubContextJson(
+  context: BrowserContext,
+  rules: Array<{ match: string, body: unknown, status?: number }>,
+): Promise<void> {
+  await context.route('**/*', async (route) => {
+    const url = route.request().url()
+    const rule = rules.find(item => url.includes(item.match))
+    if (rule) {
+      await route.fulfill({
+        status: rule.status ?? 200,
+        contentType: 'application/json',
+        body: JSON.stringify(rule.body),
+      })
+      return
+    }
+    await route.continue()
+  })
+}
+
 /** 直接改扩展 settings（storage.local 里是 JSON 字符串），用于开关类断言 */
 export async function patchExtensionSettings(context: BrowserContext, patch: Record<string, unknown>): Promise<void> {
   const worker = await waitForServiceWorker(context)

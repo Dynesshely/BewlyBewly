@@ -76,6 +76,16 @@ const BRIDGE_WAIT_MS = 1_200
 /** 骨架条数 */
 const SKELETON_COUNT = 5
 
+/**
+ * 首屏最少条目数：低于它就**不接管**。
+ *
+ * 真机实测（探针 out-25 / out-26，未登录的新 profile）：
+ * 未登录时 `/x/v2/reply?ps=20` 只返回 **3 条**，且 `sort=0` 直接返回 0 条
+ * （登录态同样是 ps=20 会返回满 20 条）。这种「数据残缺但仍能拿到 aid」的情况下接管，
+ * 用户会看到一个比原生更空的自绘列表 —— 不如把页面交回原生（原生未登录时还有登录引导）。
+ */
+const MIN_INITIAL_ITEMS = 8
+
 /** 挂载判定状态 */
 export type CommentDrawnState = 'idle' | 'pending' | 'active' | 'off'
 
@@ -325,9 +335,11 @@ async function doSetup(): Promise<boolean> {
     return false
   }
 
-  // 接口成功但一条都没有：交给原生（原生空态还有「来抢沙发」引导）
-  if (!initialItems.length) {
-    console.warn('[bewly] comment drawn: empty first page, fallback to native')
+  // 接口成功但条目太少：交给原生（未登录时接口只给 3 条，接管了反而比原生更空）
+  if (initialItems.length < MIN_INITIAL_ITEMS) {
+    console.warn(
+      `[bewly] comment drawn: only ${initialItems.length} items on first page (need ${MIN_INITIAL_ITEMS}), fallback to native`,
+    )
     return false
   }
 
@@ -426,6 +438,9 @@ export function syncCommentDrawn(): CommentDrawnState {
   if (bvid !== mountedBvid || !mounted.nativeApp.isConnected) {
     teardownCommentDrawn()
     state = 'idle'
+    // 换视频 / 宿主被整段重建：下一拍重新走一遍「预取成功才接管」的流程。
+    // 失败会落到 'off'，页面交回原生（与首次挂载完全一致）。
+    void setupCommentDrawn()
     return state
   }
 

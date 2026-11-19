@@ -9,7 +9,7 @@ import {
   seedFakeLoginCookies,
   skipIfExtensionMissing,
   skipReason,
-  stubBackgroundJson,
+  stubContextJson,
   waitForExtensionReady,
   waitForStableCardCount,
 } from './utils'
@@ -321,7 +321,7 @@ test.describe('滚动位置记忆', () => {
       await openHomeFixture(page, { minCards: 1 })
       await waitForStableCardCount(page, 2)
 
-      await stubBackgroundJson(context, [
+      await stubContextJson(context, [
         { match: '/x/web-interface/history/cursor', body: HISTORY_STUB },
         {
           match: '/x/v2/history/shadow',

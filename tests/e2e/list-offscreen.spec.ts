@@ -8,7 +8,7 @@ import {
   patchExtensionSettings,
   seedFakeLoginCookies,
   skipIfExtensionMissing,
-  stubBackgroundJson,
+  stubContextJson,
   waitForExtensionReady,
   waitForStableCardCount,
 } from './utils'
@@ -86,7 +86,7 @@ test.describe('列表页离屏优化', () => {
       await waitForStableCardCount(page, 2)
 
       // 给历史接口做桩（background fetch），再进入历史页
-      await stubBackgroundJson(context, [
+      await stubContextJson(context, [
         { match: '/x/web-interface/history/cursor', body: HISTORY_STUB },
         {
           match: '/x/v2/history/shadow',

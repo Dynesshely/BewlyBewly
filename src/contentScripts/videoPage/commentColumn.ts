@@ -41,7 +41,7 @@ const OFFSET_VAR = '--bewly-comment-column-offset'
  * 评论列搬运的最小视口宽（第 52 轮：1280 → 900，与 fixedLayout 的 MIN_VIEWPORT_WIDTH 对齐）。
  * 900~1280 的主窗口现在也走「上下分区」，评论列需要搬进右列才能在第二行给出受控高度。
  */
-const MIN_COLUMN_WIDTH = 900
+const MIN_COLUMN_WIDTH = 400
 
 interface LayoutParts {
   mirror: HTMLElement
@@ -252,6 +252,17 @@ export function syncCommentColumn(): void {
   if (!shouldEnable() || !parts) {
     restoreCommentColumn()
     return
+  }
+
+  // 第 123 轮：**wrapper 被 B 站 Vue 当成野节点清掉**时优先重插，而不是立刻还原。
+  //
+  // 真机证据（dataset 诊断）：`move` 记录显示搬运成功（parent=bewly-comment-column），
+  // 但随后 wrapper 消失、`syncCommentColumn` 走 `restoreCommentColumn()` 把它放回 left-container，
+  // 于是稳态永远是「没搬」。宽屏下 Vue 重渲染少所以看不出问题，窄屏重渲染频繁就必现。
+  // 判定条件：wrapper 已断开 **且 #commentapp 还挂在 wrapper 里**（没被 B 站抢回去）→ 重插即可。
+  if (moved && !moved.wrapper.isConnected && moved.wrapper.contains(moved.commentApp) && parts.rightInner.isConnected) {
+    parts.rightInner.insertBefore(moved.wrapper, parts.rightInner.firstChild)
+    applyColumnMetrics(parts)
   }
 
   // B 站重建了评论宿主 / 右栏：清掉旧容器后重新接管（旧节点已断开，不需要再插回原位）

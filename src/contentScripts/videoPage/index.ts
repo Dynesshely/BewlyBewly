@@ -687,6 +687,12 @@ function sync(): void {
   // 其余固定布局、轨道、工具栏、播放器模式一律不写入。
   if (viewportDegraded) {
     safeSync('syncComments', syncComments)
+    // 第 123 轮：**降级路径也要同步评论区搬运**。
+    // 原来这里直接 return，导致下面第 780 行的 syncCommentColumn 永远不执行 ——
+    // 而铺满布局的 stacked 模式已经把下方 846px 留给「右列」，
+    // #commentapp 却还留在 467px 的左列里被压成 0 高（用户看到「评论区不见了」）。
+    // commentColumn 自己会在 shouldEnable 里判断宽度（bewly-video-fit 时门槛 400）。
+    safeSync('syncCommentColumn', syncCommentColumn)
     return
   }
 

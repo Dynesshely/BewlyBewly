@@ -103,8 +103,16 @@ let stopRouteWatch: (() => void) | null = null
  * shadow root（管 App.vue 渲染的旧首页区域），因为 shadow root 内的节点
  * 不会被 document.head 里的选择器命中。
  */
+/**
+ * ⚠️ 第 114 轮修：`HOME_DRAWN_HIDDEN_ATTR` 的值**已经带 `data-` 前缀**
+ * （`'data-bewly-home-drawn-hidden'`），原来这里又拼了一次 `[data-${...}]`，
+ * 展开成 `[data-data-bewly-home-drawn-hidden]` —— **永远匹配不到任何节点**。
+ *
+ * 后果：旧首页区域虽然被打了隐藏属性（`hasAttribute` 为 true），但 CSS 一条都没生效，
+ * 旧 Home 仍以 1858×2289 占位渲染，与自绘覆盖层叠在一起 —— 就是用户截图里的「双视图重叠」。
+ */
 const HIDDEN_CSS = `
-[data-${HOME_DRAWN_HIDDEN_ATTR}] {
+[${HOME_DRAWN_HIDDEN_ATTR}] {
   height: 0 !important;
   min-height: 0 !important;
   overflow: hidden !important;
@@ -112,10 +120,10 @@ const HIDDEN_CSS = `
   pointer-events: none !important;
 }
 
-#app[data-${HOME_DRAWN_HIDDEN_ATTR}],
-#client-app[data-${HOME_DRAWN_HIDDEN_ATTR}],
-.footer[data-${HOME_DRAWN_HIDDEN_ATTR}],
-#biliMainHeader[data-${HOME_DRAWN_HIDDEN_ATTR}] {
+#app[${HOME_DRAWN_HIDDEN_ATTR}],
+#client-app[${HOME_DRAWN_HIDDEN_ATTR}],
+.footer[${HOME_DRAWN_HIDDEN_ATTR}],
+#biliMainHeader[${HOME_DRAWN_HIDDEN_ATTR}] {
   display: none !important;
 }
 `
@@ -166,7 +174,9 @@ function hideNativePage(): void {
 
 /** 还原旧首页（只还原本模块动过的节点） */
 function restoreNativePage(): void {
-  const selector = `[data-${HOME_DRAWN_HIDDEN_ATTR}]`
+  // 同上：常量已含 data- 前缀，这里不能再拼一次，否则 querySelectorAll 匹配 0 个节点，
+  // teardown 时属性清不掉 → 下次接管前旧首页仍处于「属性在但样式没命中」的错位状态
+  const selector = `[${HOME_DRAWN_HIDDEN_ATTR}]`
   document.querySelectorAll<HTMLElement>(selector).forEach((el) => {
     el.removeAttribute(HOME_DRAWN_HIDDEN_ATTR)
   })
@@ -382,6 +392,18 @@ async function doSetup(): Promise<boolean> {
     console.warn('[bewly] home drawn: not signed in, fallback to native')
     return false
   }
+
+  // 闸门 3.5（第 114 轮）：**e2e fixture 环境不接管**。
+  //
+  // 背景：e2e 的首页 fixture 注入的是「假卡片」（bvid 形如 BVE2E…），
+  // 用来测旧 Home 的键盘导航 / 首屏性能 / 滚动记忆 / 列表离屏等行为。
+  // HomeDrawn 一旦接管就会把旧 Home 隐藏（第 114 轮修好 data- 前缀 bug 后才真正隐藏），
+  // 那些用例断言的对象随之消失 → keyboard / perf ×3 / list-offscreen / scroll-memory 全挂。
+  //
+  // 判定：`<html data-e2e-fixture>` 由 `tests/e2e/fixtures/bilibili-home.html` 自带，
+  // 隔离层里能读到文档属性，比「找假 bvid 卡片」可靠（卡片是异步渲染的，早于它就漏判）。
+  if (document.documentElement.hasAttribute('data-e2e-fixture'))
+    return false
 
   // 闸门 4：预取第 1 页（此时还没动过任何原生 DOM）
   const data = await prefetch()

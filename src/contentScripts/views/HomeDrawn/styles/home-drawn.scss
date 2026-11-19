@@ -271,8 +271,33 @@ html.bewly-home-drawn body {
   min-width: 0;
 }
 
+/**
+ * 卡片内边距（第 114 轮）。
+ *
+ * 用户反馈「自绘的视频卡片完全没有内部边距，封面等元素紧贴卡片边缘」——
+ * VideoCard 本身是「封面满宽 + 文字区自带 padding」的 B 站式结构，
+ * 但它的根节点没有背景/内边距，在深色背景下看不出卡片边界，封面看起来就是贴边的。
+ * 这里给卡片根节点补「背景 + 内边距 + 圆角」，封面自然内缩，卡片有实体感。
+ */
 .home-drawn-grid__item > * {
+  padding: 10px;
   margin-bottom: 0;
+  background: var(--bew-elevated);
+  border-radius: var(--bew-radius, 14px);
+  transition:
+    background var(--bew-motion-base, 0.2s) var(--bew-ease-out, ease),
+    box-shadow var(--bew-motion-base, 0.2s) var(--bew-ease-out, ease);
+}
+
+.home-drawn-grid__item > *:hover {
+  background: var(--bew-elevated);
+  box-shadow: var(--bew-shadow-2);
+}
+
+/* 内缩后封面圆角要跟着收一点，否则会出现「大圆角套小圆角」的双层边 */
+.home-drawn-grid__item > * > :first-child {
+  border-radius: calc(var(--bew-radius, 14px) - 4px);
+  overflow: hidden;
 }
 
 @media (min-width: 1600px) {

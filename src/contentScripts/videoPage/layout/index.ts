@@ -71,23 +71,28 @@ export function syncVideoFit(): void {
     return
   }
 
-  const measurements = measureFitLayout()
-  const result = computeLayout({
-    vw: window.innerWidth,
-    vh: window.innerHeight,
-    topBarH: measurements.topBarH,
-    railH: measurements.railH,
-    reserveH: measurements.reserveH,
-    controlH: measurements.controlH,
-  })
+  try {
+    const measurements = measureFitLayout()
+    const result = computeLayout({
+      vw: window.innerWidth,
+      vh: window.innerHeight,
+      topBarH: measurements.topBarH,
+      railH: measurements.railH,
+      reserveH: measurements.reserveH,
+      controlH: measurements.controlH,
+    })
+    if (!result.ok) {
+      clearApplied()
+      return
+    }
 
-  if (!result.ok) {
-    clearApplied()
-    return
+    applyFitLayout(result)
+    applied = true
   }
-
-  applyFitLayout(result)
-  applied = true
+  catch {
+    // 布局计算失败不能影响播放页本身：静默清掉、保持原生布局
+    clearApplied()
+  }
 }
 
 /**

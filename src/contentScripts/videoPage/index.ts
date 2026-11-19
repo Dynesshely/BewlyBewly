@@ -203,10 +203,14 @@ function degradeForNarrowViewport(): void {
     disposeFixedLayout = null
   }
   clearFixedLayout()
-  if (disposeVideoFit) {
-    disposeVideoFit()
-    disposeVideoFit = null
-  }
+  // 第 119 轮：**窄屏降级时不再拆掉「按视口铺满」布局**。
+  //
+  // 原来这里会 disposeVideoFit()，导致 565×1397 这类窄视口下：
+  //   mount() 先把 layout 挂上 → syncViewportDegradation() 判定降级 →
+  //   degradeForNarrowViewport() 又把它拆掉 → 页面回到原生 4945px 高 / 1080px 宽的滚动页。
+  // 真机诊断证据：`dataset.bewlyFitDbg` 显示 ok=true/mode=stacked，但 `fit` 为 false、
+  // 注入的 `#bewly-video-fit-page` 样式也被移除（clearApplied 未触发 → 是这条路径）。
+  // 铺满布局自己会在极端视口给 ok=false，不需要降级逻辑再兜一层。
   if (disposeSplitter) {
     disposeSplitter()
     disposeSplitter = null
@@ -411,6 +415,14 @@ function mount(): void {
   // 抽屉视口远小于整页，fixedLayout / commentColumn / 轨道 / 工具栏都按整页视口分配，
   // 在抽屉里必然挤压错乱 —— 这里不 setup 这些功能，只保留评论增强与广告清理。
   viewportDegraded = shouldDegradeForViewport()
+  // 第 119 轮：按视口铺满版式 —— **放在 mount() 最前面**。
+  //
+  // 原来在 mount() 末尾（第 481 行），而 565×1397 这类窄视口下 mount() 中途会抛错，
+  // 整条 setup 链在到达那一行之前就断了（真机实测：`setupVideoFit` 里的诊断一条都没写进
+  // `documentElement.dataset`，同批次的 infoBar / fixedLayout 也确实没生效）。
+  // 挪到最前面后不受后续任何 setup 抛错影响；computeLayout 自己会在极端视口给 ok=false。
+  disposeVideoFit = setupVideoFit()
+
   // 快捷键在 iframe 内也会和外层抽屉抢空格 / 方向键，一并关闭。
   if (!viewportDegraded && !isInIframe() && settings.value.videoPageShortcuts)
     disposeShortcuts = setupShortcuts()
@@ -473,12 +485,6 @@ function mount(): void {
   //      - 「滚动后收成迷你浮窗，P 还原」（html 缺 bewly-video-mini）
   //      - 「窄屏切到上下分区」（评论列 columnVisible=false）
   // 模块（videoPage/layout/**）保留，修好这两点后把下面一行放开即可。
-  // 第 118 轮：**窄屏降级时也尝试**铺满布局。
-  // 原来包在 `if (!viewportDegraded)` 里，而 `DEGRADE_MIN_WIDTH = 900` ——
-  // 565×1397 这种窄高视口直接跳过，页面仍是原生 4945px 高 + 1080px 宽的滚动页
-  // （用户要的「完全按视图宽高铺满、无滚动」在窄屏完全没兑现）。
-  // setupVideoFit 内部有自己的保护：computeLayout 在极端视口返回 ok=false，此时不接管。
-  disposeVideoFit = setupVideoFit()
 
   // 播放器 / 评论区分隔条（第 46 轮）：iframe 降级时不渲染
   if (!viewportDegraded)
@@ -550,6 +556,12 @@ function unmount(): void {
   if (disposeShortcuts) {
     disposeShortcuts()
     disposeShortcuts = null
+  }
+  // 第 119 轮：铺满版式必须在卸载时拆掉（原来只在窄屏降级路径里拆，
+  // 离开视频页时布局残留 —— lint 也因此报 disposeVideoFit 只赋值不使用）
+  if (disposeVideoFit) {
+    disposeVideoFit()
+    disposeVideoFit = null
   }
   if (disposeComments) {
     disposeComments()

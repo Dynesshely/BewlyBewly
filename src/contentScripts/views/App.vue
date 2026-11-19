@@ -159,6 +159,17 @@ const iframePageURL = computed((): string => {
   }
   return ''
 })
+/**
+ * 第 107 轮：这些 dock 页面有**自己的独立路由**（/watchlater/list、/history、/medialist），
+ * 不是首页的变体，所以 showBewlyPage 必须让它们渲染。
+ * 其它非首页路由不允许 —— 否则会把 Bewly 页面盖在视频页 / 文章页上。
+ */
+const NON_HOME_BEWLY_PAGES = new Set<string>([
+  AppPage.WatchLater,
+  AppPage.History,
+  AppPage.Favorites,
+])
+
 const showBewlyPage = computed((): boolean => {
   if (isInIframe())
     return false
@@ -170,7 +181,18 @@ const showBewlyPage = computed((): boolean => {
   if (iframePageURL.value)
     return false
 
-  return isHomePage() && !settings.value.useOriginalBilibiliHomepage
+  // 第 107 轮修（既有 bug）：原实现硬编码 isHomePage()，导致 /watchlater、/history、
+  // /medialist 这些 **dock 页面永远不渲染** —— bewly-wrapper 高度被算成 0，
+  // 用户在稍后再看/历史/收藏页看到的是一片空白（真机实测 wrapBox 2058x0）。
+  //
+  // 但**不能**简单地对所有非首页 page 返回 true：视频页 / 文章页这些原生页面
+  // 的 activatedPage 会退化成一个带 hasBewlyPage 的默认值，那样会把 Bewly 页面
+  // 盖在原生页上（e2e：article-page ×1、video-page ×2 因此挂）。
+  // 所以只对「确实有独立 dock 路由」的三个页面放开。
+  if (isHomePage())
+    return !settings.value.useOriginalBilibiliHomepage
+
+  return NON_HOME_BEWLY_PAGES.has(activatedPage.value)
 })
 const showTopBar = computed((): boolean => {
   // When using the open in drawer feature, the iframe inside the page will hide the top bar

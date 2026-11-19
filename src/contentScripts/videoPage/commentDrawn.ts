@@ -236,6 +236,12 @@ function hideNativeList(host: HTMLElement | null): HTMLStyleElement | null {
   styleEl.textContent = [
     'div#contents { display: none !important; }',
     'div#continuations { display: none !important; }',
+    // 第 126 轮：新版评论组件的内部结构可能不是 div#contents / div#continuations
+    // （用户实测能直接看到 bili-comment-thread-renderer 线程、回复按钮、大图）。
+    // 这里按「组件标签名」兜底，**不动 header**（原生输入框在 header-renderer 里）：
+    'bili-comment-thread-renderer { display: none !important; }',
+    'bili-comment-renderer { display: none !important; }',
+    'bili-comments-reply-renderer { display: none !important; }',
   ].join('\n')
   shadow.appendChild(styleEl)
   return styleEl
@@ -247,6 +253,29 @@ function hideNativeList(host: HTMLElement | null): HTMLStyleElement | null {
  * 这一层是**嵌套 shadow**，主 shadow 的 style 穿不进去，必须单独注入。
  * header 比宿主晚一拍建好，拿不到时返回 null（每拍同步会重试）。
  */
+/**
+ * 页面级兜底（第 126 轮）：某些版本里线程渲染器直接挂在 `#commentapp` 的 light DOM 上，
+ * 只注入到 `bili-comments` shadow 里的规则命中不了。
+ */
+const PAGE_HIDE_STYLE_ID = 'bewly-comment-drawn-page-hide'
+function ensurePageHideStyle(): void {
+  if (document.getElementById(PAGE_HIDE_STYLE_ID))
+    return
+  const styleEl = document.createElement('style')
+  styleEl.id = PAGE_HIDE_STYLE_ID
+  styleEl.textContent = [
+    `#commentapp bili-comment-thread-renderer { display: none !important; }`,
+    `#commentapp bili-comment-renderer { display: none !important; }`,
+    `#commentapp bili-comments-reply-renderer { display: none !important; }`,
+    // 兜底：`#commentapp` 的直接子级里，除了我们自己的容器以外全部隐藏
+    `#commentapp > :not(#${COMMENT_DRAWN_ID}) { display: none !important; }`,
+  ].join('\n')
+  document.head.appendChild(styleEl)
+}
+function removePageHideStyle(): void {
+  document.getElementById(PAGE_HIDE_STYLE_ID)?.remove()
+}
+
 function hideNativeHeaderRow(host: HTMLElement | null): HTMLStyleElement | null {
   const headerRenderer = host?.shadowRoot?.querySelector<HTMLElement>('bili-comments-header-renderer')
   const shadow = headerRenderer?.shadowRoot
@@ -399,6 +428,7 @@ async function doSetup(): Promise<boolean> {
   const commentsHost = document.querySelector<HTMLElement>(COMMENTS_HOST_SELECTOR)
   const hideStyleEl = hideNativeList(commentsHost)
   const headerStyleEl = hideNativeHeaderRow(commentsHost)
+  ensurePageHideStyle()
 
   document.documentElement.classList.add(COMMENT_DRAWN_ACTIVE_CLASS)
   markDrawn(`ok(items=${initialItems.length},total=${initialTotal ?? '?'})`)
@@ -502,6 +532,7 @@ export function getCommentDrawnApi(): CommentDrawnApi | null {
 
 /** 卸载并完全还原原生评论区（幂等；未接管时是空操作） */
 export function teardownCommentDrawn(): void {
+  removePageHideStyle()
   const current = mounted
   mounted = null
   mounting = null

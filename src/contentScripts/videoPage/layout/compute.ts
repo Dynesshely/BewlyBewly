@@ -170,8 +170,16 @@ export function computeLayout(input: FitLayoutInput): FitLayoutResult {
 
   if (stacked) {
     // 上下分区：播放器按内容宽 16:9 定高，信息区在它下面，评论占剩下的高度
-    playerW = contentW
-    videoH = Math.round(playerW * 9 / 16)
+    //
+    // ⚠️ 第 117 轮修：原来直接用 contentW 反算 videoH，1024×800 下算出
+    // videoH=549 + controlH=56 + reserveH=96 = 701，把 mainH=724 几乎吃光，
+    // 评论列只剩 7px →「窄屏上下分区」的 e2e 断言 columnVisible(height>100) 失败，
+    // 用户看到的也是「播放器巨大、评论区一条缝」。
+    // 现在限制播放器最多占「可用高度 − 控制条 − 预留」的 55%，剩下的全给评论列。
+    const budget = Math.max(80, mainH - controlH - reserveH)
+    const fullVideoH = Math.round(contentW * 9 / 16)
+    videoH = Math.min(fullVideoH, Math.round(budget * 0.55))
+    playerW = Math.round(videoH * 16 / 9)
     leftHeight = Math.min(mainH, videoH + controlH + reserveH)
     rightTop = px(mainTop + leftHeight + innerGap)
     rightHeight = px(Math.max(0, mainH - leftHeight - innerGap))

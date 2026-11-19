@@ -1,5 +1,5 @@
 /**
- * 新布局（html.bewly-video-fit）的样式表。
+ * 新布局（html.bewly-video-fit:not(.bewly-video-mini)）的样式表。
  *
  * 为什么把 CSS 放在模块里而不是 pages/videoPage.scss：
  * - 本轮的写入边界只允许 videoPage/layout/**、fixedLayout.ts、splitter.ts、videoPage.shadow.scss；
@@ -14,15 +14,15 @@
 /** 注入到页面（light DOM）的样式：整页铺满、三区定位、不出现页面滚动 */
 export const FIT_PAGE_CSS = `
 /* ---------- 1. 整页铺满、禁页面滚动 ---------- */
-html.bewly-video-fit,
-html.bewly-video-fit body {
+html.bewly-video-fit:not(.bewly-video-mini),
+html.bewly-video-fit:not(.bewly-video-mini) body {
   overflow: hidden !important;
   height: 100% !important;
   overscroll-behavior: none !important;
 }
 
-html.bewly-video-fit #app.app-v1,
-html.bewly-video-fit #app {
+html.bewly-video-fit:not(.bewly-video-mini) #app.app-v1,
+html.bewly-video-fit:not(.bewly-video-mini) #app {
   min-width: 0 !important;
   width: 100% !important;
   height: 100% !important;
@@ -31,17 +31,17 @@ html.bewly-video-fit #app {
 }
 
 /* B 站原生头部 / 页脚 / 轨道占位条：由 Bewly 顶栏接管，避免撑出横向溢出 */
-html.bewly-video-fit #biliMainHeader,
-html.bewly-video-fit .bili-header,
-html.bewly-video-fit #biliMainFooter,
-html.bewly-video-fit .bili-footer,
-html.bewly-video-fit #bewly-video-rail-spacer {
+html.bewly-video-fit:not(.bewly-video-mini) #biliMainHeader,
+html.bewly-video-fit:not(.bewly-video-mini) .bili-header,
+html.bewly-video-fit:not(.bewly-video-mini) #biliMainFooter,
+html.bewly-video-fit:not(.bewly-video-mini) .bili-footer,
+html.bewly-video-fit:not(.bewly-video-mini) #bewly-video-rail-spacer {
   display: none !important;
 }
 
 /* ---------- 2. 主区：固定贴视口，尺寸全部来自 --bvp-* ---------- */
-html.bewly-video-fit #mirror-vdcon,
-html.bewly-video-fit #mirror-vdcon.video-container-v1 {
+html.bewly-video-fit:not(.bewly-video-mini) #mirror-vdcon,
+html.bewly-video-fit:not(.bewly-video-mini) #mirror-vdcon.video-container-v1 {
   position: fixed !important;
   box-sizing: border-box !important;
   top: var(--bvp-main-top, 64px) !important;
@@ -63,8 +63,8 @@ html.bewly-video-fit #mirror-vdcon.video-container-v1 {
 
 /* 旧布局的响应式 <900 断点在这里不适用：新布局自己算窄屏 */
 @media (max-width: 899.98px) {
-  html.bewly-video-fit #mirror-vdcon,
-  html.bewly-video-fit #mirror-vdcon.video-container-v1 {
+  html.bewly-video-fit:not(.bewly-video-mini) #mirror-vdcon,
+  html.bewly-video-fit:not(.bewly-video-mini) #mirror-vdcon.video-container-v1 {
     display: grid !important;
     grid-template-columns: var(--bvp-left-w, 1fr) var(--bvp-side-w, 1fr) !important;
     height: var(--bvp-main-h, calc(100vh - 64px)) !important;
@@ -72,8 +72,8 @@ html.bewly-video-fit #mirror-vdcon.video-container-v1 {
 }
 
 /* ---------- 3. 左列：播放器 + 信息区，全部按变量定高 ---------- */
-html.bewly-video-fit #mirror-vdcon > .left-container,
-html.bewly-video-fit #mirror-vdcon .left-container {
+html.bewly-video-fit:not(.bewly-video-mini) #mirror-vdcon > .left-container,
+html.bewly-video-fit:not(.bewly-video-mini) #mirror-vdcon .left-container {
   grid-column: 1 !important;
   grid-row: 1 !important;
   box-sizing: border-box !important;
@@ -90,7 +90,7 @@ html.bewly-video-fit #mirror-vdcon .left-container {
   position: static !important;
 }
 
-html.bewly-video-fit #playerWrap {
+html.bewly-video-fit:not(.bewly-video-mini) #playerWrap {
   position: relative !important;
   flex: 0 0 auto !important;
   box-sizing: border-box !important;
@@ -106,27 +106,27 @@ html.bewly-video-fit #playerWrap {
 }
 
 /* 播放器内部：画面区按 --bvp-player-video-h 定高，视频填满不留黑边 */
-html.bewly-video-fit #playerWrap video {
+html.bewly-video-fit:not(.bewly-video-mini) #playerWrap video {
   object-fit: contain !important;
 }
 
 /* 左列其它块（信息栏 / 工具栏 / 标签行）：不参与拉伸，按内容高度 */
-html.bewly-video-fit #mirror-vdcon > .left-container > #bewly-info-bar,
-html.bewly-video-fit #mirror-vdcon > .left-container > #viewbox_report,
-html.bewly-video-fit #mirror-vdcon > .left-container > #arc_toolbar_report,
-html.bewly-video-fit #mirror-vdcon > .left-container > .video-tag-container {
+html.bewly-video-fit:not(.bewly-video-mini) #mirror-vdcon > .left-container > #bewly-info-bar,
+html.bewly-video-fit:not(.bewly-video-mini) #mirror-vdcon > .left-container > #viewbox_report,
+html.bewly-video-fit:not(.bewly-video-mini) #mirror-vdcon > .left-container > #arc_toolbar_report,
+html.bewly-video-fit:not(.bewly-video-mini) #mirror-vdcon > .left-container > .video-tag-container {
   flex: 0 0 auto !important;
   min-height: 0 !important;
   margin: 0 !important;
 }
 
-html.bewly-video-fit .video-tag-container {
+html.bewly-video-fit:not(.bewly-video-mini) .video-tag-container {
   max-height: none !important;
 }
 
 /* ---------- 4. 右列：创作者卡片 + 评论区（内部滚动） ---------- */
-html.bewly-video-fit #mirror-vdcon > .right-container,
-html.bewly-video-fit #mirror-vdcon .right-container {
+html.bewly-video-fit:not(.bewly-video-mini) #mirror-vdcon > .right-container,
+html.bewly-video-fit:not(.bewly-video-mini) #mirror-vdcon .right-container {
   grid-column: 2 !important;
   grid-row: 1 !important;
   box-sizing: border-box !important;
@@ -141,7 +141,7 @@ html.bewly-video-fit #mirror-vdcon .right-container {
   position: static !important;
 }
 
-html.bewly-video-fit .right-container-inner {
+html.bewly-video-fit:not(.bewly-video-mini) .right-container-inner {
   box-sizing: border-box !important;
   display: block !important;
   width: 100% !important;
@@ -153,8 +153,8 @@ html.bewly-video-fit .right-container-inner {
   position: static !important;
 }
 
-html.bewly-video-fit .bewly-comment-column,
-html.bewly-video-fit [data-bewly-comment-column] {
+html.bewly-video-fit:not(.bewly-video-mini) .bewly-comment-column,
+html.bewly-video-fit:not(.bewly-video-mini) [data-bewly-comment-column] {
   box-sizing: border-box !important;
   display: flex !important;
   flex-direction: column !important;
@@ -170,17 +170,17 @@ html.bewly-video-fit [data-bewly-comment-column] {
 }
 
 /* 创作者卡片：不参与滚动，按内容高度 */
-html.bewly-video-fit .bewly-comment-column > .up-panel-container,
-html.bewly-video-fit .up-panel-container {
+html.bewly-video-fit:not(.bewly-video-mini) .bewly-comment-column > .up-panel-container,
+html.bewly-video-fit:not(.bewly-video-mini) .up-panel-container {
   flex: 0 0 auto !important;
   min-height: 0 !important;
   margin: 0 !important;
 }
 
 /* 评论区：吃掉右列剩余高度，内部滚动 */
-html.bewly-video-fit .bewly-comment-column > #commentapp,
-html.bewly-video-fit .bewly-comment-column #commentapp,
-html.bewly-video-fit #commentapp {
+html.bewly-video-fit:not(.bewly-video-mini) .bewly-comment-column > #commentapp,
+html.bewly-video-fit:not(.bewly-video-mini) .bewly-comment-column #commentapp,
+html.bewly-video-fit:not(.bewly-video-mini) #commentapp {
   flex: 1 1 auto !important;
   box-sizing: border-box !important;
   height: auto !important;
@@ -193,8 +193,8 @@ html.bewly-video-fit #commentapp {
 }
 
 /* 底部发送区：钉在评论区底部（自绘评论组件） */
-html.bewly-video-fit .bcd-compose,
-html.bewly-video-fit .bvp-comment-composer {
+html.bewly-video-fit:not(.bewly-video-mini) .bcd-compose,
+html.bewly-video-fit:not(.bewly-video-mini) .bvp-comment-composer {
   position: sticky !important;
   bottom: 0 !important;
   z-index: 2;
@@ -202,38 +202,38 @@ html.bewly-video-fit .bvp-comment-composer {
 }
 
 /* ---------- 5. 上下分区（窄视口）：播放器在上、评论在下 ---------- */
-html.bewly-video-fit.bewly-video-fit-stacked #mirror-vdcon {
+html.bewly-video-fit:not(.bewly-video-mini).bewly-video-fit-stacked #mirror-vdcon {
   grid-template-columns: 1fr !important;
   grid-template-rows: var(--bvp-left-h, auto) minmax(0, 1fr) !important;
   row-gap: var(--bvp-gap-inner, 8px) !important;
   height: var(--bvp-main-h, calc(100vh - 64px)) !important;
 }
 
-html.bewly-video-fit.bewly-video-fit-stacked #mirror-vdcon > .left-container,
-html.bewly-video-fit.bewly-video-fit-stacked #mirror-vdcon .left-container {
+html.bewly-video-fit:not(.bewly-video-mini).bewly-video-fit-stacked #mirror-vdcon > .left-container,
+html.bewly-video-fit:not(.bewly-video-mini).bewly-video-fit-stacked #mirror-vdcon .left-container {
   grid-column: 1 !important;
   grid-row: 1 !important;
   height: var(--bvp-left-h, auto) !important;
 }
 
-html.bewly-video-fit.bewly-video-fit-stacked #mirror-vdcon > .right-container,
-html.bewly-video-fit.bewly-video-fit-stacked #mirror-vdcon .right-container {
+html.bewly-video-fit:not(.bewly-video-mini).bewly-video-fit-stacked #mirror-vdcon > .right-container,
+html.bewly-video-fit:not(.bewly-video-mini).bewly-video-fit-stacked #mirror-vdcon .right-container {
   grid-column: 1 !important;
   grid-row: 2 !important;
   width: var(--bvp-side-w, 100%) !important;
   height: var(--bvp-side-h, auto) !important;
 }
 
-html.bewly-video-fit.bewly-video-fit-stacked .bewly-comment-column,
-html.bewly-video-fit.bewly-video-fit-stacked [data-bewly-comment-column] {
+html.bewly-video-fit:not(.bewly-video-mini).bewly-video-fit-stacked .bewly-comment-column,
+html.bewly-video-fit:not(.bewly-video-mini).bewly-video-fit-stacked [data-bewly-comment-column] {
   height: var(--bvp-side-h, 100%) !important;
   max-height: var(--bvp-side-h, 100%) !important;
 }
 
 /* ---------- 6. 无障碍 / 动效 ---------- */
 @media (prefers-reduced-motion: reduce) {
-  html.bewly-video-fit #mirror-vdcon,
-  html.bewly-video-fit #playerWrap {
+  html.bewly-video-fit:not(.bewly-video-mini) #mirror-vdcon,
+  html.bewly-video-fit:not(.bewly-video-mini) #playerWrap {
     transition: none !important;
   }
 }

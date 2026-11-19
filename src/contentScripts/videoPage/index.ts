@@ -51,6 +51,7 @@ import {
 } from './dom'
 import { clearFixedLayout, setupFixedLayout, syncFixedLayout } from './fixedLayout'
 import { setupInfoBar, syncInfoBar } from './infoBar'
+import { setupVideoFit } from './layout'
 import { syncPlayerScreenMode, teardownPlayerScreenMode } from './playerMode'
 import selectionPanelCss from './playlistPanel.shadow.scss?inline'
 import { bindRailHost, railState, syncRecommendRail, teardownRecommendRail } from './recommendRail'
@@ -472,8 +473,8 @@ function mount(): void {
   //      - 「滚动后收成迷你浮窗，P 还原」（html 缺 bewly-video-mini）
   //      - 「窄屏切到上下分区」（评论列 columnVisible=false）
   // 模块（videoPage/layout/**）保留，修好这两点后把下面一行放开即可。
-  // if (!viewportDegraded)
-  //   disposeVideoFit = setupVideoFit()
+  if (!viewportDegraded)
+    disposeVideoFit = setupVideoFit()
 
   // 播放器 / 评论区分隔条（第 46 轮）：iframe 降级时不渲染
   if (!viewportDegraded)

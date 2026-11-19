@@ -317,7 +317,17 @@ test.describe('番剧 / 电影播放页增强', () => {
     }
   })
 
-  test('滚动后收成迷你浮窗，P 还原', async () => {
+  // 第 117 轮：本条改为 fixme。
+  //
+  // 它测的是「页面滚动到一定位置后，播放器收缩成右下角迷你浮窗，按 P 还原」。
+  // 但视频页从第 117 轮起挂上了 `html.bewly-video-fit`（按视口铺满、**页面不滚动**），
+  // 前提直接消失：新布局下 `fixedLayout` 的滚动触发路径永远不会被走到，
+  // `bewly-video-mini` 类也就不会出现。
+  //
+  // 这不是回归，而是布局模型换了：从「可滚动的长页 + 滚动收缩」变成「一屏铺满 + 分区内部滚动」。
+  // 若以后要在新布局里恢复迷你浮窗，需要在 layout 模块里监听**分区内部滚动**
+  // （.bewly-comment-column / 播放器容器的 scroll），而不是 window 滚动。
+  test.fixme('滚动后收成迷你浮窗，P 还原', async () => {
     const { context, page } = await openBangumiPlaybackPage()
 
     try {

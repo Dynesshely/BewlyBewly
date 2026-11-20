@@ -12,9 +12,10 @@
  * 数据全部来自 `./fetcher`，本组件**不读原生 DOM**。
  */
 import type { CommentItem, CommentSort } from './types'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import CommentComposer from './CommentComposer.vue'
 import CommentThread from './CommentThread.vue'
+import { moveDanmakuInto } from './danmakuMove'
 import { fetchComments } from './fetcher'
 import { fillTemplate, useCommentDrawnI18n } from './i18n'
 import { formatCount } from './utils'
@@ -51,6 +52,58 @@ const page = ref((props.initialItems?.length ?? 0) > 0
   : 0)
 /** 只看 UP 主（由挂载层通过 defineExpose 设置） */
 const onlyUp = ref(false)
+
+/**
+ * 主面板：「评论」还是「弹幕」（第 128 轮）。
+ *
+ * 用户要求把原生「弹幕列表」和评论区做成同一个区域的两个标签页 ——
+ * 弹幕列表是 B 站原生的折叠组件（懒加载），这里把它整块搬进 `.bcd-danmaku-slot`，
+ * 切走时保持搬走状态（不反复搬，避免触发 B 站重新渲染）。
+ */
+type MainPanel = 'comments' | 'danmaku'
+const PANEL_STORAGE_KEY = 'bewly-comment-panel'
+const panel = ref<MainPanel>((() => {
+  try {
+    return sessionStorage.getItem(PANEL_STORAGE_KEY) === 'danmaku'
+      ? 'danmaku'
+      : 'comments'
+  }
+  catch {
+    return 'comments'
+  }
+})())
+const danmakuSlotRef = ref<HTMLElement | null>(null)
+const danmakuState = ref<'idle' | 'moved' | 'missing'>('idle')
+let danmakuRestore: (() => void) | null = null
+
+function switchPanel(next: MainPanel): void {
+  panel.value = next
+  try {
+    sessionStorage.setItem(PANEL_STORAGE_KEY, next)
+  }
+  catch {
+    // sessionStorage 不可用时忽略
+  }
+  if (next === 'danmaku')
+    void mountDanmaku()
+}
+
+async function mountDanmaku(): Promise<void> {
+  if (danmakuRestore || !danmakuSlotRef.value)
+    return
+  // 等一拍让 v-if 渲染出 slot 容器
+  await nextTick()
+  const slot = danmakuSlotRef.value
+  if (!slot)
+    return
+  const moved = moveDanmakuInto(slot)
+  if (!moved) {
+    danmakuState.value = 'missing'
+    return
+  }
+  danmakuRestore = moved.restore
+  danmakuState.value = 'moved'
+}
 
 const skeletonCount = computed(() => props.skeletonCount ?? 5)
 
@@ -218,7 +271,33 @@ defineExpose({
 
 <template>
   <section class="bcd-list">
-    <div class="bcd-list__toolbar">
+    <!-- 主面板切换：评论 / 弹幕（第 128 轮） -->
+    <div class="bcd-panel-tabs" role="tablist" :aria-label="t.total /* 借用现有文案占位 */">
+      <button
+        type="button"
+        role="tab"
+        class="bcd-panel-tab"
+        :class="{ 'is-active': panel === 'comments' }"
+        :aria-selected="panel === 'comments'"
+        data-bcd-panel="comments"
+        @click="switchPanel('comments')"
+      >
+        {{ t.commentsTab }}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        class="bcd-panel-tab"
+        :class="{ 'is-active': panel === 'danmaku' }"
+        :aria-selected="panel === 'danmaku'"
+        data-bcd-panel="danmaku"
+        @click="switchPanel('danmaku')"
+      >
+        {{ t.danmakuTab }}
+      </button>
+    </div>
+
+    <div v-show="panel === 'comments'" class="bcd-list__toolbar">
       <div class="bcd-list__sort" role="tablist">
         <button
           type="button"
@@ -259,7 +338,7 @@ defineExpose({
       <span v-if="totalText" class="bcd-list__total">{{ fillTemplate(t.total, totalText) }}</span>
     </div>
 
-    <div class="bcd-list__body">
+    <div v-show="panel === 'comments'" class="bcd-list__body">
       <!-- 首屏骨架 -->
       <div v-if="loading && !items.length" class="bcd-list__skeletons" aria-hidden="true">
         <div v-for="index in skeletonCount" :key="index" class="bcd-list__skeleton">
@@ -321,8 +400,16 @@ defineExpose({
       </p>
     </div>
 
+    <!-- 弹幕面板（第 128 轮）：原生弹幕列表整块搬进 `.bcd-danmaku-slot` -->
+    <div v-show="panel === 'danmaku'" class="bcd-danmaku-panel">
+      <div ref="danmakuSlotRef" class="bcd-danmaku-slot" />
+      <p v-if="danmakuState === 'missing'" class="bcd-list__state-text">
+        {{ t.danmakuMissing }}
+      </p>
+    </div>
+
     <!-- 自绘输入框：原生输入框在接管后拿不到（见 CommentComposer 顶部说明） -->
-    <CommentComposer :aid="aid" @posted="onPosted" />
+    <CommentComposer v-show="panel === 'comments'" :aid="aid" @posted="onPosted" />
   </section>
 </template>
 
@@ -470,6 +557,120 @@ defineExpose({
 
 .bcd-list__skeleton-line.is-short {
   width: 60%;
+}
+
+/* ===== 主面板切换：评论 / 弹幕（第 128 轮） ===== */
+.bcd-panel-tabs {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  align-items: center;
+  padding: 8px 12px 0;
+  border-bottom: 1px solid var(--bew-fill-1);
+}
+
+.bcd-panel-tab {
+  position: relative;
+  padding: 6px 2px;
+  margin-right: 14px;
+  font-size: var(--bew-fs-control, 14px);
+  font-weight: 600;
+  line-height: var(--bew-lh-snug, 1.4);
+  color: var(--bew-text-3) !important;
+  cursor: pointer;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.bcd-panel-tab:hover {
+  color: var(--bew-text-2) !important;
+}
+
+.bcd-panel-tab.is-active {
+  color: var(--bew-text-1) !important;
+}
+
+/* 选中态下划线（与评论区内部的排序 tab 区分开：主 tab 更粗） */
+.bcd-panel-tab.is-active::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: var(--bew-theme-color, hsl(195 100% 42%));
+  border-radius: 2px;
+}
+
+/* ===== 弹幕面板 ===== */
+.bcd-danmaku-panel {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  padding: 8px 12px 12px;
+  overflow: hidden;
+}
+
+.bcd-danmaku-slot {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  border-radius: var(--bew-radius-sm, 8px);
+  background: var(--bew-fill-1);
+}
+
+/* 搬进来的原生折叠容器：撑满 slot、内部自己滚 */
+.bcd-danmaku-slot > [data-bewly-danmaku-moved] {
+  display: flex !important;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  background: transparent !important;
+}
+
+.bcd-danmaku-slot [data-bewly-danmaku-moved] .bui-collapse-body,
+.bcd-danmaku-slot [data-bewly-danmaku-moved] .bpx-player-wraplist {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none !important;
+  overflow-y: auto !important;
+}
+
+/* ⚠️ 第 128 轮：折叠条必须钉成固定高度的单行。
+   搬进来后我们给 wrap 设了 height:100%，而原生的 .bui-collapse-header 是
+   display:block 且内部 SVG 没有任何尺寸约束 —— 实测箭头图标被拉伸成 790×790，
+   整条 header 撑到 814px 高，列表体被挤到视口外（用户看到的就是一个巨大的「>」）。 */
+.bcd-danmaku-slot [data-bewly-danmaku-moved] .bui-collapse-header {
+  display: flex !important;
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  box-sizing: border-box !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  max-height: 40px !important;
+  padding: 0 12px !important;
+  overflow: hidden !important;
+}
+
+.bcd-danmaku-slot [data-bewly-danmaku-moved] .bui-collapse-arrow,
+.bcd-danmaku-slot [data-bewly-danmaku-moved] .arrow-icon,
+.bcd-danmaku-slot [data-bewly-danmaku-moved] .bui-collapse-header svg {
+  flex: 0 0 auto !important;
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  min-height: 16px !important;
+  max-width: 16px !important;
+  max-height: 16px !important;
+}
+
+.bcd-danmaku-slot [data-bewly-danmaku-moved] .bui-collapse-arrow {
+  margin: 0 8px 0 auto !important;
 }
 
 .bcd-list__sentinel {

@@ -22,6 +22,12 @@ export interface CommentTimeLabels {
 export interface CommentDrawnMessages {
   /** 排序 tab */
   sortHot: string
+  /** 主面板 tab：评论（第 128 轮） */
+  commentsTab: string
+  /** 主面板 tab：弹幕（第 128 轮） */
+  danmakuTab: string
+  /** 弹幕列表缺失时的提示（第 128 轮） */
+  danmakuMissing: string
   sortLatest: string
   /** `{count}` 是总条数文本 */
   total: string
@@ -64,6 +70,9 @@ export interface CommentDrawnMessages {
 
 const CMN_CN: CommentDrawnMessages = {
   sortHot: '按热度',
+  commentsTab: '评论',
+  danmakuTab: '弹幕',
+  danmakuMissing: '这个视频没有弹幕列表',
   sortLatest: '按时间',
   total: '{count} 条评论',
   loadingMore: '加载中…',
@@ -104,6 +113,9 @@ const CMN_CN: CommentDrawnMessages = {
 
 const CMN_TW: CommentDrawnMessages = {
   sortHot: '按熱度',
+  commentsTab: '評論',
+  danmakuTab: '彈幕',
+  danmakuMissing: '這個影片沒有彈幕列表',
   sortLatest: '按時間',
   total: '{count} 則留言',
   loadingMore: '載入中…',
@@ -145,6 +157,9 @@ const CMN_TW: CommentDrawnMessages = {
 const JYUT: CommentDrawnMessages = {
   ...CMN_TW,
   sortHot: '按熱度',
+  commentsTab: '留言',
+  danmakuTab: '彈幕',
+  danmakuMissing: '呢條片冇彈幕列表',
   sortLatest: '按時間',
   total: '{count} 條留言',
   loadingMore: '載入緊…',
@@ -181,6 +196,9 @@ const JYUT: CommentDrawnMessages = {
 
 const EN: CommentDrawnMessages = {
   sortHot: 'Top',
+  commentsTab: 'Comments',
+  danmakuTab: 'Danmaku',
+  danmakuMissing: 'No danmaku list for this video',
   sortLatest: 'Newest',
   total: '{count} comments',
   loadingMore: 'Loading…',

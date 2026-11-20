@@ -176,6 +176,36 @@ export async function moveDanmakuInto(container: HTMLElement): Promise<MovedDanm
 
   container.appendChild(wrap)
 
+  /**
+   * 第 132 轮（方向 A）：搬完后**主动触发一次滚动**。
+   *
+   * 真机观察：B 站的弹幕列表按**可见性分页加载**，容器 610px 高只够它加载首屏一小段，
+   * 之后它认为「已加载完」就停住，视觉上停在空态插画。
+   * 这里改完父级后主动滚一下容器，逼它重新走一遍 IntersectionObserver / 可见性计算，
+   * 把当前可视区对应的那批行渲染出来。
+   */
+  const nudgeScroll = (): void => {
+    const candidates = [
+      wrap.querySelector<HTMLElement>('.bpx-player-dm-wrap'),
+      wrap.querySelector<HTMLElement>('.bpx-player-wraplist'),
+      wrap.querySelector<HTMLElement>('.bui-collapse-body'),
+      wrap.querySelector<HTMLElement>('.bpx-player-dm-container'),
+    ]
+    for (const el of candidates) {
+      if (!el)
+        continue
+      const top = el.scrollTop
+      el.scrollTop = top + 1
+      // 下一帧再滚回去，避免真的改变用户看到的滚动位置
+      requestAnimationFrame(() => {
+        el.scrollTop = top
+      })
+    }
+  }
+  nudgeScroll()
+  for (const delay of [600, 1800, 3600])
+    window.setTimeout(nudgeScroll, delay)
+
   // 折叠条的文案改成「弹幕列表」并保留可点击（用户仍能收起来）
   return {
     restore: () => {

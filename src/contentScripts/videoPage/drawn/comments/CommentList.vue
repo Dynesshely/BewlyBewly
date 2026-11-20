@@ -705,6 +705,32 @@ defineExpose({
   background: transparent !important;
 }
 
+/* ⚠️ 第 132 轮：弹幕列表用的是 **better-scroll 虚拟列表**。
+   搬进我们的容器后它按「容器高 = ul 全高」重算，把 ul 的 top 推到了 1761px
+   （视口外），用户于是只看到那块空态插画。
+   这里把内层列表钉回容器顶部：wrap 自己滚、ul 不再被 bscroll 整体位移。 */
+.bcd-danmaku-slot [data-bewly-danmaku-moved] .bui-long-list-wrap {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow-y: auto !important;
+}
+
+.bcd-danmaku-slot [data-bewly-danmaku-moved] .bui-long-list-list {
+  position: static !important;
+  top: auto !important;
+  margin: 0 !important;
+  transform: none !important;
+}
+
+/* 空态插画：数据已经加载时不该再占位（B 站只在 load 前后切换） */
+.bcd-danmaku-slot [data-bewly-danmaku-moved] .bpx-player-dm-empty,
+.bcd-danmaku-slot [data-bewly-danmaku-moved] [class*="dm-empty"],
+.bcd-danmaku-slot [data-bewly-danmaku-moved] [class*="empty-holder"] {
+  display: none !important;
+}
+
 .bcd-danmaku-slot [data-bewly-danmaku-moved] .bui-collapse-body,
 .bcd-danmaku-slot [data-bewly-danmaku-moved] .bpx-player-wraplist {
   flex: 1 1 auto;

@@ -344,6 +344,19 @@ export async function stubContextJson(
   context: BrowserContext,
   rules: Array<{ match: string, body: unknown, status?: number }>,
 ): Promise<void> {
+  /**
+   * 已知限制（第 137 轮诊断确认）：
+   *
+   * Playwright 里 page.route 的优先级高于 context.route。
+   * openHomeFixture 用的是 page.route 注册的通配 handler，它对不认识的 URL 调
+   * route.continue()，请求就此发出，后面注册的 context.route handler 完全轮不到。
+   *
+   * 真机证据：给 /x/web-interface/history/cursor 配了 stub 之后，响应体仍然是
+   * B 站返回的 code:-400 请求错误，说明 stub 从未生效。
+   *
+   * 要修得在调用侧先 page.unroute 再 stub —— 但那样会连带清掉首页 fixture 自己的拦截，
+   * 全量并发下会让别的用例失去 fixture。所以这里先保持现状 + 文档化。
+   */
   await context.route('**/*', async (route) => {
     const url = route.request().url()
     const rule = rules.find(item => url.includes(item.match))

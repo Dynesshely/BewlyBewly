@@ -142,7 +142,7 @@ async function mountDanmaku(): Promise<void> {
     return
   }
   dbg(`trying(try=${danmakuRetryCount})`)
-  const moved = moveDanmakuInto(slot)
+  const moved = await moveDanmakuInto(slot)
   if (!moved) {
     // 第 129 轮：页面上的弹幕容器经常比评论区晚几百毫秒才渲染，
     // 一次失败就判 missing 会让用户永远看不到弹幕 tab —— 这里退避重试。

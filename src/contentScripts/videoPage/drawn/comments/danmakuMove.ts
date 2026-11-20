@@ -103,7 +103,7 @@ export function expandDanmaku(wrap: HTMLElement): void {
  *
  * 找不到节点时返回 null（调用方据此显示「该视频没有弹幕列表」）。
  */
-export function moveDanmakuInto(container: HTMLElement): MovedDanmaku | null {
+export async function moveDanmakuInto(container: HTMLElement): Promise<MovedDanmaku | null> {
   const wrap = findDanmakuWrap()
   if (!wrap)
     return null
@@ -112,6 +112,28 @@ export function moveDanmakuInto(container: HTMLElement): MovedDanmaku | null {
       restore: () => {},
     }
   }
+
+  /**
+   * 第 131 轮（方向 B）：**先加载完再搬**。
+   *
+   * 第 130 轮的教训：搬走之后再展开，B 站的弹幕加载器**不再填充**
+   * （大概率靠 getBoundingClientRect / IntersectionObserver 判断可见性，
+   * 节点一旦离开原容器就认为不可见）。所以顺序必须是
+   *   「在原位置展开 → 轮询等列表出现数据行 → 再搬」。
+   */
+  const hasData = (): boolean => {
+    const list = wrap.querySelector<HTMLElement>('.bpx-player-dm-container')
+    if (!list)
+      return false
+    return list.childElementCount > 0 && (list.textContent ?? '').replace(/\s+/g, '').length > 40
+  }
+
+  // 1) 在原位置展开
+  expandDanmaku(wrap)
+
+  // 2) 等数据填充（最多 8 秒）
+  for (let i = 0; i < 32 && !hasData(); i += 1)
+    await new Promise(resolve => setTimeout(resolve, 250))
 
   const originalParent = wrap.parentElement
   const originalNext = wrap.nextSibling

@@ -256,6 +256,29 @@ export function createDanmakuOverlay(): DanmakuOverlay | null {
   const anchor = wrap.parentElement
   const anchorStyle = anchor?.getAttribute('style') ?? null
 
+  /**
+   * ⚠️ 第 135 轮：overlay 路径**没走** `moveDanmakuInto`，所以那里给 header 设的内联样式不会生效。
+   * 真机：`.bui-collapse-header` 高度 **720px**（占满整个 overlay），把列表体推到 top=949。
+   * 这里在 overlay 创建时单独钉一遍。
+   */
+  const headerEl = wrap.querySelector<HTMLElement>('.bui-collapse-header')
+  if (headerEl) {
+    headerEl.style.setProperty('display', 'flex', 'important')
+    headerEl.style.setProperty('align-items', 'center', 'important')
+    headerEl.style.setProperty('box-sizing', 'border-box', 'important')
+    headerEl.style.setProperty('height', '40px', 'important')
+    headerEl.style.setProperty('min-height', '40px', 'important')
+    headerEl.style.setProperty('max-height', '40px', 'important')
+    headerEl.style.setProperty('padding', '0 12px', 'important')
+    headerEl.style.setProperty('overflow', 'hidden', 'important')
+    for (const svg of Array.from(headerEl.querySelectorAll<SVGElement>('svg'))) {
+      svg.style.setProperty('width', '16px', 'important')
+      svg.style.setProperty('height', '16px', 'important')
+      svg.style.setProperty('max-width', '16px', 'important')
+      svg.style.setProperty('max-height', '16px', 'important')
+    }
+  }
+
   let shown = false
   const prevStyle = {
     position: wrap.style.getPropertyValue('position'),

@@ -15,7 +15,7 @@ import type { CommentItem, CommentSort } from './types'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import CommentComposer from './CommentComposer.vue'
 import CommentThread from './CommentThread.vue'
-import { findDanmakuWrap, moveDanmakuInto } from './danmakuMove'
+import { createDanmakuOverlay, findDanmakuWrap } from './danmakuMove'
 import { fetchComments } from './fetcher'
 import { fillTemplate, useCommentDrawnI18n } from './i18n'
 import { formatCount } from './utils'
@@ -72,9 +72,10 @@ const panel = ref<MainPanel>((() => {
     return 'comments'
   }
 })())
+/** 第 133 轮：fixed 定位覆盖层的句柄（不再搬 DOM） */
+let danmakuOverlay: ReturnType<typeof createDanmakuOverlay> = null
 const danmakuSlotRef = ref<HTMLElement | null>(null)
 const danmakuState = ref<'idle' | 'moved' | 'missing'>('idle')
-let danmakuRestore: (() => void) | null = null
 
 function switchPanel(next: MainPanel): void {
   panel.value = next
@@ -84,8 +85,16 @@ function switchPanel(next: MainPanel): void {
   catch {
     // sessionStorage 不可用时忽略
   }
-  if (next === 'danmaku')
-    void mountDanmaku()
+  if (next === 'danmaku') {
+    void ensureDanmakuOverlay().then((ok) => {
+      const slot = danmakuSlotRef.value
+      if (ok && slot)
+        danmakuOverlay?.show(slot)
+    })
+  }
+  else {
+    danmakuOverlay?.hide()
+  }
 }
 
 /**
@@ -114,59 +123,61 @@ function stopDanmakuWatch(): void {
 }
 
 function watchDanmakuArrival(): void {
-  if (danmakuObserver || danmakuRestore)
+  if (danmakuObserver || danmakuOverlay)
     return
   danmakuObserver = new MutationObserver(() => {
-    if (danmakuRestore || !danmakuSlotRef.value) {
+    if (danmakuOverlay || !danmakuSlotRef.value) {
       stopDanmakuWatch()
       return
     }
     if (findDanmakuWrap())
-      void mountDanmaku()
+      void ensureDanmakuOverlay()
   })
   danmakuObserver.observe(document.body, { childList: true, subtree: true })
 }
 
-async function mountDanmaku(): Promise<void> {
+/**
+ * 第 133 轮（路线 A）：改成**不搬 DOM**，只把弹幕列表用 fixed 定位覆盖到 slot 上。
+ *
+ * 搬 DOM 的五轮（128~132）已经证明走不通：better-scroll 虚拟列表在换父级后
+ * 尺寸算成 257184px、偏移 1761px，整个列表被顶到视口外，纯 CSS 压不住。
+ * 现在节点留在原位，只把它的**可视位置**搬过来，B 站的尺寸计算环境不变。
+ */
+async function ensureDanmakuOverlay(): Promise<boolean> {
   const dbg = (reason: string): void => {
     document.documentElement.dataset.bewlyDanmakuMove = reason
   }
-  if (danmakuRestore) {
-    dbg('skip:already-moved')
-    return
+  if (danmakuOverlay) {
+    dbg('ready')
+    return true
   }
   await nextTick()
-  const slot = danmakuSlotRef.value
-  if (!slot) {
-    dbg('skip:no-slot')
-    return
-  }
-  dbg(`trying(try=${danmakuRetryCount})`)
-  const moved = await moveDanmakuInto(slot)
-  if (!moved) {
-    // 第 129 轮：页面上的弹幕容器经常比评论区晚几百毫秒才渲染，
-    // 一次失败就判 missing 会让用户永远看不到弹幕 tab —— 这里退避重试。
+  const created = createDanmakuOverlay()
+  if (!created) {
     dbg(`not-found(try=${danmakuRetryCount})`)
-    // 先挂 MutationObserver（容器一出现就搬），再补一层定时重试兜底
     watchDanmakuArrival()
     if (danmakuRetryCount < DANMAKU_RETRY_MAX) {
       danmakuRetryCount += 1
       danmakuRetryTimer = window.setTimeout(() => {
         danmakuRetryTimer = null
-        void mountDanmaku()
+        void ensureDanmakuOverlay().then((ok) => {
+          if (ok && panel.value === 'danmaku')
+            danmakuOverlay?.show(danmakuSlotRef.value as HTMLElement)
+        })
       }, DANMAKU_RETRY_INTERVAL)
     }
     else {
       stopDanmakuWatch()
       danmakuState.value = 'missing'
     }
-    return
+    return false
   }
   danmakuRetryCount = 0
   stopDanmakuWatch()
-  danmakuRestore = moved.restore
+  danmakuOverlay = created
   danmakuState.value = 'moved'
-  dbg('moved:ok')
+  dbg('overlay-ready')
+  return true
 }
 
 const skeletonCount = computed(() => props.skeletonCount ?? 5)
@@ -286,18 +297,23 @@ onMounted(async () => {
   if (!items.value.length)
     await loadPage(1)
   connectObserver()
-  // 第 129 轮：**挂载就搬**弹幕列表。
-  // 原来只在「切到弹幕 tab」时才搬 → 停在「评论」tab 时页面下方仍留着一条独立的
-  // 「弹幕列表 ▾」折叠条（用户明确反馈「弹幕列表还没有集成为标签页」）。
-  await mountDanmaku()
+  // 第 133 轮：挂载时只**准备好**覆盖层（找到弹幕容器就行），不搬 DOM、不显示。
+  // 真正显示发生在用户切到「弹幕」标签时（overlay.show(slot)）。
+  if (panel.value === 'danmaku') {
+    await ensureDanmakuOverlay().then((ok) => {
+      const slot = danmakuSlotRef.value
+      if (ok && slot)
+        danmakuOverlay?.show(slot)
+    })
+  }
 })
 
 onBeforeUnmount(() => {
   observer?.disconnect()
   observer = null
   stopDanmakuWatch()
-  danmakuRestore?.()
-  danmakuRestore = null
+  danmakuOverlay?.destroy()
+  danmakuOverlay = null
 })
 
 watch(() => props.aid, async () => {
@@ -491,6 +507,11 @@ defineExpose({
   flex: 1 1 auto;
   flex-direction: column;
   width: 100%;
+  /* 第 133 轮：必须占满父级高度。
+     原来只写 flex: 1 1 auto，切到「弹幕」标签后 .bcd-list__body 被 v-show 隐藏，
+     整个 .bcd-list 塌成 22px（只剩 tab 栏），弹幕面板的 flex 剩余高度就是 0，
+     fixed 覆盖层被定位成 0 高（真机 panel: 820x0）。 */
+  height: 100%;
   min-height: 0;
 }
 
@@ -681,17 +702,22 @@ defineExpose({
   flex: 1 1 auto;
   flex-direction: column;
   gap: 8px;
-  min-height: 0;
+  min-height: 320px;
   padding: 8px 12px 12px;
   overflow: hidden;
 }
 
+/*
+ * 第 133 轮：slot 里放的是 **fixed 定位的覆盖层**（不占文档流），
+ * 所以 slot 自己的高度不能靠内容撑 —— 必须显式给一个最小高度，
+ * 否则 panel → slot 的 flex 链会算出 0，覆盖层也就被定位成 0 高（真机踩过）。
+ */
 .bcd-danmaku-slot {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  min-height: 0;
-  overflow-y: auto;
+  min-height: 320px;
+  overflow: hidden;
   border-radius: var(--bew-radius-sm, 8px);
   background: var(--bew-fill-1);
 }

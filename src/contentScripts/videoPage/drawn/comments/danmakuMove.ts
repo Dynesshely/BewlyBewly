@@ -221,3 +221,114 @@ export async function moveDanmakuInto(container: HTMLElement): Promise<MovedDanm
     },
   }
 }
+
+/**
+ * 路线 A（第 133 轮）：**不搬 DOM**，只在切到「弹幕」标签时把弹幕列表
+ * 用 `position: fixed` 定位到评论区里那块 slot 的位置和尺寸。
+ *
+ * # 为什么放弃搬 DOM
+ *
+ * 第 128~132 轮试过把 `.bui-collapse-wrap` 整块 append 进 `.bcd-danmaku-slot`：
+ * 数据能加载出来（960 万字符 / 10707 行），但 better-scroll 的虚拟列表在换父级后
+ * 尺寸算成 **257184px 高、整体偏移 top=1761px**，直接被顶到视口外，纯 CSS 压不住
+ * （ul 的 transform 是单位矩阵，偏移来自父级布局）。
+ *
+ * 所以改为：**节点留在原位不动**，只把它的可视区域「搬」到 tab 里 ——
+ * 用 fixed 定位覆盖到 slot 上。这样 B 站的尺寸计算环境完全不变。
+ */
+export interface DanmakuOverlay {
+  /** 把弹幕列表定位到 target 元素的位置上并显示 */
+  show: (target: HTMLElement) => void
+  /** 从 target 位置撤走，恢复原位 */
+  hide: () => void
+  /** 彻底清理（卸载时调用） */
+  destroy: () => void
+}
+
+const OVERLAY_ATTR = 'data-bewly-danmaku-overlay'
+
+export function createDanmakuOverlay(): DanmakuOverlay | null {
+  const wrap = findDanmakuWrap()
+  if (!wrap)
+    return null
+
+  // 定位用的外层：正常状态下它不占位、不影响 B 站布局
+  const anchor = wrap.parentElement
+  const anchorStyle = anchor?.getAttribute('style') ?? null
+
+  let shown = false
+  const prevStyle = {
+    position: wrap.style.getPropertyValue('position'),
+    top: wrap.style.getPropertyValue('top'),
+    left: wrap.style.getPropertyValue('left'),
+    width: wrap.style.getPropertyValue('width'),
+    height: wrap.style.getPropertyValue('height'),
+    zIndex: wrap.style.getPropertyValue('z-index'),
+  }
+
+  const sync = (target: HTMLElement): void => {
+    const r = target.getBoundingClientRect()
+    wrap.style.setProperty('position', 'fixed', 'important')
+    wrap.style.setProperty('left', `${Math.round(r.left)}px`, 'important')
+    wrap.style.setProperty('top', `${Math.round(r.top)}px`, 'important')
+    wrap.style.setProperty('width', `${Math.round(r.width)}px`, 'important')
+    wrap.style.setProperty('height', `${Math.round(r.height)}px`, 'important')
+    wrap.style.setProperty('z-index', '2147480000', 'important')
+    wrap.setAttribute(OVERLAY_ATTR, '')
+  }
+
+  let raf = 0
+  let target: HTMLElement | null = null
+  const loop = (): void => {
+    if (!shown || !target)
+      return
+    sync(target)
+    raf = window.requestAnimationFrame(loop)
+  }
+
+  return {
+    show: (slot: HTMLElement) => {
+      if (!wrap.isConnected)
+        return
+      target = slot
+      shown = true
+      // 先展开，否则 fixed 上去是空白的折叠条
+      expandDanmaku(wrap)
+      sync(slot)
+      raf = window.requestAnimationFrame(loop)
+    },
+    hide: () => {
+      shown = false
+      target = null
+      if (raf) {
+        window.cancelAnimationFrame(raf)
+        raf = 0
+      }
+      wrap.removeAttribute(OVERLAY_ATTR)
+      wrap.style.setProperty('position', prevStyle.position || 'static', 'important')
+      const restoreList: Array<[string, string]> = [
+        ['top', prevStyle.top],
+        ['left', prevStyle.left],
+        ['width', prevStyle.width],
+        ['height', prevStyle.height],
+        ['z-index', prevStyle.zIndex],
+      ]
+      for (const [key, value] of restoreList) {
+        if (value)
+          wrap.style.setProperty(key, value, 'important')
+        else
+          wrap.style.removeProperty(key)
+      }
+    },
+    destroy: () => {
+      if (raf) {
+        window.cancelAnimationFrame(raf)
+        raf = 0
+      }
+      wrap.removeAttribute(OVERLAY_ATTR)
+      wrap.removeAttribute('style')
+      if (anchor && anchorStyle !== null)
+        anchor.setAttribute('style', anchorStyle)
+    },
+  }
+}

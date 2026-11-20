@@ -214,7 +214,10 @@ function ensureUpCardStyle(): void {
   const style = document.createElement('style')
   style.id = UP_CARD_STYLE_ID
   style.textContent = [
-    '#bewly-up-card{display:flex;gap:12px;align-items:center;padding:12px 14px !important;border-radius:var(--bew-radius-md,12px);',
+    // 第 129 轮：**不叠 padding**。外层 `.up-panel-container` 已经有 padding（见 videoPage.scss），
+    // 这里再写 12/14 就变成双层内边距 → 卡片被撑到 128px 高、内容上下留白不均
+    // （用户反馈「创作者卡片区域仍然有问题」）。
+    '#bewly-up-card{display:flex;gap:12px;align-items:center;padding:0 !important;border-radius:0;',
     'background:var(--bew-elevated,#fff);box-shadow:var(--bew-shadow-1);}',
     '#bewly-up-card .bvp-up__avatar{display:grid;flex:0 0 auto;place-items:center;width:48px;height:48px;',
     'overflow:hidden;font-size:16px;font-weight:600;color:#fff;background:var(--bew-theme-color,#00aeec);border-radius:50%;}',

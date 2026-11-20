@@ -113,6 +113,15 @@ function onKeydown(event: KeyboardEvent): void {
  * 加 `position: sticky; bottom: 0` 做双保险：外层是滚动容器时贴底，
  * 外层不是时退化成普通流式块，不会破坏布局。
  */
+/*
+ * 第 129 轮：与评论区四周对齐。
+ *
+ * 原来发送区**左右撑满** `#bewly-comment-drawn`，而评论列表有 `padding: 0 12px`，
+ * 于是发送框比评论宽出 14px（用户反馈「评论编辑区域与评论区四周贴合有问题」）。
+ * 这里补 `margin-inline`，让输入框的左右边缘与评论正文对齐；
+ * 背景同时换成**不透明**的 `--bew-bg`（深色下 `--bew-elevated` 可能带透明度，
+ * 会让下面滚过去的评论透出来）。
+ */
 .bcd-compose {
   position: sticky;
   bottom: 0;
@@ -121,8 +130,9 @@ function onKeydown(event: KeyboardEvent): void {
   flex: 0 0 auto;
   flex-direction: column;
   gap: 6px;
-  padding: 8px 12px 10px;
-  background: var(--bew-elevated, var(--bew-bg));
+  margin: 0 12px;
+  padding: 8px 0 10px;
+  background: var(--bew-bg, #fff);
   border-top: 1px solid var(--bew-fill-1);
   backdrop-filter: var(--bew-filter-force-dark, none);
 }

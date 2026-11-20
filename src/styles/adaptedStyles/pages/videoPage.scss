@@ -796,7 +796,8 @@
   /* ---------- 作者卡（UP 主信息） ---------- */
   .up-panel-container {
     box-sizing: border-box;
-    padding: 8px;
+    /* 第 129 轮：内边距统一由这一层承担（12px），内层 #bewly-up-card 不再叠 padding */
+    padding: 12px 14px;
     background: var(--bew-fill-1);
     border: 1px solid var(--bew-border-color);
     border-radius: 12px;

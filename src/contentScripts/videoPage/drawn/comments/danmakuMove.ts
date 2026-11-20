@@ -20,10 +20,13 @@
 
 /** 候选选择器（B 站改版时按顺序退让） */
 const DANMAKU_WRAP_SELECTORS = [
-  '.video-pod-above-modules .bpx-player-collapse .bui-collapse-wrap',
-  '#danmukuBox .bpx-player-collapse .bui-collapse-wrap',
+  // 真机实测（2026-11-20）：新版结构里 wrap 的父级是 `.bui-area`，
+  // 不再是 `.bpx-player-collapse` —— 所以这里**不能写死中间层**，
+  // 用「祖先链里出现 danmukuBox / video-pod-above-modules」来判定。
+  '.video-pod-above-modules .bui-collapse-wrap',
   '#danmukuBox .bui-collapse-wrap',
   '.danmaku-box .bui-collapse-wrap',
+  '.danmaku-wrap .bui-collapse-wrap',
 ] as const
 
 const FOLDED_CLASS = 'bui-collapse-wrap-folded'
@@ -38,6 +41,13 @@ export function findDanmakuWrap(): HTMLElement | null {
   for (const selector of DANMAKU_WRAP_SELECTORS) {
     const el = document.querySelector<HTMLElement>(selector)
     if (el)
+      return el
+  }
+  // 兜底：按「折叠条文案包含弹幕」找 —— B 站改版时这条通常还能命中
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>('.bui-collapse-wrap'))) {
+    const header = el.querySelector<HTMLElement>('.bui-collapse-header')
+    const text = (header?.textContent ?? '').replace(/\s+/g, '')
+    if (text.includes('弹幕'))
       return el
   }
   return null

@@ -88,19 +88,36 @@ function switchPanel(next: MainPanel): void {
     void mountDanmaku()
 }
 
+/** 重试定时器（弹幕容器可能比评论区晚渲染） */
+let danmakuRetryTimer: number | null = null
+let danmakuRetryCount = 0
+const DANMAKU_RETRY_MAX = 20
+const DANMAKU_RETRY_INTERVAL = 500
+
 async function mountDanmaku(): Promise<void> {
-  if (danmakuRestore || !danmakuSlotRef.value)
+  if (danmakuRestore)
     return
-  // 等一拍让 v-if 渲染出 slot 容器
   await nextTick()
   const slot = danmakuSlotRef.value
   if (!slot)
     return
   const moved = moveDanmakuInto(slot)
   if (!moved) {
-    danmakuState.value = 'missing'
+    // 第 129 轮：页面上的弹幕容器经常比评论区晚几百毫秒才渲染，
+    // 一次失败就判 missing 会让用户永远看不到弹幕 tab —— 这里退避重试。
+    if (danmakuRetryCount < DANMAKU_RETRY_MAX) {
+      danmakuRetryCount += 1
+      danmakuRetryTimer = window.setTimeout(() => {
+        danmakuRetryTimer = null
+        void mountDanmaku()
+      }, DANMAKU_RETRY_INTERVAL)
+    }
+    else {
+      danmakuState.value = 'missing'
+    }
     return
   }
+  danmakuRetryCount = 0
   danmakuRestore = moved.restore
   danmakuState.value = 'moved'
 }
@@ -222,11 +239,21 @@ onMounted(async () => {
   if (!items.value.length)
     await loadPage(1)
   connectObserver()
+  // 第 129 轮：**挂载就搬**弹幕列表。
+  // 原来只在「切到弹幕 tab」时才搬 → 停在「评论」tab 时页面下方仍留着一条独立的
+  // 「弹幕列表 ▾」折叠条（用户明确反馈「弹幕列表还没有集成为标签页」）。
+  await mountDanmaku()
 })
 
 onBeforeUnmount(() => {
   observer?.disconnect()
   observer = null
+  if (danmakuRetryTimer !== null) {
+    window.clearTimeout(danmakuRetryTimer)
+    danmakuRetryTimer = null
+  }
+  danmakuRestore?.()
+  danmakuRestore = null
 })
 
 watch(() => props.aid, async () => {
@@ -401,6 +428,7 @@ defineExpose({
     </div>
 
     <!-- 弹幕面板（第 128 轮）：原生弹幕列表整块搬进 `.bcd-danmaku-slot` -->
+    <!-- v-show 而非 v-if：slot 必须一直在 DOM 里，mountDanmaku 在挂载时就要能塞进去 -->
     <div v-show="panel === 'danmaku'" class="bcd-danmaku-panel">
       <div ref="danmakuSlotRef" class="bcd-danmaku-slot" />
       <p v-if="danmakuState === 'missing'" class="bcd-list__state-text">

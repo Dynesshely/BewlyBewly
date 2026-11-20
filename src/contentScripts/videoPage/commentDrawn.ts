@@ -317,6 +317,11 @@ function ensureLayoutStyle(): HTMLStyleElement {
   const css = [
     `${NATIVE_APP_SELECTOR} { display: flex !important; flex-direction: column; }`,
     `#${COMMENT_DRAWN_ID} { display: flex; flex: 1 1 auto; flex-direction: column; width: 100%; min-height: 0; }`,
+    // ⚠️ 第 134 轮：Vue 会在 `#bewly-comment-drawn` 和 `.bcd-list` 之间插一层**匿名 div**，
+    // 它默认 height:auto / display:block → `.bcd-list` 的 height:100% 只能拿到 0，
+    // 整块塌到 tab 栏那 22px（真机实测：匿名 div h=22、.bcd-list h=22、
+    // #bewly-comment-drawn h=780）。这里把包装层显式撑满。
+    `#${COMMENT_DRAWN_ID} > div { display: flex !important; flex: 1 1 auto !important; flex-direction: column !important; width: 100% !important; min-height: 0 !important; }`,
   ].join('\n')
   return injectCSS(css, document.head)
 }

@@ -15,7 +15,7 @@ import type { CommentItem, CommentSort } from './types'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import CommentComposer from './CommentComposer.vue'
 import CommentThread from './CommentThread.vue'
-import { moveDanmakuInto } from './danmakuMove'
+import { findDanmakuWrap, moveDanmakuInto } from './danmakuMove'
 import { fetchComments } from './fetcher'
 import { fillTemplate, useCommentDrawnI18n } from './i18n'
 import { formatCount } from './utils'
@@ -88,23 +88,67 @@ function switchPanel(next: MainPanel): void {
     void mountDanmaku()
 }
 
-/** 重试定时器（弹幕容器可能比评论区晚渲染） */
+/**
+ * 重试 + DOM 观察（第 130 轮）。
+ *
+ * 真机诊断：`dataset.bewlyDanmakuMove` 停在 `not-found(try=20)` ——
+ * 20 × 500ms = 10 秒内 `findDanmakuWrap()` 一直返回 null，
+ * 但 30 秒后手动查同一批选择器**全部命中**。
+ * 结论：弹幕容器比评论区晚很多才渲染（B 站在右列搬完 / 懒加载之后才插入），
+ * 纯定时重试的窗口不够，而且固定轮询也不优雅。
+ * 改成 **MutationObserver 监听 body 子树**：容器一出现就立刻搬，最多观察 90 秒。
+ */
 let danmakuRetryTimer: number | null = null
+let danmakuObserver: MutationObserver | null = null
 let danmakuRetryCount = 0
-const DANMAKU_RETRY_MAX = 20
-const DANMAKU_RETRY_INTERVAL = 500
+const DANMAKU_RETRY_MAX = 90
+const DANMAKU_RETRY_INTERVAL = 1000
+
+function stopDanmakuWatch(): void {
+  if (danmakuRetryTimer !== null) {
+    window.clearTimeout(danmakuRetryTimer)
+    danmakuRetryTimer = null
+  }
+  danmakuObserver?.disconnect()
+  danmakuObserver = null
+}
+
+function watchDanmakuArrival(): void {
+  if (danmakuObserver || danmakuRestore)
+    return
+  danmakuObserver = new MutationObserver(() => {
+    if (danmakuRestore || !danmakuSlotRef.value) {
+      stopDanmakuWatch()
+      return
+    }
+    if (findDanmakuWrap())
+      void mountDanmaku()
+  })
+  danmakuObserver.observe(document.body, { childList: true, subtree: true })
+}
 
 async function mountDanmaku(): Promise<void> {
-  if (danmakuRestore)
+  const dbg = (reason: string): void => {
+    document.documentElement.dataset.bewlyDanmakuMove = reason
+  }
+  if (danmakuRestore) {
+    dbg('skip:already-moved')
     return
+  }
   await nextTick()
   const slot = danmakuSlotRef.value
-  if (!slot)
+  if (!slot) {
+    dbg('skip:no-slot')
     return
+  }
+  dbg(`trying(try=${danmakuRetryCount})`)
   const moved = moveDanmakuInto(slot)
   if (!moved) {
     // 第 129 轮：页面上的弹幕容器经常比评论区晚几百毫秒才渲染，
     // 一次失败就判 missing 会让用户永远看不到弹幕 tab —— 这里退避重试。
+    dbg(`not-found(try=${danmakuRetryCount})`)
+    // 先挂 MutationObserver（容器一出现就搬），再补一层定时重试兜底
+    watchDanmakuArrival()
     if (danmakuRetryCount < DANMAKU_RETRY_MAX) {
       danmakuRetryCount += 1
       danmakuRetryTimer = window.setTimeout(() => {
@@ -113,13 +157,16 @@ async function mountDanmaku(): Promise<void> {
       }, DANMAKU_RETRY_INTERVAL)
     }
     else {
+      stopDanmakuWatch()
       danmakuState.value = 'missing'
     }
     return
   }
   danmakuRetryCount = 0
+  stopDanmakuWatch()
   danmakuRestore = moved.restore
   danmakuState.value = 'moved'
+  dbg('moved:ok')
 }
 
 const skeletonCount = computed(() => props.skeletonCount ?? 5)
@@ -248,10 +295,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   observer?.disconnect()
   observer = null
-  if (danmakuRetryTimer !== null) {
-    window.clearTimeout(danmakuRetryTimer)
-    danmakuRetryTimer = null
-  }
+  stopDanmakuWatch()
   danmakuRestore?.()
   danmakuRestore = null
 })

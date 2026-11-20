@@ -53,25 +53,48 @@ export function findDanmakuWrap(): HTMLElement | null {
   return null
 }
 
-/** 展开折叠容器，触发懒加载 */
+/**
+ * 展开折叠容器，触发懒加载。
+ *
+ * ⚠️ 第 130 轮：**不能只在 `folded` 时展开**。
+ * 真机踩到的顺序是：B 站先把 wrap 渲染成「已展开但 body 还没填充」的中间态，
+ * 我们搬走时 `folded` 类已经不在 → 跳过展开 → body 高度 0 → 懒加载永不触发，
+ * 搬到 tab 里只有几百字符的「弹幕列表 / 屏蔽设定」骨架文案。
+ * 所以这里**无条件**点一次 header（点开→点回，净效果是展开并触发加载），
+ * 再清掉 body 上可能存在的内联尺寸限制。
+ */
 export function expandDanmaku(wrap: HTMLElement): void {
-  if (wrap.classList.contains(FOLDED_CLASS)) {
-    const header = wrap.querySelector<HTMLElement>('.bui-collapse-header')
-    if (header) {
-      try {
-        header.click()
-      }
-      catch {
-        // 某些版本 header 是 div 但绑了自定义事件，click 失败就退回去掉类
-      }
-    }
-    wrap.classList.remove(FOLDED_CLASS)
-  }
-  // 有的版本用一个 inline height:0 / display:none 控制 body
+  const header = wrap.querySelector<HTMLElement>('.bui-collapse-header')
   const body = wrap.querySelector<HTMLElement>('.bui-collapse-body')
+
+  /**
+   * ⚠️ 第 130 轮：header.click() 是 **toggle**，多次调用会互相抵消。
+   * 真机踩过：延迟补点 3 次（1s/2s/4s）→ body 高度最后变成 **0**（被点回折叠态）。
+   * 所以这里改成**幂等**：只在「当前是折叠态」时点一次，点完再检查 body，
+   * 高度还是 0 就再点一次；绝不无条件连点。
+   */
+  // ⚠️ 判定**只认 folded 类**，不能用「body 高度 < 8」——
+  // 弹幕列表展开后如果数据没填充（B 站加载器在节点被搬走后不工作），body 高度本来就是 0，
+  // 用高度判折叠会导致每次重试都点一下、反复 toggle，最终停在折叠态（真机验证过）。
+  if (header && wrap.classList.contains(FOLDED_CLASS)) {
+    try {
+      header.click()
+    }
+    catch {
+      // header 绑的是自定义事件时 click 可能抛错，退回去掉类
+    }
+  }
+  wrap.classList.remove(FOLDED_CLASS)
+
+  // 清掉 body 上可能存在的内联尺寸限制
   if (body) {
     body.style.removeProperty('height')
     body.style.removeProperty('display')
+  }
+  const dmWrap = wrap.querySelector<HTMLElement>('.bpx-player-dm-wrap')
+  if (dmWrap) {
+    dmWrap.style.removeProperty('display')
+    dmWrap.style.removeProperty('height')
   }
 }
 

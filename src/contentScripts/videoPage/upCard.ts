@@ -214,20 +214,20 @@ function ensureUpCardStyle(): void {
   const style = document.createElement('style')
   style.id = UP_CARD_STYLE_ID
   style.textContent = [
-    '#bewly-up-card{display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:12px;',
+    '#bewly-up-card{display:flex;gap:12px;align-items:center;padding:12px 14px !important;border-radius:var(--bew-radius-md,12px);',
     'background:var(--bew-elevated,#fff);box-shadow:var(--bew-shadow-1);}',
-    '#bewly-up-card .bvp-up__avatar{display:grid;flex:0 0 auto;place-items:center;width:44px;height:44px;',
+    '#bewly-up-card .bvp-up__avatar{display:grid;flex:0 0 auto;place-items:center;width:48px;height:48px;',
     'overflow:hidden;font-size:16px;font-weight:600;color:#fff;background:var(--bew-theme-color,#00aeec);border-radius:50%;}',
     '#bewly-up-card .bvp-up__avatar img{display:block;width:100%;height:100%;object-fit:cover;border-radius:50%;}',
     // info 是唯一的弹性项：给 min-width:0 才能让子级 ellipsis 生效
     '#bewly-up-card .bvp-up__info{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px;}',
     '#bewly-up-card .bvp-up__name-row{display:flex;gap:6px;align-items:center;min-width:0;}',
-    '#bewly-up-card .bvp-up__name{overflow:hidden;font-size:14px;font-weight:600;color:var(--bew-text-1);',
+    '#bewly-up-card .bvp-up__name{overflow:hidden;font-size:var(--bew-fs-card-title,16.65px);font-weight:600;',
     'text-decoration:none;text-overflow:ellipsis;white-space:nowrap;}',
     // 签名：**强制单行**（用户要求「尽量显示一整行」），超长才 ellipsis
     '#bewly-up-card .bvp-up__desc{overflow:hidden;font-size:12px;line-height:1.5;color:var(--bew-text-3);',
     'text-overflow:ellipsis;white-space:nowrap;}',
-    '#bewly-up-card .bvp-up__actions{display:flex;flex:0 0 auto;gap:6px;align-items:center;}',
+    '#bewly-up-card .bvp-up__actions{display:flex;flex:0 0 auto;gap:8px;align-items:center;}',
     '#bewly-up-card .bvp-up__btn{display:inline-flex;gap:4px;align-items:center;justify-content:center;',
     'min-width:28px;height:28px;padding:0 8px;font-size:12px;line-height:1;color:#fff;cursor:pointer;',
     'background:var(--bew-theme-color,#00aeec);border:0;border-radius:14px;}',

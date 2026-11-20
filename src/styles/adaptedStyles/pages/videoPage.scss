@@ -3938,6 +3938,25 @@ html.bewly-design.videoPage.bewly-video-fixed #viewbox_report {
    容器高度（标签 28px / UP 卡由内容撑）仍由既有 CSS 决定，fixedLayout 的
    measureDockBlocks() 量到的仍是同一个左列子元素 → 高度预算不变。
    颜色 / 字号 / 圆角全部复用既有 token，不造新的一套。 */
+/**
+ * 第 127 轮：标签行靠左。
+ *
+ * 隐藏原生标签时（tagsBar.ts 的 hideNativeTagLinks）只给内部的 `a.tag-link`
+ * 加了行内 display:none，**外层的 .tag 空壳仍然占宽** —— 真机 1280 视口下
+ * 11 个空壳合计 160px，把自绘条 #bewly-tags-bar 从应有的 32px 推到 **192px**，
+ * 用户看到的就是「标签行居中 / 偏右」。
+ *
+ * 这里把「不含话题链接的空壳」整块 display:none（话题 .topic-link 保留可见），
+ * 空的 shell 不再占位，自绘条自然贴左。
+ */
+html.bewly-design.videoPage .video-tag-container .tag-panel {
+  justify-content: flex-start !important;
+}
+
+html.bewly-design.videoPage .video-tag-container .tag-panel > .tag:not(:has(.topic-link)) {
+  display: none !important;
+}
+
 #bewly-tags-bar {
   display: flex;
   flex: 1 1 auto;

@@ -14,7 +14,12 @@ const TAGS_BAR_ID = 'bewly-tags-bar'
  */
 const TAG_PANEL_SELECTOR = '.tag-panel'
 const TAG_CONTAINER_FALLBACK = '.video-tag-container'
-const NATIVE_TAG_LINK_SELECTOR = 'a.tag-link'
+/**
+ * 原生标签链接。**排除话题**（.topic-link）—— 第 127 轮：
+ * 用户要求「Topics 靠左」，也就是**话题要看得见**；
+ * 原来把它一起行内隐藏了，导致话题变成 0×0 的幽灵块。
+ */
+const NATIVE_TAG_LINK_SELECTOR = 'a.tag-link:not(.topic-link)'
 
 /** page-world 桥推送的标签（bvid 感知） */
 let bridgedTags: string[] = []
